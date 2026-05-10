@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+changed_files=$(git diff --cached --name-only --diff-filter=ACMR)
+
+case "$changed_files" in
+  *".swift"*|*".swiftlint.yml"*)
+    ./scripts/lint.sh
+    ;;
+esac
