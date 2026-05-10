@@ -1,0 +1,59 @@
+## Keep Guidance Current
+
+- Keep `AGENTS.md` information concise to minimize token usage.
+- Keep `AGENTS.md` accurate when changes create useful future-agent context.
+- Put new rules in the narrowest `AGENTS.md` that covers the affected files.
+- Categorize bullets inside of `AGENTS.md` files with their own sections, if there are enough points; split dense rules into short sub-bullets with bold imperative leads.
+- Call out oversized guidance files or sections that should be split.
+- When adding a nested `AGENTS.md`, also add sibling `CLAUDE.md` as `ln -s AGENTS.md CLAUDE.md`, then list the new scope below.
+- Update `README.md` plus scoped guidance when dependencies, project structure, or lint rules change.
+
+## Scoped Guidance
+
+Read the nearest `AGENTS.md` before editing. Current scopes:
+
+- `AGENTS.md`: repo-wide workflow.
+- `.agents/AGENTS.md`: repo-local agent skills.
+
+## Build And Test
+
+- First-time setup: `./scripts/setup.sh`.
+- Build: `./scripts/build.sh`.
+- Run the demo app: `./scripts/run-demo.sh`.
+- Test: `./scripts/test.sh`, or pass focused identifiers as arguments when supported.
+- Lint: `./scripts/lint.sh`.
+- Ordered workflows must stay serial, never via `multi_tool_use.parallel`: build-then-run, build-then-test, lint-then-commit.
+- Add temporary logs early when useful; observe them yourself, then remove them after confirming the fix.
+
+### `xcsift` Output
+
+- Build/test wrappers should pipe `xcodebuild` through `xcsift -f toon -w` when installed; treat TOON `status` and `summary` as the concise result. `status` is generally `success` or `failed`.
+- `summary:` contains indented count fields such as `errors`, `warnings`, `failed_tests`, and `linker_errors`; it can also include `passed_tests`, `build_time`, `test_time`, and `coverage_percent`.
+- Inspect TOON sections such as `errors[n]{file,line,message}`, `warnings[n]{file,line,message,type}`, `failed_tests`, `linker_errors`, `slow_tests`, `flaky_tests`, `build_info`, and `executables` when present.
+- In `errors[n]{file,line,message}` rows, values are ordered as file path, line number, and quoted message.
+- In `warnings[n]{file,line,message,type}` rows, values are ordered as file path, line number, quoted message, and warning type such as `compile` or `swiftui`.
+- `linker_errors` entries include `symbol`, `architecture`, `referenced_from`, `message`, and `conflicting_files`; duplicate symbol failures list object paths in `conflicting_files`.
+- `failed_tests` entries include `test`, `message`, `file`, `line`, and `duration`; `slow_tests` entries include `test` and `duration`; `flaky_tests` is a list of test names.
+- `build_info` can include `targets[n]{name,duration,phases,depends_on}` rows with per-target timing, phases, and dependencies.
+- `executables[n]{path,name,target}` lists built artifacts with their path, name, and target.
+
+## Lint
+
+- Use SwiftLint from the repo root without `--config` so nested configs apply.
+- Install repo hooks with `./scripts/setup.sh`.
+- New Swift should follow `.swiftlint.yml`: no force unwraps outside tests, no force casts, prefer `let`, max line length 150.
+- If a change introduces lint warnings or errors, tell the user before committing.
+
+## Code Style
+
+- Put private types below public types.
+- Add concise comments only where they help future readers.
+- Search for same-type companion files before editing behavior.
+- Split large types into focused companions like `Type+Feature.swift`.
+
+## Commits
+
+When creating commits, use an appropriate trailer in the message.
+
+- If you are Claude: `Co-authored-by: Claude <noreply@anthropic.com>`
+- If you are Codex: `Co-authored-by: Codex <noreply@openai.com>`
