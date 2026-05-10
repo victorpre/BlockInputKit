@@ -96,8 +96,12 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         guard let sourceIndex = index(of: blockID) else {
             return nil
         }
+        let finalTargetIndex = min(max(targetIndex, 0), blocks.count - 1)
+        guard finalTargetIndex != sourceIndex else {
+            return nil
+        }
         let block = blocks.remove(at: sourceIndex)
-        blocks.insert(block, at: min(max(targetIndex, 0), blocks.count))
+        blocks.insert(block, at: finalTargetIndex)
         return .blocks([block.id])
     }
 
@@ -115,6 +119,9 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         guard let index = index(of: blockID) else {
             return nil
         }
+        guard blocks[index].indentationLevel > 0 else {
+            return nil
+        }
         blocks[index].indentationLevel = max(0, blocks[index].indentationLevel - 1)
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: blocks[index].utf16Length))
     }
@@ -125,6 +132,9 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         to kind: BlockInputBlockKind
     ) -> BlockInputSelection? {
         guard let index = index(of: blockID) else {
+            return nil
+        }
+        guard blocks[index].kind != kind else {
             return nil
         }
         blocks[index].kind = kind
@@ -152,6 +162,10 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         currentBlockID: BlockInputBlockID,
         currentSelection: BlockInputSelection?
     ) -> BlockInputSelection? {
+        let allBlockIDs = blocks.map(\.id)
+        if currentSelection == .blocks(allBlockIDs) {
+            return .blocks(allBlockIDs)
+        }
         guard let block = block(withID: currentBlockID) else {
             return nil
         }
@@ -160,7 +174,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
             range: NSRange(location: 0, length: block.utf16Length)
         )
         if currentSelection == .text(fullRange) {
-            return .blocks(blocks.map(\.id))
+            return .blocks(allBlockIDs)
         }
         return .text(fullRange)
     }

@@ -6,8 +6,12 @@ final class DemoAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let editorView = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
-        editorView.wantsLayer = true
-        editorView.layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
+        editorView.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(kind: .paragraph, text: "BlockInputKit demo"),
+            BlockInputBlock(kind: .quote, text: "Each visible block owns its own AppKit text input."),
+            BlockInputBlock(kind: .bulletedListItem, text: "Press Return for a new block"),
+            BlockInputBlock(kind: .checklistItem(isChecked: false), text: "Hover to reveal reorder handles")
+        ])))
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),

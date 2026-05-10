@@ -146,6 +146,42 @@ final class BlockInputDocumentTests: XCTestCase {
         XCTAssertEqual(selection, .blocks([firstID]))
     }
 
+    func testMoveBlockToSameIndexIsNoOp() {
+        let blockID = BlockInputBlockID(rawValue: "only")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Only")
+        ])
+
+        let selection = document.moveBlock(blockID: blockID, to: 0)
+
+        XCTAssertNil(selection)
+        XCTAssertEqual(document.blocks.map(\.id), [blockID])
+    }
+
+    func testOutdentAtRootLevelIsNoOp() {
+        let blockID = BlockInputBlockID(rawValue: "root")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Root", indentationLevel: 0)
+        ])
+
+        let selection = document.outdentBlock(blockID: blockID)
+
+        XCTAssertNil(selection)
+        XCTAssertEqual(document.blocks[0].indentationLevel, 0)
+    }
+
+    func testChangeBlockKindToExistingKindIsNoOp() {
+        let blockID = BlockInputBlockID(rawValue: "paragraph")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .paragraph, text: "Same")
+        ])
+
+        let selection = document.changeBlockKind(blockID: blockID, to: .paragraph)
+
+        XCTAssertNil(selection)
+        XCTAssertEqual(document.blocks[0].kind, .paragraph)
+    }
+
     func testSelectAllEscalatesFromCurrentBlockToAllBlocks() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
@@ -162,5 +198,21 @@ final class BlockInputDocumentTests: XCTestCase {
             range: NSRange(location: 0, length: 5)
         )))
         XCTAssertEqual(secondSelection, .blocks([firstID, secondID]))
+    }
+
+    func testSelectAllKeepsAllBlocksSelectedWhenAlreadyEscalated() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "Hello"),
+            BlockInputBlock(id: secondID, text: "World")
+        ])
+
+        let selection = document.selectAll(
+            currentBlockID: firstID,
+            currentSelection: .blocks([firstID, secondID])
+        )
+
+        XCTAssertEqual(selection, .blocks([firstID, secondID]))
     }
 }
