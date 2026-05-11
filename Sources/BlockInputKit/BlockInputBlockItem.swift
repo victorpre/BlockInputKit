@@ -11,6 +11,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     private var trackingArea: NSTrackingArea?
     private weak var delegate: BlockInputBlockItemDelegate?
     private var blockID: BlockInputBlockID?
+    private var selectionBeforeTextChange: BlockInputSelection?
 
     var currentSelectedRange: NSRange {
         textView.selectedRange()
@@ -29,6 +30,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         super.prepareForReuse()
         blockID = nil
         delegate = nil
+        selectionBeforeTextChange = nil
         textView.string = ""
         handleView.alphaValue = 0
     }
@@ -59,6 +61,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     ) {
         blockID = block.id
         self.delegate = delegate
+        selectionBeforeTextChange = nil
         textView.blockItem = self
         textView.string = block.text
         kindLabel.stringValue = prefix(for: block.kind, indentationLevel: block.indentationLevel)
@@ -73,6 +76,11 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             location: min(max(offset, 0), (textView.string as NSString).length),
             length: 0
         ))
+    }
+
+    func focusText(inUTF16Range range: NSRange) {
+        view.window?.makeFirstResponder(textView)
+        textView.setSelectedRange(range)
     }
 
     func setSelectedRange(_ range: NSRange) {
@@ -90,7 +98,29 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         guard let blockID else {
             return
         }
-        delegate?.blockItem(self, blockID: blockID, didChangeText: textView.string)
+        delegate?.blockItem(
+            self,
+            blockID: blockID,
+            didChangeText: textView.string,
+            selectionBefore: selectionBeforeTextChange
+        )
+        selectionBeforeTextChange = nil
+    }
+
+    func textView(
+        _ textView: NSTextView,
+        shouldChangeTextIn affectedCharRange: NSRange,
+        replacementString: String?
+    ) -> Bool {
+        guard let blockID else {
+            return true
+        }
+        // NSTextView reports the final selection before textDidChange, so capture
+        // the affected pre-edit range here for undo selection restoration.
+        selectionBeforeTextChange = affectedCharRange.length == 0
+            ? .cursor(BlockInputCursor(blockID: blockID, utf16Offset: affectedCharRange.location))
+            : .text(BlockInputTextRange(blockID: blockID, range: affectedCharRange))
+        return true
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {

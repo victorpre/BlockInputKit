@@ -50,6 +50,7 @@ Read the nearest `AGENTS.md` before editing. Current scopes:
 - Add concise comments only where they help future readers.
 - Search for same-type companion files before editing behavior.
 - Split large types into focused companions like `Type+Feature.swift`.
+- Cover AppKit focus/selection changes with mounted-view tests when model-only assertions could miss visible `NSTextView` state.
 
 ## Commits
 

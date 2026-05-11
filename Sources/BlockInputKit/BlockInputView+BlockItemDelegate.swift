@@ -6,7 +6,12 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: offset)), notify: true)
     }
 
-    func blockItem(_ item: BlockInputBlockItem, blockID: BlockInputBlockID, didChangeText text: String) {
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didChangeText text: String,
+        selectionBefore capturedSelectionBefore: BlockInputSelection?
+    ) {
         guard let index = document.index(of: blockID) else {
             return
         }
@@ -14,7 +19,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         guard beforeText != text else {
             return
         }
-        let beforeSelection = selection
+        let beforeSelection = capturedSelectionBefore ?? selection
         document.blocks[index].text = text
         let selectedRange = item.currentSelectedRange
         let afterSelection = BlockInputSelection.cursor(BlockInputCursor(

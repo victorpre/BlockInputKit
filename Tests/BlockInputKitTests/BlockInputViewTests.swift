@@ -192,6 +192,44 @@ final class BlockInputViewTests: XCTestCase {
         XCTAssertNil(view.selection)
     }
 
+    func testFocusEditorPreservesCurrentTextSelection() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])))
+        view.focus(blockID: firstID, utf16Offset: 1)
+        view.applySelection(.text(BlockInputTextRange(
+            blockID: secondID,
+            range: NSRange(location: 0, length: 2)
+        )), notify: false)
+
+        view.focusEditor()
+
+        XCTAssertEqual(view.selection, .text(BlockInputTextRange(
+            blockID: secondID,
+            range: NSRange(location: 0, length: 2)
+        )))
+    }
+
+    func testFocusEditorPreservesCurrentBlockSelection() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])))
+        view.focus(blockID: firstID, utf16Offset: 1)
+        view.applySelection(.blocks([secondID]), notify: false)
+
+        view.focusEditor()
+
+        XCTAssertEqual(view.selection, .blocks([secondID]))
+    }
+
     func testMoveBlockIsIgnoredWhenReorderingIsDisabled() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

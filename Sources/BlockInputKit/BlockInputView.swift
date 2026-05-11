@@ -20,6 +20,8 @@ public final class BlockInputView: NSView {
     private var onSelectionChange: ((BlockInputSelection?) -> Void)?
     private var pendingFocus: BlockInputCursor?
     private var lastFocusedBlockID: BlockInputBlockID?
+    // Avoid re-entering NSWindow first-responder assignment while AppKit is already promoting this view.
+    private var isBecomingFirstResponder = false
 
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -48,13 +50,19 @@ public final class BlockInputView: NSView {
         reloadDataKeepingFocus()
     }
 
-    /// Focuses the editor like a single text field, restoring the best known cursor.
+    /// Focuses the editor like a single text field, preserving valid current selections.
     public func focusEditor() {
+        if let selection, document.containsValidSelection(selection) {
+            restoreVisibleSelection()
+            return
+        }
         let cursor = pendingFocus ?? cursorForRestoredFocus()
         focus(blockID: cursor.blockID, utf16Offset: cursor.utf16Offset)
     }
 
     public override func becomeFirstResponder() -> Bool {
+        isBecomingFirstResponder = true
+        defer { isBecomingFirstResponder = false }
         focusEditor()
         return true
     }
@@ -104,6 +112,48 @@ public final class BlockInputView: NSView {
         return performStructuralEdit(named: "Move Block") { document in
             document.moveBlock(blockID: blockID, to: targetIndex)
         }
+    }
+
+    /// Undoes the most recent text edit in the active block.
+    @discardableResult
+    public func undoTextEditInActiveBlock() -> BlockInputUndoResult? {
+        guard let blockID = activeBlockID,
+              let result = undoController?.undoTextEdit(in: &document, blockID: blockID) else {
+            return nil
+        }
+        applyUndoResult(result)
+        return result
+    }
+
+    /// Redoes the most recent undone text edit in the active block.
+    @discardableResult
+    public func redoTextEditInActiveBlock() -> BlockInputUndoResult? {
+        guard let blockID = activeBlockID,
+              let result = undoController?.redoTextEdit(in: &document, blockID: blockID) else {
+            return nil
+        }
+        applyUndoResult(result)
+        return result
+    }
+
+    /// Undoes the most recent structural edit.
+    @discardableResult
+    public func undoStructuralEdit() -> BlockInputUndoResult? {
+        guard let result = undoController?.undoStructuralEdit(in: &document) else {
+            return nil
+        }
+        applyUndoResult(result)
+        return result
+    }
+
+    /// Redoes the most recent undone structural edit.
+    @discardableResult
+    public func redoStructuralEdit() -> BlockInputUndoResult? {
+        guard let result = undoController?.redoStructuralEdit(in: &document) else {
+            return nil
+        }
+        applyUndoResult(result)
+        return result
     }
 
     private func setupCollectionView() {
@@ -166,14 +216,18 @@ public final class BlockInputView: NSView {
         return BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0)
     }
 
-    private func focusVisibleItem(for cursor: BlockInputCursor) {
-        guard let index = document.index(of: cursor.blockID) else {
-            return
+    private func visibleItem(for blockID: BlockInputBlockID) -> BlockInputBlockItem? {
+        guard let index = document.index(of: blockID) else {
+            return nil
         }
         let indexPath = IndexPath(item: index, section: 0)
         collectionView.scrollToItems(at: [indexPath], scrollPosition: .nearestVerticalEdge)
         collectionView.layoutSubtreeIfNeeded()
-        guard let item = collectionView.item(at: indexPath) as? BlockInputBlockItem else {
+        return collectionView.item(at: indexPath) as? BlockInputBlockItem
+    }
+
+    private func focusVisibleItem(for cursor: BlockInputCursor) {
+        guard let item = visibleItem(for: cursor.blockID) else {
             pendingFocus = cursor
             return
         }
@@ -181,12 +235,45 @@ public final class BlockInputView: NSView {
         pendingFocus = nil
     }
 
+    private func restoreVisibleTextSelection(_ textRange: BlockInputTextRange) {
+        guard let item = visibleItem(for: textRange.blockID) else {
+            return
+        }
+        item.focusText(inUTF16Range: textRange.range)
+    }
+
+    private func restoreVisibleBlockSelection(_ blockIDs: [BlockInputBlockID]) {
+        if let firstBlockID = blockIDs.first {
+            _ = visibleItem(for: firstBlockID)
+        }
+        if !isBecomingFirstResponder, window?.firstResponder !== self {
+            window?.makeFirstResponder(self)
+        }
+    }
+
+    private func restoreVisibleSelection() {
+        switch selection {
+        case let .cursor(cursor):
+            focusVisibleItem(for: cursor)
+        case let .text(textRange):
+            restoreVisibleTextSelection(textRange)
+        case let .blocks(blockIDs):
+            restoreVisibleBlockSelection(blockIDs)
+        case nil:
+            break
+        }
+    }
+
     private func reloadDataKeepingFocus() {
         collectionView.reloadData()
         collectionView.collectionViewLayout?.invalidateLayout()
-        if let cursor = pendingFocus {
+        if selection != nil {
+            // AppKit may recreate items either immediately or on the next pass;
+            // restoring in both places keeps cursor/text selection stable.
+            restoreVisibleSelection()
             DispatchQueue.main.async { [weak self] in
-                self?.focusVisibleItem(for: cursor)
+                self?.collectionView.layoutSubtreeIfNeeded()
+                self?.restoreVisibleSelection()
             }
         }
     }
@@ -205,11 +292,18 @@ public final class BlockInputView: NSView {
 
     func applySelection(_ selection: BlockInputSelection?, notify: Bool) {
         self.selection = selection
-        if case let .cursor(cursor) = selection {
+        switch selection {
+        case let .cursor(cursor):
             lastFocusedBlockID = cursor.blockID
             pendingFocus = cursor
-        } else if case let .text(range) = selection {
+        case let .text(range):
             lastFocusedBlockID = range.blockID
+            pendingFocus = nil
+        case let .blocks(blockIDs):
+            lastFocusedBlockID = blockIDs.first
+            pendingFocus = nil
+        case nil:
+            pendingFocus = nil
         }
         if notify {
             onSelectionChange?(selection)
@@ -245,6 +339,15 @@ public final class BlockInputView: NSView {
         reloadDataKeepingFocus()
         publishDocumentChange()
         return afterSelection
+    }
+
+    private func applyUndoResult(_ result: BlockInputUndoResult) {
+        let restoredSelection = result.selection.flatMap { selection -> BlockInputSelection? in
+            document.containsValidSelection(selection) ? selection : nil
+        }
+        applySelection(restoredSelection, notify: true)
+        reloadDataKeepingFocus()
+        publishDocumentChange()
     }
 }
 
