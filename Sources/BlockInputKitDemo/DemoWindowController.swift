@@ -72,6 +72,7 @@ final class DemoWindowController: NSWindowController {
             makeButton("100k", action: #selector(loadLargeDocument)),
             makeButton("Import", action: #selector(importMarkdown)),
             makeButton("Insert Markdown", action: #selector(insertMarkdown)),
+            makeButton("Insert File", action: #selector(insertFileLink)),
             makeButton("Export", action: #selector(exportMarkdown)),
             makeSeparator(),
             makeButton("Undo Text", action: #selector(undoText)),
@@ -213,6 +214,11 @@ final class DemoWindowController: NSWindowController {
     @objc private func insertMarkdown() {
         let selection = editorView.insertMarkdown(markdownTextView.string)
         updateStatus(for: editorView.document, prefix: selection == nil ? "Markdown insert ignored" : "Inserted Markdown")
+    }
+
+    @objc private func insertFileLink() {
+        let selection = editorView.insertFileURLs([URL(fileURLWithPath: #filePath)])
+        updateStatus(for: editorView.document, prefix: selection == nil ? "File insert ignored" : "Inserted file link")
     }
 
     @objc private func exportMarkdown() {
