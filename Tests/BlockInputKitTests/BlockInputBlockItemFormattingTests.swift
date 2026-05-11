@@ -5,10 +5,14 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     @MainActor
     func testPrefixReflectsBlockKindAndIndentation() {
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .paragraph, indentationLevel: 2), "")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .heading(level: 3), indentationLevel: 0), "###")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .code(language: nil), indentationLevel: 1), " {}")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .horizontalRule, indentationLevel: 0), "---")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .quote, indentationLevel: 2), "  >")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 1), " -")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .numberedListItem(start: 3), indentationLevel: 1), " 3.")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 1), " *")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 2), "  +")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .numberedListItem(start: 3), indentationLevel: 1), " c.")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .numberedListItem(start: 3), indentationLevel: 2), "  iii.")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .checklistItem(isChecked: false), indentationLevel: 1), " [ ]")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .checklistItem(isChecked: true), indentationLevel: 1), " [x]")
     }
@@ -49,6 +53,21 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
         let checkbox = try XCTUnwrap(item.testingChecklistButton)
         XCTAssertTrue(checkbox.isHidden)
         XCTAssertEqual(checkbox.state, .off)
+    }
+
+    @MainActor
+    func testHorizontalRuleUsesNonEditableEmptyTextView() throws {
+        let blockID = BlockInputBlockID(rawValue: "rule")
+        let view = BlockInputView()
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: blockID, kind: .horizontalRule, text: "Hidden"),
+            allowsReordering: true,
+            delegate: view
+        )
+
+        let textView = try XCTUnwrap(item.testingTextView)
+        XCTAssertEqual(textView.string, "")
+        XCTAssertFalse(textView.isEditable)
     }
 
     @MainActor

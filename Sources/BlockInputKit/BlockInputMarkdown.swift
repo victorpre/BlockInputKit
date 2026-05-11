@@ -20,6 +20,18 @@ enum BlockInputMarkdownImporter {
                 continue
             }
 
+            if line.trimmingCharacters(in: .whitespaces) == "---" {
+                blocks.append(BlockInputBlock(kind: .horizontalRule))
+                index += 1
+                continue
+            }
+
+            if let heading = parseHeading(line) {
+                blocks.append(heading)
+                index += 1
+                continue
+            }
+
             if line.hasPrefix(">") {
                 let parsed = parseQuote(lines: lines, startIndex: index)
                 blocks.append(parsed.block)
@@ -84,6 +96,8 @@ enum BlockInputMarkdownImporter {
             let line = lines[index]
             if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                 codeFenceLanguage(in: line) != nil ||
+                line.trimmingCharacters(in: .whitespaces) == "---" ||
+                parseHeading(line) != nil ||
                 line.hasPrefix(">") ||
                 parseListBlock(line) != nil {
                 break
@@ -92,6 +106,16 @@ enum BlockInputMarkdownImporter {
             index += 1
         }
         return (BlockInputBlock(kind: .paragraph, text: content.joined(separator: "\n")), index)
+    }
+
+    private static func parseHeading(_ line: String) -> BlockInputBlock? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let level = trimmed.prefix { $0 == "#" }.count
+        guard (1...6).contains(level),
+              trimmed.dropFirst(level).first == " " else {
+            return nil
+        }
+        return BlockInputBlock(kind: .heading(level: level), text: String(trimmed.dropFirst(level + 1)))
     }
 
     private static func parseListBlock(_ line: String) -> BlockInputBlock? {
@@ -112,7 +136,7 @@ enum BlockInputMarkdownImporter {
                 indentationLevel: indentationLevel
             )
         }
-        if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
+        if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("+ ") {
             return BlockInputBlock(
                 kind: .bulletedListItem,
                 text: String(trimmed.dropFirst(2)),
@@ -160,9 +184,13 @@ enum BlockInputMarkdownSerializer {
         switch block.kind {
         case .paragraph:
             return block.text
+        case .heading(let level):
+            return "\(String(repeating: "#", count: min(max(level, 1), 6))) \(block.text)"
         case .code(let language):
             let fence = "```" + (language ?? "")
             return "\(fence)\n\(block.text)\n```"
+        case .horizontalRule:
+            return "---"
         case .quote:
             return block.text.components(separatedBy: .newlines).map { "> \($0)" }.joined(separator: "\n")
         case .bulletedListItem:

@@ -167,6 +167,57 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
     }
 
     @MainActor
+    func testTypingShortcutPublishesBlockReplacementToStore() throws {
+        let blockID = BlockInputBlockID(rawValue: "heading")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.string = "## Heading"
+        textView.setSelectedRange(NSRange(location: 10, length: 0))
+        store.resetCounts()
+
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertEqual(store.document.blocks[0].kind, .heading(level: 2))
+        XCTAssertEqual(store.document.blocks[0].text, "Heading")
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+    }
+
+    @MainActor
+    func testUnwrapBlockPublishesBlockReplacementToStore() throws {
+        let blockID = BlockInputBlockID(rawValue: "quote")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .quote, text: "Quoted")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        store.resetCounts()
+
+        textView.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+
+        XCTAssertEqual(store.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(store.document.blocks[0].text, ">Quoted")
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+    }
+
+    @MainActor
     func testStructuralUndoRefreshesFromStoreBeforeMutating() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let insertedID = BlockInputBlockID(rawValue: "inserted")

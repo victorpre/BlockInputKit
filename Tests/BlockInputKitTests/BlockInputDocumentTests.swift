@@ -14,7 +14,9 @@ final class BlockInputDocumentTests: XCTestCase {
     func testMarkdownRoundTripsSupportedBlockKinds() {
         let document = BlockInputDocument(blocks: [
             BlockInputBlock(id: "intro", kind: .paragraph, text: "Intro"),
+            BlockInputBlock(id: "heading", kind: .heading(level: 2), text: "Heading"),
             BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1"),
+            BlockInputBlock(id: "rule", kind: .horizontalRule),
             BlockInputBlock(id: "quote", kind: .quote, text: "Quoted\nText"),
             BlockInputBlock(id: "bullet", kind: .bulletedListItem, text: "Bullet", indentationLevel: 1),
             BlockInputBlock(id: "number", kind: .numberedListItem(start: 3), text: "Numbered"),
@@ -98,6 +100,80 @@ final class BlockInputDocumentTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
+    func testHorizontalRuleIsNotEffectivelyEmptyContent() {
+        let blockID = BlockInputBlockID(rawValue: "rule")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .horizontalRule)
+        ])
+
+        let selection = document.deleteEmptyBlockForBackspaceOrDelete(blockID: blockID)
+
+        XCTAssertFalse(document.isEffectivelyEmpty)
+        XCTAssertNil(selection)
+        XCTAssertEqual(document.blocks[0].kind, .horizontalRule)
+    }
+
+    func testHorizontalRuleBlocksNormalizeStoredText() throws {
+        var block = BlockInputBlock(id: "rule", kind: .horizontalRule, text: "Hidden")
+
+        XCTAssertEqual(block.text, "")
+        XCTAssertEqual(block.utf16Length, 0)
+
+        block.text = "Ignored"
+        XCTAssertEqual(block.text, "")
+
+        block.kind = .paragraph
+        block.text = "Visible"
+        block.kind = .horizontalRule
+        XCTAssertEqual(block.text, "")
+
+        let encoded = try JSONEncoder().encode(BlockInputBlock(id: "decoded", kind: .horizontalRule))
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        payload["text"] = "Hidden"
+        let staleEncoded = try JSONSerialization.data(withJSONObject: payload)
+        let decoded = try JSONDecoder().decode(BlockInputBlock.self, from: staleEncoded)
+        XCTAssertEqual(decoded.text, "")
+    }
+
+    func testNonListBlocksNormalizeIndentation() throws {
+        var block = BlockInputBlock(id: "quote", kind: .quote, text: "Quoted", indentationLevel: 2)
+
+        XCTAssertEqual(block.indentationLevel, 0)
+
+        block.kind = .bulletedListItem
+        block.indentationLevel = 2
+        XCTAssertEqual(block.indentationLevel, 2)
+
+        block.kind = .heading(level: 2)
+        XCTAssertEqual(block.indentationLevel, 0)
+
+        let encoded = try JSONEncoder().encode(BlockInputBlock(
+            id: "decoded",
+            kind: .bulletedListItem,
+            text: "Nested",
+            indentationLevel: 3
+        ))
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        payload["kind"] = ["quote": [:]]
+        let staleEncoded = try JSONSerialization.data(withJSONObject: payload)
+        let decoded = try JSONDecoder().decode(BlockInputBlock.self, from: staleEncoded)
+        XCTAssertEqual(decoded.indentationLevel, 0)
+    }
+
+    func testChangingBlockKindToHorizontalRuleClearsText() {
+        let blockID = BlockInputBlockID(rawValue: "rule")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Will be cleared", indentationLevel: 2)
+        ])
+
+        let selection = document.changeBlockKind(blockID: blockID, to: .horizontalRule)
+
+        XCTAssertEqual(document.blocks[0].kind, .horizontalRule)
+        XCTAssertEqual(document.blocks[0].text, "")
+        XCTAssertEqual(document.blocks[0].indentationLevel, 0)
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
     func testReplacingTextUsesUTF16Offsets() {
         let blockID = BlockInputBlockID(rawValue: "emoji")
         var document = BlockInputDocument(blocks: [
@@ -128,6 +204,23 @@ final class BlockInputDocumentTests: XCTestCase {
 
         XCTAssertEqual(document.blocks[0].text, "abcd")
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 4)))
+    }
+
+    func testReplacingTextInHorizontalRuleIsNoOp() {
+        let blockID = BlockInputBlockID(rawValue: "rule")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .horizontalRule)
+        ])
+
+        let selection = document.replaceText(
+            in: blockID,
+            range: NSRange(location: 0, length: 0),
+            replacement: "Hidden"
+        )
+
+        XCTAssertEqual(document.blocks[0].kind, .horizontalRule)
+        XCTAssertEqual(document.blocks[0].text, "")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
     func testMoveBlockUsesFinalTargetIndex() {
@@ -165,6 +258,18 @@ final class BlockInputDocumentTests: XCTestCase {
         ])
 
         let selection = document.outdentBlock(blockID: blockID)
+
+        XCTAssertNil(selection)
+        XCTAssertEqual(document.blocks[0].indentationLevel, 0)
+    }
+
+    func testIndentIgnoresNonListBlocks() {
+        let blockID = BlockInputBlockID(rawValue: "quote")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .quote, text: "Quote")
+        ])
+
+        let selection = document.indentBlock(blockID: blockID)
 
         XCTAssertNil(selection)
         XCTAssertEqual(document.blocks[0].indentationLevel, 0)

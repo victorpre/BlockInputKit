@@ -73,7 +73,7 @@ Run the local demo:
 The demo app includes:
 
 - A primary `BlockInputView` editor surface.
-- Mixed paragraph, code, quote, list, numbered list, and toggleable checklist data.
+- Mixed paragraph, heading, divider, code, quote, list, numbered list, and toggleable checklist data.
 - A 100,000-block load path for exercising large-document behavior.
 - Markdown import/export, Markdown insertion, and file-link insertion from buttons or drops.
 - Text and structural undo/redo buttons.
@@ -98,8 +98,10 @@ The demo app includes:
 - Cmd+A first selects the current block text, then all blocks.
 - Tab and Shift+Tab indent and outdent blocks.
 - Arrow movement crosses block boundaries at the start or end of a block.
+- Markdown typing shortcuts convert leading quote, list, checklist, numbered-list, heading, and `---` markers into block kinds.
+- Backspace/Delete at the front of formatted blocks unwraps them into paragraph text with the Markdown marker visible.
 - Drag reordering is enabled by default and can be disabled with `allowsBlockReordering`.
-- Markdown import/export supports paragraph, code, quote, bulleted list, numbered list, and checklist blocks.
+- Markdown import/export supports paragraph, heading, horizontal rule, code, quote, bulleted list, numbered list, and checklist blocks.
 - File URL insertion helpers and built-in file drops create Markdown link blocks.
 
 ## Performance Expectations

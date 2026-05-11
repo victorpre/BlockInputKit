@@ -124,6 +124,9 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         guard let index = index(of: blockID) else {
             return nil
         }
+        guard blocks[index].kind.supportsIndentation else {
+            return nil
+        }
         blocks[index].indentationLevel += 1
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: blocks[index].utf16Length))
     }
@@ -132,6 +135,9 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
     @discardableResult
     public mutating func outdentBlock(blockID: BlockInputBlockID) -> BlockInputSelection? {
         guard let index = index(of: blockID) else {
+            return nil
+        }
+        guard blocks[index].kind.supportsIndentation else {
             return nil
         }
         guard blocks[index].indentationLevel > 0 else {
@@ -177,6 +183,9 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
     ) -> BlockInputSelection? {
         guard let index = index(of: blockID) else {
             return nil
+        }
+        if blocks[index].kind == .horizontalRule {
+            return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
         }
         let edit = blocks[index].text.replacingUTF16Characters(in: range, with: replacement)
         blocks[index].text = edit.text

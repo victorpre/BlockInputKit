@@ -16,6 +16,11 @@ final class BlockInputTextView: NSTextView {
             blockItem?.requestReturn()
             return true
         case #selector(deleteBackward(_:)), #selector(deleteForward(_:)):
+            if selectedRange().location == 0,
+               selectedRange().length == 0,
+               blockItem?.requestUnwrapBlock() == true {
+                return true
+            }
             return blockItem?.requestDeleteEmptyBlock() == true
         case #selector(selectAll(_:)):
             blockItem?.requestSelectAll()

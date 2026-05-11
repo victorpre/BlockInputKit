@@ -51,6 +51,69 @@ final class BlockInputViewUndoTests: XCTestCase {
         XCTAssertEqual(view.document.blocks[0].kind, .checklistItem(isChecked: true))
     }
 
+    func testTypingShortcutUsesStructuralUndoStack() throws {
+        let blockID = BlockInputBlockID(rawValue: "heading")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "")
+            ]),
+            undoController: undoController
+        ))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.string = "# Heading"
+        textView.setSelectedRange(NSRange(location: 9, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        let undo = view.undoStructuralEdit()
+        XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[0].text, "")
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Format Block")
+        XCTAssertEqual(redo?.actionName, "Format Block")
+        XCTAssertEqual(view.document.blocks[0].kind, .heading(level: 1))
+        XCTAssertEqual(view.document.blocks[0].text, "Heading")
+    }
+
+    func testUnwrapBlockUsesStructuralUndoStack() throws {
+        let blockID = BlockInputBlockID(rawValue: "quote")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .quote, text: "Quoted")
+            ]),
+            undoController: undoController
+        ))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        textView.doCommand(by: #selector(NSResponder.deleteForward(_:)))
+
+        let undo = view.undoStructuralEdit()
+        XCTAssertEqual(view.document.blocks[0].kind, .quote)
+        XCTAssertEqual(view.document.blocks[0].text, "Quoted")
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Unformat Block")
+        XCTAssertEqual(redo?.actionName, "Unformat Block")
+        XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[0].text, ">Quoted")
+    }
+
     func testUndoStructuralEditWithNilSelectionCanRefocusEditor() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let undoController = BlockInputUndoController()

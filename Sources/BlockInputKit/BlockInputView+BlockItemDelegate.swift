@@ -29,12 +29,30 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         guard beforeText != text else {
             return
         }
+        if document.blocks[index].kind == .horizontalRule {
+            item.configure(block: document.blocks[index], allowsReordering: allowsBlockReordering, delegate: self)
+            return
+        }
+        let selectedRange = item.currentSelectedRange
+        let proposedOffset = selectedRange.location + selectedRange.length
+        if let shortcutSelection = applyTypingShortcutIfNeeded(
+            blockID: blockID,
+            proposedText: text,
+            proposedUTF16Offset: proposedOffset
+        ) {
+            if let block = block(withID: blockID) {
+                item.configure(block: block, allowsReordering: allowsBlockReordering, delegate: self)
+            }
+            if case let .cursor(cursor) = shortcutSelection, cursor.blockID == blockID {
+                item.setSelectedRange(NSRange(location: cursor.utf16Offset, length: 0))
+            }
+            return
+        }
         let beforeSelection = capturedSelectionBefore ?? selection
         document.blocks[index].text = text
-        let selectedRange = item.currentSelectedRange
         let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
             blockID: blockID,
-            utf16Offset: selectedRange.location + selectedRange.length
+            utf16Offset: proposedOffset
         ))
         applySelection(afterSelection, notify: true)
         undoController?.registerTextEdit(
@@ -78,6 +96,24 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         }
         applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
         return deleteCurrentEmptyBlockForBackspaceOrDelete() != nil
+    }
+
+    func blockItemDidRequestUnwrapBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
+        refreshDocumentFromStore()
+        guard let currentBlock = block(withID: blockID), currentBlock.kind.canUnwrapToParagraph else {
+            return false
+        }
+        applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+        guard let unwrapSelection = unwrapBlockToParagraph(blockID: blockID) else {
+            return false
+        }
+        if let updatedBlock = block(withID: blockID) {
+            item.configure(block: updatedBlock, allowsReordering: allowsBlockReordering, delegate: self)
+        }
+        if case let .cursor(cursor) = unwrapSelection, cursor.blockID == blockID {
+            item.setSelectedRange(NSRange(location: cursor.utf16Offset, length: 0))
+        }
+        return true
     }
 
     func blockItemDidRequestSelectAll(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {

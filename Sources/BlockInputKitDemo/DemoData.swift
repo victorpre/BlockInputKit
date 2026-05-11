@@ -5,6 +5,8 @@ enum DemoData {
     static let markdownSample = """
     BlockInputKit Markdown import
 
+    ## Heading blocks
+
     > Quotes become quote blocks.
 
     - Bulleted list item
@@ -15,6 +17,8 @@ enum DemoData {
     - [ ] Checklist item
     - [x] Completed checklist item
 
+    ---
+
     ```swift
     let editor = BlockInputView()
     ```
@@ -22,9 +26,10 @@ enum DemoData {
 
     static func mixedDocument() -> BlockInputDocument {
         BlockInputDocument(blocks: [
-            BlockInputBlock(kind: .paragraph, text: "BlockInputKit demo"),
+            BlockInputBlock(kind: .heading(level: 1), text: "BlockInputKit demo"),
             BlockInputBlock(kind: .paragraph, text: "Each visible block owns its own AppKit text input."),
             BlockInputBlock(kind: .quote, text: "Focus, selection, return, delete, and Cmd+A are coordinated across blocks."),
+            BlockInputBlock(kind: .horizontalRule),
             BlockInputBlock(kind: .code(language: "swift"), text: "let editor = BlockInputView()\neditor.focusEditor()"),
             BlockInputBlock(kind: .bulletedListItem, text: "Hover rows to reveal reorder handles"),
             BlockInputBlock(kind: .numberedListItem(start: 1), text: "Toggle reordering from the toolbar"),
@@ -36,24 +41,28 @@ enum DemoData {
 
     static func swiftUIDocument() -> BlockInputDocument {
         BlockInputDocument(blocks: [
-            BlockInputBlock(kind: .paragraph, text: "SwiftUI wrapper preview"),
+            BlockInputBlock(kind: .heading(level: 2), text: "SwiftUI wrapper preview"),
             BlockInputBlock(kind: .quote, text: "This side panel embeds BlockInputEditor.")
         ])
     }
 
     static func largeDocument(count: Int = 100_000) -> BlockInputDocument {
         let blocks = (0..<count).map { index -> BlockInputBlock in
-            switch index % 6 {
+            switch index % 8 {
             case 0:
                 return BlockInputBlock(kind: .paragraph, text: "Paragraph block \(index)")
             case 1:
-                return BlockInputBlock(kind: .quote, text: "Quote block \(index)")
+                return BlockInputBlock(kind: .heading(level: (index % 3) + 1), text: "Heading block \(index)")
             case 2:
-                return BlockInputBlock(kind: .bulletedListItem, text: "Bullet block \(index)", indentationLevel: index % 3)
+                return BlockInputBlock(kind: .quote, text: "Quote block \(index)")
             case 3:
-                return BlockInputBlock(kind: .numberedListItem(start: index + 1), text: "Numbered block \(index)")
+                return BlockInputBlock(kind: .bulletedListItem, text: "Bullet block \(index)", indentationLevel: index % 3)
             case 4:
+                return BlockInputBlock(kind: .numberedListItem(start: index + 1), text: "Numbered block \(index)")
+            case 5:
                 return BlockInputBlock(kind: .checklistItem(isChecked: index.isMultiple(of: 2)), text: "Checklist block \(index)")
+            case 6:
+                return BlockInputBlock(kind: .horizontalRule)
             default:
                 return BlockInputBlock(kind: .code(language: "swift"), text: "let index = \(index)")
             }

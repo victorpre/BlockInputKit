@@ -46,6 +46,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         selectionBeforeTextChange = nil
         textView.blockItem = nil
         textView.string = ""
+        textView.isEditable = true
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         kindLabel.stringValue = ""
         checklistButton.state = .off
@@ -85,7 +86,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.delegate = delegate
         selectionBeforeTextChange = nil
         textView.blockItem = self
-        textView.string = block.text
+        textView.string = block.kind == .horizontalRule ? "" : block.text
         configureBlockKindChrome(kind: block.kind, indentationLevel: block.indentationLevel)
         handleView.isEnabled = allowsReordering
         handleView.alphaValue = 0
@@ -173,6 +174,13 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         return delegate?.blockItemDidRequestDeleteEmptyBlock(self, blockID: blockID) ?? false
     }
 
+    func requestUnwrapBlock() -> Bool {
+        guard let blockID else {
+            return false
+        }
+        return delegate?.blockItemDidRequestUnwrapBlock(self, blockID: blockID) ?? false
+    }
+
     func requestSelectAll() {
         guard let blockID else {
             return
@@ -229,6 +237,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     private func configureBlockKindChrome(kind: BlockInputBlockKind, indentationLevel: Int) {
+        textView.isEditable = kind != .horizontalRule
         switch kind {
         case let .checklistItem(isChecked):
             kindLabel.stringValue = ""
