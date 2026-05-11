@@ -5,6 +5,7 @@ extension BlockInputDocument {
         var kind: BlockInputBlockKind
         var text: String
         var cursorOffset: Int
+        var preservesIndentation: Bool = false
     }
 
     func typingShortcut(
@@ -15,7 +16,7 @@ extension BlockInputDocument {
         guard let block = block(withID: blockID) else {
             return nil
         }
-        guard block.kind == .paragraph || block.kind.isHeading else {
+        guard block.kind == .paragraph || block.kind.isHeading || block.kind == .bulletedListItem else {
             return nil
         }
         guard let match = BlockInputTypingShortcutParser.match(in: proposedText, currentKind: block.kind) else {
@@ -25,7 +26,8 @@ extension BlockInputDocument {
         return TypingShortcut(
             kind: match.kind,
             text: match.text,
-            cursorOffset: min(cursorOffset, (match.text as NSString).length)
+            cursorOffset: min(cursorOffset, (match.text as NSString).length),
+            preservesIndentation: match.preservesIndentation
         )
     }
 
@@ -39,7 +41,9 @@ extension BlockInputDocument {
         }
         blocks[index].kind = shortcut.kind
         blocks[index].text = shortcut.text
-        blocks[index].indentationLevel = 0
+        if !shortcut.preservesIndentation {
+            blocks[index].indentationLevel = 0
+        }
         if shortcut.kind == .horizontalRule {
             let nextBlock = BlockInputBlock(kind: .paragraph)
             blocks.insert(nextBlock, at: index + 1)
@@ -76,6 +80,7 @@ private enum BlockInputTypingShortcutParser {
         var kind: BlockInputBlockKind
         var text: String
         var consumedUTF16Length: Int
+        var preservesIndentation: Bool = false
     }
 
     static func match(in text: String, currentKind: BlockInputBlockKind) -> Match? {
@@ -85,14 +90,18 @@ private enum BlockInputTypingShortcutParser {
         if text == "--- ", currentKind == .paragraph {
             return Match(kind: .horizontalRule, text: "", consumedUTF16Length: 4)
         }
-        if let heading = headingMatch(in: text) {
+        if currentKind != .bulletedListItem,
+           let heading = headingMatch(in: text) {
             return heading
+        }
+        if currentKind == .bulletedListItem {
+            return checklistMatch(in: text, consumesLeadingDash: false, preservesIndentation: true)
         }
         guard currentKind == .paragraph else {
             return nil
         }
         return quoteMatch(in: text)
-            ?? checklistMatch(in: text)
+            ?? checklistMatch(in: text, consumesLeadingDash: true, preservesIndentation: false)
             ?? bulletMatch(in: text)
             ?? numberedListMatch(in: text)
     }
@@ -120,18 +129,47 @@ private enum BlockInputTypingShortcutParser {
         return nil
     }
 
-    private static func checklistMatch(in text: String) -> Match? {
-        if text == "- [ ]" {
-            return Match(kind: .checklistItem(isChecked: false), text: "", consumedUTF16Length: 5)
+    private static func checklistMatch(
+        in text: String,
+        consumesLeadingDash: Bool,
+        preservesIndentation: Bool
+    ) -> Match? {
+        let uncheckedMarker = consumesLeadingDash ? "- [ ]" : "[ ]"
+        let checkedMarker = consumesLeadingDash ? "- [x]" : "[x]"
+        let uppercaseCheckedMarker = consumesLeadingDash ? "- [X]" : "[X]"
+        let exactMarkerLength = (uncheckedMarker as NSString).length
+        let markerAndSpaceLength = exactMarkerLength + 1
+        if text == uncheckedMarker {
+            return Match(
+                kind: .checklistItem(isChecked: false),
+                text: "",
+                consumedUTF16Length: exactMarkerLength,
+                preservesIndentation: preservesIndentation
+            )
         }
-        if text.hasPrefix("- [ ] ") {
-            return Match(kind: .checklistItem(isChecked: false), text: String(text.dropFirst(6)), consumedUTF16Length: 6)
+        if text.hasPrefix("\(uncheckedMarker) ") {
+            return Match(
+                kind: .checklistItem(isChecked: false),
+                text: String(text.dropFirst(markerAndSpaceLength)),
+                consumedUTF16Length: markerAndSpaceLength,
+                preservesIndentation: preservesIndentation
+            )
         }
-        if text == "- [x]" || text == "- [X]" {
-            return Match(kind: .checklistItem(isChecked: true), text: "", consumedUTF16Length: 5)
+        if text == checkedMarker || text == uppercaseCheckedMarker {
+            return Match(
+                kind: .checklistItem(isChecked: true),
+                text: "",
+                consumedUTF16Length: exactMarkerLength,
+                preservesIndentation: preservesIndentation
+            )
         }
-        if text.hasPrefix("- [x] ") || text.hasPrefix("- [X] ") {
-            return Match(kind: .checklistItem(isChecked: true), text: String(text.dropFirst(6)), consumedUTF16Length: 6)
+        if text.hasPrefix("\(checkedMarker) ") || text.hasPrefix("\(uppercaseCheckedMarker) ") {
+            return Match(
+                kind: .checklistItem(isChecked: true),
+                text: String(text.dropFirst(markerAndSpaceLength)),
+                consumedUTF16Length: markerAndSpaceLength,
+                preservesIndentation: preservesIndentation
+            )
         }
         return nil
     }

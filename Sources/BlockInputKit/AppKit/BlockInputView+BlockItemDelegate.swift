@@ -25,7 +25,8 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         guard let index = index(of: blockID), document.blocks.indices.contains(index) else {
             return
         }
-        let beforeText = document.blocks[index].text
+        let beforeBlock = document.blocks[index]
+        let beforeText = beforeBlock.text
         guard beforeText != text else {
             return
         }
@@ -51,17 +52,43 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             }
             return
         }
-        let beforeSelection = capturedSelectionBefore ?? selection
-        document.blocks[index].text = text
+        applyPlainTextChange(
+            item: item,
+            blockIndex: index,
+            change: PlainTextChangeContext(
+                beforeBlock: beforeBlock,
+                afterText: text,
+                proposedOffset: proposedOffset,
+                selectionBefore: capturedSelectionBefore
+            )
+        )
+    }
+
+    private func applyPlainTextChange(
+        item: BlockInputBlockItem,
+        blockIndex index: Int,
+        change: PlainTextChangeContext
+    ) {
+        let beforeSelection = change.selectionBefore ?? selection
+        document.blocks[index].text = change.afterText
+        if let lineIndentationLevels = lineIndentationLevelsAfterTextChange(
+            beforeBlock: change.beforeBlock,
+            afterText: change.afterText,
+            selectionBefore: change.selectionBefore
+        ) {
+            document.blocks[index].lineIndentationLevels = lineIndentationLevels
+        }
         let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
-            blockID: blockID,
-            utf16Offset: proposedOffset
+            blockID: change.beforeBlock.id,
+            utf16Offset: change.proposedOffset
         ))
         applySelection(afterSelection, notify: true)
         undoController?.registerTextEdit(
-            blockID: blockID,
-            beforeText: beforeText,
-            afterText: text,
+            blockID: change.beforeBlock.id,
+            beforeText: change.beforeBlock.text,
+            afterText: change.afterText,
+            beforeLineIndentationLevels: change.beforeBlock.lineIndentationLevels,
+            afterLineIndentationLevels: document.blocks[index].lineIndentationLevels,
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         )
@@ -95,7 +122,8 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             id: block.id,
             kind: block.kind,
             text: item.currentText,
-            indentationLevel: block.indentationLevel
+            indentationLevel: block.indentationLevel,
+            lineIndentationLevels: block.lineIndentationLevels
         )
         if block.kind.acceptsInlineReturn,
            !currentBlock.requiresStructuralReturnHandling(
@@ -204,26 +232,34 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         publishFocusChange(true)
     }
 
-    func blockItemDidRequestIndent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+    func blockItemDidRequestIndent(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        selectedRange: NSRange
+    ) {
         _ = performStructuralEdit(
             named: "Indent Block",
             storeSyncAction: { _, afterDocument, _ in
                 afterDocument.block(withID: blockID).map(StoreSyncAction.replaceBlock) ?? .replaceDocument
             },
             edit: { document in
-                document.indentBlock(blockID: blockID)
+                document.indentBlock(blockID: blockID, activeUTF16Offset: selectedRange.location)
             }
         )
     }
 
-    func blockItemDidRequestOutdent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+    func blockItemDidRequestOutdent(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        selectedRange: NSRange
+    ) {
         _ = performStructuralEdit(
             named: "Outdent Block",
             storeSyncAction: { _, afterDocument, _ in
                 afterDocument.block(withID: blockID).map(StoreSyncAction.replaceBlock) ?? .replaceDocument
             },
             edit: { document in
-                document.outdentBlock(blockID: blockID)
+                document.outdentBlock(blockID: blockID, activeUTF16Offset: selectedRange.location)
             }
         )
     }
@@ -281,6 +317,38 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         return true
     }
 
+    private func lineIndentationLevelsAfterTextChange(
+        beforeBlock: BlockInputBlock,
+        afterText: String,
+        selectionBefore: BlockInputSelection?
+    ) -> [Int]? {
+        guard beforeBlock.kind.supportsIndentation else {
+            return nil
+        }
+        guard let editRange = editRange(in: beforeBlock.id, selectionBefore: selectionBefore) else {
+            return nil
+        }
+        return beforeBlock.lineIndentationLevelsAfterReplacingText(
+            utf16Offset: editRange.location,
+            selectedUTF16Length: editRange.length,
+            updatedText: afterText
+        )
+    }
+
+    private func editRange(
+        in blockID: BlockInputBlockID,
+        selectionBefore: BlockInputSelection?
+    ) -> NSRange? {
+        switch selectionBefore {
+        case let .cursor(cursor) where cursor.blockID == blockID:
+            return NSRange(location: cursor.utf16Offset, length: 0)
+        case let .text(range) where range.blockID == blockID:
+            return range.range
+        default:
+            return nil
+        }
+    }
+
     private func configureBlockItem(_ item: BlockInputBlockItem, block: BlockInputBlock) {
         item.configure(
             block: block,
@@ -290,4 +358,11 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             delegate: self
         )
     }
+}
+
+private struct PlainTextChangeContext {
+    var beforeBlock: BlockInputBlock
+    var afterText: String
+    var proposedOffset: Int
+    var selectionBefore: BlockInputSelection?
 }

@@ -1,0 +1,123 @@
+import AppKit
+import XCTest
+@testable import BlockInputKit
+
+@MainActor
+final class BlockInputTextCommandRuleTests: XCTestCase {
+    func testDeleteInHorizontalRuleTextViewRevealsDashMarker() throws {
+        let blockID = BlockInputBlockID(rawValue: "rule")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .horizontalRule)
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        textView.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+
+        XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[0].text, "---")
+        XCTAssertEqual(textView.string, "---")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 3)))
+    }
+
+    func testSpaceAfterRevealedHorizontalRuleMarkerReformatsRuleAndFocusesBlockBelow() throws {
+        let blockID = BlockInputBlockID(rawValue: "rule")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .horizontalRule)
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        textView.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+
+        textView.string = "--- "
+        textView.setSelectedRange(NSRange(location: 4, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertEqual(view.document.blocks[0].id, blockID)
+        XCTAssertEqual(view.document.blocks[0].kind, .horizontalRule)
+        XCTAssertEqual(view.document.blocks[0].text, "")
+        XCTAssertEqual(view.document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    func testTypingHorizontalRuleShortcutFocusesInsertedBlockBelowRule() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: ""),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.string = "---"
+        textView.setSelectedRange(NSRange(location: 3, length: 0))
+
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertEqual(view.document.blocks.map(\.kind), [.horizontalRule, .paragraph, .paragraph])
+        XCTAssertEqual(view.document.blocks[2].id, secondID)
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    func testDeleteInSelectedHorizontalRuleTextViewDeletesRule() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let ruleID = BlockInputBlockID(rawValue: "rule")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: ruleID, kind: .horizontalRule)
+        ])))
+        view.applySelection(.blocks([ruleID]), notify: false)
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[1],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+
+        XCTAssertEqual(view.document.blocks.map(\.id), [firstID])
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 5)))
+    }
+
+    func testHorizontalRuleIgnoresProgrammaticTextChangesThroughDelegatePath() throws {
+        let blockID = BlockInputBlockID(rawValue: "rule")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .horizontalRule)
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.string = "Hidden"
+        textView.setSelectedRange(NSRange(location: 6, length: 0))
+
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertEqual(view.document.blocks[0].kind, .horizontalRule)
+        XCTAssertEqual(view.document.blocks[0].text, "")
+        XCTAssertEqual(textView.string, "")
+        XCTAssertFalse(textView.isEditable)
+    }
+}

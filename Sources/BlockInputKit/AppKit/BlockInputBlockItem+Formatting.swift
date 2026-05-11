@@ -3,40 +3,119 @@ import AppKit
 extension BlockInputBlockItem {
     static func height(for block: BlockInputBlock, textWidth: CGFloat) -> CGFloat {
         let text = block.text.isEmpty ? " " : block.text
+        let availableTextWidth = max(
+            textWidth - measuredContentIndent(for: block),
+            120
+        )
         let boundingRect = (text as NSString).boundingRect(
-            with: NSSize(width: textWidth, height: CGFloat.greatestFiniteMagnitude),
+            with: NSSize(width: availableTextWidth, height: CGFloat.greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: NSFont.preferredFont(forTextStyle: .body)]
+            attributes: [.font: font(for: block.kind)]
         )
         return max(34, ceil(boundingRect.height) + 14)
     }
 
     static func prefix(for kind: BlockInputBlockKind, indentationLevel: Int) -> String {
-        let indentation = String(repeating: " ", count: indentationLevel)
         switch kind {
-        case .paragraph:
+        case .paragraph, .heading, .horizontalRule, .quote:
             return ""
-        case .heading(let level):
-            return String(repeating: "#", count: min(max(level, 1), 6))
         case .code:
-            return indentation + "{}"
-        case .horizontalRule:
-            return ""
-        case .quote:
-            return indentation + ">"
+            return "{}"
         case .bulletedListItem:
-            return indentation + unorderedListMarker(indentationLevel: indentationLevel)
+            return unorderedListMarker(indentationLevel: indentationLevel)
         case let .numberedListItem(start):
-            return indentation + orderedListMarker(start: start, indentationLevel: indentationLevel)
+            return orderedListMarker(start: start, indentationLevel: indentationLevel)
         case let .checklistItem(isChecked):
-            return indentation + (isChecked ? "[x]" : "[ ]")
+            return isChecked ? "[x]" : "[ ]"
         }
     }
 
+    static func font(for kind: BlockInputBlockKind) -> NSFont {
+        switch kind {
+        case let .heading(level):
+            let clampedLevel = min(max(level, 1), 6)
+            let sizes: [CGFloat] = [26, 23, 20, 18, 16, 15]
+            return .systemFont(ofSize: sizes[clampedLevel - 1], weight: .semibold)
+        case .code:
+            return .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        case .paragraph, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+            return .preferredFont(forTextStyle: .body)
+        }
+    }
+
+    static func contentIndent(for block: BlockInputBlock) -> CGFloat {
+        guard block.kind.supportsIndentation,
+              block.lineIndentationLevels.isEmpty else {
+            return 0
+        }
+        return contentIndent(forIndentationLevel: block.indentationLevel)
+    }
+
+    static func measuredContentIndent(for block: BlockInputBlock) -> CGFloat {
+        guard block.kind.supportsIndentation else {
+            return 0
+        }
+        let indentationLevel = block.lineIndentationLevels.max() ?? block.indentationLevel
+        return contentIndent(forIndentationLevel: indentationLevel)
+    }
+
+    static func perLineContentIndent(for block: BlockInputBlock) -> CGFloat {
+        guard block.kind.supportsIndentation,
+              !block.lineIndentationLevels.isEmpty else {
+            return 0
+        }
+        return measuredContentIndent(for: block)
+    }
+
+    static func contentIndent(forIndentationLevel indentationLevel: Int) -> CGFloat {
+        CGFloat(max(0, indentationLevel)) * 24
+    }
+
+    static func prefixes(for block: BlockInputBlock) -> String {
+        prefixes(
+            for: block.kind,
+            indentationLevel: block.indentationLevel,
+            lineIndentationLevels: block.lineIndentationLevels,
+            text: block.text
+        )
+    }
+
     static func prefixes(for kind: BlockInputBlockKind, indentationLevel: Int, text: String) -> String {
+        prefixes(
+            for: kind,
+            indentationLevel: indentationLevel,
+            lineIndentationLevels: [],
+            text: text
+        )
+    }
+
+    static func prefixes(
+        for kind: BlockInputBlockKind,
+        indentationLevel: Int,
+        lineIndentationLevels: [Int],
+        text: String
+    ) -> String {
         let markerPrefix = prefix(for: kind, indentationLevel: indentationLevel)
         guard kind.repeatsPrefixForTextLines, !markerPrefix.isEmpty else {
             return markerPrefix
+        }
+        if case let .numberedListItem(start) = kind, !lineIndentationLevels.isEmpty {
+            return numberedListMarkers(
+                start: start,
+                indentationLevel: indentationLevel,
+                lineIndentationLevels: lineIndentationLevels,
+                lineCount: lineCount(for: text)
+            )
+        }
+        if !lineIndentationLevels.isEmpty {
+            return (0..<lineCount(for: text))
+                .map { lineOffset in
+                    let lineIndentation = lineIndentationLevels.indices.contains(lineOffset)
+                        ? lineIndentationLevels[lineOffset]
+                        : indentationLevel
+                    return prefix(for: kind, indentationLevel: lineIndentation)
+                }
+                .joined(separator: "\n")
         }
         if case let .numberedListItem(start) = kind {
             return (0..<lineCount(for: text))
@@ -48,13 +127,32 @@ extension BlockInputBlockItem {
         return repeatedPrefix(markerPrefix, lineCount: lineCount(for: text))
     }
 
-    static func prefixesAfterChecklistButton(isChecked: Bool, indentationLevel: Int, text: String) -> String {
-        let lineCount = lineCount(for: text)
-        guard lineCount > 1 else {
-            return ""
+    static func markerLines(for block: BlockInputBlock) -> [BlockInputMarkerView.MarkerLine] {
+        switch block.kind {
+        case let .checklistItem(isChecked):
+            let lineCount = lineCount(for: block.text)
+            guard lineCount > 1 else {
+                return []
+            }
+            return (0..<lineCount).map { lineIndex in
+                if lineIndex == 0 {
+                    return BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 0)
+                }
+                return BlockInputMarkerView.MarkerLine(
+                    text: prefix(for: .checklistItem(isChecked: isChecked), indentationLevel: block.indentationLevel(forLine: lineIndex)),
+                    indentationLevel: markerIndentationLevel(for: block, lineIndex: lineIndex)
+                )
+            }
+        default:
+            return BlockInputLineBreaks.lines(in: prefixes(for: block))
+                .enumerated()
+                .map { lineIndex, marker in
+                    BlockInputMarkerView.MarkerLine(
+                        text: marker,
+                        indentationLevel: markerIndentationLevel(for: block, lineIndex: lineIndex)
+                    )
+                }
         }
-        let prefix = prefix(for: .checklistItem(isChecked: isChecked), indentationLevel: indentationLevel)
-        return "\n" + repeatedPrefix(prefix, lineCount: lineCount - 1)
     }
 
     private static func repeatedPrefix(_ prefix: String, lineCount: Int) -> String {
@@ -62,11 +160,41 @@ extension BlockInputBlockItem {
     }
 
     private static func lineCount(for text: String) -> Int {
-        max(1, text.components(separatedBy: .newlines).count)
+        BlockInputLineBreaks.lineCount(in: text)
+    }
+
+    private static func numberedListMarkers(
+        start: Int,
+        indentationLevel: Int,
+        lineIndentationLevels: [Int],
+        lineCount: Int
+    ) -> String {
+        var countersByLevel: [Int: Int] = [:]
+        let baselineIndentationLevel = lineIndentationLevels.first ?? indentationLevel
+        return (0..<lineCount)
+            .map { lineOffset in
+                let lineIndentation = lineIndentationLevels.indices.contains(lineOffset)
+                    ? lineIndentationLevels[lineOffset]
+                    : indentationLevel
+                countersByLevel = countersByLevel.filter { $0.key <= lineIndentation }
+                let counter = countersByLevel[lineIndentation, default: 0]
+                countersByLevel[lineIndentation] = counter + 1
+                let markerStart = lineIndentation == baselineIndentationLevel ? start + counter : counter + 1
+                return prefix(for: .numberedListItem(start: markerStart), indentationLevel: lineIndentation)
+            }
+            .joined(separator: "\n")
+    }
+
+    private static func markerIndentationLevel(for block: BlockInputBlock, lineIndex: Int) -> Int {
+        guard block.kind.supportsIndentation,
+              !block.lineIndentationLevels.isEmpty else {
+            return 0
+        }
+        return block.indentationLevel(forLine: lineIndex)
     }
 
     private static func unorderedListMarker(indentationLevel: Int) -> String {
-        ["-", "*", "+"][max(0, indentationLevel) % 3]
+        ["•", "◦", "▪"][max(0, indentationLevel) % 3]
     }
 
     private static func orderedListMarker(start: Int, indentationLevel: Int) -> String {
@@ -89,6 +217,123 @@ extension BlockInputBlockItem {
         let markers = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"]
         return markers[max(value - 1, 0) % markers.count]
     }
+
+    func applyTextAttributes(for block: BlockInputBlock) {
+        let font = Self.font(for: block.kind)
+        textView.font = font
+        textView.typingAttributes[.font] = font
+        guard let textStorage = textView.textStorage else {
+            updateTypingAttributesForCurrentSelection()
+            return
+        }
+        let fullRange = NSRange(location: 0, length: (textView.string as NSString).length)
+        guard fullRange.length > 0 else {
+            updateTypingAttributesForCurrentSelection()
+            return
+        }
+        textStorage.beginEditing()
+        textStorage.addAttribute(.font, value: font, range: fullRange)
+        textStorage.removeAttribute(.paragraphStyle, range: fullRange)
+        applyLineIndentationAttributes(for: block, textStorage: textStorage)
+        textStorage.endEditing()
+        textView.layoutManager?.invalidateLayout(forCharacterRange: fullRange, actualCharacterRange: nil)
+        textView.needsDisplay = true
+        updateTypingAttributesForCurrentSelection()
+    }
+
+    func updateTypingAttributesForCurrentSelection() {
+        guard let block = renderedBlock else {
+            return
+        }
+        var attributes = textView.typingAttributes
+        attributes[.font] = Self.font(for: block.kind)
+        if block.kind.supportsIndentation, !block.lineIndentationLevels.isEmpty {
+            let lineIndex = block.lineIndex(containingUTF16Offset: textView.selectedRange().location)
+            let paragraphStyle = Self.paragraphStyle(
+                indentationLevel: block.indentationLevel(forLine: lineIndex)
+            )
+            attributes[.paragraphStyle] = paragraphStyle
+            textView.defaultParagraphStyle = paragraphStyle
+        } else {
+            attributes.removeValue(forKey: .paragraphStyle)
+            textView.defaultParagraphStyle = nil
+        }
+        textView.typingAttributes = attributes
+    }
+
+    func applyKindLabelAttributes(for block: BlockInputBlock) {
+        kindLabel.setMarkerLines(Self.markerLines(for: block))
+        updateMarkerLineYOffsets()
+    }
+
+    private func applyLineIndentationAttributes(for block: BlockInputBlock, textStorage: NSTextStorage) {
+        guard block.kind.supportsIndentation,
+              !block.lineIndentationLevels.isEmpty else {
+            return
+        }
+        let text = textStorage.string as NSString
+        var offset = 0
+        var lineIndex = 0
+        while offset < text.length {
+            let lineRange = text.lineRange(for: NSRange(location: offset, length: 0))
+            let paragraphStyle = Self.paragraphStyle(indentationLevel: block.indentationLevel(forLine: lineIndex))
+            textStorage.addAttribute(.paragraphStyle, value: paragraphStyle, range: lineRange)
+            offset = NSMaxRange(lineRange)
+            lineIndex += 1
+        }
+    }
+
+    private static func paragraphStyle(indentationLevel: Int) -> NSParagraphStyle {
+        let paragraphStyle = NSMutableParagraphStyle()
+        let indent = contentIndent(forIndentationLevel: indentationLevel)
+        paragraphStyle.firstLineHeadIndent = indent
+        paragraphStyle.headIndent = indent
+        return paragraphStyle
+    }
+
+    func updateMarkerLineYOffsets() {
+        guard !kindLabel.markerLines.isEmpty,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else {
+            kindLabel.setMarkerLineYOffsets([])
+            return
+        }
+        layoutManager.ensureLayout(for: textContainer)
+        let textLength = (textView.string as NSString).length
+        let lineStarts = BlockInputLineBreaks.lineStartOffsets(in: textView.string)
+        let offsets = lineStarts.prefix(kindLabel.markerLines.count).enumerated().map { lineIndex, lineStart in
+            let lineFragmentY = lineFragmentMinY(
+                lineIndex: lineIndex,
+                lineStart: lineStart,
+                textLength: textLength,
+                layoutManager: layoutManager
+            )
+            let textPoint = NSPoint(x: 0, y: textView.textContainerOrigin.y + lineFragmentY)
+            let itemPoint = textView.convert(textPoint, to: view)
+            let markerPoint = kindLabel.convert(itemPoint, from: view)
+            return max(0, markerPoint.y)
+        }
+        kindLabel.setMarkerLineYOffsets(Array(offsets))
+    }
+
+    private func lineFragmentMinY(
+        lineIndex: Int,
+        lineStart: Int,
+        textLength: Int,
+        layoutManager: NSLayoutManager
+    ) -> CGFloat {
+        guard textLength > 0, lineStart < textLength else {
+            let extraLineFragmentRect = layoutManager.extraLineFragmentRect
+            guard !extraLineFragmentRect.isEmpty else {
+                let font = Self.font(for: renderedBlock?.kind ?? .paragraph)
+                return CGFloat(lineIndex) * ceil(font.ascender - font.descender + font.leading)
+            }
+            return extraLineFragmentRect.minY
+        }
+        let glyphIndex = layoutManager.glyphIndexForCharacter(at: lineStart)
+        return layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil).minY
+    }
+
 }
 
 private extension BlockInputBlockKind {

@@ -2,7 +2,7 @@ import Foundation
 
 enum BlockInputMarkdownImporter {
     static func document(from markdown: String) -> BlockInputDocument {
-        let lines = markdown.components(separatedBy: .newlines)
+        let lines = BlockInputLineBreaks.lines(in: markdown)
         var blocks: [BlockInputBlock] = []
         var index = 0
 
@@ -123,14 +123,21 @@ enum BlockInputMarkdownImporter {
             return nil
         }
         var content = [block.text]
+        var lineIndentationLevels = [block.indentationLevel]
         var index = startIndex + 1
         while index < lines.count,
               let nextBlock = parseListLine(lines[index]),
-              canMergeListBlock(nextBlock, into: block, lineOffset: content.count) {
+              canMergeListBlock(
+                  nextBlock,
+                  into: block,
+                  lineIndentationLevels: lineIndentationLevels
+              ) {
             content.append(nextBlock.text)
+            lineIndentationLevels.append(nextBlock.indentationLevel)
             index += 1
         }
         block.text = content.joined(separator: "\n")
+        block.lineIndentationLevels = lineIndentationLevels
         return (block, index)
     }
 
@@ -173,21 +180,38 @@ enum BlockInputMarkdownImporter {
     private static func canMergeListBlock(
         _ nextBlock: BlockInputBlock,
         into firstBlock: BlockInputBlock,
-        lineOffset: Int
+        lineIndentationLevels: [Int]
     ) -> Bool {
-        guard nextBlock.indentationLevel == firstBlock.indentationLevel else {
-            return false
-        }
         switch (firstBlock.kind, nextBlock.kind) {
         case (.bulletedListItem, .bulletedListItem):
             return true
         case let (.numberedListItem(start), .numberedListItem(nextStart)):
-            return nextStart == start + lineOffset
+            return nextStart == expectedNumberedListStart(
+                start: start,
+                lineIndentationLevels: lineIndentationLevels,
+                nextIndentationLevel: nextBlock.indentationLevel
+            )
         case let (.checklistItem(isChecked), .checklistItem(nextIsChecked)):
             return isChecked == nextIsChecked
         default:
             return false
         }
+    }
+
+    private static func expectedNumberedListStart(
+        start: Int,
+        lineIndentationLevels: [Int],
+        nextIndentationLevel: Int
+    ) -> Int {
+        let baselineIndentationLevel = lineIndentationLevels.first ?? nextIndentationLevel
+        var countersByLevel: [Int: Int] = [:]
+        for indentationLevel in lineIndentationLevels {
+            countersByLevel = countersByLevel.filter { $0.key <= indentationLevel }
+            countersByLevel[indentationLevel, default: 0] += 1
+        }
+        countersByLevel = countersByLevel.filter { $0.key <= nextIndentationLevel }
+        let counter = countersByLevel[nextIndentationLevel, default: 0]
+        return nextIndentationLevel == baselineIndentationLevel ? start + counter : counter + 1
     }
 
     private static func parseNumberedList(_ line: String) -> (start: Int, text: String)? {
@@ -217,7 +241,6 @@ enum BlockInputMarkdownSerializer {
     }
 
     private static func markdownBlock(_ block: BlockInputBlock) -> String {
-        let indent = String(repeating: "  ", count: block.indentationLevel)
         switch block.kind {
         case .paragraph:
             return block.text
@@ -229,18 +252,35 @@ enum BlockInputMarkdownSerializer {
         case .horizontalRule:
             return "---"
         case .quote:
-            return block.text.components(separatedBy: .newlines).map { "> \($0)" }.joined(separator: "\n")
+            return BlockInputLineBreaks.lines(in: block.text).map { "> \($0)" }.joined(separator: "\n")
         case .bulletedListItem:
-            return block.text.components(separatedBy: .newlines).map { "\(indent)- \($0)" }.joined(separator: "\n")
-        case .numberedListItem(let start):
-            return block.text.components(separatedBy: .newlines).enumerated().map { offset, line in
-                "\(indent)\(start + offset). \(line)"
+            return BlockInputLineBreaks.lines(in: block.text).enumerated().map { offset, line in
+                "\(indent(for: block, lineOffset: offset))- \(line)"
             }.joined(separator: "\n")
+        case .numberedListItem(let start):
+            return numberedListMarkdown(block, start: start)
         case .checklistItem(let isChecked):
-            return block.text.components(separatedBy: .newlines).map { line in
-                "\(indent)- [\(isChecked ? "x" : " ")] \(line)"
+            return BlockInputLineBreaks.lines(in: block.text).enumerated().map { offset, line in
+                "\(indent(for: block, lineOffset: offset))- [\(isChecked ? "x" : " ")] \(line)"
             }.joined(separator: "\n")
         }
+    }
+
+    private static func indent(for block: BlockInputBlock, lineOffset: Int) -> String {
+        String(repeating: "  ", count: block.indentationLevel(forLine: lineOffset))
+    }
+
+    private static func numberedListMarkdown(_ block: BlockInputBlock, start: Int) -> String {
+        var countersByLevel: [Int: Int] = [:]
+        let baselineIndentationLevel = block.indentationLevel(forLine: 0)
+        return BlockInputLineBreaks.lines(in: block.text).enumerated().map { offset, line in
+            let indentationLevel = block.indentationLevel(forLine: offset)
+            countersByLevel = countersByLevel.filter { $0.key <= indentationLevel }
+            let counter = countersByLevel[indentationLevel, default: 0]
+            countersByLevel[indentationLevel] = counter + 1
+            let markerStart = indentationLevel == baselineIndentationLevel ? start + counter : counter + 1
+            return "\(indent(for: block, lineOffset: offset))\(markerStart). \(line)"
+        }.joined(separator: "\n")
     }
 }
 

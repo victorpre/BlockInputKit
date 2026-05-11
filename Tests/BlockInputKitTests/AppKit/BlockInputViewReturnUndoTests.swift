@@ -83,6 +83,44 @@ final class BlockInputViewReturnUndoTests: XCTestCase {
         XCTAssertEqual(view.document.blocks[1].kind, .paragraph)
     }
 
+    func testReturnOnIndentedEmptyInlineListLineUsesOutdentStructuralUndoAction() {
+        let blockID = BlockInputBlockID(rawValue: "bullet")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(
+                    id: blockID,
+                    kind: .bulletedListItem,
+                    text: "Before\n",
+                    lineIndentationLevels: [0, 1]
+                )
+            ]),
+            undoController: undoController
+        ))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 7)), notify: false)
+
+        _ = view.insertBlockBelowCurrentBlock()
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Outdent Block")
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(
+                id: blockID,
+                kind: .bulletedListItem,
+                text: "Before\n",
+                lineIndentationLevels: [0, 1]
+            )
+        ])
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(redo?.actionName, "Outdent Block")
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before\n")
+        ])
+    }
+
     func testReturnOnMiddleEmptyInlineListLineRestoresSplitWithStructuralUndo() {
         let blockID = BlockInputBlockID(rawValue: "number")
         let undoController = BlockInputUndoController()

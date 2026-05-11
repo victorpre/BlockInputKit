@@ -29,6 +29,12 @@ extension BlockInputBlockItem {
         view.firstDescendant(of: NSScrollView.self)
     }
 
+    var testingQuoteBarView: NSView? {
+        view.firstDescendant(of: NSView.self) { view in
+            view.identifier == BlockInputBlockItem.quoteBarIdentifier
+        }
+    }
+
     var testingHandleView: NSTextField? {
         view.firstDescendant(of: NSTextField.self) { textField in
             textField.stringValue == "::"
@@ -43,6 +49,10 @@ extension BlockInputBlockItem {
             }
             return textField !== handleView
         }
+    }
+
+    var testingMarkerView: BlockInputMarkerView? {
+        view.firstDescendant(of: BlockInputMarkerView.self)
     }
 
     var testingHandleWidthConstraint: NSLayoutConstraint? {

@@ -55,6 +55,8 @@ extension BlockInputView {
             blockID: resolvedBlockID,
             beforeText: beforeText,
             afterText: updatedBlock.text,
+            beforeLineIndentationLevels: block.lineIndentationLevels,
+            afterLineIndentationLevels: updatedBlock.lineIndentationLevels,
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         )

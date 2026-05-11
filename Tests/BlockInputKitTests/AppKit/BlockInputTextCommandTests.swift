@@ -412,42 +412,4 @@ final class BlockInputTextCommandTests: XCTestCase {
         }
     }
 
-    func testTabCommandsIndentAndOutdentThroughDelegatePath() throws {
-        let blockID = BlockInputBlockID(rawValue: "first")
-        let view = BlockInputView()
-        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First")
-        ])))
-        let item = BlockInputBlockItem.configuredForTesting(
-            block: view.document.blocks[0],
-            allowsReordering: true,
-            delegate: view
-        )
-        let textView = try XCTUnwrap(item.testingTextView)
-
-        textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
-        XCTAssertEqual(view.document.blocks[0].indentationLevel, 1)
-
-        textView.doCommand(by: #selector(NSResponder.insertBacktab(_:)))
-        XCTAssertEqual(view.document.blocks[0].indentationLevel, 0)
-    }
-
-    func testTabCommandDoesNotIndentPlainBlocks() throws {
-        let blockID = BlockInputBlockID(rawValue: "first")
-        let view = BlockInputView()
-        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
-            BlockInputBlock(id: blockID, text: "First")
-        ])))
-        let item = BlockInputBlockItem.configuredForTesting(
-            block: view.document.blocks[0],
-            allowsReordering: true,
-            delegate: view
-        )
-        let textView = try XCTUnwrap(item.testingTextView)
-
-        textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
-
-        XCTAssertEqual(view.document.blocks[0].indentationLevel, 0)
-    }
-
 }

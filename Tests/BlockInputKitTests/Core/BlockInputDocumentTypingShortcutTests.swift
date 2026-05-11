@@ -71,6 +71,58 @@ final class BlockInputDocumentTypingShortcutTests: XCTestCase {
         XCTAssertEqual(checkedSelection, .cursor(BlockInputCursor(blockID: checkedID, utf16Offset: 0)))
     }
 
+    func testTypingShortcutUpgradesEmptyBulletMarkerIntoChecklistItem() {
+        let blockID = BlockInputBlockID(rawValue: "check")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "", indentationLevel: 2)
+        ])
+        let shortcut = document.typingShortcut(
+            for: blockID,
+            proposedText: "[ ]",
+            proposedUTF16Offset: 3
+        )
+
+        let selection = shortcut.flatMap { document.applyTypingShortcut(blockID: blockID, shortcut: $0) }
+
+        XCTAssertEqual(document.blocks[0].kind, .checklistItem(isChecked: false))
+        XCTAssertEqual(document.blocks[0].text, "")
+        XCTAssertEqual(document.blocks[0].indentationLevel, 2)
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    func testTypingShortcutUpgradesBulletMarkerIntoCheckedChecklistItemWithText() {
+        let blockID = BlockInputBlockID(rawValue: "check")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "")
+        ])
+        let shortcut = document.typingShortcut(
+            for: blockID,
+            proposedText: "[x] Done",
+            proposedUTF16Offset: 8
+        )
+
+        let selection = shortcut.flatMap { document.applyTypingShortcut(blockID: blockID, shortcut: $0) }
+
+        XCTAssertEqual(document.blocks[0].kind, .checklistItem(isChecked: true))
+        XCTAssertEqual(document.blocks[0].text, "Done")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 4)))
+    }
+
+    func testTypingShortcutDoesNotApplyHeadingShortcutInsideBulletItem() {
+        let blockID = BlockInputBlockID(rawValue: "bullet")
+        let document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "")
+        ])
+
+        let shortcut = document.typingShortcut(
+            for: blockID,
+            proposedText: "# Heading",
+            proposedUTF16Offset: 9
+        )
+
+        XCTAssertNil(shortcut)
+    }
+
     func testTypingShortcutTurnsParagraphMarkerIntoBulletedListItem() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         var document = BlockInputDocument(blocks: [

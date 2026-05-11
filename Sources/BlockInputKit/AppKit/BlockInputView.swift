@@ -32,11 +32,6 @@ public final class BlockInputView: NSView {
     // Avoid re-entering NSWindow first-responder assignment while AppKit is already promoting this view.
     var isBecomingFirstResponder = false
 
-    private struct ReturnSelection {
-        var offset: Int
-        var length: Int
-    }
-
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setupCollectionView()
@@ -167,88 +162,6 @@ public final class BlockInputView: NSView {
         if isEditorFirstResponder {
             publishFocusChange(true)
         }
-    }
-
-    /// Applies Return key semantics to the active block.
-    @discardableResult
-    public func insertBlockBelowCurrentBlock() -> BlockInputSelection? {
-        refreshDocumentFromStore()
-        guard let blockID = activeBlockID else {
-            return nil
-        }
-        let focusedBlock = block(withID: blockID)
-        let returnSelection = currentReturnSelection(for: blockID)
-        let actionName = returnActionName(for: focusedBlock, selection: returnSelection)
-        return performStructuralEdit(
-            named: actionName,
-            storeSyncAction: { beforeDocument, afterDocument, afterSelection in
-                self.returnStoreSyncAction(
-                    for: blockID,
-                    beforeDocument: beforeDocument,
-                    afterDocument: afterDocument,
-                    afterSelection: afterSelection
-                )
-            },
-            edit: { document in
-                document.handleReturn(
-                    in: blockID,
-                    utf16Offset: returnSelection?.offset,
-                    selectedUTF16Length: returnSelection?.length ?? 0
-                )
-            }
-        )
-    }
-
-    private func currentReturnSelection(for blockID: BlockInputBlockID) -> ReturnSelection? {
-        switch selection {
-        case let .cursor(cursor) where cursor.blockID == blockID:
-            return ReturnSelection(offset: cursor.utf16Offset, length: 0)
-        case let .text(range) where range.blockID == blockID:
-            return ReturnSelection(offset: range.range.location, length: range.range.length)
-        default:
-            return nil
-        }
-    }
-
-    private func returnActionName(for block: BlockInputBlock?, selection: ReturnSelection?) -> String {
-        guard let block else {
-            return "Insert Block"
-        }
-        if block.isEmpty && block.kind.exitsToParagraphOnEmptyReturn {
-            return "Unformat Block"
-        }
-        guard !block.isEmpty && block.kind.acceptsInlineReturn else {
-            return "Insert Block"
-        }
-        let requiresStructuralReturn = block.requiresStructuralReturnHandling(
-            utf16Offset: selection?.offset ?? block.utf16Length,
-            selectedUTF16Length: selection?.length ?? 0
-        )
-        return requiresStructuralReturn ? "Insert Block" : "Insert Line"
-    }
-
-    private func returnStoreSyncAction(
-        for blockID: BlockInputBlockID,
-        beforeDocument: BlockInputDocument,
-        afterDocument: BlockInputDocument,
-        afterSelection: BlockInputSelection
-    ) -> StoreSyncAction {
-        guard case let .cursor(cursor) = afterSelection,
-              let focusedBlock = afterDocument.block(withID: cursor.blockID) else {
-            return .replaceDocument
-        }
-        if beforeDocument.blocks.count == afterDocument.blocks.count {
-            return .replaceBlock(focusedBlock)
-        }
-        if let beforeSourceBlock = beforeDocument.block(withID: blockID),
-           let afterSourceBlock = afterDocument.block(withID: blockID),
-           beforeSourceBlock != afterSourceBlock {
-            return .replaceDocument
-        }
-        guard let insertedIndex = afterDocument.index(of: cursor.blockID) else {
-            return .replaceDocument
-        }
-        return .insertBlocks([focusedBlock], insertionIndex: insertedIndex)
     }
 
     /// Deletes the active block if it is empty, preserving the required focus semantics.

@@ -259,6 +259,41 @@ final class BlockInputCompletionTests: XCTestCase {
     }
 
     @MainActor
+    func testAcceptCompletionSuggestionPreservesListLineIndentation() {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(
+                    id: blockID,
+                    kind: .bulletedListItem,
+                    text: "One\nTwo",
+                    lineIndentationLevels: [0, 1]
+                )
+            ]),
+            undoController: undoController
+        ))
+        view.focus(blockID: blockID, utf16Offset: 7)
+
+        let selection = view.acceptCompletionSuggestion(BlockInputCompletionSuggestion(
+            id: "append:three",
+            title: "Three",
+            insertionText: "\nThree",
+            trigger: .slashCommand
+        ))
+
+        XCTAssertEqual(view.document.blocks[0].text, "One\nTwo\nThree")
+        XCTAssertEqual(view.document.blocks[0].lineIndentationLevels, [0, 1, 1])
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 13)))
+
+        _ = view.undoTextEditInActiveBlock()
+
+        XCTAssertEqual(view.document.blocks[0].text, "One\nTwo")
+        XCTAssertEqual(view.document.blocks[0].lineIndentationLevels, [0, 1])
+    }
+
+    @MainActor
     func testAcceptCompletionSuggestionUsesExplicitRangeAndBlock() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

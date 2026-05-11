@@ -76,6 +76,10 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         }
         let currentBlock = blocks[index]
         if currentBlock.isEmpty, currentBlock.kind.exitsToParagraphOnEmptyReturn {
+            if currentBlock.kind.supportsIndentation,
+               outdentEmptyListBlock(at: index) {
+                return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
+            }
             blocks[index] = BlockInputBlock(id: blockID, kind: .paragraph)
             return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
         }
@@ -85,13 +89,53 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
             let replacementLength = min(max(selectedUTF16Length, 0), currentBlock.utf16Length - insertionOffset)
             if replacementLength == 0,
                let removalRange = currentBlock.emptyInlineLineRemovalRangeForReturn(utf16Offset: insertionOffset) {
+                if outdentEmptyInlineLineIfNeeded(at: index, utf16Offset: insertionOffset) {
+                    return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: insertionOffset))
+                }
                 return exitInlineBlock(at: index, removing: removalRange)
             }
             mutableText.replaceCharacters(in: NSRange(location: insertionOffset, length: replacementLength), with: "\n")
-            blocks[index].text = mutableText as String
+            let updatedText = mutableText as String
+            blocks[index].text = updatedText
+            if let lineIndentationLevels = currentBlock.lineIndentationLevelsAfterReplacingTextWithLineEnding(
+                utf16Offset: insertionOffset,
+                selectedUTF16Length: replacementLength,
+                updatedText: updatedText
+            ) {
+                blocks[index].lineIndentationLevels = lineIndentationLevels
+            }
             return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: insertionOffset + 1))
         }
         return insertBlock(BlockInputBlock(), at: index + 1)
+    }
+
+    private mutating func outdentEmptyListBlock(at index: Int) -> Bool {
+        guard blocks[index].kind.supportsIndentation else {
+            return false
+        }
+        let lineIndentation = blocks[index].indentationLevel(forLine: 0)
+        guard lineIndentation > 0 else {
+            return false
+        }
+        if blocks[index].lineIndentationLevels.isEmpty {
+            blocks[index].indentationLevel -= 1
+            return true
+        }
+        blocks[index].setIndentationLevel(lineIndentation - 1, forLine: 0)
+        return true
+    }
+
+    private mutating func outdentEmptyInlineLineIfNeeded(at index: Int, utf16Offset: Int) -> Bool {
+        guard blocks[index].kind.supportsIndentation else {
+            return false
+        }
+        let lineIndex = blocks[index].lineIndex(containingUTF16Offset: utf16Offset)
+        let indentationLevel = blocks[index].indentationLevel(forLine: lineIndex)
+        guard indentationLevel > 0 else {
+            return false
+        }
+        blocks[index].setIndentationLevel(indentationLevel - 1, forLine: lineIndex)
+        return true
     }
 
     private mutating func exitInlineBlock(at index: Int, removing removalRange: NSRange) -> BlockInputSelection {
@@ -136,7 +180,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
     }
 
     private static func lineCount(in text: String) -> Int {
-        text.isEmpty ? 0 : text.components(separatedBy: .newlines).count
+        text.isEmpty ? 0 : BlockInputLineBreaks.lineCount(in: text)
     }
 
     private static func removingOneTrailingLineEnding(_ text: String) -> String {
@@ -237,12 +281,24 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
 
     /// Increases a block's nesting level.
     @discardableResult
-    public mutating func indentBlock(blockID: BlockInputBlockID) -> BlockInputSelection? {
+    public mutating func indentBlock(
+        blockID: BlockInputBlockID,
+        activeUTF16Offset: Int? = nil
+    ) -> BlockInputSelection? {
         guard let index = index(of: blockID) else {
             return nil
         }
         guard blocks[index].kind.supportsIndentation else {
             return nil
+        }
+        if let activeUTF16Offset,
+           blocks[index].text.contains("\n") {
+            let lineIndex = blocks[index].lineIndex(containingUTF16Offset: activeUTF16Offset)
+            blocks[index].setIndentationLevel(
+                blocks[index].indentationLevel(forLine: lineIndex) + 1,
+                forLine: lineIndex
+            )
+            return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: activeUTF16Offset))
         }
         blocks[index].indentationLevel += 1
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: blocks[index].utf16Length))
@@ -250,12 +306,25 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
 
     /// Decreases a block's nesting level.
     @discardableResult
-    public mutating func outdentBlock(blockID: BlockInputBlockID) -> BlockInputSelection? {
+    public mutating func outdentBlock(
+        blockID: BlockInputBlockID,
+        activeUTF16Offset: Int? = nil
+    ) -> BlockInputSelection? {
         guard let index = index(of: blockID) else {
             return nil
         }
         guard blocks[index].kind.supportsIndentation else {
             return nil
+        }
+        if let activeUTF16Offset,
+           blocks[index].text.contains("\n") {
+            let lineIndex = blocks[index].lineIndex(containingUTF16Offset: activeUTF16Offset)
+            let currentLevel = blocks[index].indentationLevel(forLine: lineIndex)
+            guard currentLevel > 0 else {
+                return nil
+            }
+            blocks[index].setIndentationLevel(currentLevel - 1, forLine: lineIndex)
+            return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: activeUTF16Offset))
         }
         guard blocks[index].indentationLevel > 0 else {
             return nil
@@ -304,8 +373,17 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         if blocks[index].kind == .horizontalRule {
             return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
         }
-        let edit = blocks[index].text.replacingUTF16Characters(in: range, with: replacement)
+        let beforeBlock = blocks[index]
+        let editRange = beforeBlock.text.clampedUTF16Range(range)
+        let edit = beforeBlock.text.replacingUTF16Characters(in: editRange, with: replacement)
         blocks[index].text = edit.text
+        if let lineIndentationLevels = beforeBlock.lineIndentationLevelsAfterReplacingText(
+            utf16Offset: editRange.location,
+            selectedUTF16Length: editRange.length,
+            updatedText: edit.text
+        ) {
+            blocks[index].lineIndentationLevels = lineIndentationLevels
+        }
         return .cursor(BlockInputCursor(
             blockID: blockID,
             utf16Offset: edit.selectionOffset
@@ -347,11 +425,17 @@ public extension BlockInputBlock {
 }
 
 private extension String {
+    func clampedUTF16Range(_ range: NSRange) -> NSRange {
+        let text = self as NSString
+        let location = min(max(range.location, 0), text.length)
+        let length = min(max(range.length, 0), max(text.length - location, 0))
+        return NSRange(location: location, length: length)
+    }
+
     func replacingUTF16Characters(in range: NSRange, with replacement: String) -> (text: String, selectionOffset: Int) {
         let mutable = NSMutableString(string: self)
-        let location = min(max(range.location, 0), mutable.length)
-        let length = min(max(range.length, 0), max(mutable.length - location, 0))
-        mutable.replaceCharacters(in: NSRange(location: location, length: length), with: replacement)
-        return (mutable as String, location + (replacement as NSString).length)
+        let clampedRange = clampedUTF16Range(range)
+        mutable.replaceCharacters(in: clampedRange, with: replacement)
+        return (mutable as String, clampedRange.location + (replacement as NSString).length)
     }
 }

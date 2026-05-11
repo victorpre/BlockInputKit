@@ -207,6 +207,60 @@ final class BlockInputDocumentTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 4)))
     }
 
+    func testReplacingListTextPreservesPerLineIndentationLevels() {
+        let blockID = BlockInputBlockID(rawValue: "list")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(
+                id: blockID,
+                kind: .bulletedListItem,
+                text: "One\nTwo",
+                lineIndentationLevels: [0, 1]
+            )
+        ])
+
+        let selection = document.replaceText(
+            in: blockID,
+            range: NSRange(location: 7, length: 0),
+            replacement: "\nThree"
+        )
+
+        XCTAssertEqual(document.blocks[0].text, "One\nTwo\nThree")
+        XCTAssertEqual(document.blocks[0].lineIndentationLevels, [0, 1, 1])
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 13)))
+    }
+
+    func testReplacingAllListTextKeepsEmptyLineAtSelectionStartIndentation() {
+        let blockID = BlockInputBlockID(rawValue: "list")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(
+                id: blockID,
+                kind: .bulletedListItem,
+                text: "One\nTwo",
+                lineIndentationLevels: [1, 3]
+            )
+        ])
+
+        let selection = document.replaceText(
+            in: blockID,
+            range: NSRange(location: 0, length: 7),
+            replacement: ""
+        )
+
+        XCTAssertEqual(document.blocks[0].text, "")
+        XCTAssertEqual(document.blocks[0].lineIndentationLevels, [1])
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    func testCRLFListTextDoesNotCreatePhantomLineIndentation() {
+        let block = BlockInputBlock(
+            kind: .bulletedListItem,
+            text: "One\r\nTwo",
+            lineIndentationLevels: [0, 1]
+        )
+
+        XCTAssertEqual(block.lineIndentationLevels, [0, 1])
+    }
+
     func testReplacingTextInHorizontalRuleIsNoOp() {
         let blockID = BlockInputBlockID(rawValue: "rule")
         var document = BlockInputDocument(blocks: [
@@ -262,6 +316,36 @@ final class BlockInputDocumentTests: XCTestCase {
 
         XCTAssertNil(selection)
         XCTAssertEqual(document.blocks[0].indentationLevel, 0)
+    }
+
+    func testIndentWithActiveOffsetOnlyIndentsCurrentListLine() {
+        let blockID = BlockInputBlockID(rawValue: "list")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "One\nTwo\nThree")
+        ])
+
+        let selection = document.indentBlock(blockID: blockID, activeUTF16Offset: 5)
+
+        XCTAssertEqual(document.blocks[0].indentationLevel, 0)
+        XCTAssertEqual(document.blocks[0].lineIndentationLevels, [0, 1, 0])
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 5)))
+    }
+
+    func testOutdentWithActiveOffsetOnlyOutdentsCurrentListLine() {
+        let blockID = BlockInputBlockID(rawValue: "list")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(
+                id: blockID,
+                kind: .bulletedListItem,
+                text: "One\nTwo\nThree",
+                lineIndentationLevels: [0, 2, 0]
+            )
+        ])
+
+        let selection = document.outdentBlock(blockID: blockID, activeUTF16Offset: 5)
+
+        XCTAssertEqual(document.blocks[0].lineIndentationLevels, [0, 1, 0])
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 5)))
     }
 
     func testIndentIgnoresNonListBlocks() {

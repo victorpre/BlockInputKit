@@ -28,8 +28,16 @@ protocol BlockInputBlockItemDelegate: AnyObject {
     ) -> Bool
     func blockItemDidRequestSelectHorizontalRule(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
-    func blockItemDidRequestIndent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
-    func blockItemDidRequestOutdent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
+    func blockItemDidRequestIndent(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        selectedRange: NSRange
+    )
+    func blockItemDidRequestOutdent(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        selectedRange: NSRange
+    )
     func blockItem(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,

@@ -218,6 +218,33 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
     }
 
     @MainActor
+    func testReturnOnIndentedEmptyInlineListLinePublishesBlockReplacementToStore() {
+        let blockID = BlockInputBlockID(rawValue: "bullet")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(
+                id: blockID,
+                kind: .bulletedListItem,
+                text: "First\n",
+                lineIndentationLevels: [0, 1]
+            )
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 0)
+        XCTAssertEqual(store.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First\n")
+        ])
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)))
+    }
+
+    @MainActor
     func testReturnFallsBackToFirstStoreBlockWhenSelectionWasRemoved() {
         let staleID = BlockInputBlockID(rawValue: "stale")
         let replacementID = BlockInputBlockID(rawValue: "replacement")

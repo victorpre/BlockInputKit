@@ -63,17 +63,28 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
             normalizeForKind()
         }
     }
+    /// Per-line nesting overrides for list-like blocks.
+    ///
+    /// An empty array means every line uses `indentationLevel`. The array is
+    /// populated only when lines inside one block need different nesting levels.
+    public var lineIndentationLevels: [Int] {
+        didSet {
+            normalizeForKind()
+        }
+    }
 
     public init(
         id: BlockInputBlockID = .unique(),
         kind: BlockInputBlockKind = .paragraph,
         text: String = "",
-        indentationLevel: Int = 0
+        indentationLevel: Int = 0,
+        lineIndentationLevels: [Int] = []
     ) {
         self.id = id
         self.kind = kind
         self.text = kind == .horizontalRule ? "" : text
         self.indentationLevel = indentationLevel
+        self.lineIndentationLevels = lineIndentationLevels
         normalizeForKind()
     }
 
@@ -84,6 +95,10 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
         let decodedText = try container.decode(String.self, forKey: .text)
         text = kind == .horizontalRule ? "" : decodedText
         indentationLevel = try container.decode(Int.self, forKey: .indentationLevel)
+        lineIndentationLevels = try container.decodeIfPresent(
+            [Int].self,
+            forKey: .lineIndentationLevels
+        ) ?? []
         normalizeForKind()
     }
 
@@ -108,6 +123,27 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
         if indentationLevel != normalizedIndentation {
             indentationLevel = normalizedIndentation
         }
+        let normalizedLineIndentations = normalizedLineIndentationLevels()
+        if lineIndentationLevels != normalizedLineIndentations {
+            lineIndentationLevels = normalizedLineIndentations
+        }
+    }
+
+    private func normalizedLineIndentationLevels() -> [Int] {
+        guard kind.supportsIndentation else {
+            return []
+        }
+        guard !lineIndentationLevels.isEmpty else {
+            return []
+        }
+        let lineCount = BlockInputLineBreaks.lineCount(in: text)
+        let normalized = (0..<lineCount).map { lineIndex in
+            let level = lineIndentationLevels.indices.contains(lineIndex)
+                ? lineIndentationLevels[lineIndex]
+                : indentationLevel
+            return max(0, level)
+        }
+        return normalized.allSatisfy { $0 == indentationLevel } ? [] : normalized
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -115,10 +151,141 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
         case kind
         case text
         case indentationLevel
+        case lineIndentationLevels
     }
 }
 
 extension BlockInputBlock {
+    func indentationLevel(forLine lineIndex: Int) -> Int {
+        guard kind.supportsIndentation else {
+            return 0
+        }
+        guard lineIndentationLevels.indices.contains(lineIndex) else {
+            return indentationLevel
+        }
+        return lineIndentationLevels[lineIndex]
+    }
+
+    func lineIndex(containingUTF16Offset offset: Int) -> Int {
+        let textStorage = text as NSString
+        let clampedOffset = min(max(offset, 0), textStorage.length)
+        guard clampedOffset > 0 else {
+            return 0
+        }
+        var lineIndex = 0
+        var utf16Index = 0
+        while utf16Index < clampedOffset {
+            let character = textStorage.character(at: utf16Index)
+            if character.isCarriageReturn,
+               utf16Index + 1 < clampedOffset,
+               textStorage.character(at: utf16Index + 1).isLineFeed {
+                lineIndex += 1
+                utf16Index += 2
+                continue
+            }
+            if character.isLineEnding {
+                lineIndex += 1
+            }
+            utf16Index += 1
+        }
+        return lineIndex
+    }
+
+    mutating func setIndentationLevel(_ indentationLevel: Int, forLine lineIndex: Int) {
+        guard kind.supportsIndentation else {
+            return
+        }
+        let lineCount = BlockInputLineBreaks.lineCount(in: text)
+        guard (0..<lineCount).contains(lineIndex) else {
+            return
+        }
+        var levels = lineIndentationLevels.isEmpty
+            ? Array(repeating: self.indentationLevel, count: lineCount)
+            : lineIndentationLevels
+        if levels.count < lineCount {
+            levels += Array(repeating: self.indentationLevel, count: lineCount - levels.count)
+        } else if levels.count > lineCount {
+            levels = Array(levels.prefix(lineCount))
+        }
+        levels[lineIndex] = max(0, indentationLevel)
+        lineIndentationLevels = levels
+    }
+
+    func lineIndentationLevelsAfterReplacingTextWithLineEnding(
+        utf16Offset: Int,
+        selectedUTF16Length: Int,
+        updatedText: String
+    ) -> [Int]? {
+        let textStorage = text as NSString
+        let offset = min(max(utf16Offset, 0), textStorage.length)
+        let replacementLength = min(max(selectedUTF16Length, 0), textStorage.length - offset)
+        let updatedTextStorage = updatedText as NSString
+        guard updatedTextStorage.length == textStorage.length - replacementLength + 1,
+              offset < updatedTextStorage.length,
+              updatedTextStorage.character(at: offset).isLineEnding else {
+            return nil
+        }
+        return lineIndentationLevelsAfterReplacingText(
+            utf16Offset: utf16Offset,
+            selectedUTF16Length: selectedUTF16Length,
+            updatedText: updatedText
+        )
+    }
+
+    func lineIndentationLevelsAfterReplacingText(
+        utf16Offset: Int,
+        selectedUTF16Length: Int,
+        updatedText: String
+    ) -> [Int]? {
+        guard kind.supportsIndentation else {
+            return nil
+        }
+        let textStorage = text as NSString
+        let offset = min(max(utf16Offset, 0), textStorage.length)
+        let replacementLength = min(max(selectedUTF16Length, 0), textStorage.length - offset)
+        let updatedTextStorage = updatedText as NSString
+        let insertedLength = updatedTextStorage.length - textStorage.length + replacementLength
+        guard insertedLength >= 0,
+              updatedTextStorage.length == textStorage.length - replacementLength + insertedLength else {
+            return nil
+        }
+        let removedRange = NSRange(location: offset, length: replacementLength)
+        let insertedRange = NSRange(location: offset, length: insertedLength)
+        guard Self.rangeContainsLineEnding(removedRange, in: textStorage) ||
+              Self.rangeContainsLineEnding(insertedRange, in: updatedTextStorage) else {
+            return nil
+        }
+        let insertedUpperBound = offset + insertedLength
+        let sourceInsertionLineIndex = lineIndex(containingUTF16Offset: offset)
+        if updatedTextStorage.length == 0 {
+            return [indentationLevel(forLine: sourceInsertionLineIndex)]
+        }
+        // Map each resulting line start back to the source line that supplied
+        // its indentation; inserted lines inherit the edited line.
+        return BlockInputLineBreaks.lineStartOffsets(in: updatedText).map { updatedLineStart in
+            if updatedLineStart < offset {
+                return indentationLevel(forLine: lineIndex(containingUTF16Offset: updatedLineStart))
+            }
+            if insertedLength > 0, updatedLineStart < insertedUpperBound {
+                return indentationLevel(forLine: sourceInsertionLineIndex)
+            }
+            let sourceLineStart = updatedLineStart - insertedLength + replacementLength
+            return indentationLevel(forLine: lineIndex(containingUTF16Offset: sourceLineStart))
+        }
+    }
+
+    private static func rangeContainsLineEnding(_ range: NSRange, in text: NSString) -> Bool {
+        let lowerBound = min(max(range.location, 0), text.length)
+        let upperBound = min(max(NSMaxRange(range), lowerBound), text.length)
+        guard lowerBound < upperBound else {
+            return false
+        }
+        for index in lowerBound..<upperBound where text.character(at: index).isLineEnding {
+            return true
+        }
+        return false
+    }
+
     func requiresStructuralReturnHandling(utf16Offset: Int, selectedUTF16Length: Int) -> Bool {
         if isEmpty, kind.exitsToParagraphOnEmptyReturn {
             return true
@@ -203,15 +370,5 @@ extension BlockInputBlockKind {
         case .paragraph, .heading, .horizontalRule:
             return false
         }
-    }
-}
-
-private extension unichar {
-    var isLineEnding: Bool {
-        self == 10 || self == 13
-    }
-
-    var isCarriageReturn: Bool {
-        self == 13
     }
 }

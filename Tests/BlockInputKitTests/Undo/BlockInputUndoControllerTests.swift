@@ -114,4 +114,37 @@ final class BlockInputUndoControllerTests: XCTestCase {
 
         XCTAssertNil(undoController.redoTextEdit(in: &document, blockID: blockID))
     }
+
+    func testTextUndoRestoresPerLineIndentationLevels() {
+        let blockID = BlockInputBlockID(rawValue: "list")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(
+                id: blockID,
+                kind: .bulletedListItem,
+                text: "One\nTwo\n",
+                lineIndentationLevels: [0, 1, 1]
+            )
+        ])
+        let undoController = BlockInputUndoController()
+
+        undoController.registerTextEdit(
+            blockID: blockID,
+            beforeText: "One\nTwo",
+            afterText: "One\nTwo\n",
+            beforeLineIndentationLevels: [0, 1],
+            afterLineIndentationLevels: [0, 1, 1],
+            selectionBefore: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 7)),
+            selectionAfter: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 8))
+        )
+
+        _ = undoController.undoTextEdit(in: &document, blockID: blockID)
+
+        XCTAssertEqual(document.blocks[0].text, "One\nTwo")
+        XCTAssertEqual(document.blocks[0].lineIndentationLevels, [0, 1])
+
+        _ = undoController.redoTextEdit(in: &document, blockID: blockID)
+
+        XCTAssertEqual(document.blocks[0].text, "One\nTwo\n")
+        XCTAssertEqual(document.blocks[0].lineIndentationLevels, [0, 1, 1])
+    }
 }

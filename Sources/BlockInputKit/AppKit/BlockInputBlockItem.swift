@@ -2,25 +2,41 @@ import AppKit
 
 final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let reuseIdentifier = NSUserInterfaceItemIdentifier("BlockInputBlockItem")
-    private static let checklistButtonBaseLeading: CGFloat = 5
-    private static let checklistButtonIndentStep: CGFloat = 4
-    private static let checklistButtonMaxLeading: CGFloat = 10
+    static let chromeFrameAlignmentOffset: CGFloat = -2
+    static let checklistButtonBaseLeading: CGFloat = chromeFrameAlignmentOffset
 
-    private static let handleWidth: CGFloat = 24
-    private static let horizontalChromeWidthWithHandle: CGFloat = 56
-    private static let horizontalChromeWidthWithoutHandle: CGFloat = 32
-    private let handleView = BlockInputDragHandleView()
-    private let kindLabel = NSTextField(labelWithString: "")
-    private let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
-    private let scrollView = NSScrollView()
-    private let horizontalRuleView = BlockInputHorizontalRuleView()
+    static let handleWidth: CGFloat = 24
+    static let horizontalChromeWidthWithHandle: CGFloat = 56
+    static let horizontalChromeWidthWithoutHandle: CGFloat = 32
+    static let markerGutterWidth: CGFloat = 24
+    static let markerChromeWidth: CGFloat = 18
+    static let minimumMarkerTextGap: CGFloat = 4
+    static let defaultTextLeading: CGFloat = 4
+    // Mirrors the NSTextView inset plus line-fragment padding so external chrome starts at the plain-text glyph column.
+    static let textContainerContentLeading: CGFloat = 11
+    static let markerAlignmentLeading: CGFloat = markerGutterWidth + defaultTextLeading + textContainerContentLeading
+    static let listTextLeading: CGFloat = -textContainerContentLeading
+    static let quoteBarIdentifier = NSUserInterfaceItemIdentifier("BlockInputQuoteBarView")
+    private static let quoteTextLeading: CGFloat = 7
+    let handleView = BlockInputDragHandleView()
+    let kindLabel = BlockInputMarkerView(labelWithString: "")
+    let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    let quoteBarView = NSView()
+    let scrollView = NSScrollView()
+    let horizontalRuleView = BlockInputHorizontalRuleView()
     let textView = BlockInputTextView()
     private var trackingArea: NSTrackingArea?
-    private weak var delegate: BlockInputBlockItemDelegate?
-    private var blockID: BlockInputBlockID?
+    private(set) weak var delegate: BlockInputBlockItemDelegate?
+    private(set) var blockID: BlockInputBlockID?
+    var renderedBlock: BlockInputBlock?
     private var selectionBeforeTextChange: BlockInputSelection?
-    private var handleWidthConstraint: NSLayoutConstraint?
-    private var checklistButtonLeadingConstraint: NSLayoutConstraint?
+    var handleWidthConstraint: NSLayoutConstraint?
+    var kindLabelLeadingConstraint: NSLayoutConstraint?
+    var kindLabelWidthConstraint: NSLayoutConstraint?
+    var checklistButtonLeadingConstraint: NSLayoutConstraint?
+    var scrollViewLeadingConstraint: NSLayoutConstraint?
+    var quoteBarLeadingConstraint: NSLayoutConstraint?
+    var horizontalRuleLeadingConstraint: NSLayoutConstraint?
     private var isHorizontalRule = false
 
     enum TextLinePosition {
@@ -60,6 +76,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
     func clearConfiguration() {
         blockID = nil
+        renderedBlock = nil
         delegate = nil
         selectionBeforeTextChange = nil
         isHorizontalRule = false
@@ -71,8 +88,16 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         textView.string = ""
         textView.isEditable = true
         scrollView.isHidden = false
+        scrollViewLeadingConstraint?.constant = Self.defaultTextLeading
+        quoteBarLeadingConstraint?.constant = Self.chromeFrameAlignmentOffset
+        horizontalRuleLeadingConstraint?.constant = Self.defaultTextLeading + 4
+        quoteBarView.isHidden = true
+        quoteBarView.alphaValue = 0
         textView.setSelectedRange(NSRange(location: 0, length: 0))
-        kindLabel.stringValue = ""
+        textView.font = Self.font(for: .paragraph)
+        kindLabel.setMarkerLines([])
+        kindLabelLeadingConstraint?.constant = 0
+        kindLabelWidthConstraint?.constant = Self.markerGutterWidth
         checklistButton.state = .off
         checklistButton.isHidden = true
         checklistButton.isEnabled = false
@@ -87,6 +112,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     override func viewDidLayout() {
         super.viewDidLayout()
         updateHoverTrackingArea()
+        updateMarkerLineYOffsets()
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -119,6 +145,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate: BlockInputBlockItemDelegate
     ) {
         blockID = block.id
+        renderedBlock = block
         self.delegate = delegate
         selectionBeforeTextChange = nil
         isHorizontalRule = block.kind == .horizontalRule
@@ -127,7 +154,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         horizontalRuleView.accentColor = accentColor
         textView.blockItem = self
         textView.string = block.kind == .horizontalRule ? "" : block.text
-        configureBlockKindChrome(kind: block.kind, indentationLevel: block.indentationLevel, text: block.text)
+        configureBlockKindChrome(block: block)
         setBlockSelection(isSelected)
         handleView.isEnabled = allowsReordering
         handleView.isHidden = !allowsReordering
@@ -137,7 +164,8 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     func updateTextDependentChrome(for block: BlockInputBlock) {
-        configureBlockKindChrome(kind: block.kind, indentationLevel: block.indentationLevel, text: block.text)
+        renderedBlock = block
+        configureBlockKindChrome(block: block)
     }
 
     func focusText(atUTF16Offset offset: Int) {
@@ -146,15 +174,18 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             location: min(max(offset, 0), (textView.string as NSString).length),
             length: 0
         ))
+        updateTypingAttributesForCurrentSelection()
     }
 
     func focusText(inUTF16Range range: NSRange) {
         view.window?.makeFirstResponder(textView)
         textView.setSelectedRange(range)
+        updateTypingAttributesForCurrentSelection()
     }
 
     func setSelectedRange(_ range: NSRange) {
         textView.setSelectedRange(range)
+        updateTypingAttributesForCurrentSelection()
     }
 
     func textDidBeginEditing(_ notification: Notification) {
@@ -204,6 +235,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         guard let blockID else {
             return
         }
+        updateTypingAttributesForCurrentSelection()
         delegate?.blockItem(self, didChangeSelectionIn: blockID)
     }
 
@@ -263,20 +295,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate?.blockItemDidRequestToggleChecklist(self, blockID: blockID)
     }
 
-    func requestIndent() {
-        guard let blockID else {
-            return
-        }
-        delegate?.blockItemDidRequestIndent(self, blockID: blockID)
-    }
-
-    func requestOutdent() {
-        guard let blockID else {
-            return
-        }
-        delegate?.blockItemDidRequestOutdent(self, blockID: blockID)
-    }
-
     func requestMoveVertically(_ direction: BlockInputVerticalMovementDirection) -> Bool {
         guard let blockID, canMoveVerticallyOutOfBlock(direction) else {
             return false
@@ -324,24 +342,35 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.trackingArea = trackingArea
     }
 
-    private func configureBlockKindChrome(kind: BlockInputBlockKind, indentationLevel: Int, text: String) {
+    private func configureBlockKindChrome(block: BlockInputBlock) {
+        let kind = block.kind
         let isHorizontalRule = kind == .horizontalRule
+        let contentIndent = Self.contentIndent(for: block)
+        let perLineContentIndent = Self.perLineContentIndent(for: block)
         textView.isEditable = !isHorizontalRule
+        applyTextAttributes(for: block)
         scrollView.isHidden = isHorizontalRule
+        kindLabelLeadingConstraint?.constant = kindLabelLeadingConstant(for: block, contentIndent: contentIndent)
+        kindLabelWidthConstraint?.constant = kindLabelWidthConstant(for: block, perLineContentIndent: perLineContentIndent)
+        scrollViewLeadingConstraint?.constant = textLeadingConstant(
+            for: kind,
+            perLineContentIndent: perLineContentIndent
+        )
+        horizontalRuleLeadingConstraint?.constant = Self.defaultTextLeading + 4
+        quoteBarView.isHidden = kind != .quote || isHorizontalRule
+        quoteBarView.alphaValue = quoteBarView.isHidden ? 0 : 1
         horizontalRuleView.setVisible(isHorizontalRule)
+        applyKindLabelAttributes(for: block)
         switch kind {
         case let .checklistItem(isChecked):
-            kindLabel.stringValue = Self.prefixesAfterChecklistButton(
-                isChecked: isChecked,
-                indentationLevel: indentationLevel,
-                text: text
-            )
             checklistButton.isHidden = false
             checklistButton.isEnabled = true
             checklistButton.state = isChecked ? .on : .off
-            checklistButtonLeadingConstraint?.constant = Self.checklistButtonLeadingConstant(indentationLevel: indentationLevel)
+            checklistButtonLeadingConstraint?.constant = Self.checklistButtonLeadingConstant(
+                indentationLevel: block.indentationLevel(forLine: 0),
+                rowContentIndent: contentIndent
+            )
         default:
-            kindLabel.stringValue = Self.prefixes(for: kind, indentationLevel: indentationLevel, text: text)
             checklistButton.isHidden = true
             checklistButton.isEnabled = false
             checklistButton.state = .off
@@ -349,102 +378,59 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         }
     }
 
-    private static func checklistButtonLeadingConstant(indentationLevel: Int) -> CGFloat {
-        min(
-            checklistButtonBaseLeading + CGFloat(max(0, indentationLevel)) * checklistButtonIndentStep,
-            checklistButtonMaxLeading
-        )
-    }
-
-    private func setupViews() {
-        view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.clear.cgColor
-
-        handleView.font = .systemFont(ofSize: 13, weight: .semibold)
-        handleView.alignment = .center
-        handleView.textColor = .secondaryLabelColor
-        handleView.alphaValue = 0
-
-        kindLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        kindLabel.alignment = .right
-        kindLabel.textColor = .tertiaryLabelColor
-        kindLabel.maximumNumberOfLines = 0
-
-        setupChecklistButton()
-
-        setupTextView()
-        setupHorizontalRuleView()
-
-        for subview in [handleView, kindLabel, checklistButton, scrollView, horizontalRuleView] {
-            subview.translatesAutoresizingMaskIntoConstraints = false
-            view.addSubview(subview)
+    private func kindLabelLeadingConstant(for block: BlockInputBlock, contentIndent: CGFloat) -> CGFloat {
+        switch block.kind {
+        case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+            return Self.markerAlignmentLeading + contentIndent
+        case .paragraph, .heading, .code, .horizontalRule:
+            return contentIndent
         }
-
-        let checklistButtonLeadingConstraint = checklistButton.leadingAnchor.constraint(
-            equalTo: kindLabel.leadingAnchor,
-            constant: Self.checklistButtonBaseLeading
-        )
-        self.checklistButtonLeadingConstraint = checklistButtonLeadingConstraint
-
-        let handleWidthConstraint = handleView.widthAnchor.constraint(equalToConstant: Self.handleWidth)
-        self.handleWidthConstraint = handleWidthConstraint
-
-        NSLayoutConstraint.activate([
-            handleView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
-            handleView.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
-            handleWidthConstraint,
-
-            kindLabel.leadingAnchor.constraint(equalTo: handleView.trailingAnchor),
-            kindLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
-            kindLabel.widthAnchor.constraint(equalToConstant: 28),
-
-            checklistButtonLeadingConstraint,
-            checklistButton.centerYAnchor.constraint(equalTo: kindLabel.centerYAnchor),
-            checklistButton.widthAnchor.constraint(equalToConstant: 18),
-            checklistButton.heightAnchor.constraint(equalToConstant: 18),
-
-            scrollView.leadingAnchor.constraint(equalTo: kindLabel.trailingAnchor, constant: 4),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
-            horizontalRuleView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 4),
-            horizontalRuleView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -4),
-            horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            horizontalRuleView.heightAnchor.constraint(equalToConstant: 8)
-        ])
     }
 
-    private func setupChecklistButton() {
-        checklistButton.target = self
-        checklistButton.action = #selector(requestToggleChecklist)
-        checklistButton.isHidden = true
-        checklistButton.toolTip = "Toggle checklist item"
-        checklistButton.setAccessibilityLabel("Toggle checklist item")
+    private func kindLabelWidthConstant(
+        for block: BlockInputBlock,
+        perLineContentIndent: CGFloat
+    ) -> CGFloat {
+        if block.kind == .quote {
+            return 0
+        }
+        return Self.markerGutterWidth(for: block) + perLineContentIndent
     }
 
-    private func setupHorizontalRuleView() {
-        horizontalRuleView.blockItem = self
+    private func textLeadingConstant(
+        for kind: BlockInputBlockKind,
+        perLineContentIndent: CGFloat
+    ) -> CGFloat {
+        if kind == .quote {
+            return Self.quoteTextLeading
+        }
+        if kind.supportsIndentation {
+            return Self.listTextLeading - perLineContentIndent
+        }
+        return Self.defaultTextLeading
     }
 
-    private func setupTextView() {
-        scrollView.drawsBackground = false
-        scrollView.hasVerticalScroller = false
-        scrollView.hasHorizontalScroller = false
-        scrollView.borderType = .noBorder
-        scrollView.documentView = textView
+    private static func checklistButtonLeadingConstant(
+        indentationLevel: Int,
+        rowContentIndent: CGFloat
+    ) -> CGFloat {
+        checklistButtonBaseLeading + contentIndent(forIndentationLevel: indentationLevel) - rowContentIndent
+    }
 
-        textView.minSize = NSSize(width: 0, height: 0)
-        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = false
-        textView.autoresizingMask = [.width]
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainerInset = NSSize(width: 4, height: 6)
-        textView.backgroundColor = .clear
-        textView.drawsBackground = false
-        textView.font = .preferredFont(forTextStyle: .body)
-        textView.delegate = self
+    private static func markerGutterWidth(for block: BlockInputBlock) -> CGFloat {
+        guard block.kind.supportsIndentation else {
+            return markerGutterWidth
+        }
+        let markerLines = markerLines(for: block)
+        let markerTexts = markerLines.isEmpty ? [prefix(for: block.kind, indentationLevel: block.indentationLevel)] : markerLines.map(\.text)
+        let widestMarker = markerTexts.reduce(CGFloat.zero) { widest, marker in
+            guard !marker.isEmpty else {
+                return widest
+            }
+            let width = (marker as NSString).size(withAttributes: [.font: font(for: block.kind)]).width
+            return max(widest, width)
+        }
+        return max(markerGutterWidth, widestMarker + minimumMarkerTextGap)
     }
 
     private func draggingPreviewImage() -> NSImage {

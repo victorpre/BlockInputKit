@@ -5,32 +5,172 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     @MainActor
     func testPrefixReflectsBlockKindAndIndentation() {
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .paragraph, indentationLevel: 2), "")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .heading(level: 3), indentationLevel: 0), "###")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .code(language: nil), indentationLevel: 1), " {}")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .heading(level: 3), indentationLevel: 0), "")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .code(language: nil), indentationLevel: 1), "{}")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .horizontalRule, indentationLevel: 0), "")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .quote, indentationLevel: 2), "  >")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 1), " *")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 2), "  +")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .numberedListItem(start: 3), indentationLevel: 1), " c.")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .numberedListItem(start: 3), indentationLevel: 2), "  iii.")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .checklistItem(isChecked: false), indentationLevel: 1), " [ ]")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .checklistItem(isChecked: true), indentationLevel: 1), " [x]")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .quote, indentationLevel: 2), "")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 0), "•")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 1), "◦")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 2), "▪")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .numberedListItem(start: 3), indentationLevel: 1), "c.")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .numberedListItem(start: 3), indentationLevel: 2), "iii.")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .checklistItem(isChecked: false), indentationLevel: 1), "[ ]")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .checklistItem(isChecked: true), indentationLevel: 1), "[x]")
     }
 
     @MainActor
     func testMultilinePrefixesReflectRepeatedTextLines() {
         XCTAssertEqual(
             BlockInputBlockItem.prefixes(for: .bulletedListItem, indentationLevel: 0, text: "One\nTwo\n"),
-            "-\n-\n-"
+            "•\n•\n•"
         )
         XCTAssertEqual(
             BlockInputBlockItem.prefixes(for: .numberedListItem(start: 3), indentationLevel: 0, text: "One\nTwo"),
             "3.\n4."
         )
         XCTAssertEqual(
-            BlockInputBlockItem.prefixesAfterChecklistButton(isChecked: false, indentationLevel: 0, text: "One\nTwo"),
-            "\n[ ]"
+            BlockInputBlockItem.prefixes(for: .bulletedListItem, indentationLevel: 0, text: "One\r\nTwo"),
+            "•\n•"
         )
+    }
+
+    @MainActor
+    func testHeadingUsesHeaderTypographyWithoutMarkdownMarker() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "heading", kind: .heading(level: 2), text: "Title"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+
+        let textView = try XCTUnwrap(item.testingTextView)
+        let kindLabel = try XCTUnwrap(item.testingKindLabel)
+        XCTAssertEqual(kindLabel.stringValue, "")
+        XCTAssertEqual(textView.font?.pointSize, BlockInputBlockItem.font(for: .heading(level: 2)).pointSize)
+        XCTAssertGreaterThan(
+            BlockInputBlockItem.height(for: BlockInputBlock(kind: .heading(level: 1), text: "Title"), textWidth: 240),
+            BlockInputBlockItem.height(for: BlockInputBlock(kind: .paragraph, text: "Title"), textWidth: 240)
+        )
+    }
+
+    @MainActor
+    func testQuoteUsesLeadingRuleInsteadOfMarkdownMarker() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "quote", kind: .quote, text: "Quoted"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+
+        XCTAssertEqual(try XCTUnwrap(item.testingKindLabel).stringValue, "")
+        XCTAssertFalse(try XCTUnwrap(item.testingQuoteBarView).isHidden)
+
+        item.configure(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Plain"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+
+        XCTAssertTrue(try XCTUnwrap(item.testingQuoteBarView).isHidden)
+    }
+
+    @MainActor
+    func testPerLineChecklistIndentationUsesFirstLineCheckboxAndRemainingLinePrefixes() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(
+                id: "checklist",
+                kind: .checklistItem(isChecked: false),
+                text: "One\nTwo\nThree",
+                lineIndentationLevels: [1, 2, 1]
+            ),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+
+        let markerView = try XCTUnwrap(item.testingMarkerView)
+        XCTAssertEqual(markerView.stringValue, "\n[ ]\n[ ]")
+        XCTAssertEqual(markerView.markerLines, [
+            BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 0),
+            BlockInputMarkerView.MarkerLine(text: "[ ]", indentationLevel: 2),
+            BlockInputMarkerView.MarkerLine(text: "[ ]", indentationLevel: 1)
+        ])
+        XCTAssertFalse(try XCTUnwrap(item.testingChecklistButton).isHidden)
+    }
+
+    @MainActor
+    func testEmptyIndentedListLineUsesIndentedTypingParagraphStyle() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(
+                id: "list",
+                kind: .bulletedListItem,
+                text: "One\n",
+                lineIndentationLevels: [0, 1]
+            ),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        item.setSelectedRange(NSRange(location: 4, length: 0))
+
+        let paragraphStyle = try XCTUnwrap(textView.typingAttributes[.paragraphStyle] as? NSParagraphStyle)
+        XCTAssertEqual(paragraphStyle.firstLineHeadIndent, 24)
+        XCTAssertEqual(paragraphStyle.headIndent, 24)
+        XCTAssertEqual(textView.defaultParagraphStyle?.firstLineHeadIndent, 24)
+        XCTAssertEqual(textView.defaultParagraphStyle?.headIndent, 24)
+    }
+
+    @MainActor
+    func testEmptyIndentedListBlockUsesIndentedTypingParagraphStyle() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(
+                id: "list",
+                kind: .bulletedListItem,
+                text: "",
+                lineIndentationLevels: [1]
+            ),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        let paragraphStyle = try XCTUnwrap(textView.typingAttributes[.paragraphStyle] as? NSParagraphStyle)
+        XCTAssertEqual(paragraphStyle.firstLineHeadIndent, 24)
+        XCTAssertEqual(paragraphStyle.headIndent, 24)
+        XCTAssertEqual(textView.defaultParagraphStyle?.firstLineHeadIndent, 24)
+        XCTAssertEqual(textView.defaultParagraphStyle?.headIndent, 24)
+    }
+
+    @MainActor
+    func testListHeightAccountsForIndentedTextWidth() {
+        let text = Array(repeating: "Wrapped list content", count: 8).joined(separator: " ")
+        let rootHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(kind: .bulletedListItem, text: text),
+            textWidth: 260
+        )
+        let indentedHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(kind: .bulletedListItem, text: text, indentationLevel: 3),
+            textWidth: 260
+        )
+
+        XCTAssertGreaterThan(indentedHeight, rootHeight)
+    }
+
+    @MainActor
+    func testListHeightAccountsForPerLineIndentedTextWidth() {
+        let text = "Short\n" + Array(repeating: "Wrapped list content", count: 12).joined(separator: " ")
+        let rootHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(kind: .bulletedListItem, text: text),
+            textWidth: 180
+        )
+        let indentedHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(
+                kind: .bulletedListItem,
+                text: text,
+                lineIndentationLevels: [0, 3, 1]
+            ),
+            textWidth: 180
+        )
+
+        XCTAssertGreaterThan(indentedHeight, rootHeight)
     }
 
     @MainActor

@@ -59,11 +59,9 @@ final class BlockInputTextView: NSTextView {
             blockItem?.requestSelectAll()
             return true
         case #selector(insertTab(_:)):
-            blockItem?.requestIndent()
-            return true
+            return blockItem?.requestIndent() == true
         case #selector(insertBacktab(_:)):
-            blockItem?.requestOutdent()
-            return true
+            return blockItem?.requestOutdent() == true
         case #selector(cancelOperation(_:)):
             return true
         default:

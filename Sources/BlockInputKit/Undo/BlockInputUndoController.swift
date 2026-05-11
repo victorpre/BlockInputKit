@@ -16,20 +16,27 @@ public final class BlockInputUndoController {
     public init() {}
 
     /// Records a text edit for a single block.
+    ///
+    /// List-like blocks may also pass per-line indentation snapshots when the
+    /// edit inserts or removes list lines inside the block.
     public func registerTextEdit(
         blockID: BlockInputBlockID,
         beforeText: String,
         afterText: String,
+        beforeLineIndentationLevels: [Int]? = nil,
+        afterLineIndentationLevels: [Int]? = nil,
         selectionBefore: BlockInputSelection?,
         selectionAfter: BlockInputSelection?
     ) {
-        guard beforeText != afterText else {
+        guard beforeText != afterText || beforeLineIndentationLevels != afterLineIndentationLevels else {
             return
         }
         textUndoByBlockID[blockID, default: []].append(BlockInputTextUndoEntry(
             blockID: blockID,
             beforeText: beforeText,
             afterText: afterText,
+            beforeLineIndentationLevels: beforeLineIndentationLevels,
+            afterLineIndentationLevels: afterLineIndentationLevels,
             selectionBefore: selectionBefore,
             selectionAfter: selectionAfter
         ))
@@ -72,6 +79,9 @@ public final class BlockInputUndoController {
         textUndoByBlockID[blockID] = stack
         textRedoByBlockID[blockID, default: []].append(entry)
         document.blocks[index].text = entry.beforeText
+        if let beforeLineIndentationLevels = entry.beforeLineIndentationLevels {
+            document.blocks[index].lineIndentationLevels = beforeLineIndentationLevels
+        }
         return BlockInputUndoResult(selection: entry.selectionBefore, actionName: "Text Edit")
     }
 
@@ -88,6 +98,9 @@ public final class BlockInputUndoController {
         textRedoByBlockID[blockID] = stack
         textUndoByBlockID[blockID, default: []].append(entry)
         document.blocks[index].text = entry.afterText
+        if let afterLineIndentationLevels = entry.afterLineIndentationLevels {
+            document.blocks[index].lineIndentationLevels = afterLineIndentationLevels
+        }
         return BlockInputUndoResult(selection: entry.selectionAfter, actionName: "Text Edit")
     }
 
@@ -116,6 +129,8 @@ private struct BlockInputTextUndoEntry {
     let blockID: BlockInputBlockID
     let beforeText: String
     let afterText: String
+    let beforeLineIndentationLevels: [Int]?
+    let afterLineIndentationLevels: [Int]?
     let selectionBefore: BlockInputSelection?
     let selectionAfter: BlockInputSelection?
 }

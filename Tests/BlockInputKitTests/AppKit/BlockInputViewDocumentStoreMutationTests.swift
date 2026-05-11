@@ -119,8 +119,9 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
             allowsReordering: true,
             delegate: view
         )
+        item.setSelectedRange(NSRange(location: 0, length: 0))
 
-        item.requestIndent()
+        XCTAssertTrue(item.requestIndent())
 
         XCTAssertEqual(store.document.blocks[0].indentationLevel, 1)
         XCTAssertEqual(store.replaceDocumentCount, 0)

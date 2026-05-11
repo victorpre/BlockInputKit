@@ -14,9 +14,20 @@ extension BlockInputView {
         ) else {
             return nil
         }
+        guard let blockBeforeEdit = document.block(withID: blockID) else {
+            return nil
+        }
+        let selectionBeforeEdit = BlockInputSelection.cursor(BlockInputCursor(
+            blockID: blockID,
+            utf16Offset: min(proposedUTF16Offset, blockBeforeEdit.utf16Length)
+        ))
+        let undoSelectionBefore = validSelectionBeforeTypingShortcut(
+            selectionBefore,
+            blockBeforeEdit: blockBeforeEdit
+        ) ?? selectionBeforeEdit
         return performStructuralEdit(
             named: "Format Block",
-            selectionBeforeOverride: selectionBefore,
+            selectionBeforeOverride: undoSelectionBefore,
             storeSyncAction: { _, afterDocument, _ in
                 guard let block = afterDocument.block(withID: blockID),
                       block.kind != .horizontalRule else {
@@ -40,5 +51,34 @@ extension BlockInputView {
                 document.unwrapBlockToParagraph(blockID: blockID)
             }
         )
+    }
+}
+
+private func validSelectionBeforeTypingShortcut(
+    _ selection: BlockInputSelection?,
+    blockBeforeEdit block: BlockInputBlock
+) -> BlockInputSelection? {
+    guard let selection else {
+        return nil
+    }
+    switch selection {
+    case let .cursor(cursor):
+        guard cursor.blockID == block.id,
+              cursor.utf16Offset >= 0,
+              cursor.utf16Offset <= block.utf16Length else {
+            return nil
+        }
+        return selection
+    case let .text(textRange):
+        guard textRange.blockID == block.id,
+              textRange.range.location >= 0,
+              textRange.range.length >= 0,
+              textRange.range.location <= block.utf16Length,
+              textRange.range.length <= block.utf16Length - textRange.range.location else {
+            return nil
+        }
+        return selection
+    case .blocks:
+        return nil
     }
 }
