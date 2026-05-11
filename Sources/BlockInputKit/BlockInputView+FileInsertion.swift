@@ -16,11 +16,11 @@ public extension BlockInputView {
         }
 
         let targetBlockID = blockID ?? activeBlockID
-        return performStructuralEdit(named: "Insert Files") { document in
-            if let targetBlockID, document.index(of: targetBlockID) == nil {
-                return nil
-            }
+        if let targetBlockID, index(of: targetBlockID) == nil {
+            return nil
+        }
 
+        return performStructuralEdit(named: "Insert Files") { document in
             if document.blocks.count == 1,
                document.blocks[0].kind == .paragraph,
                document.blocks[0].isEmpty {

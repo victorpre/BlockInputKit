@@ -1,6 +1,10 @@
 import Foundation
 
 /// Document storage boundary used by the editor and host app.
+///
+/// The editor reads blocks by index and stable ID so hosts can keep large
+/// documents outside of the view. In the current API, editor mutations publish
+/// a full replacement document through `replaceDocument(_:)`.
 public protocol BlockInputDocumentStore: AnyObject {
     /// Current document snapshot.
     var document: BlockInputDocument { get }

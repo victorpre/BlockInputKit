@@ -7,9 +7,10 @@ extension BlockInputView {
         query: String,
         blockID: BlockInputBlockID? = nil
     ) async -> [BlockInputCompletionSuggestion] {
+        refreshDocumentFromStore()
         guard let provider = completionProvider,
               let resolvedBlockID = blockID ?? activeBlockID,
-              document.index(of: resolvedBlockID) != nil else {
+              index(of: resolvedBlockID) != nil else {
             return []
         }
         let context = BlockInputCompletionContext(
@@ -29,8 +30,9 @@ extension BlockInputView {
         in blockID: BlockInputBlockID? = nil,
         replacing replacementRange: NSRange? = nil
     ) -> BlockInputSelection? {
+        refreshDocumentFromStore()
         guard let resolvedBlockID = blockID ?? activeBlockID,
-              let block = document.block(withID: resolvedBlockID) else {
+              let block = block(withID: resolvedBlockID) else {
             return nil
         }
         let beforeText = block.text
@@ -56,8 +58,9 @@ extension BlockInputView {
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         )
+        syncDocumentStore()
         reloadDataKeepingFocus()
-        publishDocumentChange()
+        publishDocumentChange(syncStore: false)
         return afterSelection
     }
 }

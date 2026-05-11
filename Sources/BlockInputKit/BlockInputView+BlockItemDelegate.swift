@@ -2,6 +2,10 @@ import AppKit
 
 extension BlockInputView: BlockInputBlockItemDelegate {
     func blockItemDidBeginEditing(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+        refreshDocumentFromStore()
+        guard index(of: blockID) != nil else {
+            return
+        }
         let offset = item.currentSelectedRange.location
         applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: offset)), notify: true)
     }
@@ -12,7 +16,8 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         didChangeText text: String,
         selectionBefore capturedSelectionBefore: BlockInputSelection?
     ) {
-        guard let index = document.index(of: blockID) else {
+        refreshDocumentFromStore()
+        guard let index = index(of: blockID), document.blocks.indices.contains(index) else {
             return
         }
         let beforeText = document.blocks[index].text
@@ -39,6 +44,10 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID) {
+        refreshDocumentFromStore()
+        guard index(of: blockID) != nil else {
+            return
+        }
         let range = item.currentSelectedRange
         if range.length == 0 {
             applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: range.location)), notify: true)
@@ -48,12 +57,17 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestReturn(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+        refreshDocumentFromStore()
+        guard index(of: blockID) != nil else {
+            return
+        }
         applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: item.currentSelectedRange.location)), notify: false)
         insertBlockBelowCurrentBlock()
     }
 
     func blockItemDidRequestDeleteEmptyBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        guard let block = document.block(withID: blockID), block.isEmpty else {
+        refreshDocumentFromStore()
+        guard let block = block(withID: blockID), block.isEmpty else {
             return false
         }
         applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
@@ -61,6 +75,13 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestSelectAll(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+        refreshDocumentFromStore()
+        guard let block = block(withID: blockID) else {
+            return
+        }
+        if item.currentText != block.text {
+            item.configure(block: block, allowsReordering: allowsBlockReordering, delegate: self)
+        }
         let nextSelection = document.selectAll(currentBlockID: blockID, currentSelection: selection)
         applySelection(nextSelection, notify: true)
         if case let .text(range) = nextSelection,
@@ -82,19 +103,20 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestMoveToPreviousBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        guard let index = document.index(of: blockID), document.blocks.indices.contains(index - 1) else {
+        refreshDocumentFromStore()
+        guard let index = index(of: blockID), let previous = block(at: index - 1) else {
             return false
         }
-        let previous = document.blocks[index - 1]
         focus(blockID: previous.id, utf16Offset: previous.utf16Length)
         return true
     }
 
     func blockItemDidRequestMoveToNextBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        guard let index = document.index(of: blockID), document.blocks.indices.contains(index + 1) else {
+        refreshDocumentFromStore()
+        guard let index = index(of: blockID), let next = block(at: index + 1) else {
             return false
         }
-        focus(blockID: document.blocks[index + 1].id, utf16Offset: 0)
+        focus(blockID: next.id, utf16Offset: 0)
         return true
     }
 }

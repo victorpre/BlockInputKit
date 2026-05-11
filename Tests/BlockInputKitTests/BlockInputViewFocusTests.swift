@@ -6,7 +6,7 @@ import XCTest
 final class BlockInputViewFocusTests: XCTestCase {
     func testWindowCanMakeEditorFirstResponderWithCursorSelection() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
-        let mounted = makeMountedView(blocks: [
+        let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: blockID, text: "First")
         ])
         mounted.view.focus(blockID: blockID, utf16Offset: 2)
@@ -25,7 +25,7 @@ final class BlockInputViewFocusTests: XCTestCase {
 
     func testWindowCanMakeEditorFirstResponderWithTextSelection() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
-        let mounted = makeMountedView(blocks: [
+        let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: blockID, text: "First")
         ])
         mounted.view.applySelection(.text(BlockInputTextRange(
@@ -45,29 +45,4 @@ final class BlockInputViewFocusTests: XCTestCase {
         )
     }
 
-    private func makeMountedView(blocks: [BlockInputBlock]) -> (view: BlockInputView, window: NSWindow) {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),
-            styleMask: [.titled],
-            backing: .buffered,
-            defer: false
-        )
-        let view = BlockInputView(frame: window.contentView?.bounds ?? window.frame)
-        window.contentView = view
-        view.configure(BlockInputConfiguration(
-            document: BlockInputDocument(blocks: blocks),
-            undoController: BlockInputUndoController()
-        ))
-        view.layoutSubtreeIfNeeded()
-        view.collectionView.layoutSubtreeIfNeeded()
-        return (view, window)
-    }
-}
-
-private extension BlockInputView {
-    func visibleBlockItemForTesting(at item: Int) -> BlockInputBlockItem? {
-        collectionView.scrollToItems(at: [IndexPath(item: item, section: 0)], scrollPosition: .nearestVerticalEdge)
-        collectionView.layoutSubtreeIfNeeded()
-        return collectionView.item(at: IndexPath(item: item, section: 0)) as? BlockInputBlockItem
-    }
 }

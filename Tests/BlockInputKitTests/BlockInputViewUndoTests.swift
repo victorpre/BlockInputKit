@@ -85,7 +85,7 @@ final class BlockInputViewUndoTests: XCTestCase {
     func testUndoTextEditRestoresVisibleTextSelectionAfterReload() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let undoController = BlockInputUndoController()
-        let mounted = makeMountedView(
+        let mounted = makeMountedBlockInputView(
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: blockID, text: "First")
             ]),
@@ -111,7 +111,7 @@ final class BlockInputViewUndoTests: XCTestCase {
 
     func testFocusEditorPreservesVisibleTextSelection() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
-        let mounted = makeMountedView(
+        let mounted = makeMountedBlockInputView(
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: blockID, text: "First")
             ]),
@@ -130,7 +130,7 @@ final class BlockInputViewUndoTests: XCTestCase {
 
     func testFocusEditorPreservesVisibleBlockSelectionAsEditorResponder() {
         let blockID = BlockInputBlockID(rawValue: "first")
-        let mounted = makeMountedView(
+        let mounted = makeMountedBlockInputView(
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: blockID, text: "First")
             ]),
@@ -146,7 +146,7 @@ final class BlockInputViewUndoTests: XCTestCase {
 
     func testWindowCanMakeEditorFirstResponderWithBlockSelection() {
         let blockID = BlockInputBlockID(rawValue: "first")
-        let mounted = makeMountedView(
+        let mounted = makeMountedBlockInputView(
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: blockID, text: "First")
             ]),
@@ -159,32 +159,4 @@ final class BlockInputViewUndoTests: XCTestCase {
         XCTAssertTrue(mounted.window.firstResponder === mounted.view)
     }
 
-    private func makeMountedView(
-        document: BlockInputDocument,
-        undoController: BlockInputUndoController
-    ) -> (view: BlockInputView, window: NSWindow) {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),
-            styleMask: [.titled],
-            backing: .buffered,
-            defer: false
-        )
-        let view = BlockInputView(frame: window.contentView?.bounds ?? window.frame)
-        window.contentView = view
-        view.configure(BlockInputConfiguration(
-            document: document,
-            undoController: undoController
-        ))
-        view.layoutSubtreeIfNeeded()
-        view.collectionView.layoutSubtreeIfNeeded()
-        return (view, window)
-    }
-}
-
-private extension BlockInputView {
-    func visibleBlockItemForTesting(at item: Int) -> BlockInputBlockItem? {
-        collectionView.scrollToItems(at: [IndexPath(item: item, section: 0)], scrollPosition: .nearestVerticalEdge)
-        collectionView.layoutSubtreeIfNeeded()
-        return collectionView.item(at: IndexPath(item: item, section: 0)) as? BlockInputBlockItem
-    }
 }

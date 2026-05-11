@@ -9,7 +9,7 @@ extension BlockInputView: NSCollectionViewDataSource {
         _ collectionView: NSCollectionView,
         numberOfItemsInSection section: Int
     ) -> Int {
-        document.blocks.count
+        blockCount
     }
 
     public func collectionView(
@@ -23,8 +23,12 @@ extension BlockInputView: NSCollectionViewDataSource {
         guard let blockItem = item as? BlockInputBlockItem else {
             return item
         }
+        guard let block = block(at: indexPath.item) else {
+            blockItem.clearConfiguration()
+            return blockItem
+        }
         blockItem.configure(
-            block: document.blocks[indexPath.item],
+            block: block,
             allowsReordering: allowsBlockReordering,
             delegate: self
         )
@@ -38,8 +42,10 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
         layout collectionViewLayout: NSCollectionViewLayout,
         sizeForItemAt indexPath: IndexPath
     ) -> NSSize {
-        let block = document.blocks[indexPath.item]
         let availableWidth = max(collectionView.bounds.width - 16, 240)
+        guard let block = block(at: indexPath.item) else {
+            return NSSize(width: availableWidth, height: 32)
+        }
         let textWidth = max(availableWidth - BlockInputBlockItem.horizontalChromeWidth, 120)
         let height = BlockInputBlockItem.height(for: block, textWidth: textWidth)
         return NSSize(width: availableWidth, height: height)
@@ -54,8 +60,11 @@ extension BlockInputView: NSCollectionViewDelegate {
         guard allowsBlockReordering else {
             return nil
         }
+        guard let block = block(at: indexPath.item) else {
+            return nil
+        }
         let pasteboardItem = NSPasteboardItem()
-        pasteboardItem.setString(document.blocks[indexPath.item].id.rawValue, forType: .blockInputBlockID)
+        pasteboardItem.setString(block.id.rawValue, forType: .blockInputBlockID)
         return pasteboardItem
     }
 
@@ -103,7 +112,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         forBlockID blockID: BlockInputBlockID,
         proposedItemIndex: Int
     ) -> Int? {
-        guard let sourceIndex = document.index(of: blockID) else {
+        guard let sourceIndex = index(of: blockID) else {
             return nil
         }
         if sourceIndex < proposedItemIndex {
@@ -115,7 +124,7 @@ extension BlockInputView: NSCollectionViewDelegate {
     func canAcceptBlockReorderDrop(_ draggingInfo: NSDraggingInfo) -> Bool {
         guard allowsBlockReordering,
               let rawID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID),
-              document.index(of: BlockInputBlockID(rawValue: rawID)) != nil else {
+              index(of: BlockInputBlockID(rawValue: rawID)) != nil else {
             return false
         }
         return true

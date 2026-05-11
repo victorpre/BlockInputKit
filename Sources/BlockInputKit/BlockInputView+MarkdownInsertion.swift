@@ -17,12 +17,11 @@ public extension BlockInputView {
 
         let insertedBlocks = BlockInputDocument(markdown: markdown).blocks
         let targetBlockID = blockID ?? activeBlockID
+        if let targetBlockID, index(of: targetBlockID) == nil {
+            return nil
+        }
 
         return performStructuralEdit(named: "Insert Markdown") { document in
-            if let targetBlockID, document.index(of: targetBlockID) == nil {
-                return nil
-            }
-
             if document.blocks.count == 1,
                document.blocks[0].kind == .paragraph,
                document.blocks[0].isEmpty {

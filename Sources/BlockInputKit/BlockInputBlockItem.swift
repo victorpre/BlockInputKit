@@ -17,6 +17,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         textView.selectedRange()
     }
 
+    var currentText: String {
+        textView.string
+    }
+
     override func loadView() {
         view = NSView()
     }
@@ -28,11 +32,20 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
     override func prepareForReuse() {
         super.prepareForReuse()
+        clearConfiguration()
+    }
+
+    func clearConfiguration() {
         blockID = nil
         delegate = nil
         selectionBeforeTextChange = nil
+        textView.blockItem = nil
         textView.string = ""
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        kindLabel.stringValue = ""
+        handleView.isEnabled = false
         handleView.alphaValue = 0
+        handleView.toolTip = nil
     }
 
     override func viewDidLayout() {
@@ -64,7 +77,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         selectionBeforeTextChange = nil
         textView.blockItem = self
         textView.string = block.text
-        kindLabel.stringValue = prefix(for: block.kind, indentationLevel: block.indentationLevel)
+        kindLabel.stringValue = Self.prefix(for: block.kind, indentationLevel: block.indentationLevel)
         handleView.isEnabled = allowsReordering
         handleView.alphaValue = 0
         handleView.toolTip = allowsReordering ? "Drag to reorder block" : nil
@@ -179,16 +192,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         return delegate?.blockItemDidRequestMoveToNextBlock(self, blockID: blockID) ?? false
     }
 
-    static func height(for block: BlockInputBlock, textWidth: CGFloat) -> CGFloat {
-        let text = block.text.isEmpty ? " " : block.text
-        let boundingRect = (text as NSString).boundingRect(
-            with: NSSize(width: textWidth, height: CGFloat.greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: NSFont.preferredFont(forTextStyle: .body)]
-        )
-        return max(34, ceil(boundingRect.height) + 14)
-    }
-
     private func updateHoverTrackingArea() {
         if let trackingArea {
             view.removeTrackingArea(trackingArea)
@@ -254,21 +257,4 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         ])
     }
 
-    private func prefix(for kind: BlockInputBlockKind, indentationLevel: Int) -> String {
-        let indentation = String(repeating: " ", count: indentationLevel)
-        switch kind {
-        case .paragraph:
-            return ""
-        case .code:
-            return indentation + "{}"
-        case .quote:
-            return indentation + ">"
-        case .bulletedListItem:
-            return indentation + "-"
-        case let .numberedListItem(start):
-            return indentation + "\(start)."
-        case let .checklistItem(isChecked):
-            return indentation + (isChecked ? "[x]" : "[ ]")
-        }
-    }
 }

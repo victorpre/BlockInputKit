@@ -128,6 +128,32 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertEqual(publishedDocuments.last, view.document)
     }
 
+    func testAcceptDropRefreshesFromConfiguredStoreBeforeMovingBlock() {
+        let staleID = BlockInputBlockID(rawValue: "stale")
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: staleID, text: "Old")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        store.replaceDocument(BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ]))
+
+        let accepted = view.collectionView(
+            view.collectionView,
+            acceptDrop: BlockInputDraggingInfo(blockID: firstID),
+            indexPath: IndexPath(item: 2, section: 0),
+            dropOperation: .before
+        )
+
+        XCTAssertTrue(accepted)
+        XCTAssertEqual(store.document.blocks.map(\.id), [secondID, firstID])
+        XCTAssertEqual(view.document.blocks.map(\.id), [secondID, firstID])
+    }
+
     func testAcceptDropReturnsFalseWhenReorderingIsDisabled() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
@@ -189,6 +215,27 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertTrue(handleView.isEnabled)
         XCTAssertEqual(handleView.alphaValue, 0)
         XCTAssertEqual(handleView.toolTip, "Drag to reorder block")
+    }
+
+    func testBlockItemClearConfigurationRemovesReusableBlockState() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "first", kind: .quote, text: "First"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        let handleView = try XCTUnwrap(item.testingHandleView)
+        textView.setSelectedRange(NSRange(location: 2, length: 2))
+
+        item.clearConfiguration()
+
+        XCTAssertEqual(textView.string, "")
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 0, length: 0))
+        XCTAssertFalse(handleView.isEnabled)
+        XCTAssertEqual(handleView.alphaValue, 0)
+        XCTAssertNil(handleView.toolTip)
+        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        XCTAssertEqual(textView.string, "")
     }
 
     private func configuredReorderView(blockIDs: [BlockInputBlockID]) -> BlockInputView {

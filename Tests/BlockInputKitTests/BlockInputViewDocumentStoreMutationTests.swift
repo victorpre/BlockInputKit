@@ -1,0 +1,170 @@
+import AppKit
+import XCTest
+@testable import BlockInputKit
+
+final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
+    @MainActor
+    func testViewRefreshesFromStoreBeforeTextChanges() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Old")
+        ]))
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            undoController: undoController
+        ))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        store.replaceDocument(BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "New")
+        ]))
+
+        textView.string = "Edited"
+        textView.setSelectedRange(NSRange(location: 6, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertEqual(store.document.blocks[0].text, "Edited")
+        var document = store.document
+        _ = undoController.undoTextEdit(in: &document, blockID: blockID)
+        XCTAssertEqual(document.blocks[0].text, "New")
+    }
+
+    @MainActor
+    func testTextUndoRefreshesFromStoreBeforeMutating() {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Original")
+        ]))
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            undoController: undoController
+        ))
+        undoController.registerTextEdit(
+            blockID: blockID,
+            beforeText: "Original",
+            afterText: "Edited",
+            selectionBefore: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 8)),
+            selectionAfter: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6))
+        )
+        store.replaceDocument(BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Edited")
+        ]))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)), notify: false)
+
+        _ = view.undoTextEditInActiveBlock()
+
+        XCTAssertEqual(store.document.blocks.map(\.text), ["Original"])
+    }
+
+    @MainActor
+    func testTextRedoRefreshesFromStoreBeforeMutating() {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Original")
+        ]))
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            undoController: undoController
+        ))
+        undoController.registerTextEdit(
+            blockID: blockID,
+            beforeText: "Original",
+            afterText: "Edited",
+            selectionBefore: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 8)),
+            selectionAfter: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6))
+        )
+        store.replaceDocument(BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Edited"),
+            BlockInputBlock(id: secondID, text: "Host block")
+        ]))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)), notify: false)
+        _ = view.undoTextEditInActiveBlock()
+        store.replaceDocument(BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Original"),
+            BlockInputBlock(id: secondID, text: "Host updated")
+        ]))
+
+        _ = view.redoTextEditInActiveBlock()
+
+        XCTAssertEqual(store.document.blocks.map(\.text), ["Edited", "Host updated"])
+    }
+
+    @MainActor
+    func testStructuralUndoRefreshesFromStoreBeforeMutating() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let insertedID = BlockInputBlockID(rawValue: "inserted")
+        let beforeDocument = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First")
+        ])
+        let afterDocument = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: insertedID, text: "")
+        ])
+        let store = CountingDocumentStore(document: beforeDocument)
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            undoController: undoController
+        ))
+        undoController.registerStructuralEdit(
+            actionName: "Insert Block",
+            beforeDocument: beforeDocument,
+            afterDocument: afterDocument,
+            selectionBefore: .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 5)),
+            selectionAfter: .cursor(BlockInputCursor(blockID: insertedID, utf16Offset: 0))
+        )
+        store.replaceDocument(afterDocument)
+        view.applySelection(.cursor(BlockInputCursor(blockID: insertedID, utf16Offset: 0)), notify: false)
+
+        _ = view.undoStructuralEdit()
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [firstID])
+    }
+
+    @MainActor
+    func testStructuralRedoPublishesResultBackToStore() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let insertedID = BlockInputBlockID(rawValue: "inserted")
+        let beforeDocument = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First")
+        ])
+        let afterDocument = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: insertedID, text: "")
+        ])
+        let store = CountingDocumentStore(document: beforeDocument)
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            undoController: undoController
+        ))
+        undoController.registerStructuralEdit(
+            actionName: "Insert Block",
+            beforeDocument: beforeDocument,
+            afterDocument: afterDocument,
+            selectionBefore: .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 5)),
+            selectionAfter: .cursor(BlockInputCursor(blockID: insertedID, utf16Offset: 0))
+        )
+        store.replaceDocument(afterDocument)
+        view.applySelection(.cursor(BlockInputCursor(blockID: insertedID, utf16Offset: 0)), notify: false)
+        _ = view.undoStructuralEdit()
+
+        _ = view.redoStructuralEdit()
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [firstID, insertedID])
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: insertedID, utf16Offset: 0)))
+    }
+}
