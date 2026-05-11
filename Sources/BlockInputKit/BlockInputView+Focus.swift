@@ -193,6 +193,7 @@ extension BlockInputView {
 
     func applySelection(_ selection: BlockInputSelection?, notify: Bool) {
         self.selection = selection
+        preferredNavigationX = nil
         switch selection {
         case let .cursor(cursor):
             lastFocusedBlockID = cursor.blockID

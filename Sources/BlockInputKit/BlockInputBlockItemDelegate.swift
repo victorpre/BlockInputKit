@@ -1,4 +1,10 @@
+import CoreGraphics
 import Foundation
+
+enum BlockInputVerticalMovementDirection: Equatable {
+    case upward
+    case downward
+}
 
 @MainActor
 protocol BlockInputBlockItemDelegate: AnyObject {
@@ -19,6 +25,10 @@ protocol BlockInputBlockItemDelegate: AnyObject {
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestIndent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestOutdent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
-    func blockItemDidRequestMoveToPreviousBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
-    func blockItemDidRequestMoveToNextBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestVerticalMovement direction: BlockInputVerticalMovementDirection,
+        preferredTextContainerX: CGFloat?
+    ) -> Bool
 }

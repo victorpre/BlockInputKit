@@ -26,6 +26,7 @@ public final class BlockInputView: NSView {
     var pendingFocus: BlockInputCursor?
     var lastFocusedBlockID: BlockInputBlockID?
     var selectedHorizontalRuleIndex: Int?
+    var preferredNavigationX: CGFloat?
     // Invalidates deferred selection restoration when a later reload should not restore focus.
     var focusRestoreGeneration = 0
     // Avoid re-entering NSWindow first-responder assignment while AppKit is already promoting this view.
@@ -100,6 +101,10 @@ public final class BlockInputView: NSView {
     }
 
     public override func keyDown(with event: NSEvent) {
+        if let direction = event.verticalMovementDirection,
+           moveSelectedBlockVertically(direction) {
+            return
+        }
         if event.isBackspaceOrDelete,
            deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil {
             return
@@ -328,6 +333,16 @@ public final class BlockInputView: NSView {
 }
 
 private extension NSEvent {
+    var verticalMovementDirection: BlockInputVerticalMovementDirection? {
+        if keyCode == 126 || charactersIgnoringModifiers == "\u{F700}" {
+            return .upward
+        }
+        if keyCode == 125 || charactersIgnoringModifiers == "\u{F701}" {
+            return .downward
+        }
+        return nil
+    }
+
     var isBackspaceOrDelete: Bool {
         keyCode == 51
             || keyCode == 117

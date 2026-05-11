@@ -41,11 +41,9 @@ final class BlockInputTextView: NSTextView {
     private func handleBoundaryCommand(_ selector: Selector) -> Bool {
         switch selector {
         case #selector(moveUp(_:)):
-            return selectedRange().location == 0 && blockItem?.requestMoveToPreviousBlock() == true
+            return blockItem?.requestMoveVertically(.upward) == true
         case #selector(moveDown(_:)):
-            let range = selectedRange()
-            let textLength = (string as NSString).length
-            return range.location + range.length >= textLength && blockItem?.requestMoveToNextBlock() == true
+            return blockItem?.requestMoveVertically(.downward) == true
         default:
             return false
         }

@@ -191,21 +191,56 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         )
     }
 
-    func blockItemDidRequestMoveToPreviousBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        refreshDocumentFromStore()
-        guard let index = index(of: blockID), let previous = block(at: index - 1) else {
-            return false
-        }
-        focus(blockID: previous.id, utf16Offset: previous.utf16Length)
-        return true
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestVerticalMovement direction: BlockInputVerticalMovementDirection,
+        preferredTextContainerX: CGFloat?
+    ) -> Bool {
+        moveVertically(from: blockID, direction: direction, preferredTextContainerX: preferredTextContainerX)
     }
 
-    func blockItemDidRequestMoveToNextBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        refreshDocumentFromStore()
-        guard let index = index(of: blockID), let next = block(at: index + 1) else {
+    func moveSelectedBlockVertically(_ direction: BlockInputVerticalMovementDirection) -> Bool {
+        guard case let .blocks(blockIDs) = selection,
+              blockIDs.count == 1,
+              let blockID = blockIDs.first else {
             return false
         }
-        focus(blockID: next.id, utf16Offset: 0)
+        return moveVertically(from: blockID, direction: direction, preferredTextContainerX: nil)
+    }
+
+    private func moveVertically(
+        from blockID: BlockInputBlockID,
+        direction: BlockInputVerticalMovementDirection,
+        preferredTextContainerX: CGFloat?
+    ) -> Bool {
+        refreshDocumentFromStore()
+        guard let index = index(of: blockID) else {
+            return false
+        }
+        let targetIndex = direction == .upward ? index - 1 : index + 1
+        guard let targetBlock = block(at: targetIndex) else {
+            return false
+        }
+        let resolvedPreferredTextContainerX = preferredNavigationX ?? preferredTextContainerX
+        if targetBlock.kind == .horizontalRule {
+            selectedHorizontalRuleIndex = targetIndex
+            applySelection(.blocks([targetBlock.id]), notify: true)
+            if let targetItem = visibleItem(for: targetBlock.id, refreshConfiguration: false) {
+                selectOnlyVisibleBlockItem(targetItem)
+            }
+            window?.makeFirstResponder(self)
+            preferredNavigationX = resolvedPreferredTextContainerX
+            return true
+        }
+        let targetItem = visibleItem(for: targetBlock.id)
+        let linePosition: BlockInputBlockItem.TextLinePosition = direction == .upward ? .last : .first
+        let offset = targetItem?.utf16Offset(
+            closestToTextContainerX: resolvedPreferredTextContainerX,
+            linePosition: linePosition
+        ) ?? (direction == .upward ? targetBlock.utf16Length : 0)
+        focus(blockID: targetBlock.id, utf16Offset: offset)
+        preferredNavigationX = resolvedPreferredTextContainerX
         return true
     }
 

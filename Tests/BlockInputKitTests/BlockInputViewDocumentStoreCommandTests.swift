@@ -77,7 +77,7 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
             BlockInputBlock(id: thirdID, text: "Third")
         ]))
 
-        let didMove = item.requestMoveToNextBlock()
+        let didMove = item.requestMoveVertically(.downward)
 
         XCTAssertTrue(didMove)
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: thirdID, utf16Offset: 0)))

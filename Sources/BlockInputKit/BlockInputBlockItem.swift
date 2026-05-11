@@ -14,7 +14,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     private let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     private let scrollView = NSScrollView()
     private let horizontalRuleView = BlockInputHorizontalRuleView()
-    private let textView = BlockInputTextView()
+    let textView = BlockInputTextView()
     private var trackingArea: NSTrackingArea?
     private weak var delegate: BlockInputBlockItemDelegate?
     private var blockID: BlockInputBlockID?
@@ -22,6 +22,11 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     private var handleWidthConstraint: NSLayoutConstraint?
     private var checklistButtonLeadingConstraint: NSLayoutConstraint?
     private var isHorizontalRule = false
+
+    enum TextLinePosition {
+        case first
+        case last
+    }
 
     var currentSelectedRange: NSRange {
         textView.selectedRange()
@@ -257,18 +262,16 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate?.blockItemDidRequestOutdent(self, blockID: blockID)
     }
 
-    func requestMoveToPreviousBlock() -> Bool {
-        guard let blockID else {
+    func requestMoveVertically(_ direction: BlockInputVerticalMovementDirection) -> Bool {
+        guard let blockID, canMoveVerticallyOutOfBlock(direction) else {
             return false
         }
-        return delegate?.blockItemDidRequestMoveToPreviousBlock(self, blockID: blockID) ?? false
-    }
-
-    func requestMoveToNextBlock() -> Bool {
-        guard let blockID else {
-            return false
-        }
-        return delegate?.blockItemDidRequestMoveToNextBlock(self, blockID: blockID) ?? false
+        return delegate?.blockItem(
+            self,
+            blockID: blockID,
+            didRequestVerticalMovement: direction,
+            preferredTextContainerX: currentCaretTextContainerX()
+        ) ?? false
     }
 
     func draggingPasteboardItem() -> NSPasteboardItem? {
