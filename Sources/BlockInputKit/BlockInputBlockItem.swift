@@ -231,6 +231,13 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate?.blockItemDidRequestSelectAll(self, blockID: blockID)
     }
 
+    func requestUndoShortcut(_ shortcut: BlockInputUndoShortcut) -> Bool {
+        guard let blockID else {
+            return false
+        }
+        return delegate?.blockItem(self, blockID: blockID, didRequestUndoShortcut: shortcut) ?? false
+    }
+
     func requestSelectHorizontalRule() {
         guard let blockID else {
             return

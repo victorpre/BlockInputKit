@@ -162,6 +162,14 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         return true
     }
 
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestUndoShortcut shortcut: BlockInputUndoShortcut
+    ) -> Bool {
+        performUndoShortcut(shortcut, preferredBlockID: blockID)
+    }
+
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
         _ = toggleChecklistItem(blockID: blockID)
     }

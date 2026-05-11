@@ -240,6 +240,96 @@ final class BlockInputViewUndoTests: XCTestCase {
         XCTAssertEqual(publishedDocuments.last, view.document)
     }
 
+    func testCommandZAndCommandShiftZRouteTextUndoFromTextFocus() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let mounted = makeMountedBlockInputView(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "First")
+            ]),
+            undoController: BlockInputUndoController()
+        )
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+        textView.string = "Edited"
+        textView.setSelectedRange(NSRange(location: 6, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandZEvent()))
+
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "First")
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandShiftZEvent()))
+
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Edited")
+    }
+
+    func testCommandZFromTextFocusFallsBackToStructuralUndo() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let mounted = makeMountedBlockInputView(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "First")
+            ]),
+            undoController: BlockInputUndoController()
+        )
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+        mounted.view.focus(blockID: blockID, utf16Offset: 5)
+        _ = mounted.view.insertBlockBelowCurrentBlock()
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandZEvent()))
+
+        XCTAssertEqual(mounted.view.document.blocks.map(\.id), [blockID])
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandShiftZEvent()))
+
+        XCTAssertEqual(mounted.view.document.blocks.count, 2)
+    }
+
+    func testCommandZAndCommandShiftZRouteStructuralUndoFromEditorFocus() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let mounted = makeMountedBlockInputView(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "First")
+            ]),
+            undoController: BlockInputUndoController()
+        )
+        mounted.view.focus(blockID: blockID, utf16Offset: 5)
+        _ = mounted.view.insertBlockBelowCurrentBlock()
+        mounted.window.makeFirstResponder(mounted.view)
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandZEvent()))
+
+        XCTAssertEqual(mounted.view.document.blocks.map(\.id), [blockID])
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandShiftZEvent()))
+
+        XCTAssertEqual(mounted.view.document.blocks.count, 2)
+    }
+
+    func testUndoAndRedoActionsRouteThroughCustomUndoStacks() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let mounted = makeMountedBlockInputView(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "First")
+            ]),
+            undoController: BlockInputUndoController()
+        )
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+        textView.string = "Edited"
+        textView.setSelectedRange(NSRange(location: 6, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertTrue(textView.tryToPerform(#selector(BlockInputTextView.blockInputUndo(_:)), with: nil))
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "First")
+
+        XCTAssertTrue(textView.tryToPerform(#selector(BlockInputTextView.blockInputRedo(_:)), with: nil))
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Edited")
+    }
+
     func testUndoTextEditRestoresVisibleTextSelectionAfterReload() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let undoController = BlockInputUndoController()

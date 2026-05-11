@@ -9,6 +9,10 @@ final class BlockInputTextView: NSTextView {
             blockItem.requestSelectAll()
             return true
         }
+        if let undoShortcut = event.blockInputUndoShortcut,
+           blockItem?.requestUndoShortcut(undoShortcut) == true {
+            return true
+        }
         return super.performKeyEquivalent(with: event)
     }
 
@@ -18,6 +22,16 @@ final class BlockInputTextView: NSTextView {
             return
         }
         blockItem.requestSelectAll()
+    }
+
+    @objc(undo:)
+    func blockInputUndo(_ sender: Any?) {
+        _ = blockItem?.requestUndoShortcut(.undo)
+    }
+
+    @objc(redo:)
+    func blockInputRedo(_ sender: Any?) {
+        _ = blockItem?.requestUndoShortcut(.redo)
     }
 
     override func doCommand(by selector: Selector) {

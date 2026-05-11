@@ -122,6 +122,10 @@ public final class BlockInputView: NSView {
            selectAllFromActiveSelection() {
             return true
         }
+        if let undoShortcut = event.blockInputUndoShortcut,
+           performUndoShortcut(undoShortcut) {
+            return true
+        }
         return super.performKeyEquivalent(with: event)
     }
 
@@ -130,6 +134,16 @@ public final class BlockInputView: NSView {
             return
         }
         super.selectAll(sender)
+    }
+
+    @objc(undo:)
+    func blockInputUndo(_ sender: Any?) {
+        _ = performUndoShortcut(.undo)
+    }
+
+    @objc(redo:)
+    func blockInputRedo(_ sender: Any?) {
+        _ = performUndoShortcut(.redo)
     }
 
     /// Focuses a specific block at a UTF-16 text offset.
@@ -282,32 +296,20 @@ public final class BlockInputView: NSView {
     @discardableResult
     public func undoTextEditInActiveBlock() -> BlockInputUndoResult? {
         refreshDocumentFromStore()
-        guard let blockID = activeBlockID,
-              let result = undoController?.undoTextEdit(in: &document, blockID: blockID) else {
+        guard let blockID = activeBlockID else {
             return nil
         }
-        if let block = document.block(withID: blockID) {
-            applyUndoResult(result, storeSyncAction: .replaceBlock(block))
-        } else {
-            applyUndoResult(result)
-        }
-        return result
+        return undoTextEdit(in: blockID)
     }
 
     /// Redoes the most recent undone text edit in the active block.
     @discardableResult
     public func redoTextEditInActiveBlock() -> BlockInputUndoResult? {
         refreshDocumentFromStore()
-        guard let blockID = activeBlockID,
-              let result = undoController?.redoTextEdit(in: &document, blockID: blockID) else {
+        guard let blockID = activeBlockID else {
             return nil
         }
-        if let block = document.block(withID: blockID) {
-            applyUndoResult(result, storeSyncAction: .replaceBlock(block))
-        } else {
-            applyUndoResult(result)
-        }
-        return result
+        return redoTextEdit(in: blockID)
     }
 
     /// Undoes the most recent structural edit.
