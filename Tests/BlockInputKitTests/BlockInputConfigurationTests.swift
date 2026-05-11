@@ -36,16 +36,19 @@ final class BlockInputConfigurationTests: XCTestCase {
         let provider = ConfigurationCompletionProvider()
         let undoController = BlockInputUndoController()
         let view = BlockInputView()
+        let onFocusChange: (Bool) -> Void = { _ in }
 
         view.configure(BlockInputConfiguration(
             allowsBlockReordering: false,
             undoController: undoController,
-            completionProvider: provider
+            completionProvider: provider,
+            onFocusChange: onFocusChange
         ))
 
         XCTAssertFalse(view.allowsBlockReordering)
         XCTAssertTrue(view.undoController === undoController)
         XCTAssertTrue(view.completionProvider === provider)
+        XCTAssertNotNil(view.onFocusChange)
     }
 }
 

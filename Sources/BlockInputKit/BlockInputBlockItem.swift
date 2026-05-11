@@ -107,6 +107,13 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate?.blockItemDidBeginEditing(self, blockID: blockID)
     }
 
+    func textDidEndEditing(_ notification: Notification) {
+        guard let blockID else {
+            return
+        }
+        delegate?.blockItemDidEndEditing(self, blockID: blockID)
+    }
+
     func textDidChange(_ notification: Notification) {
         guard let blockID else {
             return

@@ -1,6 +1,23 @@
 import AppKit
 
 extension BlockInputView {
+    var isEditorFirstResponder: Bool {
+        guard let firstResponder = window?.firstResponder else {
+            return false
+        }
+        if firstResponder === self {
+            return true
+        }
+        var candidateView = firstResponder as? NSView
+        while let view = candidateView {
+            if view === self {
+                return true
+            }
+            candidateView = view.superview
+        }
+        return false
+    }
+
     var activeBlockID: BlockInputBlockID? {
         let candidateID: BlockInputBlockID?
         switch selection {
@@ -38,6 +55,38 @@ extension BlockInputView {
         }
         let firstBlock = block(at: 0) ?? document.blocks[0]
         return BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0)
+    }
+
+    @discardableResult
+    func resignEditorFocus() -> Bool {
+        guard isEditorFirstResponder else {
+            return true
+        }
+        window?.endEditing(for: nil)
+        let didResign = window?.makeFirstResponder(nil) ?? false
+        let isResigned = !isEditorFirstResponder
+        if didResign || isResigned {
+            publishFocusLossIfNeeded()
+        }
+        return didResign || isResigned
+    }
+
+    func publishFocusChange(_ isFocused: Bool) {
+        guard publishedFocusState != isFocused else {
+            return
+        }
+        publishedFocusState = isFocused
+        onFocusChange?(isFocused)
+    }
+
+    func publishFocusLossIfNeeded() {
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self, !isEditorFirstResponder else {
+                return
+            }
+            publishFocusChange(false)
+        }
     }
 
     func visibleItem(
@@ -99,6 +148,8 @@ extension BlockInputView {
     }
 
     func reloadDataKeepingFocus() {
+        focusRestoreGeneration += 1
+        let generation = focusRestoreGeneration
         collectionView.reloadData()
         collectionView.collectionViewLayout?.invalidateLayout()
         if selection != nil {
@@ -106,10 +157,20 @@ extension BlockInputView {
             // restoring in both places keeps cursor/text selection stable.
             restoreVisibleSelection()
             DispatchQueue.main.async { [weak self] in
-                self?.collectionView.layoutSubtreeIfNeeded()
-                self?.restoreVisibleSelection()
+                guard let self, focusRestoreGeneration == generation else {
+                    return
+                }
+                collectionView.layoutSubtreeIfNeeded()
+                restoreVisibleSelection()
             }
         }
+    }
+
+    func reloadDataWithoutRestoringFocus() {
+        focusRestoreGeneration += 1
+        collectionView.reloadData()
+        collectionView.collectionViewLayout?.invalidateLayout()
+        collectionView.layoutSubtreeIfNeeded()
     }
 
     func clearStaleFocusState() {

@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 protocol BlockInputBlockItemDelegate: AnyObject {
     func blockItemDidBeginEditing(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
+    func blockItemDidEndEditing(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItem(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,

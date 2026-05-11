@@ -51,9 +51,13 @@ import SwiftUI
 
 struct EditorScreen: View {
     private let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(markdown: "- [ ] Ship it"))
+    @State private var isEditorFocused = false
 
     var body: some View {
-        BlockInputEditor(configuration: BlockInputConfiguration(documentStore: store))
+        BlockInputEditor(
+            configuration: BlockInputConfiguration(documentStore: store),
+            isFocused: $isEditorFocused
+        )
     }
 }
 ```
@@ -82,7 +86,7 @@ The demo app includes:
 - `BlockInputDocument` is the structured document model and Markdown source of truth.
 - `BlockInputBlock` models a stable block ID, kind, text, and indentation level.
 - `BlockInputView` is the primary AppKit editor surface.
-- `BlockInputEditor` wraps `BlockInputView` for SwiftUI hosts.
+- `BlockInputEditor` wraps `BlockInputView` for SwiftUI hosts and can bridge focus with `Binding<Bool>`.
 - `BlockInputDocumentStore` lets hosts provide indexed block reads plus granular block mutations.
 - `BlockInputCompletionProvider` keeps mention and slash-command suggestions host-owned.
 - `BlockInputUndoController` separates per-block text undo from structural undo.

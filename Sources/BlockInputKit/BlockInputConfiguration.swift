@@ -14,6 +14,8 @@ public struct BlockInputConfiguration {
     public var onDocumentChange: ((BlockInputDocument) -> Void)?
     /// Called after the editor updates cursor, text, or block selection.
     public var onSelectionChange: ((BlockInputSelection?) -> Void)?
+    /// Called when the editor gains or loses AppKit focus.
+    public var onFocusChange: ((Bool) -> Void)?
 
     /// Current document snapshot from `documentStore`.
     public var document: BlockInputDocument {
@@ -28,7 +30,8 @@ public struct BlockInputConfiguration {
         undoController: BlockInputUndoController? = nil,
         completionProvider: (any BlockInputCompletionProvider)? = nil,
         onDocumentChange: ((BlockInputDocument) -> Void)? = nil,
-        onSelectionChange: ((BlockInputSelection?) -> Void)? = nil
+        onSelectionChange: ((BlockInputSelection?) -> Void)? = nil,
+        onFocusChange: ((Bool) -> Void)? = nil
     ) {
         self.documentStore = documentStore ?? BlockInputMemoryDocumentStore(document: document)
         self.allowsBlockReordering = allowsBlockReordering
@@ -36,5 +39,6 @@ public struct BlockInputConfiguration {
         self.completionProvider = completionProvider
         self.onDocumentChange = onDocumentChange
         self.onSelectionChange = onSelectionChange
+        self.onFocusChange = onFocusChange
     }
 }

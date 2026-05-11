@@ -18,8 +18,12 @@ public final class BlockInputView: NSView {
     var completionProvider: (any BlockInputCompletionProvider)?
     var onDocumentChange: ((BlockInputDocument) -> Void)?
     var onSelectionChange: ((BlockInputSelection?) -> Void)?
+    var onFocusChange: ((Bool) -> Void)?
+    var publishedFocusState = false
     var pendingFocus: BlockInputCursor?
     var lastFocusedBlockID: BlockInputBlockID?
+    // Invalidates deferred selection restoration when a later reload should not restore focus.
+    var focusRestoreGeneration = 0
     // Avoid re-entering NSWindow first-responder assignment while AppKit is already promoting this view.
     var isBecomingFirstResponder = false
 
@@ -39,6 +43,10 @@ public final class BlockInputView: NSView {
 
     /// Applies configuration and reloads the editor from its document store.
     public func configure(_ configuration: BlockInputConfiguration) {
+        configure(configuration, restoresFocus: true)
+    }
+
+    func configure(_ configuration: BlockInputConfiguration, restoresFocus: Bool) {
         documentStore = configuration.documentStore
         document = configuration.document
         allowsBlockReordering = configuration.allowsBlockReordering
@@ -46,8 +54,13 @@ public final class BlockInputView: NSView {
         completionProvider = configuration.completionProvider
         onDocumentChange = configuration.onDocumentChange
         onSelectionChange = configuration.onSelectionChange
+        onFocusChange = configuration.onFocusChange
         clearStaleFocusState()
-        reloadDataKeepingFocus()
+        if restoresFocus {
+            reloadDataKeepingFocus()
+        } else {
+            reloadDataWithoutRestoringFocus()
+        }
     }
 
     /// Focuses the editor like a single text field, preserving valid current selections.
@@ -55,6 +68,9 @@ public final class BlockInputView: NSView {
         refreshDocumentFromStore()
         if let selection, containsValidSelection(selection) {
             restoreVisibleSelection()
+            if isEditorFirstResponder {
+                publishFocusChange(true)
+            }
             return
         }
         let cursor = pendingFocus ?? cursorForRestoredFocus()
@@ -65,6 +81,14 @@ public final class BlockInputView: NSView {
         isBecomingFirstResponder = true
         defer { isBecomingFirstResponder = false }
         focusEditor()
+        publishFocusChange(true)
+        return true
+    }
+
+    public override func resignFirstResponder() -> Bool {
+        if !isBecomingFirstResponder {
+            publishFocusLossIfNeeded()
+        }
         return true
     }
 
@@ -81,6 +105,9 @@ public final class BlockInputView: NSView {
         pendingFocus = cursor
         applySelection(.cursor(cursor), notify: true)
         focusVisibleItem(for: cursor)
+        if isEditorFirstResponder {
+            publishFocusChange(true)
+        }
     }
 
     /// Inserts a paragraph below the active block.

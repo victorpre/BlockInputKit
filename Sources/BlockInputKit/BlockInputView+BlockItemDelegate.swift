@@ -6,8 +6,13 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         guard index(of: blockID) != nil else {
             return
         }
+        publishFocusChange(true)
         let offset = item.currentSelectedRange.location
         applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: offset)), notify: true)
+    }
+
+    func blockItemDidEndEditing(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+        publishFocusLossIfNeeded()
     }
 
     func blockItem(
