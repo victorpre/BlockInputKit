@@ -267,23 +267,16 @@ final class DemoWindowController: NSWindowController {
     }
 
     private func showCompletions(trigger: BlockInputCompletionTrigger) {
-        guard let blockID = editorView.selection?.firstBlockID ?? editorView.document.blocks.first?.id else {
-            return
-        }
-        let context = BlockInputCompletionContext(
-            trigger: trigger,
-            query: completionQueryField.stringValue,
-            document: editorView.document,
-            blockID: blockID
-        )
-        Task { [completionProvider, weak self] in
-            let suggestions = await completionProvider.suggestions(for: context)
-            await MainActor.run {
-                self?.latestCompletionSuggestions = suggestions
-                self?.completionResultsLabel.stringValue = suggestions.isEmpty
-                    ? "No suggestions"
-                    : suggestions.map { "\($0.title) -> \($0.insertionText)" }.joined(separator: "\n")
+        let query = completionQueryField.stringValue
+        Task { [weak self] in
+            guard let self else {
+                return
             }
+            let suggestions = await editorView.completionSuggestions(trigger: trigger, query: query)
+            latestCompletionSuggestions = suggestions
+            completionResultsLabel.stringValue = suggestions.isEmpty
+                ? "No suggestions"
+                : suggestions.map { "\($0.title) -> \($0.insertionText)" }.joined(separator: "\n")
         }
     }
 
@@ -294,18 +287,5 @@ final class DemoWindowController: NSWindowController {
         }
         let selection = editorView.acceptCompletionSuggestion(suggestion)
         updateStatus(for: editorView.document, prefix: selection == nil ? "Completion ignored" : "Inserted completion")
-    }
-}
-
-private extension BlockInputSelection {
-    var firstBlockID: BlockInputBlockID? {
-        switch self {
-        case .cursor(let cursor):
-            cursor.blockID
-        case .text(let range):
-            range.blockID
-        case .blocks(let blockIDs):
-            blockIDs.first
-        }
     }
 }

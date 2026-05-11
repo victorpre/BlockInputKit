@@ -1,6 +1,27 @@
 import AppKit
 
 extension BlockInputView {
+    /// Requests host-provided suggestions for the active block, or an explicit block.
+    public func completionSuggestions(
+        trigger: BlockInputCompletionTrigger,
+        query: String,
+        blockID: BlockInputBlockID? = nil
+    ) async -> [BlockInputCompletionSuggestion] {
+        guard let provider = completionProvider,
+              let resolvedBlockID = blockID ?? activeBlockID,
+              document.index(of: resolvedBlockID) != nil else {
+            return []
+        }
+        let context = BlockInputCompletionContext(
+            trigger: trigger,
+            query: query,
+            document: document,
+            blockID: resolvedBlockID,
+            selectedRange: completionSelectedRange(in: resolvedBlockID)
+        )
+        return await provider.suggestions(for: context)
+    }
+
     /// Applies a host-provided completion suggestion to the active block.
     @discardableResult
     public func acceptCompletionSuggestion(
@@ -42,6 +63,17 @@ extension BlockInputView {
 }
 
 private extension BlockInputView {
+    func completionSelectedRange(in blockID: BlockInputBlockID) -> NSRange? {
+        switch selection {
+        case let .cursor(cursor) where cursor.blockID == blockID:
+            return NSRange(location: cursor.utf16Offset, length: 0)
+        case let .text(textRange) where textRange.blockID == blockID:
+            return textRange.range
+        default:
+            return nil
+        }
+    }
+
     func completionReplacementRange(in blockID: BlockInputBlockID, block: BlockInputBlock) -> NSRange {
         switch selection {
         case let .cursor(cursor) where cursor.blockID == blockID:

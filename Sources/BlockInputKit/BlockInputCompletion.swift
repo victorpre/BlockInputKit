@@ -63,6 +63,7 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
 }
 
 /// Supplies mention and slash-command completions to the editor.
-public protocol BlockInputCompletionProvider: AnyObject {
+public protocol BlockInputCompletionProvider: AnyObject, Sendable {
+    /// Returns suggestions for the active completion context.
     func suggestions(for context: BlockInputCompletionContext) async -> [BlockInputCompletionSuggestion]
 }

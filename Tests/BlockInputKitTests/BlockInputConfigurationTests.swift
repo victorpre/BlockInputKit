@@ -49,7 +49,7 @@ final class BlockInputConfigurationTests: XCTestCase {
     }
 }
 
-private final class ConfigurationCompletionProvider: BlockInputCompletionProvider {
+private final class ConfigurationCompletionProvider: BlockInputCompletionProvider, @unchecked Sendable {
     func suggestions(for context: BlockInputCompletionContext) async -> [BlockInputCompletionSuggestion] {
         []
     }

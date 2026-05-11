@@ -39,6 +39,161 @@ final class BlockInputCompletionTests: XCTestCase {
     }
 
     @MainActor
+    func testCompletionSuggestionsBuildsContextFromCurrentSelection() async {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let provider = CapturingCompletionProvider()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "@al")
+            ]),
+            completionProvider: provider
+        ))
+        view.applySelection(.text(BlockInputTextRange(
+            blockID: blockID,
+            range: NSRange(location: 1, length: 2)
+        )), notify: false)
+
+        let suggestions = await view.completionSuggestions(trigger: .mention, query: "al")
+
+        XCTAssertEqual(suggestions.map(\.insertionText), ["```"])
+        XCTAssertEqual(provider.lastContext, BlockInputCompletionContext(
+            trigger: .mention,
+            query: "al",
+            document: view.document,
+            blockID: blockID,
+            selectedRange: NSRange(location: 1, length: 2)
+        ))
+    }
+
+    @MainActor
+    func testCompletionSuggestionsBuildsContextFromCurrentCursor() async {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let provider = CapturingCompletionProvider()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "@al")
+            ]),
+            completionProvider: provider
+        ))
+        view.focus(blockID: blockID, utf16Offset: 3)
+
+        _ = await view.completionSuggestions(trigger: .mention, query: "al")
+
+        XCTAssertEqual(provider.lastContext, BlockInputCompletionContext(
+            trigger: .mention,
+            query: "al",
+            document: view.document,
+            blockID: blockID,
+            selectedRange: NSRange(location: 3, length: 0)
+        ))
+    }
+
+    @MainActor
+    func testCompletionSuggestionsUsesExplicitBlockAndIgnoresSelectionFromAnotherBlock() async {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let provider = CapturingCompletionProvider()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: firstID, text: "First"),
+                BlockInputBlock(id: secondID, text: "/cod")
+            ]),
+            completionProvider: provider
+        ))
+        view.applySelection(.text(BlockInputTextRange(
+            blockID: firstID,
+            range: NSRange(location: 0, length: 2)
+        )), notify: false)
+
+        _ = await view.completionSuggestions(trigger: .slashCommand, query: "cod", blockID: secondID)
+
+        XCTAssertEqual(provider.lastContext, BlockInputCompletionContext(
+            trigger: .slashCommand,
+            query: "cod",
+            document: view.document,
+            blockID: secondID
+        ))
+    }
+
+    @MainActor
+    func testCompletionSuggestionsUsesFirstSelectedBlockForBlockSelection() async {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let provider = CapturingCompletionProvider()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: firstID, text: "@ava"),
+                BlockInputBlock(id: secondID, text: "@noah")
+            ]),
+            completionProvider: provider
+        ))
+        view.applySelection(.blocks([secondID, firstID]), notify: false)
+
+        _ = await view.completionSuggestions(trigger: .mention, query: "no")
+
+        XCTAssertEqual(provider.lastContext, BlockInputCompletionContext(
+            trigger: .mention,
+            query: "no",
+            document: view.document,
+            blockID: secondID
+        ))
+    }
+
+    @MainActor
+    func testCompletionSuggestionsFallsBackToFirstBlockWithoutSelection() async {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let provider = CapturingCompletionProvider()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: firstID, text: "@ava"),
+                BlockInputBlock(id: secondID, text: "@noah")
+            ]),
+            completionProvider: provider
+        ))
+
+        _ = await view.completionSuggestions(trigger: .mention, query: "av")
+
+        XCTAssertEqual(provider.lastContext, BlockInputCompletionContext(
+            trigger: .mention,
+            query: "av",
+            document: view.document,
+            blockID: firstID
+        ))
+    }
+
+    @MainActor
+    func testCompletionSuggestionsReturnsEmptyWithoutProviderOrKnownBlock() async {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let provider = CapturingCompletionProvider()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "@al")
+        ])))
+
+        let missingProviderSuggestions = await view.completionSuggestions(trigger: .mention, query: "al")
+
+        view.configure(BlockInputConfiguration(
+            document: view.document,
+            completionProvider: provider
+        ))
+        let missingBlockSuggestions = await view.completionSuggestions(
+            trigger: .mention,
+            query: "al",
+            blockID: "missing"
+        )
+
+        XCTAssertTrue(missingProviderSuggestions.isEmpty)
+        XCTAssertTrue(missingBlockSuggestions.isEmpty)
+        XCTAssertNil(provider.lastContext)
+    }
+
+    @MainActor
     func testAcceptCompletionSuggestionReplacesCurrentTextSelection() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let undoController = BlockInputUndoController()
@@ -177,7 +332,7 @@ final class BlockInputCompletionTests: XCTestCase {
     }
 }
 
-private final class CapturingCompletionProvider: BlockInputCompletionProvider {
+private final class CapturingCompletionProvider: BlockInputCompletionProvider, @unchecked Sendable {
     private(set) var lastContext: BlockInputCompletionContext?
 
     func suggestions(for context: BlockInputCompletionContext) async -> [BlockInputCompletionSuggestion] {
