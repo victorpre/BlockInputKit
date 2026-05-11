@@ -36,10 +36,14 @@ final class BlockInputStoreInsertionTests: XCTestCase {
         store.replaceDocument(BlockInputDocument(blocks: [
             BlockInputBlock(id: replacementID, text: "New")
         ]))
+        store.resetCounts()
 
         let selection = view.insertMarkdown("Inserted", below: replacementID)
 
         XCTAssertEqual(store.document.blocks.map(\.text), ["New", "Inserted"])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches.first?.index, 1)
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
     }
 
@@ -56,10 +60,14 @@ final class BlockInputStoreInsertionTests: XCTestCase {
         store.replaceDocument(BlockInputDocument(blocks: [
             BlockInputBlock(id: replacementID, text: "New")
         ]))
+        store.resetCounts()
 
         let selection = view.insertMarkdown("Inserted")
 
         XCTAssertEqual(store.document.blocks.map(\.text), ["New", "Inserted"])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches.first?.index, 1)
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
     }
 
@@ -79,10 +87,14 @@ final class BlockInputStoreInsertionTests: XCTestCase {
             BlockInputBlock(id: firstID, text: "First"),
             BlockInputBlock(id: secondID, text: "Second")
         ]))
+        store.resetCounts()
 
         let selection = view.insertMarkdown("Inserted")
 
         XCTAssertEqual(store.document.blocks.map(\.text), ["First", "Second", "Inserted"])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches.first?.index, 2)
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: store.document.blocks[2].id, utf16Offset: 0)))
     }
 
@@ -119,10 +131,14 @@ final class BlockInputStoreInsertionTests: XCTestCase {
         store.replaceDocument(BlockInputDocument(blocks: [
             BlockInputBlock(id: replacementID, text: "New")
         ]))
+        store.resetCounts()
 
         let selection = view.insertFileURLs([URL(fileURLWithPath: "/tmp/example.txt")], below: replacementID)
 
         XCTAssertEqual(store.document.blocks.map(\.text), ["New", "[example.txt](<file:///tmp/example.txt>)"])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches.first?.index, 1)
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
     }
 
@@ -139,10 +155,14 @@ final class BlockInputStoreInsertionTests: XCTestCase {
         store.replaceDocument(BlockInputDocument(blocks: [
             BlockInputBlock(id: replacementID, text: "New")
         ]))
+        store.resetCounts()
 
         let selection = view.insertFileURLs([URL(fileURLWithPath: "/tmp/example.txt")])
 
         XCTAssertEqual(store.document.blocks.map(\.text), ["New", "[example.txt](<file:///tmp/example.txt>)"])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches.first?.index, 1)
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
     }
 
@@ -162,6 +182,7 @@ final class BlockInputStoreInsertionTests: XCTestCase {
             BlockInputBlock(id: firstID, text: "First"),
             BlockInputBlock(id: secondID, text: "Second")
         ]))
+        store.resetCounts()
 
         let selection = view.insertFileURLs([URL(fileURLWithPath: "/tmp/example.txt")])
 
@@ -170,6 +191,9 @@ final class BlockInputStoreInsertionTests: XCTestCase {
             "Second",
             "[example.txt](<file:///tmp/example.txt>)"
         ])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches.first?.index, 2)
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: store.document.blocks[2].id, utf16Offset: 0)))
     }
 }

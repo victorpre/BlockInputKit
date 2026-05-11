@@ -63,7 +63,9 @@ final class BlockInputViewDocumentStoreTests: XCTestCase {
 
         XCTAssertEqual(store.document.blocks.count, 2)
         XCTAssertEqual(store.document.blocks[0].id, firstID)
-        XCTAssertEqual(store.replaceDocumentCount, 1)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches.first?.index, 1)
     }
 
     @MainActor
@@ -91,7 +93,8 @@ final class BlockInputViewDocumentStoreTests: XCTestCase {
         item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
 
         XCTAssertEqual(store.document.blocks[0].text, "Edited")
-        XCTAssertEqual(store.replaceDocumentCount, 1)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
         var document = store.document
         let undo = undoController.undoTextEdit(in: &document, blockID: blockID)
         XCTAssertEqual(document.blocks[0].text, "First")

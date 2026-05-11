@@ -141,6 +141,7 @@ final class BlockInputViewReorderingTests: XCTestCase {
             BlockInputBlock(id: firstID, text: "First"),
             BlockInputBlock(id: secondID, text: "Second")
         ]))
+        store.resetCounts()
 
         let accepted = view.collectionView(
             view.collectionView,
@@ -152,6 +153,31 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertTrue(accepted)
         XCTAssertEqual(store.document.blocks.map(\.id), [secondID, firstID])
         XCTAssertEqual(view.document.blocks.map(\.id), [secondID, firstID])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.movedBlocks.map(\.id), [firstID])
+        XCTAssertEqual(store.movedBlocks.map(\.index), [1])
+    }
+
+    func testMoveBlockPublishesClampedFinalIndexToStore() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second"),
+            BlockInputBlock(id: thirdID, text: "Third")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        store.resetCounts()
+
+        _ = view.moveBlock(blockID: firstID, to: 99)
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [secondID, thirdID, firstID])
+        XCTAssertEqual(view.document.blocks.map(\.id), [secondID, thirdID, firstID])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.movedBlocks.map(\.id), [firstID])
+        XCTAssertEqual(store.movedBlocks.map(\.index), [2])
     }
 
     func testAcceptDropReturnsFalseWhenReorderingIsDisabled() {

@@ -58,9 +58,9 @@ extension BlockInputView {
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         )
-        syncDocumentStore()
+        syncDocumentStore(.replaceBlock(updatedBlock))
         reloadDataKeepingFocus()
-        publishDocumentChange(syncStore: false)
+        publishDocumentChange()
         return afterSelection
     }
 }

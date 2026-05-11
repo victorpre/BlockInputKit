@@ -7,6 +7,10 @@ final class CountingDocumentStore: BlockInputDocumentStore {
     private(set) var blockAtReadIndexes: [Int] = []
     private(set) var indexReadIDs: [BlockInputBlockID] = []
     private(set) var replaceDocumentCount = 0
+    private(set) var replaceBlockIDs: [BlockInputBlockID] = []
+    private(set) var insertedBlockBatches: [(blocks: [BlockInputBlock], index: Int)] = []
+    private(set) var deletedBlockIDs: [[BlockInputBlockID]] = []
+    private(set) var movedBlocks: [(id: BlockInputBlockID, index: Int)] = []
 
     var blockCount: Int {
         blockCountReadCount += 1
@@ -22,6 +26,10 @@ final class CountingDocumentStore: BlockInputDocumentStore {
         blockAtReadIndexes = []
         indexReadIDs = []
         replaceDocumentCount = 0
+        replaceBlockIDs = []
+        insertedBlockBatches = []
+        deletedBlockIDs = []
+        movedBlocks = []
     }
 
     func block(at index: Int) -> BlockInputBlock? {
@@ -40,6 +48,30 @@ final class CountingDocumentStore: BlockInputDocumentStore {
     func replaceDocument(_ document: BlockInputDocument) {
         replaceDocumentCount += 1
         self.document = document
+    }
+
+    func replaceBlock(_ block: BlockInputBlock) {
+        replaceBlockIDs.append(block.id)
+        guard let index = document.index(of: block.id) else {
+            return
+        }
+        document.blocks[index] = block
+    }
+
+    func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
+        insertedBlockBatches.append((blocks, index))
+        document.insertBlocks(blocks, at: index)
+    }
+
+    func deleteBlocks(withIDs ids: [BlockInputBlockID]) {
+        deletedBlockIDs.append(ids)
+        let deletedIDs = Set(ids)
+        document.blocks.removeAll { deletedIDs.contains($0.id) }
+    }
+
+    func moveBlock(withID id: BlockInputBlockID, to index: Int) {
+        movedBlocks.append((id, index))
+        document.moveBlock(blockID: id, to: index)
     }
 }
 

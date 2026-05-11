@@ -40,6 +40,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             selectionAfter: afterSelection
         )
         collectionView.collectionViewLayout?.invalidateLayout()
+        syncDocumentStore(.replaceBlock(document.blocks[index]))
         publishDocumentChange()
     }
 
@@ -91,15 +92,27 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestIndent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
-        _ = performStructuralEdit(named: "Indent Block") { document in
-            document.indentBlock(blockID: blockID)
-        }
+        _ = performStructuralEdit(
+            named: "Indent Block",
+            storeSyncAction: { _, afterDocument, _ in
+                afterDocument.block(withID: blockID).map(StoreSyncAction.replaceBlock) ?? .replaceDocument
+            },
+            edit: { document in
+                document.indentBlock(blockID: blockID)
+            }
+        )
     }
 
     func blockItemDidRequestOutdent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
-        _ = performStructuralEdit(named: "Outdent Block") { document in
-            document.outdentBlock(blockID: blockID)
-        }
+        _ = performStructuralEdit(
+            named: "Outdent Block",
+            storeSyncAction: { _, afterDocument, _ in
+                afterDocument.block(withID: blockID).map(StoreSyncAction.replaceBlock) ?? .replaceDocument
+            },
+            edit: { document in
+                document.outdentBlock(blockID: blockID)
+            }
+        )
     }
 
     func blockItemDidRequestMoveToPreviousBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {

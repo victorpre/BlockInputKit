@@ -23,12 +23,36 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
             BlockInputBlock(id: secondID, text: "Second")
         ]))
         view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+        store.resetCounts()
 
         let didDelete = item.requestDeleteEmptyBlock()
 
         XCTAssertTrue(didDelete)
         XCTAssertEqual(store.document.blocks.map(\.id), [secondID])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.deletedBlockIDs, [[blockID]])
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: secondID, utf16Offset: 0)))
+    }
+
+    @MainActor
+    func testDeleteOnlyEmptyBlockPublishesBlockReplacementToStore() {
+        let blockID = BlockInputBlockID(rawValue: "only")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .quote, text: "")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+        store.resetCounts()
+
+        _ = view.deleteCurrentEmptyBlockForBackspaceOrDelete()
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [blockID])
+        XCTAssertEqual(store.document.blocks.map(\.kind), [.paragraph])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+        XCTAssertTrue(store.deletedBlockIDs.isEmpty)
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
     @MainActor
@@ -71,11 +95,14 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
         store.replaceDocument(BlockInputDocument(blocks: [
             BlockInputBlock(id: replacementID, text: "Replacement")
         ]))
+        store.resetCounts()
 
         _ = view.insertBlockBelowCurrentBlock()
 
         XCTAssertEqual(store.document.blocks.map(\.id).first, replacementID)
         XCTAssertEqual(store.document.blocks.count, 2)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
     }
 
     @MainActor
@@ -91,11 +118,14 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
         store.replaceDocument(BlockInputDocument(blocks: [
             BlockInputBlock(id: replacementID, text: "Replacement")
         ]))
+        store.resetCounts()
 
         _ = view.insertBlockBelowCurrentBlock()
 
         XCTAssertEqual(store.document.blocks.map(\.id).first, replacementID)
         XCTAssertEqual(store.document.blocks.count, 2)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
     }
 
@@ -115,11 +145,14 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
             BlockInputBlock(id: firstID, text: "First"),
             BlockInputBlock(id: secondID, text: "Second")
         ]))
+        store.resetCounts()
 
         _ = view.insertBlockBelowCurrentBlock()
 
         XCTAssertEqual(store.document.blocks.map(\.id).prefix(2), [firstID, secondID])
         XCTAssertEqual(store.document.blocks.count, 3)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: store.document.blocks[2].id, utf16Offset: 0)))
     }
 }

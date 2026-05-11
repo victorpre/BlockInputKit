@@ -20,20 +20,32 @@ public extension BlockInputView {
             return nil
         }
 
-        return performStructuralEdit(named: "Insert Files") { document in
-            if document.blocks.count == 1,
-               document.blocks[0].kind == .paragraph,
-               document.blocks[0].isEmpty {
-                document.blocks = insertedBlocks
-                guard let firstBlock = insertedBlocks.first else {
-                    return nil
+        return performStructuralEdit(
+            named: "Insert Files",
+            storeSyncAction: { beforeDocument, _, _ in
+                if beforeDocument.blocks.count == 1,
+                   beforeDocument.blocks[0].kind == .paragraph,
+                   beforeDocument.blocks[0].isEmpty {
+                    return .replaceDocument
                 }
-                return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0))
-            }
+                let insertionIndex = fileInsertionIndex(below: targetBlockID, in: beforeDocument)
+                return .insertBlocks(insertedBlocks, insertionIndex: insertionIndex)
+            },
+            edit: { document in
+                if document.blocks.count == 1,
+                   document.blocks[0].kind == .paragraph,
+                   document.blocks[0].isEmpty {
+                    document.blocks = insertedBlocks
+                    guard let firstBlock = insertedBlocks.first else {
+                        return nil
+                    }
+                    return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0))
+                }
 
-            let insertionIndex = fileInsertionIndex(below: targetBlockID, in: document)
-            return document.insertBlocks(insertedBlocks, at: insertionIndex)
-        }
+                let insertionIndex = fileInsertionIndex(below: targetBlockID, in: document)
+                return document.insertBlocks(insertedBlocks, at: insertionIndex)
+            }
+        )
     }
 
     private static func fileLinkBlock(for url: URL) -> BlockInputBlock? {

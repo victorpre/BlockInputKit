@@ -83,7 +83,7 @@ The demo app includes:
 - `BlockInputBlock` models a stable block ID, kind, text, and indentation level.
 - `BlockInputView` is the primary AppKit editor surface.
 - `BlockInputEditor` wraps `BlockInputView` for SwiftUI hosts.
-- `BlockInputDocumentStore` lets hosts provide indexed block reads and receive document replacements.
+- `BlockInputDocumentStore` lets hosts provide indexed block reads plus granular block mutations.
 - `BlockInputCompletionProvider` keeps mention and slash-command suggestions host-owned.
 - `BlockInputUndoController` separates per-block text undo from structural undo.
 
@@ -100,9 +100,7 @@ The demo app includes:
 
 ## Performance Expectations
 
-BlockInputKit is designed for large documents. The AppKit surface uses `NSCollectionView` so visible items are reused instead of mounting every block view at once, and `BlockInputDocumentStore` supports indexed block reads for rendering. The demo includes a 100,000-block loading path to keep large-document behavior visible during development.
-
-The next performance milestone is a more granular mutation path so very large documents do not require whole-document replacement for every edit.
+BlockInputKit is designed for large documents. The AppKit surface uses `NSCollectionView` so visible items are reused instead of mounting every block view at once, and `BlockInputDocumentStore` supports indexed block reads for rendering. Common editor edits publish granular store mutations for block replacement, insertion, deletion, and movement; broad structural undo/redo can still publish a full document replacement. The demo includes a 100,000-block loading path to keep large-document behavior visible during development.
 
 ## Validation
 

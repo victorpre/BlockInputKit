@@ -128,6 +128,7 @@ final class BlockInputStoreCompletionTests: XCTestCase {
         store.replaceDocument(BlockInputDocument(blocks: [
             BlockInputBlock(id: blockID, text: "New @al")
         ]))
+        store.resetCounts()
 
         let selection = view.acceptCompletionSuggestion(
             BlockInputCompletionSuggestion(
@@ -141,6 +142,8 @@ final class BlockInputStoreCompletionTests: XCTestCase {
         )
 
         XCTAssertEqual(store.document.blocks.map(\.text), ["New @alice"])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 10)))
     }
 
@@ -160,6 +163,7 @@ final class BlockInputStoreCompletionTests: XCTestCase {
             BlockInputBlock(id: firstID, text: "First"),
             BlockInputBlock(id: secondID, text: "Second @al")
         ]))
+        store.resetCounts()
 
         let selection = view.acceptCompletionSuggestion(BlockInputCompletionSuggestion(
             id: "mention:alice",
@@ -169,6 +173,8 @@ final class BlockInputStoreCompletionTests: XCTestCase {
         ))
 
         XCTAssertEqual(store.document.blocks.map(\.text), ["First", "Second @al@alice"])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [secondID])
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: secondID, utf16Offset: 16)))
     }
 }

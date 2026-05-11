@@ -58,10 +58,13 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
             BlockInputBlock(id: blockID, text: "Edited")
         ]))
         view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)), notify: false)
+        store.resetCounts()
 
         _ = view.undoTextEditInActiveBlock()
 
         XCTAssertEqual(store.document.blocks.map(\.text), ["Original"])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
     }
 
     @MainActor
@@ -94,10 +97,34 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
             BlockInputBlock(id: blockID, text: "Original"),
             BlockInputBlock(id: secondID, text: "Host updated")
         ]))
+        store.resetCounts()
 
         _ = view.redoTextEditInActiveBlock()
 
         XCTAssertEqual(store.document.blocks.map(\.text), ["Edited", "Host updated"])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+    }
+
+    @MainActor
+    func testIndentPublishesBlockReplacementToStore() {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+
+        item.requestIndent()
+
+        XCTAssertEqual(store.document.blocks[0].indentationLevel, 1)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
     }
 
     @MainActor

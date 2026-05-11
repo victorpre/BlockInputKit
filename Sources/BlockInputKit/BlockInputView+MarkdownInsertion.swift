@@ -21,22 +21,35 @@ public extension BlockInputView {
             return nil
         }
 
-        return performStructuralEdit(named: "Insert Markdown") { document in
-            if document.blocks.count == 1,
-               document.blocks[0].kind == .paragraph,
-               document.blocks[0].isEmpty {
-                document.blocks = insertedBlocks
-                guard let firstBlock = insertedBlocks.first else {
+        return performStructuralEdit(
+            named: "Insert Markdown",
+            storeSyncAction: { beforeDocument, _, _ in
+                if beforeDocument.blocks.count == 1,
+                   beforeDocument.blocks[0].kind == .paragraph,
+                   beforeDocument.blocks[0].isEmpty {
+                    return .replaceDocument
+                }
+                let insertionIndex = markdownInsertionIndex(below: targetBlockID, in: beforeDocument)
+                    ?? beforeDocument.blocks.count
+                return .insertBlocks(insertedBlocks, insertionIndex: insertionIndex)
+            },
+            edit: { document in
+                if document.blocks.count == 1,
+                   document.blocks[0].kind == .paragraph,
+                   document.blocks[0].isEmpty {
+                    document.blocks = insertedBlocks
+                    guard let firstBlock = insertedBlocks.first else {
+                        return nil
+                    }
+                    return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0))
+                }
+
+                guard let insertionIndex = markdownInsertionIndex(below: targetBlockID, in: document) else {
                     return nil
                 }
-                return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0))
+                return document.insertBlocks(insertedBlocks, at: insertionIndex)
             }
-
-            guard let insertionIndex = markdownInsertionIndex(below: targetBlockID, in: document) else {
-                return nil
-            }
-            return document.insertBlocks(insertedBlocks, at: insertionIndex)
-        }
+        )
     }
 
     private func markdownInsertionIndex(

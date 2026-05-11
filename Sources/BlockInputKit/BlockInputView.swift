@@ -90,9 +90,20 @@ public final class BlockInputView: NSView {
         guard let blockID = activeBlockID else {
             return nil
         }
-        return performStructuralEdit(named: "Insert Block") { document in
-            document.handleReturn(in: blockID)
-        }
+        return performStructuralEdit(
+            named: "Insert Block",
+            storeSyncAction: { _, afterDocument, afterSelection in
+                guard case let .cursor(cursor) = afterSelection,
+                      let insertedIndex = afterDocument.index(of: cursor.blockID),
+                      let insertedBlock = afterDocument.block(withID: cursor.blockID) else {
+                    return .replaceDocument
+                }
+                return .insertBlocks([insertedBlock], insertionIndex: insertedIndex)
+            },
+            edit: { document in
+                document.handleReturn(in: blockID)
+            }
+        )
     }
 
     /// Deletes the active block if it is empty, preserving the required focus semantics.
@@ -102,9 +113,19 @@ public final class BlockInputView: NSView {
         guard let blockID = activeBlockID else {
             return nil
         }
-        return performStructuralEdit(named: "Delete Block") { document in
-            document.deleteEmptyBlockForBackspaceOrDelete(blockID: blockID)
-        }
+        return performStructuralEdit(
+            named: "Delete Block",
+            storeSyncAction: { beforeDocument, afterDocument, _ in
+                if beforeDocument.blocks.count == 1,
+                   let replacementBlock = afterDocument.block(withID: blockID) {
+                    return .replaceBlock(replacementBlock)
+                }
+                return .deleteBlocks([blockID])
+            },
+            edit: { document in
+                document.deleteEmptyBlockForBackspaceOrDelete(blockID: blockID)
+            }
+        )
     }
 
     /// Moves a block when reordering is enabled.
@@ -114,9 +135,18 @@ public final class BlockInputView: NSView {
         guard allowsBlockReordering else {
             return nil
         }
-        return performStructuralEdit(named: "Move Block") { document in
-            document.moveBlock(blockID: blockID, to: targetIndex)
-        }
+        return performStructuralEdit(
+            named: "Move Block",
+            storeSyncAction: { _, afterDocument, _ in
+                guard let finalIndex = afterDocument.index(of: blockID) else {
+                    return .replaceDocument
+                }
+                return .moveBlock(blockID, targetIndex: finalIndex)
+            },
+            edit: { document in
+                document.moveBlock(blockID: blockID, to: targetIndex)
+            }
+        )
     }
 
     /// Undoes the most recent text edit in the active block.
@@ -127,7 +157,11 @@ public final class BlockInputView: NSView {
               let result = undoController?.undoTextEdit(in: &document, blockID: blockID) else {
             return nil
         }
-        applyUndoResult(result)
+        if let block = document.block(withID: blockID) {
+            applyUndoResult(result, storeSyncAction: .replaceBlock(block))
+        } else {
+            applyUndoResult(result)
+        }
         return result
     }
 
@@ -139,7 +173,11 @@ public final class BlockInputView: NSView {
               let result = undoController?.redoTextEdit(in: &document, blockID: blockID) else {
             return nil
         }
-        applyUndoResult(result)
+        if let block = document.block(withID: blockID) {
+            applyUndoResult(result, storeSyncAction: .replaceBlock(block))
+        } else {
+            applyUndoResult(result)
+        }
         return result
     }
 

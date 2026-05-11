@@ -1,15 +1,34 @@
 import Foundation
 
 extension BlockInputView {
-    func publishDocumentChange(syncStore: Bool = true) {
-        if syncStore {
-            syncDocumentStore()
-        }
+    enum StoreSyncAction {
+        case replaceDocument
+        case replaceBlock(BlockInputBlock)
+        case insertBlocks([BlockInputBlock], insertionIndex: Int)
+        case deleteBlocks([BlockInputBlockID])
+        case moveBlock(BlockInputBlockID, targetIndex: Int)
+    }
+
+    func publishDocumentChange() {
         onDocumentChange?(document)
     }
 
-    func syncDocumentStore() {
-        documentStore?.replaceDocument(document)
+    func syncDocumentStore(_ action: StoreSyncAction) {
+        guard let documentStore else {
+            return
+        }
+        switch action {
+        case .replaceDocument:
+            documentStore.replaceDocument(document)
+        case let .replaceBlock(block):
+            documentStore.replaceBlock(block)
+        case let .insertBlocks(blocks, insertionIndex):
+            documentStore.insertBlocks(blocks, at: insertionIndex)
+        case let .deleteBlocks(blockIDs):
+            documentStore.deleteBlocks(withIDs: blockIDs)
+        case let .moveBlock(blockID, targetIndex):
+            documentStore.moveBlock(withID: blockID, to: targetIndex)
+        }
     }
 
     func refreshDocumentFromStore() {
@@ -20,6 +39,11 @@ extension BlockInputView {
 
     func performStructuralEdit(
         named actionName: String,
+        storeSyncAction: (
+            _ beforeDocument: BlockInputDocument,
+            _ afterDocument: BlockInputDocument,
+            _ afterSelection: BlockInputSelection
+        ) -> StoreSyncAction = { _, _, _ in .replaceDocument },
         edit: (inout BlockInputDocument) -> BlockInputSelection?
     ) -> BlockInputSelection? {
         refreshDocumentFromStore()
@@ -32,7 +56,7 @@ extension BlockInputView {
             applySelection(afterSelection, notify: beforeSelection != afterSelection)
             return nil
         }
-        syncDocumentStore()
+        syncDocumentStore(storeSyncAction(beforeDocument, document, afterSelection))
         applySelection(afterSelection, notify: true)
         undoController?.registerStructuralEdit(
             actionName: actionName,
@@ -42,17 +66,17 @@ extension BlockInputView {
             selectionAfter: afterSelection
         )
         reloadDataKeepingFocus()
-        publishDocumentChange(syncStore: false)
+        publishDocumentChange()
         return afterSelection
     }
 
-    func applyUndoResult(_ result: BlockInputUndoResult) {
-        syncDocumentStore()
+    func applyUndoResult(_ result: BlockInputUndoResult, storeSyncAction: StoreSyncAction = .replaceDocument) {
+        syncDocumentStore(storeSyncAction)
         let restoredSelection = result.selection.flatMap { selection -> BlockInputSelection? in
             containsValidSelection(selection) ? selection : nil
         }
         applySelection(restoredSelection, notify: true)
         reloadDataKeepingFocus()
-        publishDocumentChange(syncStore: false)
+        publishDocumentChange()
     }
 }
