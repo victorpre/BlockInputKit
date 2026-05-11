@@ -29,3 +29,18 @@ func keyDownEvent(keyCode: UInt16, characters: String) throws -> NSEvent {
         keyCode: keyCode
     ))
 }
+
+func commandAEvent() throws -> NSEvent {
+    try XCTUnwrap(NSEvent.keyEvent(
+        with: .keyDown,
+        location: .zero,
+        modifierFlags: .command,
+        timestamp: 0,
+        windowNumber: 0,
+        context: nil,
+        characters: "a",
+        charactersIgnoringModifiers: "a",
+        isARepeat: false,
+        keyCode: 0
+    ))
+}

@@ -105,11 +105,31 @@ public final class BlockInputView: NSView {
            moveSelectedBlockVertically(direction) {
             return
         }
-        if event.isBackspaceOrDelete,
-           deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil {
-            return
+        if event.isBackspaceOrDelete {
+            if selectedBlockCount == 1,
+               deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil {
+                return
+            }
+            if deleteSelectedBlocksForBackspaceOrDelete() != nil {
+                return
+            }
         }
         super.keyDown(with: event)
+    }
+
+    public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.blockInputIsSelectAllShortcut,
+           selectAllFromActiveSelection() {
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    public override func selectAll(_ sender: Any?) {
+        if selectAllFromActiveSelection() {
+            return
+        }
+        super.selectAll(sender)
     }
 
     /// Focuses a specific block at a UTF-16 text offset.
@@ -206,6 +226,33 @@ public final class BlockInputView: NSView {
                     return document.deleteBlock(at: deletionIndex)
                 }
                 return document.deleteBlock(blockID: blockID)
+            }
+        )
+    }
+
+    /// Deletes the selected whole blocks after Cmd+A escalates to document-level selection.
+    @discardableResult
+    public func deleteSelectedBlocksForBackspaceOrDelete() -> BlockInputSelection? {
+        refreshDocumentFromStore()
+        guard case let .blocks(blockIDs) = selection,
+              !blockIDs.isEmpty else {
+            return nil
+        }
+        return performStructuralEdit(
+            named: blockIDs.count == 1 ? "Delete Block" : "Delete Blocks",
+            storeSyncAction: { beforeDocument, afterDocument, _ in
+                if beforeDocument.blocks.count == 1,
+                   let replacementBlock = afterDocument.blocks.first {
+                    return .replaceBlock(replacementBlock)
+                }
+                if beforeDocument.blocks.count == blockIDs.count,
+                   afterDocument.blocks.count == 1 {
+                    return .replaceDocument
+                }
+                return .deleteBlocks(blockIDs)
+            },
+            edit: { document in
+                document.deleteBlocks(blockIDs: blockIDs)
             }
         )
     }

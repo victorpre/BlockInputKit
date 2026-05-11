@@ -223,6 +223,13 @@ extension BlockInputView {
         return blockIDs.contains(blockID)
     }
 
+    var selectedBlockCount: Int {
+        guard case let .blocks(blockIDs) = selection else {
+            return 0
+        }
+        return blockIDs.count
+    }
+
     private func updateVisibleBlockSelectionHighlights() {
         for item in collectionView.visibleItems().compactMap({ $0 as? BlockInputBlockItem }) {
             guard let blockID = item.representedBlockID else {

@@ -84,6 +84,56 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
     }
 
     @MainActor
+    func testSelectAllRefreshesFromStoreBeforeResolvingActiveBlock() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Old"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+        store.replaceDocument(BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Updated text"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ]))
+        store.resetCounts()
+
+        let didSelect = view.selectAllFromActiveSelection()
+
+        XCTAssertTrue(didSelect)
+        XCTAssertEqual(view.selection, .text(BlockInputTextRange(
+            blockID: blockID,
+            range: NSRange(location: 0, length: 12)
+        )))
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+    }
+
+    @MainActor
+    func testDeleteSelectedBlocksPublishesGranularDeletionToStore() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second"),
+            BlockInputBlock(id: thirdID, text: "Third")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.blocks([secondID]), notify: false)
+        store.resetCounts()
+
+        view.keyDown(with: try keyDownEvent(keyCode: 51, characters: "\u{7F}"))
+
+        XCTAssertEqual(store.deletedBlockIDs, [[secondID]])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.document.blocks.map(\.id), [firstID, thirdID])
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 5)))
+    }
+
+    @MainActor
     func testReturnRefreshesFromStoreBeforeResolvingActiveBlock() {
         let staleID = BlockInputBlockID(rawValue: "stale")
         let replacementID = BlockInputBlockID(rawValue: "replacement")

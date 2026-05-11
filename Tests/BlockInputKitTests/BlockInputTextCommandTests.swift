@@ -68,6 +68,142 @@ final class BlockInputTextCommandTests: XCTestCase {
         XCTAssertEqual(view.selection, .blocks([firstID, secondID]))
     }
 
+    func testCommandASelectsCurrentBlockThenAllBlocksFromTextFocus() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandAEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .text(BlockInputTextRange(
+            blockID: firstID,
+            range: NSRange(location: 0, length: 5)
+        )))
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 0, length: 5))
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandAEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        XCTAssertTrue(mounted.window.firstResponder === mounted.view)
+    }
+
+    func testSelectAllActionSelectsCurrentBlockThenAllBlocksFromTextFocus() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+
+        textView.selectAll(nil)
+
+        XCTAssertEqual(mounted.view.selection, .text(BlockInputTextRange(
+            blockID: firstID,
+            range: NSRange(location: 0, length: 5)
+        )))
+
+        textView.selectAll(nil)
+
+        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+    }
+
+    func testCommandASelectsAllBlocksFromBlockSelectionFocus() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])
+        mounted.view.applySelection(.blocks([secondID]), notify: false)
+        XCTAssertTrue(mounted.window.makeFirstResponder(mounted.view))
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandAEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .text(BlockInputTextRange(
+            blockID: secondID,
+            range: NSRange(location: 0, length: 6)
+        )))
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandAEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+    }
+
+    func testSelectAllActionSelectsAllBlocksFromBlockSelectionFocus() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])
+        mounted.view.applySelection(.blocks([secondID]), notify: false)
+        XCTAssertTrue(mounted.window.makeFirstResponder(mounted.view))
+
+        mounted.view.selectAll(nil)
+
+        XCTAssertEqual(mounted.view.selection, .text(BlockInputTextRange(
+            blockID: secondID,
+            range: NSRange(location: 0, length: 6)
+        )))
+
+        mounted.view.selectAll(nil)
+
+        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+    }
+
+    func testCommandASelectsAllBlocksFromSelectedHorizontalRule() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let ruleID = BlockInputBlockID(rawValue: "rule")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: ruleID, kind: .horizontalRule)
+        ])
+        mounted.view.applySelection(.blocks([ruleID]), notify: false)
+        XCTAssertTrue(mounted.window.makeFirstResponder(mounted.view))
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandAEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .blocks([firstID, ruleID]))
+    }
+
+    func testCommandAAllBlocksSelectionIsVisibleAndDeleteClearsDocument() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let ruleID = BlockInputBlockID(rawValue: "rule")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: ruleID, kind: .horizontalRule),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])
+        let firstItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let firstTextView = try XCTUnwrap(firstItem.testingTextView)
+        mounted.window.makeFirstResponder(firstTextView)
+
+        XCTAssertTrue(firstTextView.performKeyEquivalent(with: try commandAEvent()))
+        XCTAssertTrue(firstTextView.performKeyEquivalent(with: try commandAEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .blocks([firstID, ruleID, secondID]))
+        XCTAssertTrue(mounted.window.firstResponder === mounted.view)
+        let selectedBlockColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.18).cgColor
+        XCTAssertEqual(try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0)).view.layer?.backgroundColor, selectedBlockColor)
+        XCTAssertEqual(try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1)).view.layer?.backgroundColor, selectedBlockColor)
+        XCTAssertEqual(try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 2)).view.layer?.backgroundColor, selectedBlockColor)
+
+        mounted.view.keyDown(with: try keyDownEvent(keyCode: 51, characters: "\u{7F}"))
+
+        XCTAssertEqual(mounted.view.document.blocks, [BlockInputBlock(id: firstID, text: "")])
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 0)))
+    }
+
     func testMoveUpCommandFocusesPreviousBlockAtBoundary() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

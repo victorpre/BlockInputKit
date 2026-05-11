@@ -100,6 +100,54 @@ final class BlockInputDocumentTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
+    func testDeleteSelectedBlocksFocusesPreviousRemainingBlock() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        let fourthID = BlockInputBlockID(rawValue: "fourth")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second"),
+            BlockInputBlock(id: thirdID, text: "Third"),
+            BlockInputBlock(id: fourthID, text: "Fourth")
+        ])
+
+        let selection = document.deleteBlocks(blockIDs: [secondID, thirdID])
+
+        XCTAssertEqual(document.blocks.map(\.id), [firstID, fourthID])
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 5)))
+    }
+
+    func testDeleteLeadingSelectedBlocksFocusesNextRemainingBlock() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second"),
+            BlockInputBlock(id: thirdID, text: "Third")
+        ])
+
+        let selection = document.deleteBlocks(blockIDs: [firstID, secondID])
+
+        XCTAssertEqual(document.blocks.map(\.id), [thirdID])
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: thirdID, utf16Offset: 0)))
+    }
+
+    func testDeleteAllSelectedBlocksLeavesOneEmptyParagraphFocused() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])
+
+        let selection = document.deleteBlocks(blockIDs: [firstID, secondID])
+
+        XCTAssertEqual(document.blocks, [BlockInputBlock(id: firstID, text: "")])
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 0)))
+    }
+
     func testHorizontalRuleIsNotEffectivelyEmptyContent() {
         let blockID = BlockInputBlockID(rawValue: "rule")
         var document = BlockInputDocument(blocks: [
@@ -343,5 +391,21 @@ final class BlockInputDocumentTests: XCTestCase {
         )
 
         XCTAssertEqual(selection, .blocks([firstID, secondID]))
+    }
+
+    func testSelectAllEscalatesSelectedHorizontalRuleToAllBlocks() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let ruleID = BlockInputBlockID(rawValue: "rule")
+        let document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "Hello"),
+            BlockInputBlock(id: ruleID, kind: .horizontalRule)
+        ])
+
+        let selection = document.selectAll(
+            currentBlockID: ruleID,
+            currentSelection: .blocks([ruleID])
+        )
+
+        XCTAssertEqual(selection, .blocks([firstID, ruleID]))
     }
 }

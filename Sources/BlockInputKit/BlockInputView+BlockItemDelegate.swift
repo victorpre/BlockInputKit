@@ -146,7 +146,20 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         if case let .text(range) = nextSelection,
            range.blockID == blockID {
             item.setSelectedRange(range.range)
+        } else if case .blocks = nextSelection, window != nil {
+            restoreVisibleSelection()
         }
+    }
+
+    func selectAllFromActiveSelection() -> Bool {
+        refreshDocumentFromStore()
+        guard let blockID = activeBlockID,
+              let nextSelection = document.selectAll(currentBlockID: blockID, currentSelection: selection) else {
+            return false
+        }
+        applySelection(nextSelection, notify: true)
+        restoreVisibleSelection()
+        return true
     }
 
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {

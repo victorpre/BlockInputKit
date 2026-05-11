@@ -56,23 +56,25 @@ final class BlockInputViewTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 6)))
     }
 
-    func testDeleteKeyIgnoresSelectedNonRuleBlock() throws {
+    func testDeleteKeyClearsOnlySelectedBlock() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let view = BlockInputView()
-        var publishCount = 0
+        var publishedDocument: BlockInputDocument?
         view.configure(BlockInputConfiguration(
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: blockID, text: "First")
             ]),
-            onDocumentChange: { _ in publishCount += 1 }
+            onDocumentChange: { publishedDocument = $0 }
         ))
         view.applySelection(.blocks([blockID]), notify: false)
 
         view.keyDown(with: try keyDownEvent(keyCode: 51, characters: "\u{7F}"))
 
         XCTAssertEqual(view.document.blocks.map(\.id), [blockID])
-        XCTAssertEqual(view.selection, .blocks([blockID]))
-        XCTAssertEqual(publishCount, 0)
+        XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[0].text, "")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+        XCTAssertEqual(publishedDocument, view.document)
     }
 
     func testFocusIgnoresMissingBlockID() {

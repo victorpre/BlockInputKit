@@ -103,6 +103,35 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return nil
     }
 
+    /// Deletes selected whole blocks and returns the cursor selection that should receive focus next.
+    @discardableResult
+    public mutating func deleteBlocks(blockIDs: [BlockInputBlockID]) -> BlockInputSelection? {
+        let selectedBlockIDs = Set(blockIDs)
+        let deletionIndices = blocks.indices.filter { selectedBlockIDs.contains(blocks[$0].id) }
+        guard let firstDeletionIndex = deletionIndices.first else {
+            return nil
+        }
+
+        if deletionIndices.count == blocks.count {
+            let replacement = BlockInputBlock(id: blocks[firstDeletionIndex].id, kind: .paragraph)
+            blocks = [replacement]
+            return .cursor(BlockInputCursor(blockID: replacement.id, utf16Offset: 0))
+        }
+
+        for index in deletionIndices.reversed() {
+            blocks.remove(at: index)
+        }
+        if blocks.indices.contains(firstDeletionIndex - 1) {
+            let previous = blocks[firstDeletionIndex - 1]
+            return .cursor(BlockInputCursor(blockID: previous.id, utf16Offset: previous.utf16Length))
+        }
+        if blocks.indices.contains(firstDeletionIndex) {
+            let next = blocks[firstDeletionIndex]
+            return .cursor(BlockInputCursor(blockID: next.id, utf16Offset: 0))
+        }
+        return nil
+    }
+
     /// Applies Backspace/Delete key semantics for an empty block.
     @discardableResult
     public mutating func deleteEmptyBlockForBackspaceOrDelete(blockID: BlockInputBlockID) -> BlockInputSelection? {
@@ -215,6 +244,10 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         }
         guard let block = block(withID: currentBlockID) else {
             return nil
+        }
+        if block.kind == .horizontalRule,
+           currentSelection == .blocks([currentBlockID]) {
+            return .blocks(allBlockIDs)
         }
         let fullRange = BlockInputTextRange(
             blockID: currentBlockID,

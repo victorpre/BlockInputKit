@@ -63,6 +63,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate = nil
         selectionBeforeTextChange = nil
         isHorizontalRule = false
+        view.layer?.backgroundColor = NSColor.clear.cgColor
         handleView.blockItem = nil
         horizontalRuleView.blockItem = nil
         horizontalRuleView.resetForReuse()
@@ -238,6 +239,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     func setBlockSelection(_ isSelected: Bool) {
+        view.layer?.backgroundColor = isSelected
+            ? NSColor.selectedContentBackgroundColor.withAlphaComponent(0.18).cgColor
+            : NSColor.clear.cgColor
         horizontalRuleView.isSelected = isHorizontalRule && isSelected
     }
 

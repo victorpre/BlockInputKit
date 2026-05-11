@@ -3,6 +3,23 @@ import AppKit
 final class BlockInputTextView: NSTextView {
     weak var blockItem: BlockInputBlockItem?
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.blockInputIsSelectAllShortcut,
+           let blockItem {
+            blockItem.requestSelectAll()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    override func selectAll(_ sender: Any?) {
+        guard let blockItem else {
+            super.selectAll(sender)
+            return
+        }
+        blockItem.requestSelectAll()
+    }
+
     override func doCommand(by selector: Selector) {
         if handleBlockCommand(selector) || handleBoundaryCommand(selector) {
             return
