@@ -71,6 +71,7 @@ final class DemoWindowController: NSWindowController {
             makeButton("Mixed", action: #selector(loadMixedDocument)),
             makeButton("100k", action: #selector(loadLargeDocument)),
             makeButton("Import", action: #selector(importMarkdown)),
+            makeButton("Insert Markdown", action: #selector(insertMarkdown)),
             makeButton("Export", action: #selector(exportMarkdown)),
             makeSeparator(),
             makeButton("Undo Text", action: #selector(undoText)),
@@ -207,6 +208,11 @@ final class DemoWindowController: NSWindowController {
 
     @objc private func importMarkdown() {
         replaceDocument(BlockInputDocument(markdown: markdownTextView.string), status: "Imported Markdown")
+    }
+
+    @objc private func insertMarkdown() {
+        let selection = editorView.insertMarkdown(markdownTextView.string)
+        updateStatus(for: editorView.document, prefix: selection == nil ? "Markdown insert ignored" : "Inserted Markdown")
     }
 
     @objc private func exportMarkdown() {

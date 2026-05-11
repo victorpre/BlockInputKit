@@ -71,7 +71,7 @@ The demo app includes:
 - A primary `BlockInputView` editor surface.
 - Mixed paragraph, code, quote, list, numbered list, and checklist data.
 - A 100,000-block load path for exercising large-document behavior.
-- Markdown import/export.
+- Markdown import/export and insertion below the current block.
 - Text and structural undo/redo buttons.
 - Hover reorder handles and a runtime reordering toggle.
 - Host-provided mention and slash-command completion samples, including accepted-suggestion insertion.
