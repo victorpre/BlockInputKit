@@ -21,7 +21,7 @@ extension BlockInputBlockItem {
         case .code:
             return indentation + "{}"
         case .horizontalRule:
-            return "---"
+            return ""
         case .quote:
             return indentation + ">"
         case .bulletedListItem:

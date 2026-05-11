@@ -14,6 +14,14 @@ final class BlockInputViewTests: XCTestCase {
         XCTAssertTrue(view.allowsBlockReordering)
     }
 
+    func testCollectionLayoutDoesNotInsertRowSeparatorSpacing() {
+        let view = BlockInputView()
+
+        let layout = view.collectionView.collectionViewLayout as? NSCollectionViewFlowLayout
+
+        XCTAssertEqual(layout?.minimumLineSpacing, 0)
+    }
+
     func testInsertBlockBelowCurrentBlockPublishesDocumentChange() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let view = BlockInputView()

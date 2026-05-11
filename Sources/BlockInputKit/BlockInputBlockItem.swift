@@ -11,6 +11,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     private let kindLabel = NSTextField(labelWithString: "")
     private let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     private let scrollView = NSScrollView()
+    private let horizontalRuleView = NSView()
     private let textView = BlockInputTextView()
     private var trackingArea: NSTrackingArea?
     private weak var delegate: BlockInputBlockItemDelegate?
@@ -53,6 +54,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         checklistButton.isHidden = true
         checklistButton.isEnabled = false
         checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
+        horizontalRuleView.isHidden = true
         handleView.isEnabled = false
         handleView.alphaValue = 0
         handleView.toolTip = nil
@@ -238,6 +240,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
     private func configureBlockKindChrome(kind: BlockInputBlockKind, indentationLevel: Int) {
         textView.isEditable = kind != .horizontalRule
+        horizontalRuleView.isHidden = kind != .horizontalRule
         switch kind {
         case let .checklistItem(isChecked):
             kindLabel.stringValue = ""
@@ -263,7 +266,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
     private func setupViews() {
         view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
+        view.layer?.backgroundColor = NSColor.clear.cgColor
 
         handleView.font = .systemFont(ofSize: 13, weight: .semibold)
         handleView.alignment = .center
@@ -277,8 +280,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         setupChecklistButton()
 
         setupTextView()
+        setupHorizontalRuleView()
 
-        for subview in [handleView, kindLabel, checklistButton, scrollView] {
+        for subview in [handleView, kindLabel, checklistButton, scrollView, horizontalRuleView] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
@@ -306,7 +310,12 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             scrollView.leadingAnchor.constraint(equalTo: kindLabel.trailingAnchor, constant: 4),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            horizontalRuleView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 4),
+            horizontalRuleView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -4),
+            horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            horizontalRuleView.heightAnchor.constraint(equalToConstant: 1)
         ])
     }
 
@@ -316,6 +325,14 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         checklistButton.isHidden = true
         checklistButton.toolTip = "Toggle checklist item"
         checklistButton.setAccessibilityLabel("Toggle checklist item")
+    }
+
+    private func setupHorizontalRuleView() {
+        horizontalRuleView.wantsLayer = true
+        horizontalRuleView.layer?.backgroundColor = NSColor.separatorColor.cgColor
+        horizontalRuleView.isHidden = true
+        horizontalRuleView.setAccessibilityElement(false)
+        horizontalRuleView.identifier = NSUserInterfaceItemIdentifier("BlockInputHorizontalRuleView")
     }
 
     private func setupTextView() {

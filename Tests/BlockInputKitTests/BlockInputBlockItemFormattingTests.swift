@@ -7,7 +7,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .paragraph, indentationLevel: 2), "")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .heading(level: 3), indentationLevel: 0), "###")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .code(language: nil), indentationLevel: 1), " {}")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .horizontalRule, indentationLevel: 0), "---")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .horizontalRule, indentationLevel: 0), "")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .quote, indentationLevel: 2), "  >")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 1), " *")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 2), "  +")
@@ -68,6 +68,25 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
         let textView = try XCTUnwrap(item.testingTextView)
         XCTAssertEqual(textView.string, "")
         XCTAssertFalse(textView.isEditable)
+        XCTAssertFalse(try XCTUnwrap(item.testingHorizontalRuleView).isHidden)
+    }
+
+    @MainActor
+    func testHorizontalRuleViewIsHiddenForTextBlocks() throws {
+        let view = BlockInputView()
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "rule", kind: .horizontalRule),
+            allowsReordering: true,
+            delegate: view
+        )
+
+        item.configure(
+            block: BlockInputBlock(id: "paragraph", text: "Plain"),
+            allowsReordering: true,
+            delegate: view
+        )
+
+        XCTAssertTrue(try XCTUnwrap(item.testingHorizontalRuleView).isHidden)
     }
 
     @MainActor

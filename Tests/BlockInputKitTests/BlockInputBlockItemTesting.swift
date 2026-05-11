@@ -29,6 +29,12 @@ extension BlockInputBlockItem {
             button.toolTip == "Toggle checklist item"
         }
     }
+
+    var testingHorizontalRuleView: NSView? {
+        view.firstDescendant(of: NSView.self) { view in
+            view.identifier?.rawValue == "BlockInputHorizontalRuleView"
+        }
+    }
 }
 
 private extension NSView {

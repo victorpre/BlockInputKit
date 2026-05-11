@@ -234,7 +234,7 @@ public final class BlockInputView: NSView {
         wantsLayer = true
         layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
 
-        layout.minimumLineSpacing = 2
+        layout.minimumLineSpacing = 0
         layout.minimumInteritemSpacing = 0
         layout.sectionInset = NSEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)
 
