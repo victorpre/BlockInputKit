@@ -9,9 +9,12 @@ public final class BlockInputView: NSView {
     public internal(set) var selection: BlockInputSelection?
     /// Whether drag reordering is enabled for block items.
     public internal(set) var allowsBlockReordering = true
+    /// Color used for the drag insertion indicator line.
+    public internal(set) var dropIndicatorColor = NSColor.controlAccentColor
 
     private let scrollView = NSScrollView()
-    let collectionView = NSCollectionView()
+    let collectionView = BlockInputCollectionView()
+    let dropIndicatorView = NSView()
     private let layout = NSCollectionViewFlowLayout()
     var documentStore: (any BlockInputDocumentStore)?
     var undoController: BlockInputUndoController?
@@ -50,11 +53,14 @@ public final class BlockInputView: NSView {
         documentStore = configuration.documentStore
         document = configuration.document
         allowsBlockReordering = configuration.allowsBlockReordering
+        dropIndicatorColor = configuration.dropIndicatorColor
         undoController = configuration.undoController
         completionProvider = configuration.completionProvider
         onDocumentChange = configuration.onDocumentChange
         onSelectionChange = configuration.onSelectionChange
         onFocusChange = configuration.onFocusChange
+        updateDropIndicatorColor()
+        hideDropIndicator()
         clearStaleFocusState()
         if restoresFocus {
             reloadDataKeepingFocus()
@@ -241,6 +247,7 @@ public final class BlockInputView: NSView {
         collectionView.collectionViewLayout = layout
         collectionView.dataSource = self
         collectionView.delegate = self
+        collectionView.blockInputView = self
         collectionView.isSelectable = false
         collectionView.backgroundColors = [.textBackgroundColor]
         collectionView.register(
@@ -249,6 +256,14 @@ public final class BlockInputView: NSView {
         )
         collectionView.registerForDraggedTypes([.blockInputBlockID, .fileURL])
         collectionView.setDraggingSourceOperationMask(.move, forLocal: true)
+
+        dropIndicatorView.wantsLayer = true
+        dropIndicatorView.layer?.cornerRadius = 1
+        dropIndicatorView.layer?.zPosition = 10
+        updateDropIndicatorColor()
+        dropIndicatorView.isHidden = true
+        dropIndicatorView.setAccessibilityElement(false)
+        collectionView.addSubview(dropIndicatorView, positioned: .above, relativeTo: nil)
 
         scrollView.borderType = .noBorder
         scrollView.hasVerticalScroller = true

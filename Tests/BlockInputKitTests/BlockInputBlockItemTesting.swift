@@ -24,6 +24,16 @@ extension BlockInputBlockItem {
         }
     }
 
+    var testingHandleWidthConstraint: NSLayoutConstraint? {
+        guard let handleView = testingHandleView else {
+            return nil
+        }
+        return (handleView.constraints + view.constraints).first { constraint in
+            (constraint.firstItem as? NSView) === handleView
+                && constraint.firstAttribute == .width
+        }
+    }
+
     var testingChecklistButton: NSButton? {
         view.firstDescendant(of: NSButton.self) { button in
             button.toolTip == "Toggle checklist item"

@@ -49,7 +49,8 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
         guard let block = block(at: indexPath.item) else {
             return NSSize(width: availableWidth, height: 32)
         }
-        let textWidth = max(availableWidth - BlockInputBlockItem.horizontalChromeWidth, 120)
+        let chromeWidth = BlockInputBlockItem.horizontalChromeWidth(allowsReordering: allowsBlockReordering)
+        let textWidth = max(availableWidth - chromeWidth, 120)
         let height = BlockInputBlockItem.height(for: block, textWidth: textWidth)
         return NSSize(width: availableWidth, height: height)
     }
@@ -88,13 +89,26 @@ extension BlockInputView: NSCollectionViewDelegate {
         dropOperation proposedDropOperation: UnsafeMutablePointer<NSCollectionView.DropOperation>
     ) -> NSDragOperation {
         if canAcceptBlockReorderDrop(draggingInfo) {
+            let insertionIndex = resolvedDropInsertionIndex(
+                from: draggingInfo,
+                proposedItemIndex: proposedDropIndexPath.pointee.item
+            )
+            proposedDropIndexPath.pointee = NSIndexPath(forItem: insertionIndex, inSection: 0)
             proposedDropOperation.pointee = .before
+            showDropIndicator(atInsertionIndex: insertionIndex)
             return .move
         }
         if canAcceptFileDrop(draggingInfo) {
+            let insertionIndex = resolvedDropInsertionIndex(
+                from: draggingInfo,
+                proposedItemIndex: proposedDropIndexPath.pointee.item
+            )
+            proposedDropIndexPath.pointee = NSIndexPath(forItem: insertionIndex, inSection: 0)
             proposedDropOperation.pointee = .before
+            showDropIndicator(atInsertionIndex: insertionIndex)
             return .copy
         }
+        hideDropIndicator()
         return []
     }
 
@@ -104,17 +118,22 @@ extension BlockInputView: NSCollectionViewDelegate {
         indexPath: IndexPath,
         dropOperation: NSCollectionView.DropOperation
     ) -> Bool {
+        hideDropIndicator()
+        let insertionIndex = resolvedDropInsertionIndex(
+            from: draggingInfo,
+            proposedItemIndex: indexPath.item
+        )
         if canAcceptBlockReorderDrop(draggingInfo),
            let rawID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID),
            let targetIndex = collectionDropTargetIndex(
             forBlockID: BlockInputBlockID(rawValue: rawID),
-            proposedItemIndex: indexPath.item
+            proposedItemIndex: insertionIndex
            ) {
             return moveBlock(blockID: BlockInputBlockID(rawValue: rawID), to: targetIndex) != nil
         }
         let fileURLs = fileURLs(from: draggingInfo.draggingPasteboard)
         if !fileURLs.isEmpty {
-            return insertFileURLs(fileURLs, at: indexPath.item) != nil
+            return insertFileURLs(fileURLs, at: insertionIndex) != nil
         }
         return false
     }
@@ -151,5 +170,95 @@ extension BlockInputView: NSCollectionViewDelegate {
         ]
         let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL]
         return urls?.filter(\.isFileURL) ?? []
+    }
+
+    func resolvedDropInsertionIndex(
+        from draggingInfo: NSDraggingInfo,
+        proposedItemIndex: Int
+    ) -> Int {
+        let location = collectionView.convert(draggingInfo.draggingLocation, from: nil)
+        return dropInsertionIndex(forLocation: location, fallbackIndex: proposedItemIndex)
+    }
+
+    func dropInsertionIndex(forLocation location: NSPoint, fallbackIndex: Int) -> Int {
+        let fallbackIndex = clampedInsertionIndex(fallbackIndex)
+        guard blockCount > 0 else {
+            return 0
+        }
+
+        // Resolve against visible layout attributes only so drag validation stays cheap for large documents.
+        let searchRect = collectionView.visibleRect.insetBy(dx: 0, dy: -80)
+        let attributes = collectionView.collectionViewLayout?
+            .layoutAttributesForElements(in: searchRect)
+            .filter { $0.representedElementCategory == .item }
+            .compactMap { attribute -> (indexPath: IndexPath, frame: NSRect)? in
+                guard let indexPath = attribute.indexPath else {
+                    return nil
+                }
+                return (indexPath, attribute.frame)
+            }
+            .sorted { $0.frame.minY < $1.frame.minY } ?? []
+        guard !attributes.isEmpty else {
+            return fallbackIndex
+        }
+
+        for attribute in attributes where location.y < attribute.frame.midY {
+            return clampedInsertionIndex(attribute.indexPath.item)
+        }
+        guard let lastItem = attributes.last?.indexPath.item else {
+            return fallbackIndex
+        }
+        return clampedInsertionIndex(lastItem + 1)
+    }
+
+    func showDropIndicator(atInsertionIndex insertionIndex: Int) {
+        guard let frame = dropIndicatorFrame(forInsertionIndex: insertionIndex) else {
+            hideDropIndicator()
+            return
+        }
+        dropIndicatorView.frame = frame
+        dropIndicatorView.isHidden = false
+        if dropIndicatorView.superview == nil {
+            collectionView.addSubview(dropIndicatorView, positioned: .above, relativeTo: nil)
+        }
+    }
+
+    func hideDropIndicator() {
+        dropIndicatorView.isHidden = true
+    }
+
+    func updateDropIndicatorColor() {
+        dropIndicatorView.layer?.backgroundColor = dropIndicatorColor.cgColor
+    }
+
+    func dropIndicatorFrame(forInsertionIndex insertionIndex: Int) -> NSRect? {
+        guard blockCount > 0 else {
+            return NSRect(x: 12, y: 8, width: max(collectionView.bounds.width - 24, 1), height: 2)
+        }
+
+        let yPosition: CGFloat
+        if insertionIndex < blockCount,
+           let attributes = collectionView.layoutAttributesForItem(
+            at: IndexPath(item: clampedInsertionIndex(insertionIndex), section: 0)
+           ) {
+            yPosition = attributes.frame.minY
+        } else if let attributes = collectionView.layoutAttributesForItem(
+            at: IndexPath(item: blockCount - 1, section: 0)
+        ) {
+            yPosition = attributes.frame.maxY
+        } else {
+            return nil
+        }
+
+        return NSRect(
+            x: 12,
+            y: yPosition - 1,
+            width: max(collectionView.bounds.width - 24, 1),
+            height: 2
+        )
+    }
+
+    private func clampedInsertionIndex(_ index: Int) -> Int {
+        min(max(index, 0), blockCount)
     }
 }

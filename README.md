@@ -36,6 +36,7 @@ let editor = BlockInputView()
 editor.configure(BlockInputConfiguration(
     documentStore: store,
     allowsBlockReordering: true,
+    dropIndicatorColor: .systemTeal,
     undoController: undoController,
     onDocumentChange: { updatedDocument in
         print(updatedDocument.markdown)
@@ -101,6 +102,7 @@ The demo app includes:
 - Markdown typing shortcuts convert leading quote, list, checklist, numbered-list, heading, and `---` markers into block kinds.
 - Backspace/Delete at the front of formatted blocks unwraps them into paragraph text with the Markdown marker visible.
 - Drag reordering is enabled by default and can be disabled with `allowsBlockReordering`.
+- Drag insertion line color defaults to the system accent color and can be customized with `dropIndicatorColor`.
 - Markdown import/export supports paragraph, heading, horizontal rule, code, quote, bulleted list, numbered list, and checklist blocks.
 - File URL insertion helpers and built-in file drops create Markdown link blocks.
 

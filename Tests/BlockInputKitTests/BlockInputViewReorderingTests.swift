@@ -331,23 +331,56 @@ final class BlockInputViewReorderingTests: XCTestCase {
             delegate: BlockInputView()
         )
         let handleView = try XCTUnwrap(item.testingHandleView)
+        let handleWidthConstraint = try XCTUnwrap(item.testingHandleWidthConstraint)
 
         XCTAssertFalse(handleView.isEnabled)
+        XCTAssertTrue(handleView.isHidden)
+        XCTAssertEqual(handleWidthConstraint.constant, 0)
         XCTAssertEqual(handleView.alphaValue, 0)
         XCTAssertNil(handleView.toolTip)
+        XCTAssertNil(item.draggingPasteboardItem())
     }
 
     func testBlockItemEnablesHoverHandleWhenReorderingIsEnabled() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: blockID, text: "First"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let handleView = try XCTUnwrap(item.testingHandleView)
+        let handleWidthConstraint = try XCTUnwrap(item.testingHandleWidthConstraint)
+        let pasteboardItem = try XCTUnwrap(item.draggingPasteboardItem())
+
+        XCTAssertTrue(handleView.isEnabled)
+        XCTAssertFalse(handleView.isHidden)
+        XCTAssertEqual(handleWidthConstraint.constant, 24)
+        XCTAssertEqual(handleView.alphaValue, 0)
+        XCTAssertEqual(handleView.toolTip, "Drag to reorder block")
+        XCTAssertEqual(handleView.accessibilityLabel(), "Drag to reorder block")
+        XCTAssertEqual(pasteboardItem.string(forType: .blockInputBlockID), blockID.rawValue)
+    }
+
+    func testBlockItemHidesHoverHandleWhenReconfiguredWithReorderingDisabled() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "first", text: "First"),
             allowsReordering: true,
             delegate: BlockInputView()
         )
-        let handleView = try XCTUnwrap(item.testingHandleView)
 
-        XCTAssertTrue(handleView.isEnabled)
-        XCTAssertEqual(handleView.alphaValue, 0)
-        XCTAssertEqual(handleView.toolTip, "Drag to reorder block")
+        item.configure(
+            block: BlockInputBlock(id: "first", text: "First"),
+            allowsReordering: false,
+            delegate: BlockInputView()
+        )
+
+        let handleView = try XCTUnwrap(item.testingHandleView)
+        let handleWidthConstraint = try XCTUnwrap(item.testingHandleWidthConstraint)
+        XCTAssertFalse(handleView.isEnabled)
+        XCTAssertTrue(handleView.isHidden)
+        XCTAssertEqual(handleWidthConstraint.constant, 0)
+        XCTAssertNil(handleView.toolTip)
+        XCTAssertNil(item.draggingPasteboardItem())
     }
 
     func testBlockItemClearConfigurationRemovesReusableBlockState() throws {
@@ -358,6 +391,7 @@ final class BlockInputViewReorderingTests: XCTestCase {
         )
         let textView = try XCTUnwrap(item.testingTextView)
         let handleView = try XCTUnwrap(item.testingHandleView)
+        let handleWidthConstraint = try XCTUnwrap(item.testingHandleWidthConstraint)
         textView.setSelectedRange(NSRange(location: 2, length: 2))
 
         item.clearConfiguration()
@@ -365,8 +399,11 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertEqual(textView.string, "")
         XCTAssertEqual(textView.selectedRange(), NSRange(location: 0, length: 0))
         XCTAssertFalse(handleView.isEnabled)
+        XCTAssertTrue(handleView.isHidden)
+        XCTAssertEqual(handleWidthConstraint.constant, 0)
         XCTAssertEqual(handleView.alphaValue, 0)
         XCTAssertNil(handleView.toolTip)
+        XCTAssertNil(item.draggingPasteboardItem())
         textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
         XCTAssertEqual(textView.string, "")
     }
@@ -390,48 +427,4 @@ final class BlockInputViewReorderingTests: XCTestCase {
         ))
         return view
     }
-}
-
-private final class BlockInputDraggingInfo: NSObject, NSDraggingInfo {
-    private let pasteboard: NSPasteboard
-
-    init(blockID: BlockInputBlockID? = nil, fileURLs: [URL] = []) {
-        pasteboard = NSPasteboard(name: NSPasteboard.Name("BlockInputKitTests.\(UUID().uuidString)"))
-        pasteboard.clearContents()
-        if let blockID {
-            pasteboard.setString(blockID.rawValue, forType: .blockInputBlockID)
-        }
-        if !fileURLs.isEmpty {
-            pasteboard.writeObjects(fileURLs as [NSURL])
-        }
-    }
-
-    var draggingDestinationWindow: NSWindow? { nil }
-    var draggingSourceOperationMask: NSDragOperation { .move }
-    var draggingLocation: NSPoint { .zero }
-    var draggedImageLocation: NSPoint { .zero }
-    var draggedImage: NSImage? { nil }
-    var draggingPasteboard: NSPasteboard { pasteboard }
-    var draggingSource: Any? { nil }
-    var draggingSequenceNumber: Int { 0 }
-    var draggingFormation: NSDraggingFormation = .none
-    var animatesToDestination = false
-    var numberOfValidItemsForDrop = 1
-    var springLoadingHighlight: NSSpringLoadingHighlight { .none }
-
-    func slideDraggedImage(to screenPoint: NSPoint) {}
-
-    override func namesOfPromisedFilesDropped(atDestination dropDestination: URL) -> [String]? {
-        nil
-    }
-
-    func enumerateDraggingItems(
-        options enumOpts: NSDraggingItemEnumerationOptions = [],
-        for view: NSView?,
-        classes classArray: [AnyClass],
-        searchOptions: [NSPasteboard.ReadingOptionKey: Any] = [:],
-        using block: (NSDraggingItem, Int, UnsafeMutablePointer<ObjCBool>) -> Void
-    ) {}
-
-    func resetSpringLoading() {}
 }

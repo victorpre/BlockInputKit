@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import XCTest
 @testable import BlockInputKit
 
@@ -40,12 +40,14 @@ final class BlockInputConfigurationTests: XCTestCase {
 
         view.configure(BlockInputConfiguration(
             allowsBlockReordering: false,
+            dropIndicatorColor: .systemPink,
             undoController: undoController,
             completionProvider: provider,
             onFocusChange: onFocusChange
         ))
 
         XCTAssertFalse(view.allowsBlockReordering)
+        XCTAssertEqual(view.dropIndicatorColor, .systemPink)
         XCTAssertTrue(view.undoController === undoController)
         XCTAssertTrue(view.completionProvider === provider)
         XCTAssertNotNil(view.onFocusChange)

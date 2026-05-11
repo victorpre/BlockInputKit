@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 /// Runtime options and host integration points for a block input editor.
 public struct BlockInputConfiguration {
@@ -6,6 +6,8 @@ public struct BlockInputConfiguration {
     public var documentStore: any BlockInputDocumentStore
     /// Whether the leading drag handle can reorder blocks.
     public var allowsBlockReordering: Bool
+    /// Color used for the drag insertion indicator line.
+    public var dropIndicatorColor: NSColor
     /// Undo coordinator used by text and structural editor operations.
     public var undoController: BlockInputUndoController?
     /// Host completion source for mentions and slash commands.
@@ -27,6 +29,7 @@ public struct BlockInputConfiguration {
         document: BlockInputDocument = BlockInputDocument(),
         documentStore: (any BlockInputDocumentStore)? = nil,
         allowsBlockReordering: Bool = true,
+        dropIndicatorColor: NSColor = .controlAccentColor,
         undoController: BlockInputUndoController? = nil,
         completionProvider: (any BlockInputCompletionProvider)? = nil,
         onDocumentChange: ((BlockInputDocument) -> Void)? = nil,
@@ -35,6 +38,7 @@ public struct BlockInputConfiguration {
     ) {
         self.documentStore = documentStore ?? BlockInputMemoryDocumentStore(document: document)
         self.allowsBlockReordering = allowsBlockReordering
+        self.dropIndicatorColor = dropIndicatorColor
         self.undoController = undoController
         self.completionProvider = completionProvider
         self.onDocumentChange = onDocumentChange

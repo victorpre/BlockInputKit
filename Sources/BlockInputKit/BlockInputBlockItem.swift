@@ -2,12 +2,14 @@ import AppKit
 
 final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let reuseIdentifier = NSUserInterfaceItemIdentifier("BlockInputBlockItem")
-    static let horizontalChromeWidth: CGFloat = 56
     private static let checklistButtonBaseLeading: CGFloat = 5
     private static let checklistButtonIndentStep: CGFloat = 4
     private static let checklistButtonMaxLeading: CGFloat = 10
 
-    private let handleView = NSTextField(labelWithString: "::")
+    private static let handleWidth: CGFloat = 24
+    private static let horizontalChromeWidthWithHandle: CGFloat = 56
+    private static let horizontalChromeWidthWithoutHandle: CGFloat = 32
+    private let handleView = BlockInputDragHandleView()
     private let kindLabel = NSTextField(labelWithString: "")
     private let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     private let scrollView = NSScrollView()
@@ -17,6 +19,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     private weak var delegate: BlockInputBlockItemDelegate?
     private var blockID: BlockInputBlockID?
     private var selectionBeforeTextChange: BlockInputSelection?
+    private var handleWidthConstraint: NSLayoutConstraint?
     private var checklistButtonLeadingConstraint: NSLayoutConstraint?
 
     var currentSelectedRange: NSRange {
@@ -25,6 +28,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
     var currentText: String {
         textView.string
+    }
+
+    static func horizontalChromeWidth(allowsReordering: Bool) -> CGFloat {
+        allowsReordering ? horizontalChromeWidthWithHandle : horizontalChromeWidthWithoutHandle
     }
 
     override func loadView() {
@@ -45,6 +52,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         blockID = nil
         delegate = nil
         selectionBeforeTextChange = nil
+        handleView.blockItem = nil
         textView.blockItem = nil
         textView.string = ""
         textView.isEditable = true
@@ -56,8 +64,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
         horizontalRuleView.isHidden = true
         handleView.isEnabled = false
+        handleView.isHidden = true
         handleView.alphaValue = 0
         handleView.toolTip = nil
+        handleWidthConstraint?.constant = 0
     }
 
     override func viewDidLayout() {
@@ -87,12 +97,15 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         blockID = block.id
         self.delegate = delegate
         selectionBeforeTextChange = nil
+        handleView.blockItem = self
         textView.blockItem = self
         textView.string = block.kind == .horizontalRule ? "" : block.text
         configureBlockKindChrome(kind: block.kind, indentationLevel: block.indentationLevel)
         handleView.isEnabled = allowsReordering
+        handleView.isHidden = !allowsReordering
         handleView.alphaValue = 0
         handleView.toolTip = allowsReordering ? "Drag to reorder block" : nil
+        handleWidthConstraint?.constant = allowsReordering ? Self.handleWidth : 0
     }
 
     func focusText(atUTF16Offset offset: Int) {
@@ -225,6 +238,28 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         return delegate?.blockItemDidRequestMoveToNextBlock(self, blockID: blockID) ?? false
     }
 
+    func draggingPasteboardItem() -> NSPasteboardItem? {
+        guard handleView.isEnabled,
+              let blockID else {
+            return nil
+        }
+        let pasteboardItem = NSPasteboardItem()
+        pasteboardItem.setString(blockID.rawValue, forType: .blockInputBlockID)
+        return pasteboardItem
+    }
+
+    func beginDraggingHandle(with event: NSEvent) {
+        guard let pasteboardItem = draggingPasteboardItem() else {
+            return
+        }
+        let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
+        draggingItem.setDraggingFrame(
+            handleView.convert(view.bounds, from: view),
+            contents: draggingPreviewImage()
+        )
+        handleView.beginDraggingSession(with: [draggingItem], event: event, source: handleView)
+    }
+
     private func updateHoverTrackingArea() {
         if let trackingArea {
             view.removeTrackingArea(trackingArea)
@@ -293,10 +328,13 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         )
         self.checklistButtonLeadingConstraint = checklistButtonLeadingConstraint
 
+        let handleWidthConstraint = handleView.widthAnchor.constraint(equalToConstant: Self.handleWidth)
+        self.handleWidthConstraint = handleWidthConstraint
+
         NSLayoutConstraint.activate([
             handleView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
             handleView.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
-            handleView.widthAnchor.constraint(equalToConstant: 24),
+            handleWidthConstraint,
 
             kindLabel.leadingAnchor.constraint(equalTo: handleView.trailingAnchor),
             kindLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
@@ -353,6 +391,16 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         textView.drawsBackground = false
         textView.font = .preferredFont(forTextStyle: .body)
         textView.delegate = self
+    }
+
+    private func draggingPreviewImage() -> NSImage {
+        let image = NSImage(size: view.bounds.size)
+        guard let representation = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+            return image
+        }
+        view.cacheDisplay(in: view.bounds, to: representation)
+        image.addRepresentation(representation)
+        return image
     }
 
 }
