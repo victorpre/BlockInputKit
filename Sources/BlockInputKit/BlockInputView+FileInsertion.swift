@@ -20,32 +20,28 @@ public extension BlockInputView {
             return nil
         }
 
-        return performStructuralEdit(
-            named: "Insert Files",
-            storeSyncAction: { beforeDocument, _, _ in
-                if beforeDocument.blocks.count == 1,
-                   beforeDocument.blocks[0].kind == .paragraph,
-                   beforeDocument.blocks[0].isEmpty {
-                    return .replaceDocument
-                }
-                let insertionIndex = fileInsertionIndex(below: targetBlockID, in: beforeDocument)
-                return .insertBlocks(insertedBlocks, insertionIndex: insertionIndex)
-            },
-            edit: { document in
-                if document.blocks.count == 1,
-                   document.blocks[0].kind == .paragraph,
-                   document.blocks[0].isEmpty {
-                    document.blocks = insertedBlocks
-                    guard let firstBlock = insertedBlocks.first else {
-                        return nil
-                    }
-                    return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0))
-                }
+        return insertFileBlocks(insertedBlocks) { document in
+            self.fileInsertionIndex(below: targetBlockID, in: document)
+        }
+    }
 
-                let insertionIndex = fileInsertionIndex(below: targetBlockID, in: document)
-                return document.insertBlocks(insertedBlocks, at: insertionIndex)
-            }
-        )
+    /// Inserts file URLs as Markdown link paragraph blocks at a document index.
+    ///
+    /// This is used by the built-in collection view drop handling. The insertion
+    /// index is clamped to the current document.
+    @discardableResult
+    func insertFileURLs(
+        _ fileURLs: [URL],
+        at insertionIndex: Int
+    ) -> BlockInputSelection? {
+        let insertedBlocks = fileURLs.compactMap(Self.fileLinkBlock)
+        guard !insertedBlocks.isEmpty else {
+            return nil
+        }
+
+        return insertFileBlocks(insertedBlocks) { document in
+            min(max(insertionIndex, 0), document.blocks.count)
+        }
     }
 
     private static func fileLinkBlock(for url: URL) -> BlockInputBlock? {
@@ -78,5 +74,35 @@ public extension BlockInputView {
             return document.blocks.count
         }
         return index + 1
+    }
+
+    private func insertFileBlocks(
+        _ insertedBlocks: [BlockInputBlock],
+        insertionIndex: @escaping (BlockInputDocument) -> Int
+    ) -> BlockInputSelection? {
+        performStructuralEdit(
+            named: "Insert Files",
+            storeSyncAction: { beforeDocument, _, _ in
+                if beforeDocument.blocks.count == 1,
+                   beforeDocument.blocks[0].kind == .paragraph,
+                   beforeDocument.blocks[0].isEmpty {
+                    return .replaceDocument
+                }
+                return .insertBlocks(insertedBlocks, insertionIndex: insertionIndex(beforeDocument))
+            },
+            edit: { document in
+                if document.blocks.count == 1,
+                   document.blocks[0].kind == .paragraph,
+                   document.blocks[0].isEmpty {
+                    document.blocks = insertedBlocks
+                    guard let firstBlock = insertedBlocks.first else {
+                        return nil
+                    }
+                    return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0))
+                }
+
+                return document.insertBlocks(insertedBlocks, at: insertionIndex(document))
+            }
+        )
     }
 }

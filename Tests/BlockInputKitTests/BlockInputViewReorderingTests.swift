@@ -105,6 +105,48 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertFalse(view.canAcceptBlockReorderDrop(BlockInputDraggingInfo(blockID: nil)))
     }
 
+    func testValidateDropAcceptsFileURLsEvenWhenReorderingIsDisabled() {
+        let view = configuredReorderView(
+            blockIDs: ["first"],
+            allowsBlockReordering: false
+        )
+        let draggingInfo = BlockInputDraggingInfo(fileURLs: [
+            URL(fileURLWithPath: "/tmp/example.txt")
+        ])
+        var indexPath = NSIndexPath(forItem: 0, inSection: 0)
+        var operation = NSCollectionView.DropOperation.on
+
+        let dragOperation = withUnsafeMutablePointer(to: &indexPath) { pointer in
+            view.collectionView(
+                view.collectionView,
+                validateDrop: draggingInfo,
+                proposedIndexPath: AutoreleasingUnsafeMutablePointer(pointer),
+                dropOperation: &operation
+            )
+        }
+
+        XCTAssertTrue(dragOperation.contains(.copy))
+        XCTAssertEqual(operation, .before)
+    }
+
+    func testValidateDropRejectsRemoteURLs() throws {
+        let view = configuredReorderView(blockIDs: ["first"])
+        let remoteURL = try XCTUnwrap(URL(string: "https://example.com/file.txt"))
+        var indexPath = NSIndexPath(forItem: 0, inSection: 0)
+        var operation = NSCollectionView.DropOperation.on
+
+        let dragOperation = withUnsafeMutablePointer(to: &indexPath) { pointer in
+            view.collectionView(
+                view.collectionView,
+                validateDrop: BlockInputDraggingInfo(fileURLs: [remoteURL]),
+                proposedIndexPath: AutoreleasingUnsafeMutablePointer(pointer),
+                dropOperation: &operation
+            )
+        }
+
+        XCTAssertTrue(dragOperation.isEmpty)
+    }
+
     func testAcceptDropMovesBlockAndPublishesDocumentChange() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
@@ -126,6 +168,71 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertTrue(accepted)
         XCTAssertEqual(view.document.blocks.map(\.id), [secondID, firstID, thirdID])
         XCTAssertEqual(publishedDocuments.last, view.document)
+    }
+
+    func testAcceptDropInsertsFileURLsAtProposedIndex() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        var publishedDocuments: [BlockInputDocument] = []
+        let view = configuredReorderView(
+            blockIDs: [firstID, secondID],
+            allowsBlockReordering: false,
+            onDocumentChange: { publishedDocuments.append($0) }
+        )
+
+        let accepted = view.collectionView(
+            view.collectionView,
+            acceptDrop: BlockInputDraggingInfo(fileURLs: [
+                URL(fileURLWithPath: "/tmp/example.txt")
+            ]),
+            indexPath: IndexPath(item: 1, section: 0),
+            dropOperation: .before
+        )
+
+        XCTAssertTrue(accepted)
+        XCTAssertEqual(view.document.blocks.map(\.text), [
+            "first",
+            "[example.txt](<file:///tmp/example.txt>)",
+            "second"
+        ])
+        XCTAssertEqual(publishedDocuments.last, view.document)
+    }
+
+    func testAcceptFileDropPublishesGranularInsertionToStore() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            allowsBlockReordering: false
+        ))
+        store.resetCounts()
+
+        let accepted = view.collectionView(
+            view.collectionView,
+            acceptDrop: BlockInputDraggingInfo(fileURLs: [
+                URL(fileURLWithPath: "/tmp/example.txt")
+            ]),
+            indexPath: IndexPath(item: 1, section: 0),
+            dropOperation: .before
+        )
+
+        XCTAssertTrue(accepted)
+        XCTAssertEqual(store.document.blocks.map(\.text), [
+            "First",
+            "[example.txt](<file:///tmp/example.txt>)",
+            "Second"
+        ])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches.first?.index, 1)
+        XCTAssertEqual(store.insertedBlockBatches.first?.blocks.map(\.text), [
+            "[example.txt](<file:///tmp/example.txt>)"
+        ])
     }
 
     func testAcceptDropRefreshesFromConfiguredStoreBeforeMovingBlock() {
@@ -288,11 +395,14 @@ final class BlockInputViewReorderingTests: XCTestCase {
 private final class BlockInputDraggingInfo: NSObject, NSDraggingInfo {
     private let pasteboard: NSPasteboard
 
-    init(blockID: BlockInputBlockID?) {
+    init(blockID: BlockInputBlockID? = nil, fileURLs: [URL] = []) {
         pasteboard = NSPasteboard(name: NSPasteboard.Name("BlockInputKitTests.\(UUID().uuidString)"))
         pasteboard.clearContents()
         if let blockID {
             pasteboard.setString(blockID.rawValue, forType: .blockInputBlockID)
+        }
+        if !fileURLs.isEmpty {
+            pasteboard.writeObjects(fileURLs as [NSURL])
         }
     }
 

@@ -89,6 +89,42 @@ final class BlockInputViewFileInsertionTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: insertedID, utf16Offset: 0)))
     }
 
+    func testInsertFileURLsAtExplicitIndex() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])))
+
+        let selection = view.insertFileURLs([
+            URL(fileURLWithPath: "/tmp/Alpha File.md")
+        ], at: 1)
+
+        XCTAssertEqual(view.document.blocks.count, 3)
+        let insertedID = view.document.blocks[1].id
+        XCTAssertEqual(view.document.blocks.map(\.id), [firstID, insertedID, secondID])
+        XCTAssertEqual(view.document.blocks[1].text, "[Alpha File.md](<file:///tmp/Alpha%20File.md>)")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: insertedID, utf16Offset: 0)))
+    }
+
+    func testInsertFileURLsClampsExplicitIndex() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First")
+        ])))
+
+        let selection = view.insertFileURLs([
+            URL(fileURLWithPath: "/tmp/Alpha File.md")
+        ], at: 99)
+
+        XCTAssertEqual(view.document.blocks.count, 2)
+        XCTAssertEqual(view.document.blocks.map(\.id).first, firstID)
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
+    }
+
     func testInsertFileURLsWithoutSelectionUsesDefaultActiveBlock() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

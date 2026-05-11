@@ -87,11 +87,15 @@ extension BlockInputView: NSCollectionViewDelegate {
         proposedIndexPath proposedDropIndexPath: AutoreleasingUnsafeMutablePointer<NSIndexPath>,
         dropOperation proposedDropOperation: UnsafeMutablePointer<NSCollectionView.DropOperation>
     ) -> NSDragOperation {
-        guard canAcceptBlockReorderDrop(draggingInfo) else {
-            return []
+        if canAcceptBlockReorderDrop(draggingInfo) {
+            proposedDropOperation.pointee = .before
+            return .move
         }
-        proposedDropOperation.pointee = .before
-        return .move
+        if canAcceptFileDrop(draggingInfo) {
+            proposedDropOperation.pointee = .before
+            return .copy
+        }
+        return []
     }
 
     public func collectionView(
@@ -100,15 +104,19 @@ extension BlockInputView: NSCollectionViewDelegate {
         indexPath: IndexPath,
         dropOperation: NSCollectionView.DropOperation
     ) -> Bool {
-        guard canAcceptBlockReorderDrop(draggingInfo),
-              let rawID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID),
-              let targetIndex = collectionDropTargetIndex(
-                forBlockID: BlockInputBlockID(rawValue: rawID),
-                proposedItemIndex: indexPath.item
-              ) else {
-            return false
+        if canAcceptBlockReorderDrop(draggingInfo),
+           let rawID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID),
+           let targetIndex = collectionDropTargetIndex(
+            forBlockID: BlockInputBlockID(rawValue: rawID),
+            proposedItemIndex: indexPath.item
+           ) {
+            return moveBlock(blockID: BlockInputBlockID(rawValue: rawID), to: targetIndex) != nil
         }
-        return moveBlock(blockID: BlockInputBlockID(rawValue: rawID), to: targetIndex) != nil
+        let fileURLs = fileURLs(from: draggingInfo.draggingPasteboard)
+        if !fileURLs.isEmpty {
+            return insertFileURLs(fileURLs, at: indexPath.item) != nil
+        }
+        return false
     }
 
     func collectionDropTargetIndex(
@@ -131,5 +139,17 @@ extension BlockInputView: NSCollectionViewDelegate {
             return false
         }
         return true
+    }
+
+    func canAcceptFileDrop(_ draggingInfo: NSDraggingInfo) -> Bool {
+        !fileURLs(from: draggingInfo.draggingPasteboard).isEmpty
+    }
+
+    func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
+        let options: [NSPasteboard.ReadingOptionKey: Any] = [
+            .urlReadingFileURLsOnly: true
+        ]
+        let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL]
+        return urls?.filter(\.isFileURL) ?? []
     }
 }

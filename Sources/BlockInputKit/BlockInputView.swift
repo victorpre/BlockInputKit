@@ -247,7 +247,7 @@ public final class BlockInputView: NSView {
             BlockInputBlockItem.self,
             forItemWithIdentifier: BlockInputBlockItem.reuseIdentifier
         )
-        collectionView.registerForDraggedTypes([.blockInputBlockID])
+        collectionView.registerForDraggedTypes([.blockInputBlockID, .fileURL])
         collectionView.setDraggingSourceOperationMask(.move, forLocal: true)
 
         scrollView.borderType = .noBorder
