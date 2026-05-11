@@ -1,6 +1,8 @@
 import Foundation
 
+/// Structured block document used as the editor's model and Markdown source of truth.
 public struct BlockInputDocument: Equatable, Codable, Sendable {
+    /// Ordered blocks in the document. The document always contains at least one block.
     public var blocks: [BlockInputBlock] {
         didSet {
             if blocks.isEmpty {
@@ -13,26 +15,32 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         self.blocks = blocks.isEmpty ? [.emptyParagraph()] : blocks
     }
 
+    /// Parses a Markdown snapshot into structured blocks.
     public init(markdown: String) {
         self = BlockInputMarkdownImporter.document(from: markdown)
     }
 
+    /// Serializes the structured blocks into Markdown.
     public var markdown: String {
         BlockInputMarkdownSerializer.markdown(from: self)
     }
 
+    /// Returns true when every block is empty.
     public var isEffectivelyEmpty: Bool {
         blocks.allSatisfy(\.isEmpty)
     }
 
+    /// Returns a block by stable ID.
     public func block(withID id: BlockInputBlockID) -> BlockInputBlock? {
         blocks.first { $0.id == id }
     }
 
+    /// Returns the ordered index for a stable block ID.
     public func index(of id: BlockInputBlockID) -> Int? {
         blocks.firstIndex { $0.id == id }
     }
 
+    /// Inserts a block at a clamped document index and returns the cursor selection for it.
     @discardableResult
     public mutating func insertBlock(
         _ block: BlockInputBlock = .emptyParagraph(),
@@ -43,6 +51,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return .cursor(BlockInputCursor(blockID: block.id, utf16Offset: 0))
     }
 
+    /// Inserts a new block below an existing block and returns the cursor selection for it.
     @discardableResult
     public mutating func insertBlockBelow(
         blockID: BlockInputBlockID,
@@ -55,11 +64,13 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return insertBlock(block, at: index + 1)
     }
 
+    /// Applies Return key semantics for a block editor.
     @discardableResult
     public mutating func handleReturn(in blockID: BlockInputBlockID) -> BlockInputSelection? {
         insertBlockBelow(blockID: blockID)
     }
 
+    /// Deletes a block and returns the cursor selection that should receive focus next.
     @discardableResult
     public mutating func deleteBlock(blockID: BlockInputBlockID) -> BlockInputSelection? {
         guard let index = index(of: blockID) else {
@@ -83,6 +94,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return nil
     }
 
+    /// Applies Backspace/Delete key semantics for an empty block.
     @discardableResult
     public mutating func deleteEmptyBlockForBackspaceOrDelete(blockID: BlockInputBlockID) -> BlockInputSelection? {
         guard let block = block(withID: blockID), block.isEmpty else {
@@ -91,6 +103,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return deleteBlock(blockID: blockID)
     }
 
+    /// Moves a block to a document index and returns a block selection for the moved block.
     @discardableResult
     public mutating func moveBlock(blockID: BlockInputBlockID, to targetIndex: Int) -> BlockInputSelection? {
         guard let sourceIndex = index(of: blockID) else {
@@ -105,6 +118,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return .blocks([block.id])
     }
 
+    /// Increases a block's nesting level.
     @discardableResult
     public mutating func indentBlock(blockID: BlockInputBlockID) -> BlockInputSelection? {
         guard let index = index(of: blockID) else {
@@ -114,6 +128,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: blocks[index].utf16Length))
     }
 
+    /// Decreases a block's nesting level.
     @discardableResult
     public mutating func outdentBlock(blockID: BlockInputBlockID) -> BlockInputSelection? {
         guard let index = index(of: blockID) else {
@@ -126,6 +141,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: blocks[index].utf16Length))
     }
 
+    /// Changes a block's semantic kind.
     @discardableResult
     public mutating func changeBlockKind(
         blockID: BlockInputBlockID,
@@ -141,6 +157,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: blocks[index].utf16Length))
     }
 
+    /// Replaces a UTF-16 range in a block's text and returns the resulting cursor selection.
     @discardableResult
     public mutating func replaceText(
         in blockID: BlockInputBlockID,
@@ -158,6 +175,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         ))
     }
 
+    /// Implements Cmd+A escalation from current block text selection to all blocks.
     public func selectAll(
         currentBlockID: BlockInputBlockID,
         currentSelection: BlockInputSelection?
@@ -181,6 +199,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
 }
 
 public extension BlockInputBlock {
+    /// Creates a new empty paragraph block.
     static func emptyParagraph() -> Self {
         BlockInputBlock(kind: .paragraph)
     }

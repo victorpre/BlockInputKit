@@ -1,15 +1,21 @@
 import AppKit
 
+/// Primary AppKit editor surface for a structured block document.
 @MainActor
 public final class BlockInputView: NSView {
+    /// Current document snapshot rendered by the view.
     public internal(set) var document = BlockInputDocument()
+    /// Current block, text, or multi-block selection.
     public internal(set) var selection: BlockInputSelection?
+    /// Whether drag reordering is enabled for block items.
     public internal(set) var allowsBlockReordering = true
 
     private let scrollView = NSScrollView()
     let collectionView = NSCollectionView()
     private let layout = NSCollectionViewFlowLayout()
+    private var documentStore: (any BlockInputDocumentStore)?
     var undoController: BlockInputUndoController?
+    var completionProvider: (any BlockInputCompletionProvider)?
     private var onDocumentChange: ((BlockInputDocument) -> Void)?
     private var onSelectionChange: ((BlockInputSelection?) -> Void)?
     private var pendingFocus: BlockInputCursor?
@@ -29,16 +35,20 @@ public final class BlockInputView: NSView {
         true
     }
 
+    /// Applies configuration and reloads the editor from its document store.
     public func configure(_ configuration: BlockInputConfiguration) {
+        documentStore = configuration.documentStore
         document = configuration.document
         allowsBlockReordering = configuration.allowsBlockReordering
         undoController = configuration.undoController
+        completionProvider = configuration.completionProvider
         onDocumentChange = configuration.onDocumentChange
         onSelectionChange = configuration.onSelectionChange
         clearStaleFocusState()
         reloadDataKeepingFocus()
     }
 
+    /// Focuses the editor like a single text field, restoring the best known cursor.
     public func focusEditor() {
         let cursor = pendingFocus ?? cursorForRestoredFocus()
         focus(blockID: cursor.blockID, utf16Offset: cursor.utf16Offset)
@@ -49,6 +59,7 @@ public final class BlockInputView: NSView {
         return true
     }
 
+    /// Focuses a specific block at a UTF-16 text offset.
     public func focus(blockID: BlockInputBlockID, utf16Offset: Int = 0) {
         guard let block = document.block(withID: blockID) else {
             return
@@ -62,6 +73,7 @@ public final class BlockInputView: NSView {
         focusVisibleItem(for: cursor)
     }
 
+    /// Inserts a paragraph below the active block.
     @discardableResult
     public func insertBlockBelowCurrentBlock() -> BlockInputSelection? {
         guard let blockID = activeBlockID else {
@@ -72,6 +84,7 @@ public final class BlockInputView: NSView {
         }
     }
 
+    /// Deletes the active block if it is empty, preserving the required focus semantics.
     @discardableResult
     public func deleteCurrentEmptyBlockForBackspaceOrDelete() -> BlockInputSelection? {
         guard let blockID = activeBlockID else {
@@ -82,6 +95,7 @@ public final class BlockInputView: NSView {
         }
     }
 
+    /// Moves a block when reordering is enabled.
     @discardableResult
     public func moveBlock(blockID: BlockInputBlockID, to targetIndex: Int) -> BlockInputSelection? {
         guard allowsBlockReordering else {
@@ -203,6 +217,7 @@ public final class BlockInputView: NSView {
     }
 
     func publishDocumentChange() {
+        documentStore?.replaceDocument(document)
         onDocumentChange?(document)
     }
 

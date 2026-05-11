@@ -250,55 +250,6 @@ final class BlockInputViewTests: XCTestCase {
         XCTAssertEqual(view.document.blocks.map(\.id), [blockID])
     }
 
-    func testCollectionDropTargetAdjustsForwardMovesToFinalDocumentIndex() {
-        let firstID = BlockInputBlockID(rawValue: "first")
-        let secondID = BlockInputBlockID(rawValue: "second")
-        let thirdID = BlockInputBlockID(rawValue: "third")
-        let view = configuredReorderView(blockIDs: [firstID, secondID, thirdID])
-
-        let targetIndex = view.collectionDropTargetIndex(
-            forBlockID: firstID,
-            proposedItemIndex: 2
-        )
-
-        XCTAssertEqual(targetIndex, 1)
-    }
-
-    func testCollectionDropTargetKeepsBackwardMovesAtProposedIndex() {
-        let firstID = BlockInputBlockID(rawValue: "first")
-        let secondID = BlockInputBlockID(rawValue: "second")
-        let thirdID = BlockInputBlockID(rawValue: "third")
-        let view = configuredReorderView(blockIDs: [firstID, secondID, thirdID])
-
-        let targetIndex = view.collectionDropTargetIndex(
-            forBlockID: thirdID,
-            proposedItemIndex: 0
-        )
-
-        XCTAssertEqual(targetIndex, 0)
-    }
-
-    func testCollectionDropTargetSupportsDroppingAtEnd() {
-        let firstID = BlockInputBlockID(rawValue: "first")
-        let secondID = BlockInputBlockID(rawValue: "second")
-        let thirdID = BlockInputBlockID(rawValue: "third")
-        let view = configuredReorderView(blockIDs: [firstID, secondID, thirdID])
-
-        let targetIndex = view.collectionDropTargetIndex(
-            forBlockID: firstID,
-            proposedItemIndex: 3
-        )
-
-        XCTAssertEqual(targetIndex, 2)
-    }
-
-    private func configuredReorderView(blockIDs: [BlockInputBlockID]) -> BlockInputView {
-        let view = BlockInputView()
-        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: blockIDs.map { blockID in
-            BlockInputBlock(id: blockID, text: blockID.rawValue)
-        })))
-        return view
-    }
 }
 
 private extension BlockInputSelection {

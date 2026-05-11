@@ -1,7 +1,9 @@
 import Foundation
 
+/// Caret position inside a single block.
 public struct BlockInputCursor: Equatable, Codable, Sendable {
     public var blockID: BlockInputBlockID
+    /// UTF-16 text offset compatible with AppKit text ranges.
     public var utf16Offset: Int
 
     public init(blockID: BlockInputBlockID, utf16Offset: Int) {
@@ -10,8 +12,10 @@ public struct BlockInputCursor: Equatable, Codable, Sendable {
     }
 }
 
+/// Text selection range inside a single block.
 public struct BlockInputTextRange: Equatable, Codable, Sendable {
     public var blockID: BlockInputBlockID
+    /// UTF-16 range compatible with AppKit text selections.
     public var range: NSRange
 
     public init(blockID: BlockInputBlockID, range: NSRange) {
@@ -20,6 +24,7 @@ public struct BlockInputTextRange: Equatable, Codable, Sendable {
     }
 }
 
+/// Current editor selection, including escalated multi-block selection.
 public enum BlockInputSelection: Equatable, Codable, Sendable {
     case cursor(BlockInputCursor)
     case text(BlockInputTextRange)

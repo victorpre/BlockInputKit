@@ -1,10 +1,12 @@
 import Foundation
 
+/// Result of an undo or redo operation, including the selection to restore.
 public struct BlockInputUndoResult: Equatable, Sendable {
     public var selection: BlockInputSelection?
     public var actionName: String
 }
 
+/// Coordinates per-block text undo with a separate structural undo stack.
 public final class BlockInputUndoController {
     private var textUndoByBlockID: [BlockInputBlockID: [BlockInputTextUndoEntry]] = [:]
     private var textRedoByBlockID: [BlockInputBlockID: [BlockInputTextUndoEntry]] = [:]
@@ -13,6 +15,7 @@ public final class BlockInputUndoController {
 
     public init() {}
 
+    /// Records a text edit for a single block.
     public func registerTextEdit(
         blockID: BlockInputBlockID,
         beforeText: String,
@@ -34,6 +37,7 @@ public final class BlockInputUndoController {
         structuralRedoStack = []
     }
 
+    /// Records a document-level structural edit.
     public func registerStructuralEdit(
         actionName: String,
         beforeDocument: BlockInputDocument,
@@ -55,6 +59,7 @@ public final class BlockInputUndoController {
         textRedoByBlockID = [:]
     }
 
+    /// Undoes the most recent text edit for a block.
     public func undoTextEdit(
         in document: inout BlockInputDocument,
         blockID: BlockInputBlockID
@@ -70,6 +75,7 @@ public final class BlockInputUndoController {
         return BlockInputUndoResult(selection: entry.selectionBefore, actionName: "Text Edit")
     }
 
+    /// Redoes the most recent undone text edit for a block.
     public func redoTextEdit(
         in document: inout BlockInputDocument,
         blockID: BlockInputBlockID
@@ -85,6 +91,7 @@ public final class BlockInputUndoController {
         return BlockInputUndoResult(selection: entry.selectionAfter, actionName: "Text Edit")
     }
 
+    /// Undoes the most recent structural edit.
     public func undoStructuralEdit(in document: inout BlockInputDocument) -> BlockInputUndoResult? {
         guard let entry = structuralUndoStack.popLast() else {
             return nil
@@ -94,6 +101,7 @@ public final class BlockInputUndoController {
         return BlockInputUndoResult(selection: entry.selectionBefore, actionName: entry.actionName)
     }
 
+    /// Redoes the most recent undone structural edit.
     public func redoStructuralEdit(in document: inout BlockInputDocument) -> BlockInputUndoResult? {
         guard let entry = structuralRedoStack.popLast() else {
             return nil

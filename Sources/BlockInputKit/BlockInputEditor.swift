@@ -1,7 +1,8 @@
 import SwiftUI
 
+/// SwiftUI wrapper around `BlockInputView`.
 public struct BlockInputEditor: NSViewRepresentable {
-    private var configuration: BlockInputConfiguration
+    private let configuration: BlockInputConfiguration
 
     public init(configuration: BlockInputConfiguration = BlockInputConfiguration()) {
         self.configuration = configuration
