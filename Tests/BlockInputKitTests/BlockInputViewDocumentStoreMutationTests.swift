@@ -128,6 +128,45 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
     }
 
     @MainActor
+    func testChecklistTogglePublishesBlockReplacementToStore() {
+        let blockID = BlockInputBlockID(rawValue: "check")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), text: "Done")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.focus(blockID: blockID, utf16Offset: 0)
+        store.resetCounts()
+
+        let selection = view.toggleChecklistItem()
+
+        XCTAssertEqual(store.document.blocks[0].kind, .checklistItem(isChecked: true))
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 4)))
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+    }
+
+    @MainActor
+    func testChecklistItemButtonTogglesBlock() throws {
+        let blockID = BlockInputBlockID(rawValue: "check")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), text: "Done")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+
+        item.requestToggleChecklist()
+
+        XCTAssertEqual(store.document.blocks[0].kind, .checklistItem(isChecked: true))
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+    }
+
+    @MainActor
     func testStructuralUndoRefreshesFromStoreBeforeMutating() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let insertedID = BlockInputBlockID(rawValue: "inserted")

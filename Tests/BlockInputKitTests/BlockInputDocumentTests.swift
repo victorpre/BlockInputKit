@@ -182,6 +182,30 @@ final class BlockInputDocumentTests: XCTestCase {
         XCTAssertEqual(document.blocks[0].kind, .paragraph)
     }
 
+    func testToggleChecklistItemFlipsCheckedState() {
+        let blockID = BlockInputBlockID(rawValue: "check")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), text: "Done")
+        ])
+
+        let selection = document.toggleChecklistItem(blockID: blockID)
+
+        XCTAssertEqual(document.blocks[0].kind, .checklistItem(isChecked: true))
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 4)))
+    }
+
+    func testToggleChecklistItemIgnoresNonChecklistBlocks() {
+        let blockID = BlockInputBlockID(rawValue: "paragraph")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .paragraph, text: "Same")
+        ])
+
+        let selection = document.toggleChecklistItem(blockID: blockID)
+
+        XCTAssertNil(selection)
+        XCTAssertEqual(document.blocks[0].kind, .paragraph)
+    }
+
     func testSelectAllEscalatesFromCurrentBlockToAllBlocks() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

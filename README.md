@@ -73,7 +73,7 @@ Run the local demo:
 The demo app includes:
 
 - A primary `BlockInputView` editor surface.
-- Mixed paragraph, code, quote, list, numbered list, and checklist data.
+- Mixed paragraph, code, quote, list, numbered list, and toggleable checklist data.
 - A 100,000-block load path for exercising large-document behavior.
 - Markdown import/export, Markdown insertion, and file-link insertion helpers.
 - Text and structural undo/redo buttons.

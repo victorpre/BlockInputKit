@@ -3,15 +3,20 @@ import AppKit
 final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let reuseIdentifier = NSUserInterfaceItemIdentifier("BlockInputBlockItem")
     static let horizontalChromeWidth: CGFloat = 56
+    private static let checklistButtonBaseLeading: CGFloat = 5
+    private static let checklistButtonIndentStep: CGFloat = 4
+    private static let checklistButtonMaxLeading: CGFloat = 10
 
     private let handleView = NSTextField(labelWithString: "::")
     private let kindLabel = NSTextField(labelWithString: "")
+    private let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     private let scrollView = NSScrollView()
     private let textView = BlockInputTextView()
     private var trackingArea: NSTrackingArea?
     private weak var delegate: BlockInputBlockItemDelegate?
     private var blockID: BlockInputBlockID?
     private var selectionBeforeTextChange: BlockInputSelection?
+    private var checklistButtonLeadingConstraint: NSLayoutConstraint?
 
     var currentSelectedRange: NSRange {
         textView.selectedRange()
@@ -43,6 +48,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         textView.string = ""
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         kindLabel.stringValue = ""
+        checklistButton.state = .off
+        checklistButton.isHidden = true
+        checklistButton.isEnabled = false
+        checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
         handleView.isEnabled = false
         handleView.alphaValue = 0
         handleView.toolTip = nil
@@ -77,7 +86,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         selectionBeforeTextChange = nil
         textView.blockItem = self
         textView.string = block.text
-        kindLabel.stringValue = Self.prefix(for: block.kind, indentationLevel: block.indentationLevel)
+        configureBlockKindChrome(kind: block.kind, indentationLevel: block.indentationLevel)
         handleView.isEnabled = allowsReordering
         handleView.alphaValue = 0
         handleView.toolTip = allowsReordering ? "Drag to reorder block" : nil
@@ -171,6 +180,13 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate?.blockItemDidRequestSelectAll(self, blockID: blockID)
     }
 
+    @objc func requestToggleChecklist() {
+        guard let blockID else {
+            return
+        }
+        delegate?.blockItemDidRequestToggleChecklist(self, blockID: blockID)
+    }
+
     func requestIndent() {
         guard let blockID else {
             return
@@ -212,6 +228,30 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.trackingArea = trackingArea
     }
 
+    private func configureBlockKindChrome(kind: BlockInputBlockKind, indentationLevel: Int) {
+        switch kind {
+        case let .checklistItem(isChecked):
+            kindLabel.stringValue = ""
+            checklistButton.isHidden = false
+            checklistButton.isEnabled = true
+            checklistButton.state = isChecked ? .on : .off
+            checklistButtonLeadingConstraint?.constant = Self.checklistButtonLeadingConstant(indentationLevel: indentationLevel)
+        default:
+            kindLabel.stringValue = Self.prefix(for: kind, indentationLevel: indentationLevel)
+            checklistButton.isHidden = true
+            checklistButton.isEnabled = false
+            checklistButton.state = .off
+            checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
+        }
+    }
+
+    private static func checklistButtonLeadingConstant(indentationLevel: Int) -> CGFloat {
+        min(
+            checklistButtonBaseLeading + CGFloat(max(0, indentationLevel)) * checklistButtonIndentStep,
+            checklistButtonMaxLeading
+        )
+    }
+
     private func setupViews() {
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
@@ -225,6 +265,51 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         kindLabel.alignment = .right
         kindLabel.textColor = .tertiaryLabelColor
 
+        setupChecklistButton()
+
+        setupTextView()
+
+        for subview in [handleView, kindLabel, checklistButton, scrollView] {
+            subview.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(subview)
+        }
+
+        let checklistButtonLeadingConstraint = checklistButton.leadingAnchor.constraint(
+            equalTo: kindLabel.leadingAnchor,
+            constant: Self.checklistButtonBaseLeading
+        )
+        self.checklistButtonLeadingConstraint = checklistButtonLeadingConstraint
+
+        NSLayoutConstraint.activate([
+            handleView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
+            handleView.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+            handleView.widthAnchor.constraint(equalToConstant: 24),
+
+            kindLabel.leadingAnchor.constraint(equalTo: handleView.trailingAnchor),
+            kindLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+            kindLabel.widthAnchor.constraint(equalToConstant: 28),
+
+            checklistButtonLeadingConstraint,
+            checklistButton.centerYAnchor.constraint(equalTo: kindLabel.centerYAnchor),
+            checklistButton.widthAnchor.constraint(equalToConstant: 18),
+            checklistButton.heightAnchor.constraint(equalToConstant: 18),
+
+            scrollView.leadingAnchor.constraint(equalTo: kindLabel.trailingAnchor, constant: 4),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+    }
+
+    private func setupChecklistButton() {
+        checklistButton.target = self
+        checklistButton.action = #selector(requestToggleChecklist)
+        checklistButton.isHidden = true
+        checklistButton.toolTip = "Toggle checklist item"
+        checklistButton.setAccessibilityLabel("Toggle checklist item")
+    }
+
+    private func setupTextView() {
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
@@ -242,26 +327,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         textView.drawsBackground = false
         textView.font = .preferredFont(forTextStyle: .body)
         textView.delegate = self
-
-        for subview in [handleView, kindLabel, scrollView] {
-            subview.translatesAutoresizingMaskIntoConstraints = false
-            view.addSubview(subview)
-        }
-
-        NSLayoutConstraint.activate([
-            handleView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
-            handleView.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
-            handleView.widthAnchor.constraint(equalToConstant: 24),
-
-            kindLabel.leadingAnchor.constraint(equalTo: handleView.trailingAnchor),
-            kindLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
-            kindLabel.widthAnchor.constraint(equalToConstant: 28),
-
-            scrollView.leadingAnchor.constraint(equalTo: kindLabel.trailingAnchor, constant: 4),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
     }
 
 }

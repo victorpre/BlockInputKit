@@ -96,6 +96,10 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         }
     }
 
+    func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+        _ = toggleChecklistItem(blockID: blockID)
+    }
+
     func blockItemDidRequestIndent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
         _ = performStructuralEdit(
             named: "Indent Block",

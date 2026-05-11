@@ -23,6 +23,12 @@ extension BlockInputBlockItem {
             textField.stringValue == "::"
         }
     }
+
+    var testingChecklistButton: NSButton? {
+        view.firstDescendant(of: NSButton.self) { button in
+            button.toolTip == "Toggle checklist item"
+        }
+    }
 }
 
 private extension NSView {

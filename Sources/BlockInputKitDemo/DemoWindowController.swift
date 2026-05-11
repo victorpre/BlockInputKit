@@ -80,6 +80,7 @@ final class DemoWindowController: NSWindowController {
             makeButton("Undo Structure", action: #selector(undoStructure)),
             makeButton("Redo Structure", action: #selector(redoStructure)),
             makeSeparator(),
+            makeButton("Toggle Check", action: #selector(toggleChecklist)),
             makeButton("Focus First", action: #selector(focusFirstBlock)),
             reorderCheckbox
         ])
@@ -241,6 +242,11 @@ final class DemoWindowController: NSWindowController {
     @objc private func redoStructure() {
         let result = editorView.redoStructuralEdit()
         updateStatus(for: editorView.document, prefix: result?.actionName ?? "No structural redo")
+    }
+
+    @objc private func toggleChecklist() {
+        let selection = editorView.toggleChecklistItem()
+        updateStatus(for: editorView.document, prefix: selection == nil ? "No checklist item selected" : "Toggled checklist")
     }
 
     @objc private func focusFirstBlock() {

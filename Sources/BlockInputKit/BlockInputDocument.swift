@@ -157,6 +157,17 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: blocks[index].utf16Length))
     }
 
+    /// Toggles a checklist item and returns a cursor selection for that block.
+    @discardableResult
+    public mutating func toggleChecklistItem(blockID: BlockInputBlockID) -> BlockInputSelection? {
+        guard let index = index(of: blockID),
+              case let .checklistItem(isChecked) = blocks[index].kind else {
+            return nil
+        }
+        blocks[index].kind = .checklistItem(isChecked: !isChecked)
+        return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: blocks[index].utf16Length))
+    }
+
     /// Replaces a UTF-16 range in a block's text and returns the resulting cursor selection.
     @discardableResult
     public mutating func replaceText(

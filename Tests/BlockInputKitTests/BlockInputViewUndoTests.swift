@@ -30,6 +30,27 @@ final class BlockInputViewUndoTests: XCTestCase {
         XCTAssertEqual(publishedDocuments.last, view.document)
     }
 
+    func testChecklistToggleUsesStructuralUndoStack() {
+        let blockID = BlockInputBlockID(rawValue: "check")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), text: "Done")
+            ]),
+            undoController: undoController
+        ))
+        view.focus(blockID: blockID, utf16Offset: 0)
+
+        _ = view.toggleChecklistItem()
+        let undo = view.undoStructuralEdit()
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Toggle Checklist")
+        XCTAssertEqual(redo?.actionName, "Toggle Checklist")
+        XCTAssertEqual(view.document.blocks[0].kind, .checklistItem(isChecked: true))
+    }
+
     func testUndoStructuralEditWithNilSelectionCanRefocusEditor() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let undoController = BlockInputUndoController()

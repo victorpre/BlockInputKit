@@ -14,6 +14,7 @@ protocol BlockInputBlockItemDelegate: AnyObject {
     func blockItemDidRequestReturn(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestDeleteEmptyBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRequestSelectAll(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
+    func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestIndent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestOutdent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestMoveToPreviousBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
