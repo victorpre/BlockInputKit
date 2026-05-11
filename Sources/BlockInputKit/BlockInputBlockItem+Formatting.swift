@@ -33,6 +33,38 @@ extension BlockInputBlockItem {
         }
     }
 
+    static func prefixes(for kind: BlockInputBlockKind, indentationLevel: Int, text: String) -> String {
+        let markerPrefix = prefix(for: kind, indentationLevel: indentationLevel)
+        guard kind.repeatsPrefixForTextLines, !markerPrefix.isEmpty else {
+            return markerPrefix
+        }
+        if case let .numberedListItem(start) = kind {
+            return (0..<lineCount(for: text))
+                .map { lineOffset in
+                    prefix(for: .numberedListItem(start: start + lineOffset), indentationLevel: indentationLevel)
+                }
+                .joined(separator: "\n")
+        }
+        return repeatedPrefix(markerPrefix, lineCount: lineCount(for: text))
+    }
+
+    static func prefixesAfterChecklistButton(isChecked: Bool, indentationLevel: Int, text: String) -> String {
+        let lineCount = lineCount(for: text)
+        guard lineCount > 1 else {
+            return ""
+        }
+        let prefix = prefix(for: .checklistItem(isChecked: isChecked), indentationLevel: indentationLevel)
+        return "\n" + repeatedPrefix(prefix, lineCount: lineCount - 1)
+    }
+
+    private static func repeatedPrefix(_ prefix: String, lineCount: Int) -> String {
+        Array(repeating: prefix, count: max(1, lineCount)).joined(separator: "\n")
+    }
+
+    private static func lineCount(for text: String) -> Int {
+        max(1, text.components(separatedBy: .newlines).count)
+    }
+
     private static func unorderedListMarker(indentationLevel: Int) -> String {
         ["-", "*", "+"][max(0, indentationLevel) % 3]
     }
@@ -56,5 +88,16 @@ extension BlockInputBlockItem {
     private static func romanMarker(for value: Int) -> String {
         let markers = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"]
         return markers[max(value - 1, 0) % markers.count]
+    }
+}
+
+private extension BlockInputBlockKind {
+    var repeatsPrefixForTextLines: Bool {
+        switch self {
+        case .quote, .bulletedListItem, .numberedListItem:
+            return true
+        case .paragraph, .heading, .code, .horizontalRule, .checklistItem:
+            return false
+        }
     }
 }

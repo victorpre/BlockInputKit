@@ -118,6 +118,56 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
     }
 }
 
+extension BlockInputBlock {
+    func requiresStructuralReturnHandling(utf16Offset: Int, selectedUTF16Length: Int) -> Bool {
+        if isEmpty, kind.exitsToParagraphOnEmptyReturn {
+            return true
+        }
+        guard kind.acceptsInlineReturn else {
+            return true
+        }
+        guard selectedUTF16Length == 0 else {
+            return false
+        }
+        return emptyInlineLineRemovalRangeForReturn(utf16Offset: utf16Offset) != nil
+    }
+
+    func emptyInlineLineRemovalRangeForReturn(utf16Offset: Int) -> NSRange? {
+        guard kind.acceptsInlineReturn, !isEmpty else {
+            return nil
+        }
+        let textStorage = text as NSString
+        let offset = min(max(utf16Offset, 0), textStorage.length)
+        let lineRange = textStorage.lineRange(for: NSRange(location: offset, length: 0))
+        guard isEmptyLine(range: lineRange, in: textStorage) else {
+            return nil
+        }
+        if lineRange.length > 0 {
+            return lineRange
+        }
+        guard offset > 0, textStorage.character(at: offset - 1).isLineEnding else {
+            return nil
+        }
+        let lineEndingStart = offset > 1 && textStorage.character(at: offset - 2).isCarriageReturn
+            ? offset - 2
+            : offset - 1
+        return NSRange(location: lineEndingStart, length: offset - lineEndingStart)
+    }
+
+    private func isEmptyLine(range: NSRange, in textStorage: NSString) -> Bool {
+        var contentLength = range.length
+        while contentLength > 0,
+              textStorage.character(at: range.location + contentLength - 1).isLineEnding {
+            contentLength -= 1
+        }
+        let contentRange = NSRange(location: range.location, length: contentLength)
+        return textStorage
+            .substring(with: contentRange)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+    }
+}
+
 extension BlockInputBlockKind {
     var supportsIndentation: Bool {
         switch self {
@@ -135,5 +185,33 @@ extension BlockInputBlockKind {
         case .heading, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
         }
+    }
+
+    var exitsToParagraphOnEmptyReturn: Bool {
+        switch self {
+        case .heading, .code, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+            return true
+        case .paragraph, .horizontalRule:
+            return false
+        }
+    }
+
+    var acceptsInlineReturn: Bool {
+        switch self {
+        case .code, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+            return true
+        case .paragraph, .heading, .horizontalRule:
+            return false
+        }
+    }
+}
+
+private extension unichar {
+    var isLineEnding: Bool {
+        self == 10 || self == 13
+    }
+
+    var isCarriageReturn: Bool {
+        self == 13
     }
 }

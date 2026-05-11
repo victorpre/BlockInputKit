@@ -127,13 +127,17 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         horizontalRuleView.accentColor = accentColor
         textView.blockItem = self
         textView.string = block.kind == .horizontalRule ? "" : block.text
-        configureBlockKindChrome(kind: block.kind, indentationLevel: block.indentationLevel)
+        configureBlockKindChrome(kind: block.kind, indentationLevel: block.indentationLevel, text: block.text)
         setBlockSelection(isSelected)
         handleView.isEnabled = allowsReordering
         handleView.isHidden = !allowsReordering
         handleView.alphaValue = 0
         handleView.toolTip = allowsReordering ? "Drag to reorder block" : nil
         handleWidthConstraint?.constant = allowsReordering ? Self.handleWidth : 0
+    }
+
+    func updateTextDependentChrome(for block: BlockInputBlock) {
+        configureBlockKindChrome(kind: block.kind, indentationLevel: block.indentationLevel, text: block.text)
     }
 
     func focusText(atUTF16Offset offset: Int) {
@@ -203,11 +207,11 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate?.blockItem(self, didChangeSelectionIn: blockID)
     }
 
-    func requestReturn() {
+    func requestReturn() -> Bool {
         guard let blockID else {
-            return
+            return true
         }
-        delegate?.blockItemDidRequestReturn(self, blockID: blockID)
+        return delegate?.blockItemDidRequestReturn(self, blockID: blockID) ?? true
     }
 
     func requestDeleteEmptyBlock() -> Bool {
@@ -320,20 +324,24 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.trackingArea = trackingArea
     }
 
-    private func configureBlockKindChrome(kind: BlockInputBlockKind, indentationLevel: Int) {
+    private func configureBlockKindChrome(kind: BlockInputBlockKind, indentationLevel: Int, text: String) {
         let isHorizontalRule = kind == .horizontalRule
         textView.isEditable = !isHorizontalRule
         scrollView.isHidden = isHorizontalRule
         horizontalRuleView.setVisible(isHorizontalRule)
         switch kind {
         case let .checklistItem(isChecked):
-            kindLabel.stringValue = ""
+            kindLabel.stringValue = Self.prefixesAfterChecklistButton(
+                isChecked: isChecked,
+                indentationLevel: indentationLevel,
+                text: text
+            )
             checklistButton.isHidden = false
             checklistButton.isEnabled = true
             checklistButton.state = isChecked ? .on : .off
             checklistButtonLeadingConstraint?.constant = Self.checklistButtonLeadingConstant(indentationLevel: indentationLevel)
         default:
-            kindLabel.stringValue = Self.prefix(for: kind, indentationLevel: indentationLevel)
+            kindLabel.stringValue = Self.prefixes(for: kind, indentationLevel: indentationLevel, text: text)
             checklistButton.isHidden = true
             checklistButton.isEnabled = false
             checklistButton.state = .off
@@ -360,6 +368,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         kindLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         kindLabel.alignment = .right
         kindLabel.textColor = .tertiaryLabelColor
+        kindLabel.maximumNumberOfLines = 0
 
         setupChecklistButton()
 

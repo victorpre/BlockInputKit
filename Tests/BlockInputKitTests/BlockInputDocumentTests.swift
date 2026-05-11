@@ -43,19 +43,18 @@ final class BlockInputDocumentTests: XCTestCase {
         XCTAssertEqual(parsed.blocks.map(\.text), ["First", "Second"])
     }
 
-    func testReturnInsertsEmptyParagraphBelowCurrentBlock() {
-        let firstID = BlockInputBlockID(rawValue: "first")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(id: firstID, text: "Hello")
+    func testMarkdownRoundTripsMultilineListBlocks() {
+        let document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: "bullet", kind: .bulletedListItem, text: "One\nTwo\n", indentationLevel: 1),
+            BlockInputBlock(id: "number", kind: .numberedListItem(start: 3), text: "Three\nFour\n"),
+            BlockInputBlock(id: "check", kind: .checklistItem(isChecked: false), text: "Todo\nLater\n")
         ])
 
-        let selection = document.handleReturn(in: firstID)
+        let parsed = BlockInputDocument(markdown: document.markdown)
 
-        XCTAssertEqual(document.blocks.count, 2)
-        XCTAssertEqual(document.blocks[0].text, "Hello")
-        XCTAssertEqual(document.blocks[1].kind, .paragraph)
-        XCTAssertEqual(document.blocks[1].text, "")
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
+        XCTAssertEqual(parsed.blocks.map(\.kind), document.blocks.map(\.kind))
+        XCTAssertEqual(parsed.blocks.map(\.text), document.blocks.map(\.text))
+        XCTAssertEqual(parsed.blocks.map(\.indentationLevel), document.blocks.map(\.indentationLevel))
     }
 
     func testDeleteEmptyBlockFocusesEndOfPreviousBlock() {

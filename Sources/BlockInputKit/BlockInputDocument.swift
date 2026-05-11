@@ -66,8 +66,87 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
 
     /// Applies Return key semantics for a block editor.
     @discardableResult
-    public mutating func handleReturn(in blockID: BlockInputBlockID) -> BlockInputSelection? {
-        insertBlockBelow(blockID: blockID)
+    public mutating func handleReturn(
+        in blockID: BlockInputBlockID,
+        utf16Offset: Int? = nil,
+        selectedUTF16Length: Int = 0
+    ) -> BlockInputSelection? {
+        guard let index = index(of: blockID) else {
+            return nil
+        }
+        let currentBlock = blocks[index]
+        if currentBlock.isEmpty, currentBlock.kind.exitsToParagraphOnEmptyReturn {
+            blocks[index] = BlockInputBlock(id: blockID, kind: .paragraph)
+            return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
+        }
+        if currentBlock.kind.acceptsInlineReturn {
+            let insertionOffset = min(max(utf16Offset ?? currentBlock.utf16Length, 0), currentBlock.utf16Length)
+            let mutableText = NSMutableString(string: currentBlock.text)
+            let replacementLength = min(max(selectedUTF16Length, 0), currentBlock.utf16Length - insertionOffset)
+            if replacementLength == 0,
+               let removalRange = currentBlock.emptyInlineLineRemovalRangeForReturn(utf16Offset: insertionOffset) {
+                return exitInlineBlock(at: index, removing: removalRange)
+            }
+            mutableText.replaceCharacters(in: NSRange(location: insertionOffset, length: replacementLength), with: "\n")
+            blocks[index].text = mutableText as String
+            return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: insertionOffset + 1))
+        }
+        return insertBlock(BlockInputBlock(), at: index + 1)
+    }
+
+    private mutating func exitInlineBlock(at index: Int, removing removalRange: NSRange) -> BlockInputSelection {
+        let currentBlock = blocks[index]
+        let textStorage = currentBlock.text as NSString
+        let prefix = Self.removingOneTrailingLineEnding(textStorage.substring(to: removalRange.location))
+        let suffix = textStorage.substring(from: NSMaxRange(removalRange))
+        if prefix.isEmpty {
+            blocks[index] = BlockInputBlock(id: currentBlock.id, kind: .paragraph)
+            insertContinuationBlockIfNeeded(from: currentBlock, text: suffix, afterPrefix: prefix, at: index + 1)
+            return .cursor(BlockInputCursor(blockID: currentBlock.id, utf16Offset: 0))
+        }
+
+        blocks[index].text = prefix
+        let paragraph = BlockInputBlock()
+        blocks.insert(paragraph, at: index + 1)
+        insertContinuationBlockIfNeeded(from: currentBlock, text: suffix, afterPrefix: prefix, at: index + 2)
+        return .cursor(BlockInputCursor(blockID: paragraph.id, utf16Offset: 0))
+    }
+
+    private mutating func insertContinuationBlockIfNeeded(
+        from block: BlockInputBlock,
+        text: String,
+        afterPrefix prefix: String,
+        at index: Int
+    ) {
+        guard !text.isEmpty else {
+            return
+        }
+        var continuationBlock = block
+        continuationBlock.id = .unique()
+        continuationBlock.kind = continuationKind(for: block.kind, afterPrefix: prefix)
+        continuationBlock.text = text
+        blocks.insert(continuationBlock, at: index)
+    }
+
+    private func continuationKind(for kind: BlockInputBlockKind, afterPrefix prefix: String) -> BlockInputBlockKind {
+        guard case let .numberedListItem(start) = kind else {
+            return kind
+        }
+        return .numberedListItem(start: start + Self.lineCount(in: prefix))
+    }
+
+    private static func lineCount(in text: String) -> Int {
+        text.isEmpty ? 0 : text.components(separatedBy: .newlines).count
+    }
+
+    private static func removingOneTrailingLineEnding(_ text: String) -> String {
+        if text.hasSuffix("\r\n") {
+            return String(text.dropLast(2))
+        }
+        guard text.last == "\n" || text.last == "\r" else {
+            return text
+        }
+        return String(text.dropLast())
     }
 
     /// Deletes a block and returns the cursor selection that should receive focus next.

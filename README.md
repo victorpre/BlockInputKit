@@ -94,7 +94,8 @@ The demo app includes:
 
 ## Current Behavior
 
-- Return inserts a new paragraph block below the active block.
+- Return inserts a paragraph below paragraph-like blocks; list, checklist, quote, and code blocks can keep editing
+  inside the same block, and empty inline items exit to a paragraph below.
 - Backspace/Delete removes an empty block and moves focus to the previous block end, or the next remaining block.
 - Cmd+A first selects the current block text, then all blocks.
 - Tab and Shift+Tab indent and outdent blocks.

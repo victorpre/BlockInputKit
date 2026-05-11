@@ -181,7 +181,7 @@ final class BlockInputViewDocumentStoreRefreshTests: XCTestCase {
         ]))
         view.applySelection(nil, notify: false)
 
-        item.requestReturn()
+        _ = item.requestReturn()
 
         XCTAssertEqual(store.document.blocks.map(\.id), [replacementID])
         XCTAssertNil(view.selection)

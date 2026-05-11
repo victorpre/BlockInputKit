@@ -18,6 +18,22 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     }
 
     @MainActor
+    func testMultilinePrefixesReflectRepeatedTextLines() {
+        XCTAssertEqual(
+            BlockInputBlockItem.prefixes(for: .bulletedListItem, indentationLevel: 0, text: "One\nTwo\n"),
+            "-\n-\n-"
+        )
+        XCTAssertEqual(
+            BlockInputBlockItem.prefixes(for: .numberedListItem(start: 3), indentationLevel: 0, text: "One\nTwo"),
+            "3.\n4."
+        )
+        XCTAssertEqual(
+            BlockInputBlockItem.prefixesAfterChecklistButton(isChecked: false, indentationLevel: 0, text: "One\nTwo"),
+            "\n[ ]"
+        )
+    }
+
+    @MainActor
     func testHeightUsesMinimumForEmptyBlocks() {
         let height = BlockInputBlockItem.height(for: .emptyParagraph(), textWidth: 240)
 

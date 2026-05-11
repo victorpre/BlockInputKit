@@ -39,9 +39,9 @@ enum BlockInputMarkdownImporter {
                 continue
             }
 
-            if let listBlock = parseListBlock(line) {
-                blocks.append(listBlock)
-                index += 1
+            if let parsed = parseListBlock(lines: lines, startIndex: index) {
+                blocks.append(parsed.block)
+                index = parsed.nextIndex
                 continue
             }
 
@@ -99,7 +99,7 @@ enum BlockInputMarkdownImporter {
                 line.trimmingCharacters(in: .whitespaces) == "---" ||
                 parseHeading(line) != nil ||
                 line.hasPrefix(">") ||
-                parseListBlock(line) != nil {
+                parseListLine(line) != nil {
                 break
             }
             content.append(line)
@@ -118,21 +118,38 @@ enum BlockInputMarkdownImporter {
         return BlockInputBlock(kind: .heading(level: level), text: String(trimmed.dropFirst(level + 1)))
     }
 
-    private static func parseListBlock(_ line: String) -> BlockInputBlock? {
-        let indentationLevel = line.prefix { $0 == " " }.count / 2
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
+    private static func parseListBlock(lines: [String], startIndex: Int) -> (block: BlockInputBlock, nextIndex: Int)? {
+        guard var block = parseListLine(lines[startIndex]) else {
+            return nil
+        }
+        var content = [block.text]
+        var index = startIndex + 1
+        while index < lines.count,
+              let nextBlock = parseListLine(lines[index]),
+              canMergeListBlock(nextBlock, into: block, lineOffset: content.count) {
+            content.append(nextBlock.text)
+            index += 1
+        }
+        block.text = content.joined(separator: "\n")
+        return (block, index)
+    }
 
-        if trimmed.hasPrefix("- [ ] ") {
+    private static func parseListLine(_ line: String) -> BlockInputBlock? {
+        let leadingSpaceCount = line.prefix { $0 == " " }.count
+        let indentationLevel = leadingSpaceCount / 2
+        let trimmed = String(line.dropFirst(leadingSpaceCount))
+
+        if trimmed == "- [ ]" || trimmed.hasPrefix("- [ ] ") {
             return BlockInputBlock(
                 kind: .checklistItem(isChecked: false),
-                text: String(trimmed.dropFirst(6)),
+                text: String(trimmed.dropFirst(min(6, trimmed.count))),
                 indentationLevel: indentationLevel
             )
         }
-        if trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") {
+        if trimmed == "- [x]" || trimmed == "- [X]" || trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") {
             return BlockInputBlock(
                 kind: .checklistItem(isChecked: true),
-                text: String(trimmed.dropFirst(6)),
+                text: String(trimmed.dropFirst(min(6, trimmed.count))),
                 indentationLevel: indentationLevel
             )
         }
@@ -151,6 +168,26 @@ enum BlockInputMarkdownImporter {
             )
         }
         return nil
+    }
+
+    private static func canMergeListBlock(
+        _ nextBlock: BlockInputBlock,
+        into firstBlock: BlockInputBlock,
+        lineOffset: Int
+    ) -> Bool {
+        guard nextBlock.indentationLevel == firstBlock.indentationLevel else {
+            return false
+        }
+        switch (firstBlock.kind, nextBlock.kind) {
+        case (.bulletedListItem, .bulletedListItem):
+            return true
+        case let (.numberedListItem(start), .numberedListItem(nextStart)):
+            return nextStart == start + lineOffset
+        case let (.checklistItem(isChecked), .checklistItem(nextIsChecked)):
+            return isChecked == nextIsChecked
+        default:
+            return false
+        }
     }
 
     private static func parseNumberedList(_ line: String) -> (start: Int, text: String)? {
@@ -194,11 +231,15 @@ enum BlockInputMarkdownSerializer {
         case .quote:
             return block.text.components(separatedBy: .newlines).map { "> \($0)" }.joined(separator: "\n")
         case .bulletedListItem:
-            return "\(indent)- \(block.text)"
+            return block.text.components(separatedBy: .newlines).map { "\(indent)- \($0)" }.joined(separator: "\n")
         case .numberedListItem(let start):
-            return "\(indent)\(start). \(block.text)"
+            return block.text.components(separatedBy: .newlines).enumerated().map { offset, line in
+                "\(indent)\(start + offset). \(line)"
+            }.joined(separator: "\n")
         case .checklistItem(let isChecked):
-            return "\(indent)- [\(isChecked ? "x" : " ")] \(block.text)"
+            return block.text.components(separatedBy: .newlines).map { line in
+                "\(indent)- [\(isChecked ? "x" : " ")] \(line)"
+            }.joined(separator: "\n")
         }
     }
 }

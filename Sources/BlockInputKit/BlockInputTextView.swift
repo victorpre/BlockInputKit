@@ -44,8 +44,10 @@ final class BlockInputTextView: NSTextView {
     private func handleBlockCommand(_ selector: Selector) -> Bool {
         switch selector {
         case #selector(insertNewline(_:)):
-            blockItem?.requestReturn()
-            return true
+            guard let blockItem else {
+                return true
+            }
+            return blockItem.requestReturn()
         case #selector(deleteBackward(_:)), #selector(deleteForward(_:)):
             if selectedRange().location == 0,
                selectedRange().length == 0,

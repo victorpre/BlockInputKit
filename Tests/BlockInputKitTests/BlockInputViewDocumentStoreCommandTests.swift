@@ -156,6 +156,68 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
     }
 
     @MainActor
+    func testReturnInEmptyFormattedBlockPublishesBlockReplacementToStore() {
+        let blockID = BlockInputBlockID(rawValue: "quote")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .quote)
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.focus(blockID: blockID)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+        XCTAssertEqual(store.insertedBlockBatches.count, 0)
+        XCTAssertEqual(store.document.blocks, [BlockInputBlock(id: blockID, kind: .paragraph)])
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    @MainActor
+    func testReturnInInlineBlockPublishesBlockReplacementToStore() {
+        let blockID = BlockInputBlockID(rawValue: "bullet")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "BeforeAfter")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.text(BlockInputTextRange(blockID: blockID, range: NSRange(location: 6, length: 1))), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+        XCTAssertEqual(store.insertedBlockBatches.count, 0)
+        XCTAssertEqual(store.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before\nfter")
+        ])
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 7)))
+    }
+
+    @MainActor
+    func testReturnOnEmptyInlineListLinePublishesDocumentReplacementToStore() {
+        let blockID = BlockInputBlockID(rawValue: "bullet")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First\n")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.replaceDocumentCount, 1)
+        XCTAssertEqual(store.replaceBlockIDs, [])
+        XCTAssertEqual(store.insertedBlockBatches.count, 0)
+        XCTAssertEqual(store.document.blocks.count, 2)
+        XCTAssertEqual(store.document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First"))
+        XCTAssertEqual(store.document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    @MainActor
     func testReturnFallsBackToFirstStoreBlockWhenSelectionWasRemoved() {
         let staleID = BlockInputBlockID(rawValue: "stale")
         let replacementID = BlockInputBlockID(rawValue: "replacement")

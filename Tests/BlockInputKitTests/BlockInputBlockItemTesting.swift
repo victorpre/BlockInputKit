@@ -35,6 +35,16 @@ extension BlockInputBlockItem {
         }
     }
 
+    var testingKindLabel: NSTextField? {
+        let handleView = testingHandleView
+        return view.firstDescendant(of: NSTextField.self) { textField in
+            guard let handleView else {
+                return true
+            }
+            return textField !== handleView
+        }
+    }
+
     var testingHandleWidthConstraint: NSLayoutConstraint? {
         guard let handleView = testingHandleView else {
             return nil

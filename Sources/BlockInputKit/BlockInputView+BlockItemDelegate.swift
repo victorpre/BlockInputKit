@@ -65,6 +65,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         )
+        item.updateTextDependentChrome(for: document.blocks[index])
         collectionView.collectionViewLayout?.invalidateLayout()
         syncDocumentStore(.replaceBlock(document.blocks[index]))
         publishDocumentChange()
@@ -84,13 +85,28 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         }
     }
 
-    func blockItemDidRequestReturn(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+    func blockItemDidRequestReturn(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
         refreshDocumentFromStore()
-        guard index(of: blockID) != nil else {
-            return
+        guard let block = block(withID: blockID) else {
+            return true
         }
-        applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: item.currentSelectedRange.location)), notify: false)
+        let selectedRange = item.currentSelectedRange
+        let currentBlock = BlockInputBlock(
+            id: block.id,
+            kind: block.kind,
+            text: item.currentText,
+            indentationLevel: block.indentationLevel
+        )
+        if block.kind.acceptsInlineReturn,
+           !currentBlock.requiresStructuralReturnHandling(
+               utf16Offset: selectedRange.location,
+               selectedUTF16Length: selectedRange.length
+           ) {
+            return false
+        }
+        applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: selectedRange.location)), notify: false)
         insertBlockBelowCurrentBlock()
+        return true
     }
 
     func blockItemDidRequestDeleteEmptyBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {

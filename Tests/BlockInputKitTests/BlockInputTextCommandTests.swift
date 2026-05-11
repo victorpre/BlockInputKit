@@ -4,27 +4,6 @@ import XCTest
 
 @MainActor
 final class BlockInputTextCommandTests: XCTestCase {
-    func testReturnCommandInsertsBlockThroughDelegatePath() throws {
-        let blockID = BlockInputBlockID(rawValue: "first")
-        let view = BlockInputView()
-        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
-            BlockInputBlock(id: blockID, text: "First")
-        ])))
-        let item = BlockInputBlockItem.configuredForTesting(
-            block: view.document.blocks[0],
-            allowsReordering: true,
-            delegate: view
-        )
-        let textView = try XCTUnwrap(item.testingTextView)
-        textView.setSelectedRange(NSRange(location: 5, length: 0))
-
-        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
-
-        XCTAssertEqual(view.document.blocks.count, 2)
-        XCTAssertEqual(view.document.blocks[0].id, blockID)
-        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
-    }
-
     func testDeleteCommandRemovesEmptyBlockThroughDelegatePath() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
