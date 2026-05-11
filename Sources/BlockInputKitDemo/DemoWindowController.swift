@@ -15,6 +15,7 @@ final class DemoWindowController: NSWindowController {
 
     private var store = BlockInputMemoryDocumentStore(document: DemoData.mixedDocument())
     private var undoController = BlockInputUndoController()
+    private var latestCompletionSuggestions: [BlockInputCompletionSuggestion] = []
 
     init() {
         let window = NSWindow(
@@ -96,7 +97,8 @@ final class DemoWindowController: NSWindowController {
 
         let completionButtons = NSStackView(views: [
             makeButton("Mentions", action: #selector(showMentionCompletions)),
-            makeButton("Slash", action: #selector(showSlashCompletions))
+            makeButton("Slash", action: #selector(showSlashCompletions)),
+            makeButton("Insert First", action: #selector(insertFirstCompletion))
         ])
         completionButtons.orientation = .horizontal
         completionButtons.spacing = 8
@@ -171,6 +173,8 @@ final class DemoWindowController: NSWindowController {
     private func replaceDocument(_ document: BlockInputDocument, status: String) {
         store = BlockInputMemoryDocumentStore(document: document)
         undoController = BlockInputUndoController()
+        latestCompletionSuggestions = []
+        completionResultsLabel.stringValue = ""
         configureEditor()
         updateStatus(for: document, prefix: status)
     }
@@ -263,11 +267,21 @@ final class DemoWindowController: NSWindowController {
         Task { [completionProvider, weak self] in
             let suggestions = await completionProvider.suggestions(for: context)
             await MainActor.run {
+                self?.latestCompletionSuggestions = suggestions
                 self?.completionResultsLabel.stringValue = suggestions.isEmpty
                     ? "No suggestions"
                     : suggestions.map { "\($0.title) -> \($0.insertionText)" }.joined(separator: "\n")
             }
         }
+    }
+
+    @objc private func insertFirstCompletion() {
+        guard let suggestion = latestCompletionSuggestions.first else {
+            updateStatus(for: editorView.document, prefix: "No completion selected")
+            return
+        }
+        let selection = editorView.acceptCompletionSuggestion(suggestion)
+        updateStatus(for: editorView.document, prefix: selection == nil ? "Completion ignored" : "Inserted completion")
     }
 }
 

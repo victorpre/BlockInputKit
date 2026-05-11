@@ -192,7 +192,7 @@ public final class BlockInputView: NSView {
         ])
     }
 
-    private var activeBlockID: BlockInputBlockID? {
+    var activeBlockID: BlockInputBlockID? {
         switch selection {
         case let .cursor(cursor):
             cursor.blockID
@@ -264,7 +264,7 @@ public final class BlockInputView: NSView {
         }
     }
 
-    private func reloadDataKeepingFocus() {
+    func reloadDataKeepingFocus() {
         collectionView.reloadData()
         collectionView.collectionViewLayout?.invalidateLayout()
         if selection != nil {

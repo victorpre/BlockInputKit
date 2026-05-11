@@ -75,7 +75,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         proposedIndexPath proposedDropIndexPath: AutoreleasingUnsafeMutablePointer<NSIndexPath>,
         dropOperation proposedDropOperation: UnsafeMutablePointer<NSCollectionView.DropOperation>
     ) -> NSDragOperation {
-        guard allowsBlockReordering else {
+        guard canAcceptBlockReorderDrop(draggingInfo) else {
             return []
         }
         proposedDropOperation.pointee = .before
@@ -88,7 +88,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         indexPath: IndexPath,
         dropOperation: NSCollectionView.DropOperation
     ) -> Bool {
-        guard allowsBlockReordering,
+        guard canAcceptBlockReorderDrop(draggingInfo),
               let rawID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID),
               let targetIndex = collectionDropTargetIndex(
                 forBlockID: BlockInputBlockID(rawValue: rawID),
@@ -110,5 +110,14 @@ extension BlockInputView: NSCollectionViewDelegate {
             return max(0, proposedItemIndex - 1)
         }
         return proposedItemIndex
+    }
+
+    func canAcceptBlockReorderDrop(_ draggingInfo: NSDraggingInfo) -> Bool {
+        guard allowsBlockReordering,
+              let rawID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID),
+              document.index(of: BlockInputBlockID(rawValue: rawID)) != nil else {
+            return false
+        }
+        return true
     }
 }

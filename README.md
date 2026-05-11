@@ -74,7 +74,7 @@ The demo app includes:
 - Markdown import/export.
 - Text and structural undo/redo buttons.
 - Hover reorder handles and a runtime reordering toggle.
-- Host-provided mention and slash-command completion samples.
+- Host-provided mention and slash-command completion samples, including accepted-suggestion insertion.
 - A SwiftUI `BlockInputEditor` preview embedded beside the AppKit editor.
 
 ## Architecture
@@ -109,18 +109,7 @@ The next performance milestone is a more granular host-owned store/data-source p
 ./scripts/build.sh
 ./scripts/test.sh
 ./scripts/lint.sh
-git diff --check
 ```
-
-## Current Gaps
-
-These are planned but not fully implemented yet:
-
-- Completion popup UI and accepted-suggestion insertion.
-- File/drop insertion helpers beyond local block reordering.
-- Broader key-window first-responder coverage for interactive AppKit scenarios.
-- Full `NSDraggingInfo` accept-drop tests.
-- Formal 100,000-block performance assertions.
 
 ## License
 

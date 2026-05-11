@@ -76,6 +76,95 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertEqual(writer.string(forType: .blockInputBlockID), blockID.rawValue)
     }
 
+    func testCanAcceptBlockReorderDropAcceptsKnownBlockID() {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let view = configuredReorderView(blockIDs: [blockID])
+
+        XCTAssertTrue(view.canAcceptBlockReorderDrop(BlockInputDraggingInfo(blockID: blockID)))
+    }
+
+    func testCanAcceptBlockReorderDropRejectsDisabledReordering() {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let view = configuredReorderView(
+            blockIDs: [blockID],
+            allowsBlockReordering: false
+        )
+
+        XCTAssertFalse(view.canAcceptBlockReorderDrop(BlockInputDraggingInfo(blockID: blockID)))
+    }
+
+    func testCanAcceptBlockReorderDropRejectsUnknownBlockID() {
+        let view = configuredReorderView(blockIDs: ["first"])
+
+        XCTAssertFalse(view.canAcceptBlockReorderDrop(BlockInputDraggingInfo(blockID: "missing")))
+    }
+
+    func testCanAcceptBlockReorderDropRejectsMissingBlockID() {
+        let view = configuredReorderView(blockIDs: ["first"])
+
+        XCTAssertFalse(view.canAcceptBlockReorderDrop(BlockInputDraggingInfo(blockID: nil)))
+    }
+
+    func testAcceptDropMovesBlockAndPublishesDocumentChange() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        var publishedDocuments: [BlockInputDocument] = []
+        let view = configuredReorderView(
+            blockIDs: [firstID, secondID, thirdID],
+            onDocumentChange: { publishedDocuments.append($0) }
+        )
+        let draggingInfo = BlockInputDraggingInfo(blockID: firstID)
+
+        let accepted = view.collectionView(
+            view.collectionView,
+            acceptDrop: draggingInfo,
+            indexPath: IndexPath(item: 2, section: 0),
+            dropOperation: .before
+        )
+
+        XCTAssertTrue(accepted)
+        XCTAssertEqual(view.document.blocks.map(\.id), [secondID, firstID, thirdID])
+        XCTAssertEqual(publishedDocuments.last, view.document)
+    }
+
+    func testAcceptDropReturnsFalseWhenReorderingIsDisabled() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let view = configuredReorderView(
+            blockIDs: [firstID, secondID],
+            allowsBlockReordering: false
+        )
+        let draggingInfo = BlockInputDraggingInfo(blockID: firstID)
+
+        let accepted = view.collectionView(
+            view.collectionView,
+            acceptDrop: draggingInfo,
+            indexPath: IndexPath(item: 1, section: 0),
+            dropOperation: .before
+        )
+
+        XCTAssertFalse(accepted)
+        XCTAssertEqual(view.document.blocks.map(\.id), [firstID, secondID])
+    }
+
+    func testAcceptDropReturnsFalseForUnknownBlockID() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let view = configuredReorderView(blockIDs: [firstID, secondID])
+        let draggingInfo = BlockInputDraggingInfo(blockID: "missing")
+
+        let accepted = view.collectionView(
+            view.collectionView,
+            acceptDrop: draggingInfo,
+            indexPath: IndexPath(item: 1, section: 0),
+            dropOperation: .before
+        )
+
+        XCTAssertFalse(accepted)
+        XCTAssertEqual(view.document.blocks.map(\.id), [firstID, secondID])
+    }
+
     func testBlockItemDisablesHoverHandleWhenReorderingIsDisabled() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "first", text: "First"),
@@ -103,10 +192,63 @@ final class BlockInputViewReorderingTests: XCTestCase {
     }
 
     private func configuredReorderView(blockIDs: [BlockInputBlockID]) -> BlockInputView {
+        configuredReorderView(blockIDs: blockIDs, allowsBlockReordering: true)
+    }
+
+    private func configuredReorderView(
+        blockIDs: [BlockInputBlockID],
+        allowsBlockReordering: Bool = true,
+        onDocumentChange: ((BlockInputDocument) -> Void)? = nil
+    ) -> BlockInputView {
         let view = BlockInputView()
-        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: blockIDs.map { blockID in
-            BlockInputBlock(id: blockID, text: blockID.rawValue)
-        })))
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: blockIDs.map { blockID in
+                BlockInputBlock(id: blockID, text: blockID.rawValue)
+            }),
+            allowsBlockReordering: allowsBlockReordering,
+            onDocumentChange: onDocumentChange
+        ))
         return view
     }
+}
+
+private final class BlockInputDraggingInfo: NSObject, NSDraggingInfo {
+    private let pasteboard: NSPasteboard
+
+    init(blockID: BlockInputBlockID?) {
+        pasteboard = NSPasteboard(name: NSPasteboard.Name("BlockInputKitTests.\(UUID().uuidString)"))
+        pasteboard.clearContents()
+        if let blockID {
+            pasteboard.setString(blockID.rawValue, forType: .blockInputBlockID)
+        }
+    }
+
+    var draggingDestinationWindow: NSWindow? { nil }
+    var draggingSourceOperationMask: NSDragOperation { .move }
+    var draggingLocation: NSPoint { .zero }
+    var draggedImageLocation: NSPoint { .zero }
+    var draggedImage: NSImage? { nil }
+    var draggingPasteboard: NSPasteboard { pasteboard }
+    var draggingSource: Any? { nil }
+    var draggingSequenceNumber: Int { 0 }
+    var draggingFormation: NSDraggingFormation = .none
+    var animatesToDestination = false
+    var numberOfValidItemsForDrop = 1
+    var springLoadingHighlight: NSSpringLoadingHighlight { .none }
+
+    func slideDraggedImage(to screenPoint: NSPoint) {}
+
+    override func namesOfPromisedFilesDropped(atDestination dropDestination: URL) -> [String]? {
+        nil
+    }
+
+    func enumerateDraggingItems(
+        options enumOpts: NSDraggingItemEnumerationOptions = [],
+        for view: NSView?,
+        classes classArray: [AnyClass],
+        searchOptions: [NSPasteboard.ReadingOptionKey: Any] = [:],
+        using block: (NSDraggingItem, Int, UnsafeMutablePointer<ObjCBool>) -> Void
+    ) {}
+
+    func resetSpringLoading() {}
 }
