@@ -23,6 +23,10 @@ let package = Package(
     targets: [
         .target(
             name: "BlockInputKit",
+            exclude: [
+                "AppKit/AGENTS.md",
+                "AppKit/CLAUDE.md"
+            ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]
@@ -39,6 +43,10 @@ let package = Package(
             dependencies: [
                 "BlockInputKit",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
+            ],
+            exclude: [
+                "AGENTS.md",
+                "CLAUDE.md"
             ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")

@@ -92,6 +92,14 @@ The demo app includes:
 - `BlockInputCompletionProvider` keeps mention and slash-command suggestions host-owned.
 - `BlockInputUndoController` separates per-block text undo from structural undo.
 
+## Project Layout
+
+- `Sources/BlockInputKit/Core`: document, block, selection, typing shortcut, and store primitives.
+- `Sources/BlockInputKit/AppKit`: primary editor surface, collection items, text views, drag/drop, focus, and keyboard coordination.
+- `Sources/BlockInputKit/Markdown`, `Completion`, `Undo`, `SwiftUI`, and `Support`: feature-specific library areas.
+- `Sources/BlockInputKitDemo`: demo app for exercising library behavior.
+- `Tests/BlockInputKitTests` mirrors the same high-level source areas for focused coverage.
+
 ## Current Behavior
 
 - Return inserts a paragraph below paragraph-like blocks; list, checklist, quote, and code blocks can keep editing
