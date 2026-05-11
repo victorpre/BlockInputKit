@@ -79,7 +79,7 @@ The demo app includes:
 - Text and structural undo/redo buttons.
 - Hover reorder handles and a runtime reordering toggle.
 - Host-provided mention and slash-command completion samples, including accepted-suggestion insertion.
-- A SwiftUI `BlockInputEditor` preview embedded beside the AppKit editor.
+- A SwiftUI `BlockInputEditor` preview with focus-binding controls embedded beside the AppKit editor.
 
 ## Architecture
 

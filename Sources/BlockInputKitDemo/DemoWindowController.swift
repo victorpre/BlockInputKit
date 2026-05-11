@@ -114,10 +114,7 @@ final class DemoWindowController: NSWindowController {
         markdownScrollView.documentView = markdownTextView
         markdownScrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 220).isActive = true
 
-        let swiftUIPreview = NSHostingView(rootView: BlockInputEditor(configuration: BlockInputConfiguration(
-            document: DemoData.swiftUIDocument(),
-            allowsBlockReordering: false
-        )))
+        let swiftUIPreview = NSHostingView(rootView: DemoSwiftUIPreview())
         swiftUIPreview.heightAnchor.constraint(equalToConstant: 180).isActive = true
 
         sideStack.addArrangedSubview(sectionLabel("Completion Provider"))

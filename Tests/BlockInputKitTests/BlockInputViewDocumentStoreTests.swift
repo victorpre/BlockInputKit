@@ -26,6 +26,43 @@ final class BlockInputViewDocumentStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testCollectionItemWidthDoesNotExceedNarrowCollectionWidth() {
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 10, height: 120))
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(text: "First")
+        ])))
+        view.collectionView.frame = NSRect(x: 0, y: 0, width: 10, height: 120)
+
+        let size = view.collectionView(
+            view.collectionView,
+            layout: view.collectionView.collectionViewLayout ?? NSCollectionViewFlowLayout(),
+            sizeForItemAt: IndexPath(item: 0, section: 0)
+        )
+
+        XCTAssertLessThanOrEqual(size.width, view.collectionView.bounds.width)
+        XCTAssertGreaterThan(size.width, 0)
+    }
+
+    @MainActor
+    func testCollectionItemWidthAccountsForFlowLayoutHorizontalInsets() {
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 100, height: 120))
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(text: "First")
+        ])))
+        view.collectionView.frame = NSRect(x: 0, y: 0, width: 100, height: 120)
+        let layout = NSCollectionViewFlowLayout()
+        layout.sectionInset = NSEdgeInsets(top: 0, left: 12, bottom: 0, right: 18)
+
+        let size = view.collectionView(
+            view.collectionView,
+            layout: layout,
+            sizeForItemAt: IndexPath(item: 0, section: 0)
+        )
+
+        XCTAssertEqual(size.width, 70)
+    }
+
+    @MainActor
     func testPasteboardWriterReadsThroughConfiguredStore() throws {
         let staleID = BlockInputBlockID(rawValue: "stale")
         let replacementID = BlockInputBlockID(rawValue: "replacement")

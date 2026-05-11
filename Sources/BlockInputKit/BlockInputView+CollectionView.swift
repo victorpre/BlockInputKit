@@ -42,7 +42,10 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
         layout collectionViewLayout: NSCollectionViewLayout,
         sizeForItemAt indexPath: IndexPath
     ) -> NSSize {
-        let availableWidth = max(collectionView.bounds.width - 16, 240)
+        let sectionInset = (collectionViewLayout as? NSCollectionViewFlowLayout)?.sectionInset
+            ?? NSEdgeInsetsZero
+        let horizontalInsets = sectionInset.left + sectionInset.right
+        let availableWidth = max(collectionView.bounds.width - horizontalInsets, 1)
         guard let block = block(at: indexPath.item) else {
             return NSSize(width: availableWidth, height: 32)
         }
