@@ -193,6 +193,61 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
     }
 
     @MainActor
+    func testHorizontalRuleTypingShortcutPublishesDocumentReplacementToStore() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: ""),
+            BlockInputBlock(id: secondID, text: "Second")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.string = "---"
+        textView.setSelectedRange(NSRange(location: 3, length: 0))
+        store.resetCounts()
+
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertEqual(store.document.blocks.count, 3)
+        XCTAssertEqual(store.document.blocks[0].id, firstID)
+        XCTAssertEqual(store.document.blocks[2].id, secondID)
+        XCTAssertEqual(store.document.blocks[0].kind, .horizontalRule)
+        XCTAssertEqual(store.document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(store.replaceDocumentCount, 1)
+        XCTAssertEqual(store.replaceBlockIDs, [])
+        XCTAssertEqual(store.insertedBlockBatches.count, 0)
+    }
+
+    @MainActor
+    func testSelectedHorizontalRuleDeletePublishesDocumentReplacementToStore() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let ruleID = BlockInputBlockID(rawValue: "rule")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: ruleID, kind: .horizontalRule),
+            BlockInputBlock(id: secondID, text: "Second")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.blocks([ruleID]), notify: false)
+        store.resetCounts()
+
+        _ = view.deleteSelectedHorizontalRuleForBackspaceOrDelete()
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [firstID, secondID])
+        XCTAssertEqual(store.replaceDocumentCount, 1)
+        XCTAssertEqual(store.replaceBlockIDs, [])
+        XCTAssertEqual(store.deletedBlockIDs, [])
+    }
+
+    @MainActor
     func testUnwrapBlockPublishesBlockReplacementToStore() throws {
         let blockID = BlockInputBlockID(rawValue: "quote")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [

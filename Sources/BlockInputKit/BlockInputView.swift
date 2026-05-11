@@ -25,6 +25,7 @@ public final class BlockInputView: NSView {
     var publishedFocusState = false
     var pendingFocus: BlockInputCursor?
     var lastFocusedBlockID: BlockInputBlockID?
+    var selectedHorizontalRuleIndex: Int?
     // Invalidates deferred selection restoration when a later reload should not restore focus.
     var focusRestoreGeneration = 0
     // Avoid re-entering NSWindow first-responder assignment while AppKit is already promoting this view.
@@ -98,6 +99,14 @@ public final class BlockInputView: NSView {
         return true
     }
 
+    public override func keyDown(with event: NSEvent) {
+        if event.isBackspaceOrDelete,
+           deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil {
+            return
+        }
+        super.keyDown(with: event)
+    }
+
     /// Focuses a specific block at a UTF-16 text offset.
     public func focus(blockID: BlockInputBlockID, utf16Offset: Int = 0) {
         refreshDocumentFromStore()
@@ -157,6 +166,41 @@ public final class BlockInputView: NSView {
             },
             edit: { document in
                 document.deleteEmptyBlockForBackspaceOrDelete(blockID: blockID)
+            }
+        )
+    }
+
+    /// Deletes a selected horizontal rule block after the rule itself has focus-like selection.
+    @discardableResult
+    public func deleteSelectedHorizontalRuleForBackspaceOrDelete() -> BlockInputSelection? {
+        refreshDocumentFromStore()
+        guard case let .blocks(blockIDs) = selection,
+              blockIDs.count == 1,
+              let blockID = blockIDs.first,
+              block(withID: blockID)?.kind == .horizontalRule else {
+            return nil
+        }
+        let deletionIndex = selectedHorizontalRuleIndex.flatMap { index -> Int? in
+            guard block(at: index)?.id == blockID,
+                  block(at: index)?.kind == .horizontalRule else {
+                return nil
+            }
+            return index
+        }
+        return performStructuralEdit(
+            named: "Delete Block",
+            storeSyncAction: { beforeDocument, afterDocument, _ in
+                if beforeDocument.blocks.count == 1,
+                   let replacementBlock = afterDocument.block(withID: blockID) {
+                    return .replaceBlock(replacementBlock)
+                }
+                return .replaceDocument
+            },
+            edit: { document in
+                if let deletionIndex {
+                    return document.deleteBlock(at: deletionIndex)
+                }
+                return document.deleteBlock(blockID: blockID)
             }
         )
     }
@@ -281,4 +325,13 @@ public final class BlockInputView: NSView {
         ])
     }
 
+}
+
+private extension NSEvent {
+    var isBackspaceOrDelete: Bool {
+        keyCode == 51
+            || keyCode == 117
+            || charactersIgnoringModifiers == "\u{7F}"
+            || charactersIgnoringModifiers == "\u{F728}"
+    }
 }

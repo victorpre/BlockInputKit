@@ -5,17 +5,28 @@ extension BlockInputBlockItem {
     static func configuredForTesting(
         block: BlockInputBlock,
         allowsReordering: Bool,
+        isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) -> BlockInputBlockItem {
         let item = BlockInputBlockItem()
         item.loadView()
         item.viewDidLoad()
-        item.configure(block: block, allowsReordering: allowsReordering, delegate: delegate)
+        item.configure(
+            block: block,
+            allowsReordering: allowsReordering,
+            accentColor: .controlAccentColor,
+            isSelected: isSelected,
+            delegate: delegate
+        )
         return item
     }
 
     var testingTextView: BlockInputTextView? {
         view.firstDescendant(of: BlockInputTextView.self)
+    }
+
+    var testingTextScrollView: NSScrollView? {
+        view.firstDescendant(of: NSScrollView.self)
     }
 
     var testingHandleView: NSTextField? {
@@ -44,6 +55,22 @@ extension BlockInputBlockItem {
         view.firstDescendant(of: NSView.self) { view in
             view.identifier?.rawValue == "BlockInputHorizontalRuleView"
         }
+    }
+
+    var testingHorizontalRuleSelectionView: BlockInputHorizontalRuleView? {
+        view.firstDescendant(of: BlockInputHorizontalRuleView.self)
+    }
+}
+
+extension BlockInputHorizontalRuleView {
+    var testingLineView: NSView? {
+        subviews.first
+    }
+
+    var testingLineHeight: CGFloat? {
+        testingLineView?.constraints.first { constraint in
+            constraint.firstAttribute == .height
+        }?.constant
     }
 }
 

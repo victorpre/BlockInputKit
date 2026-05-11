@@ -67,6 +67,7 @@ final class BlockInputViewUndoTests: XCTestCase {
             delegate: view
         )
         let textView = try XCTUnwrap(item.testingTextView)
+        _ = item.textView(textView, shouldChangeTextIn: NSRange(location: 0, length: 0), replacementString: "# Heading")
         textView.string = "# Heading"
         textView.setSelectedRange(NSRange(location: 9, length: 0))
         item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
@@ -74,6 +75,7 @@ final class BlockInputViewUndoTests: XCTestCase {
         let undo = view.undoStructuralEdit()
         XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
         XCTAssertEqual(view.document.blocks[0].text, "")
+        XCTAssertEqual(undo?.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
 
         let redo = view.redoStructuralEdit()
 
@@ -81,6 +83,78 @@ final class BlockInputViewUndoTests: XCTestCase {
         XCTAssertEqual(redo?.actionName, "Format Block")
         XCTAssertEqual(view.document.blocks[0].kind, .heading(level: 1))
         XCTAssertEqual(view.document.blocks[0].text, "Heading")
+    }
+
+    func testHorizontalRuleTypingShortcutUndoRestoresOriginalBlockCount() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: firstID, text: ""),
+                BlockInputBlock(id: secondID, text: "Second")
+            ]),
+            undoController: undoController
+        ))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        _ = item.textView(textView, shouldChangeTextIn: NSRange(location: 0, length: 0), replacementString: "---")
+        textView.string = "---"
+        textView.setSelectedRange(NSRange(location: 3, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Format Block")
+        XCTAssertEqual(view.document.blocks.map(\.id), [firstID, secondID])
+        XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[0].text, "")
+        XCTAssertEqual(undo?.selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 0)))
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(redo?.actionName, "Format Block")
+        XCTAssertEqual(view.document.blocks.count, 3)
+        XCTAssertEqual(view.document.blocks[0].id, firstID)
+        XCTAssertEqual(view.document.blocks[0].kind, .horizontalRule)
+        XCTAssertEqual(view.document.blocks[2].id, secondID)
+        XCTAssertEqual(redo?.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    func testSelectedHorizontalRuleDeleteUsesStructuralUndoStack() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let ruleID = BlockInputBlockID(rawValue: "rule")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: firstID, text: "First"),
+                BlockInputBlock(id: ruleID, kind: .horizontalRule),
+                BlockInputBlock(id: secondID, text: "Second")
+            ]),
+            undoController: undoController
+        ))
+        view.applySelection(.blocks([ruleID]), notify: false)
+
+        _ = view.deleteSelectedHorizontalRuleForBackspaceOrDelete()
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Delete Block")
+        XCTAssertEqual(view.document.blocks.map(\.id), [firstID, ruleID, secondID])
+        XCTAssertEqual(view.document.blocks[1].kind, .horizontalRule)
+        XCTAssertEqual(undo?.selection, .blocks([ruleID]))
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(redo?.actionName, "Delete Block")
+        XCTAssertEqual(view.document.blocks.map(\.id), [firstID, secondID])
+        XCTAssertEqual(redo?.selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 5)))
     }
 
     func testUnwrapBlockUsesStructuralUndoStack() throws {

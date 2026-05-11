@@ -68,7 +68,25 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
         let textView = try XCTUnwrap(item.testingTextView)
         XCTAssertEqual(textView.string, "")
         XCTAssertFalse(textView.isEditable)
+        XCTAssertTrue(try XCTUnwrap(item.testingTextScrollView).isHidden)
         XCTAssertFalse(try XCTUnwrap(item.testingHorizontalRuleView).isHidden)
+    }
+
+    @MainActor
+    func testHorizontalRuleSelectionUsesAccentColor() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "rule", kind: .horizontalRule),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let ruleView = try XCTUnwrap(item.testingHorizontalRuleSelectionView)
+        ruleView.accentColor = .systemPink
+
+        item.setBlockSelection(true)
+
+        XCTAssertEqual(ruleView.testingLineView?.layer?.backgroundColor, NSColor.systemPink.cgColor)
+        XCTAssertEqual(ruleView.testingLineHeight, 3)
+        XCTAssertNotEqual(ruleView.layer?.backgroundColor, NSColor.clear.cgColor)
     }
 
     @MainActor
@@ -86,7 +104,37 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
             delegate: view
         )
 
-        XCTAssertTrue(try XCTUnwrap(item.testingHorizontalRuleView).isHidden)
+        let ruleView = try XCTUnwrap(item.testingHorizontalRuleView)
+        XCTAssertTrue(ruleView.isHidden)
+        XCTAssertEqual(ruleView.alphaValue, 0)
+        XCTAssertFalse(try XCTUnwrap(item.testingTextScrollView).isHidden)
+    }
+
+    @MainActor
+    func testSelectedHorizontalRuleOverlayIsClearedWhenReconfiguredAsTextBlock() throws {
+        let view = BlockInputView()
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "rule", kind: .horizontalRule),
+            allowsReordering: true,
+            delegate: view
+        )
+        item.setBlockSelection(true)
+
+        item.configure(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Plain"),
+            allowsReordering: true,
+            isSelected: true,
+            delegate: view
+        )
+
+        let ruleView = try XCTUnwrap(item.testingHorizontalRuleSelectionView)
+        XCTAssertTrue(ruleView.isHidden)
+        XCTAssertEqual(ruleView.alphaValue, 0)
+        XCTAssertEqual(ruleView.testingLineHeight, 1)
+        XCTAssertEqual(ruleView.testingLineView?.layer?.backgroundColor, NSColor.separatorColor.cgColor)
+        XCTAssertEqual(ruleView.layer?.backgroundColor, NSColor.clear.cgColor)
+        XCTAssertEqual(try XCTUnwrap(item.testingTextView).string, "Plain")
+        XCTAssertFalse(try XCTUnwrap(item.testingTextScrollView).isHidden)
     }
 
     @MainActor

@@ -30,7 +30,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             return
         }
         if document.blocks[index].kind == .horizontalRule {
-            item.configure(block: document.blocks[index], allowsReordering: allowsBlockReordering, delegate: self)
+            configureBlockItem(item, block: document.blocks[index])
             return
         }
         let selectedRange = item.currentSelectedRange
@@ -38,12 +38,15 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         if let shortcutSelection = applyTypingShortcutIfNeeded(
             blockID: blockID,
             proposedText: text,
-            proposedUTF16Offset: proposedOffset
+            proposedUTF16Offset: proposedOffset,
+            selectionBefore: capturedSelectionBefore
         ) {
-            if let block = block(withID: blockID) {
-                item.configure(block: block, allowsReordering: allowsBlockReordering, delegate: self)
-            }
+            // Shortcuts can insert a new focused block and reload collection items,
+            // so only reconfigure this item if it still owns the edited block.
             if case let .cursor(cursor) = shortcutSelection, cursor.blockID == blockID {
+                if let block = block(withID: blockID) {
+                    configureBlockItem(item, block: block)
+                }
                 item.setSelectedRange(NSRange(location: cursor.utf16Offset, length: 0))
             }
             return
@@ -69,7 +72,8 @@ extension BlockInputView: BlockInputBlockItemDelegate {
 
     func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID) {
         refreshDocumentFromStore()
-        guard index(of: blockID) != nil else {
+        guard let block = block(withID: blockID),
+              block.kind != .horizontalRule else {
             return
         }
         let range = item.currentSelectedRange
@@ -91,7 +95,13 @@ extension BlockInputView: BlockInputBlockItemDelegate {
 
     func blockItemDidRequestDeleteEmptyBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
         refreshDocumentFromStore()
-        guard let block = block(withID: blockID), block.isEmpty else {
+        guard let block = block(withID: blockID) else {
+            return false
+        }
+        if block.kind == .horizontalRule {
+            return deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil
+        }
+        guard block.isEmpty else {
             return false
         }
         applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
@@ -100,7 +110,14 @@ extension BlockInputView: BlockInputBlockItemDelegate {
 
     func blockItemDidRequestUnwrapBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
         refreshDocumentFromStore()
-        guard let currentBlock = block(withID: blockID), currentBlock.kind.canUnwrapToParagraph else {
+        guard let currentBlock = block(withID: blockID) else {
+            return false
+        }
+        if currentBlock.kind == .horizontalRule,
+           selection == .blocks([blockID]) {
+            return deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil
+        }
+        guard currentBlock.kind.canUnwrapToParagraph else {
             return false
         }
         applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
@@ -108,7 +125,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             return false
         }
         if let updatedBlock = block(withID: blockID) {
-            item.configure(block: updatedBlock, allowsReordering: allowsBlockReordering, delegate: self)
+            configureBlockItem(item, block: updatedBlock)
         }
         if case let .cursor(cursor) = unwrapSelection, cursor.blockID == blockID {
             item.setSelectedRange(NSRange(location: cursor.utf16Offset, length: 0))
@@ -122,7 +139,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             return
         }
         if item.currentText != block.text {
-            item.configure(block: block, allowsReordering: allowsBlockReordering, delegate: self)
+            configureBlockItem(item, block: block)
         }
         let nextSelection = document.selectAll(currentBlockID: blockID, currentSelection: selection)
         applySelection(nextSelection, notify: true)
@@ -134,6 +151,20 @@ extension BlockInputView: BlockInputBlockItemDelegate {
 
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
         _ = toggleChecklistItem(blockID: blockID)
+    }
+
+    func blockItemDidRequestSelectHorizontalRule(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+        refreshDocumentFromStore()
+        guard block(withID: blockID)?.kind == .horizontalRule else {
+            return
+        }
+        selectedHorizontalRuleIndex = collectionView.indexPath(for: item)?.item
+        hideDropIndicator()
+        applySelection(.blocks([blockID]), notify: true)
+        selectOnlyVisibleBlockItem(item)
+        window?.makeFirstResponder(self)
+        selectOnlyVisibleBlockItem(item)
+        publishFocusChange(true)
     }
 
     func blockItemDidRequestIndent(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
@@ -176,5 +207,15 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         }
         focus(blockID: next.id, utf16Offset: 0)
         return true
+    }
+
+    private func configureBlockItem(_ item: BlockInputBlockItem, block: BlockInputBlock) {
+        item.configure(
+            block: block,
+            allowsReordering: allowsBlockReordering,
+            accentColor: dropIndicatorColor,
+            isSelected: isBlockSelected(block.id),
+            delegate: self
+        )
     }
 }

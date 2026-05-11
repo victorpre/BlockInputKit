@@ -30,6 +30,8 @@ extension BlockInputView: NSCollectionViewDataSource {
         blockItem.configure(
             block: block,
             allowsReordering: allowsBlockReordering,
+            accentColor: dropIndicatorColor,
+            isSelected: isBlockSelected(block.id),
             delegate: self
         )
         return blockItem

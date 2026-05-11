@@ -39,6 +39,7 @@ extension BlockInputView {
 
     func performStructuralEdit(
         named actionName: String,
+        selectionBeforeOverride: BlockInputSelection? = nil,
         storeSyncAction: (
             _ beforeDocument: BlockInputDocument,
             _ afterDocument: BlockInputDocument,
@@ -48,7 +49,7 @@ extension BlockInputView {
     ) -> BlockInputSelection? {
         refreshDocumentFromStore()
         let beforeDocument = document
-        let beforeSelection = selection
+        let beforeSelection = selectionBeforeOverride ?? selection
         guard let afterSelection = edit(&document) else {
             return nil
         }

@@ -13,7 +13,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     private let kindLabel = NSTextField(labelWithString: "")
     private let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     private let scrollView = NSScrollView()
-    private let horizontalRuleView = NSView()
+    private let horizontalRuleView = BlockInputHorizontalRuleView()
     private let textView = BlockInputTextView()
     private var trackingArea: NSTrackingArea?
     private weak var delegate: BlockInputBlockItemDelegate?
@@ -21,6 +21,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     private var selectionBeforeTextChange: BlockInputSelection?
     private var handleWidthConstraint: NSLayoutConstraint?
     private var checklistButtonLeadingConstraint: NSLayoutConstraint?
+    private var isHorizontalRule = false
 
     var currentSelectedRange: NSRange {
         textView.selectedRange()
@@ -28,6 +29,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
     var currentText: String {
         textView.string
+    }
+
+    var representedBlockID: BlockInputBlockID? {
+        blockID
     }
 
     static func horizontalChromeWidth(allowsReordering: Bool) -> CGFloat {
@@ -52,17 +57,20 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         blockID = nil
         delegate = nil
         selectionBeforeTextChange = nil
+        isHorizontalRule = false
         handleView.blockItem = nil
+        horizontalRuleView.blockItem = nil
+        horizontalRuleView.resetForReuse()
         textView.blockItem = nil
         textView.string = ""
         textView.isEditable = true
+        scrollView.isHidden = false
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         kindLabel.stringValue = ""
         checklistButton.state = .off
         checklistButton.isHidden = true
         checklistButton.isEnabled = false
         checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
-        horizontalRuleView.isHidden = true
         handleView.isEnabled = false
         handleView.isHidden = true
         handleView.alphaValue = 0
@@ -89,18 +97,32 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         }
     }
 
+    override func mouseDown(with event: NSEvent) {
+        guard isHorizontalRule else {
+            super.mouseDown(with: event)
+            return
+        }
+        requestSelectHorizontalRule()
+    }
+
     func configure(
         block: BlockInputBlock,
         allowsReordering: Bool,
+        accentColor: NSColor = .controlAccentColor,
+        isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) {
         blockID = block.id
         self.delegate = delegate
         selectionBeforeTextChange = nil
+        isHorizontalRule = block.kind == .horizontalRule
         handleView.blockItem = self
+        horizontalRuleView.blockItem = self
+        horizontalRuleView.accentColor = accentColor
         textView.blockItem = self
         textView.string = block.kind == .horizontalRule ? "" : block.text
         configureBlockKindChrome(kind: block.kind, indentationLevel: block.indentationLevel)
+        setBlockSelection(isSelected)
         handleView.isEnabled = allowsReordering
         handleView.isHidden = !allowsReordering
         handleView.alphaValue = 0
@@ -203,6 +225,17 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate?.blockItemDidRequestSelectAll(self, blockID: blockID)
     }
 
+    func requestSelectHorizontalRule() {
+        guard let blockID else {
+            return
+        }
+        delegate?.blockItemDidRequestSelectHorizontalRule(self, blockID: blockID)
+    }
+
+    func setBlockSelection(_ isSelected: Bool) {
+        horizontalRuleView.isSelected = isHorizontalRule && isSelected
+    }
+
     @objc func requestToggleChecklist() {
         guard let blockID else {
             return
@@ -274,8 +307,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     private func configureBlockKindChrome(kind: BlockInputBlockKind, indentationLevel: Int) {
-        textView.isEditable = kind != .horizontalRule
-        horizontalRuleView.isHidden = kind != .horizontalRule
+        let isHorizontalRule = kind == .horizontalRule
+        textView.isEditable = !isHorizontalRule
+        scrollView.isHidden = isHorizontalRule
+        horizontalRuleView.setVisible(isHorizontalRule)
         switch kind {
         case let .checklistItem(isChecked):
             kindLabel.stringValue = ""
@@ -353,7 +388,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             horizontalRuleView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 4),
             horizontalRuleView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -4),
             horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            horizontalRuleView.heightAnchor.constraint(equalToConstant: 1)
+            horizontalRuleView.heightAnchor.constraint(equalToConstant: 8)
         ])
     }
 
@@ -366,11 +401,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     private func setupHorizontalRuleView() {
-        horizontalRuleView.wantsLayer = true
-        horizontalRuleView.layer?.backgroundColor = NSColor.separatorColor.cgColor
-        horizontalRuleView.isHidden = true
-        horizontalRuleView.setAccessibilityElement(false)
-        horizontalRuleView.identifier = NSUserInterfaceItemIdentifier("BlockInputHorizontalRuleView")
+        horizontalRuleView.blockItem = self
     }
 
     private func setupTextView() {

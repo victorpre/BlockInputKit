@@ -6,7 +6,7 @@ public struct BlockInputConfiguration {
     public var documentStore: any BlockInputDocumentStore
     /// Whether the leading drag handle can reorder blocks.
     public var allowsBlockReordering: Bool
-    /// Color used for the drag insertion indicator line.
+    /// Color used for editor accent affordances, including drag insertion and selected horizontal rules.
     public var dropIndicatorColor: NSColor
     /// Undo coordinator used by text and structural editor operations.
     public var undoController: BlockInputUndoController?

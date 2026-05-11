@@ -104,7 +104,13 @@ extension BlockInputView {
             return nil
         }
         if refreshConfiguration {
-            item.configure(block: block, allowsReordering: allowsBlockReordering, delegate: self)
+            item.configure(
+                block: block,
+                allowsReordering: allowsBlockReordering,
+                accentColor: dropIndicatorColor,
+                isSelected: isBlockSelected(block.id),
+                delegate: self
+            )
         }
         return item
     }
@@ -191,17 +197,44 @@ extension BlockInputView {
         case let .cursor(cursor):
             lastFocusedBlockID = cursor.blockID
             pendingFocus = cursor
+            selectedHorizontalRuleIndex = nil
         case let .text(range):
             lastFocusedBlockID = range.blockID
             pendingFocus = nil
+            selectedHorizontalRuleIndex = nil
         case let .blocks(blockIDs):
             lastFocusedBlockID = blockIDs.first
             pendingFocus = nil
         case nil:
             pendingFocus = nil
+            selectedHorizontalRuleIndex = nil
         }
         if notify {
             onSelectionChange?(selection)
+        }
+        updateVisibleBlockSelectionHighlights()
+    }
+
+    func isBlockSelected(_ blockID: BlockInputBlockID) -> Bool {
+        guard case let .blocks(blockIDs) = selection else {
+            return false
+        }
+        return blockIDs.contains(blockID)
+    }
+
+    private func updateVisibleBlockSelectionHighlights() {
+        for item in collectionView.visibleItems().compactMap({ $0 as? BlockInputBlockItem }) {
+            guard let blockID = item.representedBlockID else {
+                item.setBlockSelection(false)
+                continue
+            }
+            item.setBlockSelection(isBlockSelected(blockID))
+        }
+    }
+
+    func selectOnlyVisibleBlockItem(_ selectedItem: BlockInputBlockItem) {
+        for item in collectionView.visibleItems().compactMap({ $0 as? BlockInputBlockItem }) {
+            item.setBlockSelection(item === selectedItem)
         }
     }
 }

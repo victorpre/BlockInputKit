@@ -40,6 +40,11 @@ extension BlockInputDocument {
         blocks[index].kind = shortcut.kind
         blocks[index].text = shortcut.text
         blocks[index].indentationLevel = 0
+        if shortcut.kind == .horizontalRule {
+            let nextBlock = BlockInputBlock(kind: .paragraph)
+            blocks.insert(nextBlock, at: index + 1)
+            return .cursor(BlockInputCursor(blockID: nextBlock.id, utf16Offset: 0))
+        }
         let offset = min(shortcut.cursorOffset, blocks[index].utf16Length)
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: offset))
     }

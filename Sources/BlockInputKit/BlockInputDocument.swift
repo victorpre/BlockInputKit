@@ -76,6 +76,15 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         guard let index = index(of: blockID) else {
             return nil
         }
+        return deleteBlock(at: index)
+    }
+
+    /// Deletes the block at an ordered index and returns the cursor selection that should receive focus next.
+    @discardableResult
+    public mutating func deleteBlock(at index: Int) -> BlockInputSelection? {
+        guard blocks.indices.contains(index) else {
+            return nil
+        }
 
         if blocks.count == 1 {
             let replacement = BlockInputBlock(id: blocks[index].id, kind: .paragraph)
