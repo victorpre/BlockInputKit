@@ -123,6 +123,70 @@ final class BlockInputTextCommandTypingShortcutTests: XCTestCase {
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
+    func testTypingShortcutDoesNotReconfigureItemReusedForDifferentBlock() throws {
+        let editedID = BlockInputBlockID(rawValue: "edited")
+        let reusedID = BlockInputBlockID(rawValue: "reused")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: editedID, text: ""),
+            BlockInputBlock(id: reusedID, text: "Second")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[1],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        XCTAssertEqual(textView.string, "Second")
+        textView.setSelectedRange(NSRange(location: 6, length: 0))
+
+        view.blockItem(
+            item,
+            blockID: editedID,
+            didChangeText: "## Heading",
+            selectionBefore: .cursor(BlockInputCursor(blockID: editedID, utf16Offset: 0))
+        )
+
+        XCTAssertEqual(view.document.blocks[0].kind, .heading(level: 2))
+        XCTAssertEqual(view.document.blocks[0].text, "Heading")
+        XCTAssertEqual(view.document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[1].text, "Second")
+        XCTAssertEqual(item.representedBlockID, reusedID)
+        XCTAssertEqual(textView.string, "Second")
+    }
+
+    func testChecklistTypingShortcutDoesNotReconfigureItemReusedForDifferentBlock() throws {
+        let editedID = BlockInputBlockID(rawValue: "edited")
+        let reusedID = BlockInputBlockID(rawValue: "reused")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: editedID, text: ""),
+            BlockInputBlock(id: reusedID, text: "Second")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[1],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        XCTAssertEqual(textView.string, "Second")
+        textView.setSelectedRange(NSRange(location: 6, length: 0))
+
+        view.blockItem(
+            item,
+            blockID: editedID,
+            didChangeText: "- [ ] Todo",
+            selectionBefore: .cursor(BlockInputCursor(blockID: editedID, utf16Offset: 0))
+        )
+
+        XCTAssertEqual(view.document.blocks[0].kind, .checklistItem(isChecked: false))
+        XCTAssertEqual(view.document.blocks[0].text, "Todo")
+        XCTAssertEqual(view.document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[1].text, "Second")
+        XCTAssertEqual(item.representedBlockID, reusedID)
+        XCTAssertEqual(textView.string, "Second")
+    }
+
     func testDeleteAtFrontUnwrapsFormattedBlockThroughDelegatePath() throws {
         let blockID = BlockInputBlockID(rawValue: "quote")
         let view = BlockInputView()
@@ -143,6 +207,33 @@ final class BlockInputTextCommandTypingShortcutTests: XCTestCase {
         XCTAssertEqual(view.document.blocks[0].text, ">Quoted")
         XCTAssertEqual(textView.string, ">Quoted")
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 1)))
+    }
+
+    func testUnwrapDoesNotReconfigureItemReusedForDifferentBlock() throws {
+        let editedID = BlockInputBlockID(rawValue: "edited")
+        let reusedID = BlockInputBlockID(rawValue: "reused")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: editedID, kind: .quote, text: "Quoted"),
+            BlockInputBlock(id: reusedID, text: "Second")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[1],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 2, length: 0))
+
+        XCTAssertTrue(view.blockItemDidRequestUnwrapBlock(item, blockID: editedID))
+
+        XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[0].text, ">Quoted")
+        XCTAssertEqual(view.document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[1].text, "Second")
+        XCTAssertEqual(item.representedBlockID, reusedID)
+        XCTAssertEqual(textView.string, "Second")
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 2, length: 0))
     }
 
     func testSpaceAfterRevealedQuoteMarkerReformatsQuoteBlock() throws {

@@ -44,7 +44,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         ) {
             // Shortcuts can insert a new focused block and reload collection items,
             // so only reconfigure this item if it still owns the edited block.
-            if case let .cursor(cursor) = shortcutSelection, cursor.blockID == blockID {
+            if case let .cursor(cursor) = shortcutSelection,
+               cursor.blockID == blockID,
+               item.representedBlockID == blockID {
                 if let block = block(withID: blockID) {
                     configureBlockItem(item, block: block)
                 }
@@ -167,6 +169,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
         guard let unwrapSelection = unwrapBlockToParagraph(blockID: blockID) else {
             return false
+        }
+        guard item.representedBlockID == blockID else {
+            return true
         }
         if let updatedBlock = block(withID: blockID) {
             configureBlockItem(item, block: updatedBlock)
