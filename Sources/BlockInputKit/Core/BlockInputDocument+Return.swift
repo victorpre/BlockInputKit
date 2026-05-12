@@ -20,8 +20,8 @@ public extension BlockInputDocument {
             blocks[index] = BlockInputBlock(id: blockID, kind: .paragraph)
             return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
         }
-        if case .checklistItem = currentBlock.kind {
-            return insertChecklistItemAfterReturn(
+        if currentBlock.kind.insertsSiblingListItemOnReturn {
+            return insertSiblingListItemAfterReturn(
                 at: index,
                 utf16Offset: utf16Offset,
                 selectedUTF16Length: selectedUTF16Length
@@ -55,7 +55,7 @@ public extension BlockInputDocument {
 }
 
 private extension BlockInputDocument {
-    mutating func insertChecklistItemAfterReturn(
+    mutating func insertSiblingListItemAfterReturn(
         at index: Int,
         utf16Offset: Int?,
         selectedUTF16Length: Int
@@ -66,7 +66,7 @@ private extension BlockInputDocument {
         let replacementLength = min(max(selectedUTF16Length, 0), textStorage.length - insertionOffset)
         let prefix = Self.removingOneTrailingLineEnding(textStorage.substring(to: insertionOffset))
         let suffix = textStorage.substring(from: insertionOffset + replacementLength)
-        let insertedLineIndentationLevels = checklistLineIndentationLevelsAfterReturn(
+        let insertedLineIndentationLevels = lineIndentationLevelsAfterListReturn(
             in: currentBlock,
             insertionOffset: insertionOffset,
             suffixOffset: insertionOffset + replacementLength,
@@ -74,7 +74,7 @@ private extension BlockInputDocument {
         )
         blocks[index].text = prefix
         let insertedBlock = BlockInputBlock(
-            kind: .checklistItem(isChecked: false),
+            kind: siblingListKind(after: currentBlock.kind),
             text: suffix,
             indentationLevel: insertedLineIndentationLevels.first ?? currentBlock.indentationLevel(forLine: 0),
             lineIndentationLevels: insertedLineIndentationLevels
@@ -83,7 +83,20 @@ private extension BlockInputDocument {
         return .cursor(BlockInputCursor(blockID: insertedBlock.id, utf16Offset: 0))
     }
 
-    func checklistLineIndentationLevelsAfterReturn(
+    func siblingListKind(after kind: BlockInputBlockKind) -> BlockInputBlockKind {
+        switch kind {
+        case .bulletedListItem:
+            return .bulletedListItem
+        case let .numberedListItem(start):
+            return .numberedListItem(start: start + 1)
+        case .checklistItem:
+            return .checklistItem(isChecked: false)
+        case .paragraph, .heading, .code, .horizontalRule, .quote:
+            return kind
+        }
+    }
+
+    func lineIndentationLevelsAfterListReturn(
         in block: BlockInputBlock,
         insertionOffset: Int,
         suffixOffset: Int,

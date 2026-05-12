@@ -135,6 +135,22 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return deleteBlock(blockID: blockID)
     }
 
+    /// Merges a paragraph into the previous text block and returns the join-point cursor selection.
+    @discardableResult
+    public mutating func mergeBlockIntoPrevious(blockID: BlockInputBlockID) -> BlockInputSelection? {
+        guard let index = index(of: blockID),
+              index > 0,
+              blocks[index].kind == .paragraph,
+              blocks[index - 1].kind != .horizontalRule else {
+            return nil
+        }
+        let cursorOffset = blocks[index - 1].utf16Length
+        let mergedText = blocks[index - 1].text + blocks[index].text
+        blocks[index - 1].text = mergedText
+        blocks.remove(at: index)
+        return .cursor(BlockInputCursor(blockID: blocks[index - 1].id, utf16Offset: cursorOffset))
+    }
+
     /// Moves a block to a document index and returns a block selection for the moved block.
     @discardableResult
     public mutating func moveBlock(blockID: BlockInputBlockID, to targetIndex: Int) -> BlockInputSelection? {

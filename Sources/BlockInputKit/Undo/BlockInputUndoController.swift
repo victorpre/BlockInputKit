@@ -5,12 +5,45 @@ public struct BlockInputUndoResult: Equatable, Sendable {
     public var selection: BlockInputSelection?
     public var actionName: String
     var replacedBlock: BlockInputBlock?
+    var insertedBlocks: [BlockInputBlock]?
+    var insertionIndex: Int?
+    var deletedBlockIDs: [BlockInputBlockID]?
 
-    init(selection: BlockInputSelection?, actionName: String, replacedBlock: BlockInputBlock? = nil) {
+    init(
+        selection: BlockInputSelection?,
+        actionName: String,
+        replacedBlock: BlockInputBlock? = nil,
+        insertedBlocks: [BlockInputBlock]? = nil,
+        insertionIndex: Int? = nil,
+        deletedBlockIDs: [BlockInputBlockID]? = nil
+    ) {
         self.selection = selection
         self.actionName = actionName
         self.replacedBlock = replacedBlock
+        self.insertedBlocks = insertedBlocks
+        self.insertionIndex = insertionIndex
+        self.deletedBlockIDs = deletedBlockIDs
     }
+}
+
+struct BlockInputReplaceInsertEdit {
+    var actionName: String
+    var beforeBlock: BlockInputBlock
+    var afterBlock: BlockInputBlock
+    var insertedBlocks: [BlockInputBlock]
+    var insertionIndex: Int
+    var selectionBefore: BlockInputSelection?
+    var selectionAfter: BlockInputSelection?
+}
+
+struct BlockInputReplaceDeleteEdit {
+    var actionName: String
+    var beforeBlock: BlockInputBlock
+    var afterBlock: BlockInputBlock
+    var deletedBlocks: [BlockInputBlock]
+    var deletionIndex: Int
+    var selectionBefore: BlockInputSelection?
+    var selectionAfter: BlockInputSelection?
 }
 
 /// Coordinates per-block text undo with a separate structural undo stack.
@@ -21,6 +54,14 @@ public final class BlockInputUndoController {
     private var structuralRedoStack: [BlockInputStructuralUndoEntry] = []
 
     public init() {}
+
+    func canUndoTextEdit(in blockID: BlockInputBlockID) -> Bool {
+        !(textUndoByBlockID[blockID]?.isEmpty ?? true)
+    }
+
+    func canRedoTextEdit(in blockID: BlockInputBlockID) -> Bool {
+        !(textRedoByBlockID[blockID]?.isEmpty ?? true)
+    }
 
     /// Records a text edit for a single block.
     ///
@@ -94,6 +135,67 @@ public final class BlockInputUndoController {
         textRedoByBlockID = [:]
     }
 
+    /// Records a structural edit that inserts blocks without snapshotting the full document.
+    func registerBlockInsertionStructuralEdit(
+        actionName: String,
+        insertedBlocks: [BlockInputBlock],
+        insertionIndex: Int,
+        selectionBefore: BlockInputSelection?,
+        selectionAfter: BlockInputSelection?
+    ) {
+        guard !insertedBlocks.isEmpty else {
+            return
+        }
+        structuralUndoStack.append(BlockInputStructuralUndoEntry(
+            actionName: actionName,
+            payload: .blockInsertion(insertedBlocks: insertedBlocks, insertionIndex: insertionIndex),
+            selectionBefore: selectionBefore,
+            selectionAfter: selectionAfter
+        ))
+        structuralRedoStack = []
+        textRedoByBlockID = [:]
+    }
+
+    /// Records a structural edit that replaces one block and inserts follow-up blocks.
+    func registerBlockReplacementInsertionStructuralEdit(_ edit: BlockInputReplaceInsertEdit) {
+        guard edit.beforeBlock != edit.afterBlock, !edit.insertedBlocks.isEmpty else {
+            return
+        }
+        structuralUndoStack.append(BlockInputStructuralUndoEntry(
+            actionName: edit.actionName,
+            payload: .blockReplacementInsertion(
+                beforeBlock: edit.beforeBlock,
+                afterBlock: edit.afterBlock,
+                insertedBlocks: edit.insertedBlocks,
+                insertionIndex: edit.insertionIndex
+            ),
+            selectionBefore: edit.selectionBefore,
+            selectionAfter: edit.selectionAfter
+        ))
+        structuralRedoStack = []
+        textRedoByBlockID = [:]
+    }
+
+    /// Records a structural edit that replaces one block and deletes follow-up blocks.
+    func registerBlockReplacementDeletionStructuralEdit(_ edit: BlockInputReplaceDeleteEdit) {
+        guard edit.beforeBlock != edit.afterBlock, !edit.deletedBlocks.isEmpty else {
+            return
+        }
+        structuralUndoStack.append(BlockInputStructuralUndoEntry(
+            actionName: edit.actionName,
+            payload: .blockReplacementDeletion(
+                beforeBlock: edit.beforeBlock,
+                afterBlock: edit.afterBlock,
+                deletedBlocks: edit.deletedBlocks,
+                deletionIndex: edit.deletionIndex
+            ),
+            selectionBefore: edit.selectionBefore,
+            selectionAfter: edit.selectionAfter
+        ))
+        structuralRedoStack = []
+        textRedoByBlockID = [:]
+    }
+
     /// Undoes the most recent text edit for a block.
     public func undoTextEdit(
         in document: inout BlockInputDocument,
@@ -111,6 +213,27 @@ public final class BlockInputUndoController {
             document.blocks[index].lineIndentationLevels = beforeLineIndentationLevels
         }
         return BlockInputUndoResult(selection: entry.selectionBefore, actionName: "Text Edit")
+    }
+
+    /// Undoes text using the current block snapshot so store-backed views can
+    /// replace one block without refreshing the full document.
+    func undoTextEdit(for block: BlockInputBlock) -> BlockInputUndoResult? {
+        guard var stack = textUndoByBlockID[block.id],
+              let entry = stack.popLast() else {
+            return nil
+        }
+        textUndoByBlockID[block.id] = stack
+        textRedoByBlockID[block.id, default: []].append(entry)
+        var replacement = block
+        replacement.text = entry.beforeText
+        if let beforeLineIndentationLevels = entry.beforeLineIndentationLevels {
+            replacement.lineIndentationLevels = beforeLineIndentationLevels
+        }
+        return BlockInputUndoResult(
+            selection: entry.selectionBefore,
+            actionName: "Text Edit",
+            replacedBlock: replacement
+        )
     }
 
     /// Redoes the most recent undone text edit for a block.
@@ -132,6 +255,27 @@ public final class BlockInputUndoController {
         return BlockInputUndoResult(selection: entry.selectionAfter, actionName: "Text Edit")
     }
 
+    /// Redoes text using the current block snapshot so store-backed views can
+    /// replace one block without refreshing the full document.
+    func redoTextEdit(for block: BlockInputBlock) -> BlockInputUndoResult? {
+        guard var stack = textRedoByBlockID[block.id],
+              let entry = stack.popLast() else {
+            return nil
+        }
+        textRedoByBlockID[block.id] = stack
+        textUndoByBlockID[block.id, default: []].append(entry)
+        var replacement = block
+        replacement.text = entry.afterText
+        if let afterLineIndentationLevels = entry.afterLineIndentationLevels {
+            replacement.lineIndentationLevels = afterLineIndentationLevels
+        }
+        return BlockInputUndoResult(
+            selection: entry.selectionAfter,
+            actionName: "Text Edit",
+            replacedBlock: replacement
+        )
+    }
+
     /// Undoes the most recent structural edit.
     public func undoStructuralEdit(in document: inout BlockInputDocument) -> BlockInputUndoResult? {
         guard let entry = structuralUndoStack.popLast() else {
@@ -142,7 +286,10 @@ public final class BlockInputUndoController {
         return BlockInputUndoResult(
             selection: entry.selectionBefore,
             actionName: entry.actionName,
-            replacedBlock: entry.payload.replacementBlockForUndo
+            replacedBlock: entry.payload.replacementBlockForUndo,
+            insertedBlocks: entry.payload.insertedBlocksForUndo,
+            insertionIndex: entry.payload.insertionIndexForUndo,
+            deletedBlockIDs: entry.payload.deletedBlockIDsForUndo
         )
     }
 
@@ -156,93 +303,65 @@ public final class BlockInputUndoController {
         return BlockInputUndoResult(
             selection: entry.selectionAfter,
             actionName: entry.actionName,
-            replacedBlock: entry.payload.replacementBlockForRedo
+            replacedBlock: entry.payload.replacementBlockForRedo,
+            insertedBlocks: entry.payload.insertedBlocksForRedo,
+            insertionIndex: entry.payload.insertionIndexForRedo,
+            deletedBlockIDs: entry.payload.deletedBlockIDsForRedo
         )
     }
-}
 
-private struct BlockInputTextUndoEntry {
-    let blockID: BlockInputBlockID
-    let beforeText: String
-    let afterText: String
-    let beforeLineIndentationLevels: [Int]?
-    let afterLineIndentationLevels: [Int]?
-    let selectionBefore: BlockInputSelection?
-    let selectionAfter: BlockInputSelection?
-}
-
-private struct BlockInputStructuralUndoEntry {
-    let actionName: String
-    let payload: BlockInputStructuralUndoPayload
-    let selectionBefore: BlockInputSelection?
-    let selectionAfter: BlockInputSelection?
-
-    init(
-        actionName: String,
-        beforeDocument: BlockInputDocument,
-        afterDocument: BlockInputDocument,
-        selectionBefore: BlockInputSelection?,
-        selectionAfter: BlockInputSelection?
-    ) {
-        self.actionName = actionName
-        payload = .documentReplacement(beforeDocument: beforeDocument, afterDocument: afterDocument)
-        self.selectionBefore = selectionBefore
-        self.selectionAfter = selectionAfter
-    }
-
-    init(
-        actionName: String,
-        payload: BlockInputStructuralUndoPayload,
-        selectionBefore: BlockInputSelection?,
-        selectionAfter: BlockInputSelection?
-    ) {
-        self.actionName = actionName
-        self.payload = payload
-        self.selectionBefore = selectionBefore
-        self.selectionAfter = selectionAfter
-    }
-}
-
-private enum BlockInputStructuralUndoPayload {
-    case documentReplacement(beforeDocument: BlockInputDocument, afterDocument: BlockInputDocument)
-    case blockReplacement(beforeBlock: BlockInputBlock, afterBlock: BlockInputBlock)
-
-    var replacementBlockForUndo: BlockInputBlock? {
-        guard case let .blockReplacement(beforeBlock, _) = self else {
+    func nextGranularStructuralUndoResult() -> BlockInputUndoResult? {
+        guard let entry = structuralUndoStack.last,
+              entry.payload.canApplyGranularly else {
             return nil
         }
-        return beforeBlock
+        return entry.payload.undoResult(selection: entry.selectionBefore, actionName: entry.actionName)
     }
 
-    var replacementBlockForRedo: BlockInputBlock? {
-        guard case let .blockReplacement(_, afterBlock) = self else {
-            return nil
-        }
-        return afterBlock
-    }
-
-    func applyUndo(to document: inout BlockInputDocument) {
-        switch self {
-        case let .documentReplacement(beforeDocument, _):
-            document = beforeDocument
-        case let .blockReplacement(beforeBlock, _):
-            replace(beforeBlock, in: &document)
-        }
-    }
-
-    func applyRedo(to document: inout BlockInputDocument) {
-        switch self {
-        case let .documentReplacement(_, afterDocument):
-            document = afterDocument
-        case let .blockReplacement(_, afterBlock):
-            replace(afterBlock, in: &document)
-        }
-    }
-
-    private func replace(_ block: BlockInputBlock, in document: inout BlockInputDocument) {
-        guard let index = document.index(of: block.id) else {
+    func commitGranularStructuralUndo() {
+        guard let entry = structuralUndoStack.last,
+              entry.payload.canApplyGranularly else {
             return
         }
-        document.blocks[index] = block
+        structuralUndoStack.removeLast()
+        structuralRedoStack.append(entry)
+    }
+
+    func nextGranularStructuralRedoResult() -> BlockInputUndoResult? {
+        guard let entry = structuralRedoStack.last,
+              entry.payload.canApplyGranularly else {
+            return nil
+        }
+        return entry.payload.redoResult(selection: entry.selectionAfter, actionName: entry.actionName)
+    }
+
+    func commitGranularStructuralRedo() {
+        guard let entry = structuralRedoStack.last,
+              entry.payload.canApplyGranularly else {
+            return
+        }
+        structuralRedoStack.removeLast()
+        structuralUndoStack.append(entry)
+    }
+
+    /// Records a structural edit that deletes blocks without snapshotting the full document.
+    func registerBlockDeletionStructuralEdit(
+        actionName: String,
+        deletedBlocks: [BlockInputBlock],
+        deletionIndex: Int,
+        selectionBefore: BlockInputSelection?,
+        selectionAfter: BlockInputSelection?
+    ) {
+        guard !deletedBlocks.isEmpty else {
+            return
+        }
+        structuralUndoStack.append(BlockInputStructuralUndoEntry(
+            actionName: actionName,
+            payload: .blockDeletion(deletedBlocks: deletedBlocks, deletionIndex: deletionIndex),
+            selectionBefore: selectionBefore,
+            selectionAfter: selectionAfter
+        ))
+        structuralRedoStack = []
+        textRedoByBlockID = [:]
     }
 }

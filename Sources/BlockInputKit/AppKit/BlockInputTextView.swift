@@ -54,6 +54,11 @@ final class BlockInputTextView: NSTextView {
                blockItem?.requestUnwrapBlock() == true {
                 return true
             }
+            if selectedRange().location == 0,
+               selectedRange().length == 0,
+               blockItem?.requestMergeWithPreviousBlock() == true {
+                return true
+            }
             return blockItem?.requestDeleteEmptyBlock() == true
         case #selector(selectAll(_:)):
             blockItem?.requestSelectAll()

@@ -105,7 +105,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             invalidateLayoutForBlock(at: index)
         }
         syncDocumentStore(.replaceBlock(afterBlock))
-        if !didReplaceCachedBlock {
+        if !didReplaceCachedBlock && isDocumentCacheSynchronized {
             refreshDocumentFromStore()
         }
         publishDocumentChange()
@@ -140,7 +140,6 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestReturn(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        refreshDocumentFromStore()
         guard let block = block(withID: blockID) else {
             return true
         }
@@ -168,8 +167,16 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         return true
     }
 
+    func blockItemDidRequestMergeWithPreviousBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
+        guard item.currentSelectedRange.location == 0,
+              item.currentSelectedRange.length == 0 else {
+            return false
+        }
+        applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+        return mergeBlockIntoPrevious(blockID: blockID) != nil
+    }
+
     func blockItemDidRequestDeleteEmptyBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        refreshDocumentFromStore()
         guard let block = block(withID: blockID) else {
             return false
         }
@@ -184,7 +191,6 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestUnwrapBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        refreshDocumentFromStore()
         guard let currentBlock = block(withID: blockID) else {
             return false
         }

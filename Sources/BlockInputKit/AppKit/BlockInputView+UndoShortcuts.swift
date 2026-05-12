@@ -16,8 +16,8 @@ extension BlockInputView {
 
     @discardableResult
     func undoTextEdit(in blockID: BlockInputBlockID) -> BlockInputUndoResult? {
-        refreshDocumentFromStore()
-        guard let result = undoController?.undoTextEdit(in: &document, blockID: blockID) else {
+        guard let block = block(withID: blockID),
+              let result = undoController?.undoTextEdit(for: block) else {
             return nil
         }
         applyTextUndoResult(result, blockID: blockID)
@@ -26,8 +26,8 @@ extension BlockInputView {
 
     @discardableResult
     func redoTextEdit(in blockID: BlockInputBlockID) -> BlockInputUndoResult? {
-        refreshDocumentFromStore()
-        guard let result = undoController?.redoTextEdit(in: &document, blockID: blockID) else {
+        guard let block = block(withID: blockID),
+              let result = undoController?.redoTextEdit(for: block) else {
             return nil
         }
         applyTextUndoResult(result, blockID: blockID)
@@ -36,23 +36,36 @@ extension BlockInputView {
 
     private func undoForKeyboardShortcut(preferredBlockID: BlockInputBlockID?) -> BlockInputUndoResult? {
         if let preferredBlockID {
-            return undoTextEdit(in: preferredBlockID) ?? undoStructuralEdit()
+            if undoController?.canUndoTextEdit(in: preferredBlockID) == true {
+                return undoTextEdit(in: preferredBlockID)
+            }
+            return undoStructuralEdit()
         }
-        return undoTextEditInActiveBlock() ?? undoStructuralEdit()
+        if let activeBlockID, undoController?.canUndoTextEdit(in: activeBlockID) == true {
+            return undoTextEdit(in: activeBlockID)
+        }
+        return undoStructuralEdit()
     }
 
     private func redoForKeyboardShortcut(preferredBlockID: BlockInputBlockID?) -> BlockInputUndoResult? {
         if let preferredBlockID {
-            return redoTextEdit(in: preferredBlockID) ?? redoStructuralEdit()
+            if undoController?.canRedoTextEdit(in: preferredBlockID) == true {
+                return redoTextEdit(in: preferredBlockID)
+            }
+            return redoStructuralEdit()
         }
-        return redoTextEditInActiveBlock() ?? redoStructuralEdit()
+        if let activeBlockID, undoController?.canRedoTextEdit(in: activeBlockID) == true {
+            return redoTextEdit(in: activeBlockID)
+        }
+        return redoStructuralEdit()
     }
 
     private func applyTextUndoResult(_ result: BlockInputUndoResult, blockID: BlockInputBlockID) {
-        if let block = document.block(withID: blockID) {
-            applyUndoResult(result, storeSyncAction: .replaceBlock(block))
-        } else {
+        guard let replacedBlock = result.replacedBlock,
+              let replacementIndex = index(of: blockID) else {
             applyUndoResult(result)
+            return
         }
+        _ = applyGranularReplacementUndo(replacedBlock, at: replacementIndex, selection: result.selection)
     }
 }

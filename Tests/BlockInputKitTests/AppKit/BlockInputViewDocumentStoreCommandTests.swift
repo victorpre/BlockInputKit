@@ -175,7 +175,35 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
     }
 
     @MainActor
-    func testReturnInInlineBlockPublishesBlockReplacementToStore() {
+    func testReturnAfterHeadingPublishesBlockInsertionToStore() {
+        let blockID = BlockInputBlockID(rawValue: "heading")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .heading(level: 2), text: "Heading")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 7)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [])
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].index, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks[0].kind, .paragraph)
+        XCTAssertEqual(store.document.blocks[0], BlockInputBlock(
+            id: blockID,
+            kind: .heading(level: 2),
+            text: "Heading"
+        ))
+        XCTAssertEqual(store.document.blocks[1], store.insertedBlockBatches[0].blocks[0])
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    @MainActor
+    func testReturnInListBlockPublishesDocumentReplacementToStoreWhenSplittingText() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
             BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "BeforeAfter")
@@ -187,12 +215,14 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
 
         _ = view.insertBlockBelowCurrentBlock()
 
-        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+        XCTAssertEqual(store.replaceDocumentCount, 1)
+        XCTAssertEqual(store.replaceBlockIDs, [])
         XCTAssertEqual(store.insertedBlockBatches.count, 0)
-        XCTAssertEqual(store.document.blocks, [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before\nfter")
-        ])
-        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 7)))
+        XCTAssertEqual(store.document.blocks.count, 2)
+        XCTAssertEqual(store.document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before"))
+        XCTAssertEqual(store.document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(store.document.blocks[1].text, "fter")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
     }
 
     @MainActor
@@ -213,7 +243,8 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
         XCTAssertEqual(store.insertedBlockBatches.count, 0)
         XCTAssertEqual(store.document.blocks.count, 2)
         XCTAssertEqual(store.document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First"))
-        XCTAssertEqual(store.document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(store.document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(store.document.blocks[1].text, "")
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
     }
 
@@ -274,7 +305,7 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
     }
 
     @MainActor
-    func testReturnOnIndentedEmptyInlineListLinePublishesBlockReplacementToStore() {
+    func testReturnOnIndentedTrailingListLinePublishesDocumentReplacementToStore() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
             BlockInputBlock(
@@ -291,13 +322,15 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
 
         _ = view.insertBlockBelowCurrentBlock()
 
-        XCTAssertEqual(store.replaceBlockIDs, [blockID])
-        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [])
+        XCTAssertEqual(store.replaceDocumentCount, 1)
         XCTAssertEqual(store.insertedBlockBatches.count, 0)
-        XCTAssertEqual(store.document.blocks, [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First\n")
-        ])
-        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)))
+        XCTAssertEqual(store.document.blocks.count, 2)
+        XCTAssertEqual(store.document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First"))
+        XCTAssertEqual(store.document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(store.document.blocks[1].indentationLevel, 1)
+        XCTAssertEqual(store.document.blocks[1].text, "")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
     }
 
     @MainActor

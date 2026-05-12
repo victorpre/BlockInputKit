@@ -12,8 +12,15 @@ public struct BlockInputConfiguration {
     public var undoController: BlockInputUndoController?
     /// Host completion source for mentions and slash commands.
     public var completionProvider: (any BlockInputCompletionProvider)?
-    /// Called after the editor mutates the document.
+    /// Called immediately with the granular store mutation applied by the editor.
+    public var onDocumentMutation: ((BlockInputDocumentChange) -> Void)?
+    /// Called with a full document snapshot after editor mutations.
+    ///
+    /// Large store-backed editors defer and coalesce this callback; use
+    /// `onDocumentMutation` for synchronous per-edit updates.
     public var onDocumentChange: ((BlockInputDocument) -> Void)?
+    /// Delay used to coalesce full-document snapshots for large store-backed documents.
+    public var documentChangeSnapshotDelay: TimeInterval
     /// Called after the editor updates cursor, text, or block selection.
     public var onSelectionChange: ((BlockInputSelection?) -> Void)?
     /// Called when the editor gains or loses AppKit focus.
@@ -32,7 +39,9 @@ public struct BlockInputConfiguration {
         dropIndicatorColor: NSColor = .controlAccentColor,
         undoController: BlockInputUndoController? = nil,
         completionProvider: (any BlockInputCompletionProvider)? = nil,
+        onDocumentMutation: ((BlockInputDocumentChange) -> Void)? = nil,
         onDocumentChange: ((BlockInputDocument) -> Void)? = nil,
+        documentChangeSnapshotDelay: TimeInterval = 0.25,
         onSelectionChange: ((BlockInputSelection?) -> Void)? = nil,
         onFocusChange: ((Bool) -> Void)? = nil
     ) {
@@ -41,7 +50,9 @@ public struct BlockInputConfiguration {
         self.dropIndicatorColor = dropIndicatorColor
         self.undoController = undoController
         self.completionProvider = completionProvider
+        self.onDocumentMutation = onDocumentMutation
         self.onDocumentChange = onDocumentChange
+        self.documentChangeSnapshotDelay = documentChangeSnapshotDelay
         self.onSelectionChange = onSelectionChange
         self.onFocusChange = onFocusChange
     }

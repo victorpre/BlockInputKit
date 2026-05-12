@@ -35,17 +35,42 @@ final class BlockInputMarkdownTests: XCTestCase {
         XCTAssertEqual(parsed.blocks.map(\.text), ["First", "Second"])
     }
 
-    func testMarkdownRoundTripsMultilineListBlocks() {
+    func testMarkdownParsesAdjacentListLinesAsSeparateBlocks() {
+        let parsed = BlockInputDocument(markdown: """
+        - One
+          - Two
+        3. Three
+          1. Four
+        """)
+
+        XCTAssertEqual(parsed.blocks.map(\.kind), [
+            .bulletedListItem,
+            .bulletedListItem,
+            .numberedListItem(start: 3),
+            .numberedListItem(start: 1)
+        ])
+        XCTAssertEqual(parsed.blocks.map(\.text), ["One", "Two", "Three", "Four"])
+        XCTAssertEqual(parsed.blocks.map(\.indentationLevel), [0, 1, 0, 1])
+    }
+
+    func testMarkdownExportsAdjacentListBlocksWithoutBlankLines() {
         let document = BlockInputDocument(blocks: [
-            BlockInputBlock(id: "bullet", kind: .bulletedListItem, text: "One\nTwo\n", indentationLevel: 1),
-            BlockInputBlock(id: "number", kind: .numberedListItem(start: 3), text: "Three\nFour\n")
+            BlockInputBlock(id: "bullet-1", kind: .bulletedListItem, text: "One"),
+            BlockInputBlock(id: "bullet-2", kind: .bulletedListItem, text: "Two", indentationLevel: 1),
+            BlockInputBlock(id: "number-1", kind: .numberedListItem(start: 3), text: "Three"),
+            BlockInputBlock(id: "number-2", kind: .numberedListItem(start: 1), text: "Four", indentationLevel: 1),
+            BlockInputBlock(id: "check", kind: .checklistItem(isChecked: false), text: "Todo")
         ])
 
-        let parsed = BlockInputDocument(markdown: document.markdown)
+        let markdown = document.markdown
 
-        XCTAssertEqual(parsed.blocks.map(\.kind), document.blocks.map(\.kind))
-        XCTAssertEqual(parsed.blocks.map(\.text), document.blocks.map(\.text))
-        XCTAssertEqual(parsed.blocks.map(\.indentationLevel), document.blocks.map(\.indentationLevel))
+        XCTAssertEqual(markdown, """
+        - One
+          - Two
+        3. Three
+          1. Four
+        - [ ] Todo
+        """)
     }
 
     func testMarkdownKeepsChecklistItemsSeparate() {
@@ -59,7 +84,7 @@ final class BlockInputMarkdownTests: XCTestCase {
         XCTAssertEqual(parsed.blocks.map(\.text), ["Todo", "Later", "Done"])
     }
 
-    func testMarkdownRoundTripsPerLineListIndentation() {
+    func testMarkdownExportsLegacyPerLineListIndentation() {
         let document = BlockInputDocument(blocks: [
             BlockInputBlock(
                 id: "bullet",
@@ -70,15 +95,11 @@ final class BlockInputMarkdownTests: XCTestCase {
         ])
 
         let markdown = document.markdown
-        let parsed = BlockInputDocument(markdown: markdown)
 
         XCTAssertEqual(markdown, "- One\n  - Two\n    - Three")
-        XCTAssertEqual(parsed.blocks[0].kind, .bulletedListItem)
-        XCTAssertEqual(parsed.blocks[0].text, "One\nTwo\nThree")
-        XCTAssertEqual(parsed.blocks[0].lineIndentationLevels, [0, 1, 2])
     }
 
-    func testMarkdownTreatsCRLFAsSingleLineBreak() {
+    func testMarkdownImportTreatsCRLFAsSeparateListBlocks() {
         let document = BlockInputDocument(blocks: [
             BlockInputBlock(
                 id: "bullet",
@@ -92,11 +113,11 @@ final class BlockInputMarkdownTests: XCTestCase {
         let parsed = BlockInputDocument(markdown: "- One\r\n  - Two")
 
         XCTAssertEqual(markdown, "- One\n  - Two")
-        XCTAssertEqual(parsed.blocks[0].text, "One\nTwo")
-        XCTAssertEqual(parsed.blocks[0].lineIndentationLevels, [0, 1])
+        XCTAssertEqual(parsed.blocks.map(\.text), ["One", "Two"])
+        XCTAssertEqual(parsed.blocks.map(\.indentationLevel), [0, 1])
     }
 
-    func testMarkdownRoundTripsNestedOrderedListIndentationWithPerLevelCounters() {
+    func testMarkdownExportsLegacyNestedOrderedListIndentationWithPerLevelCounters() {
         let document = BlockInputDocument(blocks: [
             BlockInputBlock(
                 id: "number",
@@ -107,15 +128,11 @@ final class BlockInputMarkdownTests: XCTestCase {
         ])
 
         let markdown = document.markdown
-        let parsed = BlockInputDocument(markdown: markdown)
 
         XCTAssertEqual(markdown, "1. One\n  1. Two\n    1. Three\n  2. Four\n2. Five")
-        XCTAssertEqual(parsed.blocks[0].kind, .numberedListItem(start: 1))
-        XCTAssertEqual(parsed.blocks[0].text, "One\nTwo\nThree\nFour\nFive")
-        XCTAssertEqual(parsed.blocks[0].lineIndentationLevels, [0, 1, 2, 1, 0])
     }
 
-    func testMarkdownRoundTripsIndentedOrderedListStartAtBaselineIndentation() {
+    func testMarkdownExportsLegacyIndentedOrderedListStartAtBaselineIndentation() {
         let document = BlockInputDocument(blocks: [
             BlockInputBlock(
                 id: "number",
@@ -126,12 +143,8 @@ final class BlockInputMarkdownTests: XCTestCase {
         ])
 
         let markdown = document.markdown
-        let parsed = BlockInputDocument(markdown: markdown)
 
         XCTAssertEqual(markdown, "  3. One\n    1. Two\n  4. Three")
-        XCTAssertEqual(parsed.blocks[0].kind, .numberedListItem(start: 3))
-        XCTAssertEqual(parsed.blocks[0].text, "One\nTwo\nThree")
-        XCTAssertEqual(parsed.blocks[0].lineIndentationLevels, [1, 2, 1])
     }
 
     func testMarkdownKeepsUnexpectedNumberedListSequenceSeparate() {

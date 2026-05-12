@@ -6,15 +6,28 @@ extension BlockInputView {
         var length: Int
     }
 
+    private struct InlineExit {
+        var afterBlock: BlockInputBlock
+        var insertedBlocks: [BlockInputBlock]
+        var insertionOffset: Int
+    }
+
     /// Applies Return key semantics to the active block.
     @discardableResult
     public func insertBlockBelowCurrentBlock() -> BlockInputSelection? {
-        refreshDocumentFromStore()
         guard let blockID = activeBlockID else {
             return nil
         }
-        let focusedBlock = block(withID: blockID)
         let returnSelection = currentReturnSelection(for: blockID)
+        if let granularSelection = performGranularReturnIfPossible(
+            blockID: blockID,
+            returnSelection: returnSelection
+        ) {
+            return granularSelection
+        }
+
+        refreshDocumentFromStore()
+        let focusedBlock = block(withID: blockID)
         let actionName = returnActionName(for: focusedBlock, selection: returnSelection)
         return performStructuralEdit(
             named: actionName,
@@ -34,6 +47,279 @@ extension BlockInputView {
                 )
             }
         )
+    }
+
+    private func performGranularReturnIfPossible(
+        blockID: BlockInputBlockID,
+        returnSelection: ReturnSelection?
+    ) -> BlockInputSelection? {
+        guard let index = index(of: blockID),
+              let block = block(at: index),
+              cachedBlockMatches(block, at: index) else {
+            return nil
+        }
+        if let replacement = replacementBlockForGranularReturn(from: block, at: index, selection: returnSelection) {
+            return performGranularReturnBlockReplacement(
+                actionName: returnActionName(for: block, selection: returnSelection),
+                beforeBlock: block,
+                afterBlock: replacement,
+                index: index
+            )
+        }
+        if let inlineExit = inlineExitForGranularReturn(from: block, selection: returnSelection) {
+            return performGranularReturnInlineExit(
+                actionName: returnActionName(for: block, selection: returnSelection),
+                beforeBlock: block,
+                inlineExit: inlineExit,
+                replacementIndex: index
+            )
+        }
+        guard let insertedBlock = insertedBlockForGranularReturn(from: block, selection: returnSelection) else {
+            return nil
+        }
+        return performGranularReturnBlockInsertion(
+            actionName: "Insert Block",
+            insertedBlock: insertedBlock,
+            insertionIndex: index + 1
+        )
+    }
+
+    private func cachedBlockMatches(_ block: BlockInputBlock, at index: Int) -> Bool {
+        guard isDocumentCacheSynchronized else {
+            return documentStore != nil
+        }
+        return document.blocks.indices.contains(index) && document.blocks[index] == block
+    }
+
+    private func replacementBlockForGranularReturn(
+        from block: BlockInputBlock,
+        at index: Int,
+        selection: ReturnSelection?
+    ) -> BlockInputBlock? {
+        if block.isEmpty,
+           returnOutdentsListItem(block: block, selection: selection) {
+            var replacement = block
+            let lineIndentation = replacement.indentationLevel(forLine: 0)
+            if replacement.lineIndentationLevels.isEmpty {
+                replacement.indentationLevel = max(0, lineIndentation - 1)
+            } else {
+                replacement.setIndentationLevel(lineIndentation - 1, forLine: 0)
+            }
+            normalizeNumberedListStartIfNeeded(for: &replacement, at: index)
+            return replacement
+        }
+        guard block.isEmpty,
+              block.kind.exitsToParagraphOnEmptyReturn,
+              !returnOutdentsListItem(block: block, selection: selection) else {
+            return nil
+        }
+        return BlockInputBlock(id: block.id, kind: .paragraph)
+    }
+
+    private func inlineExitForGranularReturn(
+        from block: BlockInputBlock,
+        selection: ReturnSelection?
+    ) -> InlineExit? {
+        guard block.kind.acceptsInlineReturn,
+              !block.isEmpty,
+              (selection?.length ?? 0) == 0,
+              let offset = selection?.offset,
+              let removalRange = block.emptyInlineLineRemovalRangeForReturn(utf16Offset: offset) else {
+            return nil
+        }
+        let textStorage = block.text as NSString
+        let prefix = Self.removingOneTrailingLineEnding(textStorage.substring(to: removalRange.location))
+        guard !prefix.isEmpty else {
+            return nil
+        }
+        let suffix = textStorage.substring(from: NSMaxRange(removalRange))
+        var afterBlock = block
+        afterBlock.text = prefix
+        // Exiting an empty inline quote/code line is a composite edit: trim
+        // the current block and insert the plain paragraph that receives focus.
+        var insertedBlocks = [BlockInputBlock()]
+        if !suffix.isEmpty {
+            var continuationBlock = block
+            continuationBlock.id = .unique()
+            continuationBlock.text = suffix
+            insertedBlocks.append(continuationBlock)
+        }
+        return InlineExit(afterBlock: afterBlock, insertedBlocks: insertedBlocks, insertionOffset: 1)
+    }
+
+    private func insertedBlockForGranularReturn(
+        from block: BlockInputBlock,
+        selection: ReturnSelection?
+    ) -> BlockInputBlock? {
+        if block.kind.insertsSiblingListItemOnReturn {
+            guard block.lineIndentationLevels.isEmpty,
+                  block.text.rangeOfCharacter(from: .newlines) == nil,
+                  (selection?.length ?? 0) == 0,
+                  (selection?.offset ?? block.utf16Length) == block.utf16Length else {
+                return nil
+            }
+            return BlockInputBlock(
+                kind: nextListKind(after: block.kind),
+                indentationLevel: block.indentationLevel
+            )
+        }
+        guard !block.kind.acceptsInlineReturn,
+              !(block.isEmpty && block.kind.exitsToParagraphOnEmptyReturn) else {
+            return nil
+        }
+        return BlockInputBlock()
+    }
+
+    private func performGranularReturnBlockReplacement(
+        actionName: String,
+        beforeBlock: BlockInputBlock,
+        afterBlock: BlockInputBlock,
+        index: Int
+    ) -> BlockInputSelection {
+        let beforeSelection = selection
+        let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
+            blockID: afterBlock.id,
+            utf16Offset: 0
+        ))
+        syncDocumentStore(.replaceBlock(afterBlock))
+        _ = replaceCachedBlock(afterBlock, at: index)
+        applySelection(afterSelection, notify: true)
+        undoController?.registerBlockReplacementStructuralEdit(
+            actionName: actionName,
+            beforeBlock: beforeBlock,
+            afterBlock: afterBlock,
+            selectionBefore: beforeSelection,
+            selectionAfter: afterSelection
+        )
+        reloadVisibleBlock(at: index)
+        publishDocumentChange()
+        return afterSelection
+    }
+
+    private func performGranularReturnBlockInsertion(
+        actionName: String,
+        insertedBlock: BlockInputBlock,
+        insertionIndex: Int
+    ) -> BlockInputSelection? {
+        let beforeSelection = selection
+        let insertedBlocks = [insertedBlock]
+        if canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) {
+            guard document.insertBlocks(insertedBlocks, at: insertionIndex) != nil else {
+                return nil
+            }
+        } else {
+            markDocumentCacheUnsynchronized()
+        }
+        let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
+            blockID: insertedBlock.id,
+            utf16Offset: 0
+        ))
+        syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: insertionIndex))
+        applySelection(afterSelection, notify: true)
+        undoController?.registerBlockInsertionStructuralEdit(
+            actionName: actionName,
+            insertedBlocks: insertedBlocks,
+            insertionIndex: insertionIndex,
+            selectionBefore: beforeSelection,
+            selectionAfter: afterSelection
+        )
+        insertVisibleBlock(at: insertionIndex)
+        publishDocumentChange()
+        return afterSelection
+    }
+
+    private func performGranularReturnInlineExit(
+        actionName: String,
+        beforeBlock: BlockInputBlock,
+        inlineExit: InlineExit,
+        replacementIndex: Int
+    ) -> BlockInputSelection? {
+        let afterBlock = inlineExit.afterBlock
+        let insertedBlocks = inlineExit.insertedBlocks
+        let insertionIndex = replacementIndex + inlineExit.insertionOffset
+        guard let insertedBlock = insertedBlocks.first else {
+            return nil
+        }
+        let beforeSelection = selection
+        if canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) {
+            guard replaceCachedBlock(afterBlock, at: replacementIndex),
+                  document.insertBlocks(insertedBlocks, at: insertionIndex) != nil else {
+                return nil
+            }
+        } else {
+            markDocumentCacheUnsynchronized()
+        }
+        let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
+            blockID: insertedBlock.id,
+            utf16Offset: 0
+        ))
+        syncDocumentStore(.replaceBlock(afterBlock))
+        syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: insertionIndex))
+        applySelection(afterSelection, notify: true)
+        undoController?.registerBlockReplacementInsertionStructuralEdit(BlockInputReplaceInsertEdit(
+            actionName: actionName,
+            beforeBlock: beforeBlock,
+            afterBlock: afterBlock,
+            insertedBlocks: insertedBlocks,
+            insertionIndex: insertionIndex,
+            selectionBefore: beforeSelection,
+            selectionAfter: afterSelection
+        ))
+        if shouldDeferGranularCountLayout {
+            reloadVisibleBlock(at: replacementIndex)
+            if insertedBlocks.count == 1 {
+                insertVisibleBlock(at: insertionIndex)
+            } else {
+                reloadDataKeepingFocus()
+            }
+        } else {
+            // The document count has already changed; a reload-item plus insert-item
+            // sequence is invalid for AppKit here, so rebuild the visible layout once.
+            reloadDataKeepingFocus()
+        }
+        publishDocumentChange()
+        return afterSelection
+    }
+
+    private func reloadVisibleBlock(at index: Int) {
+        if let block = block(at: index) {
+            itemHeightCache.invalidate(blockID: block.id)
+        } else {
+            itemHeightCache.invalidate(at: index)
+        }
+        let indexPath = IndexPath(item: index, section: 0)
+        if shouldDeferGranularCountLayout,
+           let block = block(at: index),
+           reconfigureVisibleReplacement(block, at: index) {
+            // Same-row replacements, such as empty quote -> paragraph, should
+            // stay mounted in large documents instead of reloading the row.
+            return
+        }
+        collectionView.reloadItems(at: [indexPath])
+        collectionView.layoutSubtreeIfNeeded()
+        restoreVisibleSelection()
+    }
+
+    private static func removingOneTrailingLineEnding(_ text: String) -> String {
+        if text.hasSuffix("\r\n") {
+            return String(text.dropLast(2))
+        }
+        guard text.last == "\n" || text.last == "\r" else {
+            return text
+        }
+        return String(text.dropLast())
+    }
+
+    func insertVisibleBlock(at index: Int) {
+        itemHeightCache.insertItems(at: index, count: 1)
+        let indexPath = IndexPath(item: index, section: 0)
+        if shouldDeferGranularCountLayout {
+            reconfigureMountedBlocksAfterGranularCountChange(startingAt: index)
+            return
+        }
+        collectionView.insertItems(at: [indexPath])
+        collectionView.layoutSubtreeIfNeeded()
+        restoreMountedSelection()
     }
 
     private func currentReturnSelection(for blockID: BlockInputBlockID) -> ReturnSelection? {
@@ -108,5 +394,70 @@ extension BlockInputView {
             return .replaceDocument
         }
         return .insertBlocks([focusedBlock], insertionIndex: insertedIndex)
+    }
+
+    private func normalizeNumberedListStartIfNeeded(
+        for block: inout BlockInputBlock,
+        at index: Int
+    ) {
+        guard case .numberedListItem = block.kind else {
+            return
+        }
+        let indentationLevel = block.indentationLevel(forLine: 0)
+        if let previousStart = previousNumberedListStart(before: index, indentationLevel: indentationLevel) {
+            block.kind = .numberedListItem(start: previousStart + 1)
+        } else if indentationLevel > 0 {
+            block.kind = .numberedListItem(start: 1)
+        }
+    }
+
+    private func previousNumberedListStart(before index: Int, indentationLevel: Int) -> Int? {
+        guard index > 0 else {
+            return nil
+        }
+        var visitedCount = 0
+        for previousIndex in stride(from: index - 1, through: 0, by: -1) {
+            guard visitedCount < 128 else {
+                return nil
+            }
+            visitedCount += 1
+            guard let previousBlock = block(at: previousIndex),
+                  previousBlock.kind.isReturnListItem else {
+                return nil
+            }
+            let previousIndentationLevel = previousBlock.indentationLevel(forLine: 0)
+            if case let .numberedListItem(start) = previousBlock.kind,
+               previousIndentationLevel == indentationLevel {
+                return start
+            }
+            if previousIndentationLevel < indentationLevel {
+                return nil
+            }
+        }
+        return nil
+    }
+
+    private func nextListKind(after kind: BlockInputBlockKind) -> BlockInputBlockKind {
+        switch kind {
+        case .bulletedListItem:
+            return .bulletedListItem
+        case let .numberedListItem(start):
+            return .numberedListItem(start: start + 1)
+        case .checklistItem:
+            return .checklistItem(isChecked: false)
+        case .paragraph, .heading, .code, .horizontalRule, .quote:
+            return kind
+        }
+    }
+}
+
+private extension BlockInputBlockKind {
+    var isReturnListItem: Bool {
+        switch self {
+        case .bulletedListItem, .numberedListItem, .checklistItem:
+            return true
+        case .paragraph, .heading, .code, .horizontalRule, .quote:
+            return false
+        }
     }
 }

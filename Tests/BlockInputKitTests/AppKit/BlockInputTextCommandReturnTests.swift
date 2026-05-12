@@ -45,21 +45,25 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
 
         textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
 
-        XCTAssertEqual(view.document.blocks.count, 1)
+        XCTAssertEqual(view.document.blocks.count, 2)
         XCTAssertEqual(view.document.blocks[0].kind, .bulletedListItem)
         XCTAssertEqual(view.document.blocks[0].indentationLevel, 1)
-        XCTAssertEqual(view.document.blocks[0].text, "First\n")
-        XCTAssertEqual(textView.string, "First\n")
-        XCTAssertEqual(item.testingMarkerView?.markerLines.map(\.text).joined(separator: "\n"), "◦\n◦")
-        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)))
+        XCTAssertEqual(view.document.blocks[0].text, "First")
+        XCTAssertEqual(view.document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(view.document.blocks[1].indentationLevel, 1)
+        XCTAssertEqual(view.document.blocks[1].text, "")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
 
-        _ = view.undoTextEditInActiveBlock()
+        _ = view.undoStructuralEdit()
 
+        XCTAssertEqual(view.document.blocks.count, 1)
         XCTAssertEqual(view.document.blocks[0].text, "First")
 
-        _ = view.redoTextEditInActiveBlock()
+        _ = view.redoStructuralEdit()
 
-        XCTAssertEqual(view.document.blocks[0].text, "First\n")
+        XCTAssertEqual(view.document.blocks.count, 2)
+        XCTAssertEqual(view.document.blocks[0].text, "First")
+        XCTAssertEqual(view.document.blocks[1].kind, .bulletedListItem)
     }
 
     func testReturnCommandInChecklistCreatesSiblingChecklistBlockThroughDelegatePath() throws {
@@ -108,7 +112,7 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
     }
 
-    func testReturnCommandContinuesCurrentLineIndentationThroughDelegatePath() throws {
+    func testReturnCommandContinuesCurrentIndentationThroughDelegatePath() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let undoController = BlockInputUndoController()
         let view = BlockInputView()
@@ -117,8 +121,8 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
                 BlockInputBlock(
                     id: blockID,
                     kind: .bulletedListItem,
-                    text: "One\nTwo",
-                    lineIndentationLevels: [0, 1]
+                    text: "One",
+                    indentationLevel: 1
                 )
             ]),
             undoController: undoController
@@ -129,33 +133,36 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
             delegate: view
         )
         let textView = try XCTUnwrap(item.testingTextView)
-        textView.setSelectedRange(NSRange(location: 7, length: 0))
+        textView.setSelectedRange(NSRange(location: 3, length: 0))
 
         textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
 
-        XCTAssertEqual(view.document.blocks[0].text, "One\nTwo\n")
-        XCTAssertEqual(view.document.blocks[0].lineIndentationLevels, [0, 1, 1])
+        XCTAssertEqual(view.document.blocks.count, 2)
+        XCTAssertEqual(view.document.blocks[0].text, "One")
+        XCTAssertEqual(view.document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(view.document.blocks[1].indentationLevel, 1)
 
-        _ = view.undoTextEditInActiveBlock()
+        _ = view.undoStructuralEdit()
 
-        XCTAssertEqual(view.document.blocks[0].text, "One\nTwo")
-        XCTAssertEqual(view.document.blocks[0].lineIndentationLevels, [0, 1])
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "One", indentationLevel: 1)
+        ])
 
-        _ = view.redoTextEditInActiveBlock()
+        _ = view.redoStructuralEdit()
 
-        XCTAssertEqual(view.document.blocks[0].text, "One\nTwo\n")
-        XCTAssertEqual(view.document.blocks[0].lineIndentationLevels, [0, 1, 1])
+        XCTAssertEqual(view.document.blocks.count, 2)
+        XCTAssertEqual(view.document.blocks[1].indentationLevel, 1)
     }
 
-    func testReturnCommandReplacingSelectedTextContinuesCurrentLineIndentationThroughDelegatePath() throws {
+    func testReturnCommandReplacingSelectedTextCreatesSiblingListItemThroughDelegatePath() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let view = BlockInputView()
         view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
             BlockInputBlock(
                 id: blockID,
                 kind: .bulletedListItem,
-                text: "One\nTwo",
-                lineIndentationLevels: [0, 1]
+                text: "BeforeMiddleAfter",
+                indentationLevel: 1
             )
         ])))
         let item = BlockInputBlockItem.configuredForTesting(
@@ -164,45 +171,31 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
             delegate: view
         )
         let textView = try XCTUnwrap(item.testingTextView)
-        textView.setSelectedRange(NSRange(location: 4, length: 2))
+        textView.setSelectedRange(NSRange(location: 6, length: 6))
 
         textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
 
-        XCTAssertEqual(view.document.blocks[0].text, "One\n\no")
-        XCTAssertEqual(view.document.blocks[0].lineIndentationLevels, [0, 1, 1])
+        XCTAssertEqual(view.document.blocks.count, 2)
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(
+            id: blockID,
+            kind: .bulletedListItem,
+            text: "Before",
+            indentationLevel: 1
+        ))
+        XCTAssertEqual(view.document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(view.document.blocks[1].text, "After")
+        XCTAssertEqual(view.document.blocks[1].indentationLevel, 1)
     }
 
-    func testReturnCommandReplacingSelectionFromLineBreakPreservesFollowingLineIndentationThroughDelegatePath() throws {
+    func testReturnCommandSplitsNumberedListIntoSiblingNumberedBlockThroughDelegatePath() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let view = BlockInputView()
         view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
             BlockInputBlock(
                 id: blockID,
-                kind: .bulletedListItem,
-                text: "One\nTwo\nThree",
-                lineIndentationLevels: [0, 1, 2]
+                kind: .numberedListItem(start: 4),
+                text: "BeforeAfter"
             )
-        ])))
-        let item = BlockInputBlockItem.configuredForTesting(
-            block: view.document.blocks[0],
-            allowsReordering: true,
-            delegate: view
-        )
-        let textView = try XCTUnwrap(item.testingTextView)
-        textView.setSelectedRange(NSRange(location: 3, length: 5))
-
-        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
-
-        XCTAssertEqual(view.document.blocks[0].text, "One\nThree")
-        XCTAssertEqual(view.document.blocks[0].lineIndentationLevels, [0, 2])
-        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 4)))
-    }
-
-    func testReturnCommandOnEmptyInlineListLineExitsToParagraphThroughDelegatePath() throws {
-        let blockID = BlockInputBlockID(rawValue: "first")
-        let view = BlockInputView()
-        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First\n")
         ])))
         let item = BlockInputBlockItem.configuredForTesting(
             block: view.document.blocks[0],
@@ -215,12 +208,36 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
         textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
 
         XCTAssertEqual(view.document.blocks.count, 2)
-        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First"))
-        XCTAssertEqual(view.document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(
+            id: blockID,
+            kind: .numberedListItem(start: 4),
+            text: "Before"
+        ))
+        XCTAssertEqual(view.document.blocks[1].kind, .numberedListItem(start: 5))
+        XCTAssertEqual(view.document.blocks[1].text, "After")
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
     }
 
-    func testReturnCommandOnIndentedEmptyInlineListLineOutdentsThroughDelegatePath() throws {
+    func testReturnCommandOnEmptyListBlockExitsToParagraphThroughDelegatePath() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem)
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+
+        XCTAssertEqual(view.document.blocks, [BlockInputBlock(id: blockID, kind: .paragraph)])
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    func testReturnCommandOnIndentedEmptyListBlockOutdentsThroughDelegatePath() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let undoController = BlockInputUndoController()
         let view = BlockInputView()
@@ -229,8 +246,7 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
                 BlockInputBlock(
                     id: blockID,
                     kind: .bulletedListItem,
-                    text: "First\n",
-                    lineIndentationLevels: [0, 2]
+                    indentationLevel: 2
                 )
             ]),
             undoController: undoController
@@ -241,7 +257,6 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
             delegate: view
         )
         let textView = try XCTUnwrap(item.testingTextView)
-        textView.setSelectedRange(NSRange(location: 6, length: 0))
 
         textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
 
@@ -249,11 +264,10 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
             BlockInputBlock(
                 id: blockID,
                 kind: .bulletedListItem,
-                text: "First\n",
-                lineIndentationLevels: [0, 1]
+                indentationLevel: 1
             )
         ])
-        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)))
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
 
         _ = view.undoStructuralEdit()
 
@@ -261,8 +275,7 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
             BlockInputBlock(
                 id: blockID,
                 kind: .bulletedListItem,
-                text: "First\n",
-                lineIndentationLevels: [0, 2]
+                indentationLevel: 2
             )
         ])
     }

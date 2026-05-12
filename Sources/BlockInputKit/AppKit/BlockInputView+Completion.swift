@@ -30,9 +30,11 @@ extension BlockInputView {
         in blockID: BlockInputBlockID? = nil,
         replacing replacementRange: NSRange? = nil
     ) -> BlockInputSelection? {
-        refreshDocumentFromStore()
         guard let resolvedBlockID = blockID ?? activeBlockID,
-              let block = block(withID: resolvedBlockID) else {
+              let index = index(of: resolvedBlockID),
+              let block = block(at: index),
+              block.id == resolvedBlockID,
+              block.kind != .horizontalRule else {
             return nil
         }
         let beforeText = block.text
@@ -41,16 +43,24 @@ extension BlockInputView {
             in: block
         )
         let beforeSelection = completionSelectionBefore(in: resolvedBlockID, replacementRange: range)
-        guard let afterSelection = document.replaceText(
-            in: resolvedBlockID,
-            range: range,
-            replacement: suggestion.insertionText
-        ),
-            let updatedBlock = document.block(withID: resolvedBlockID),
-            updatedBlock.text != beforeText else {
+        let textStorage = NSMutableString(string: block.text)
+        textStorage.replaceCharacters(in: range, with: suggestion.insertionText)
+        var updatedBlock = block
+        updatedBlock.text = textStorage as String
+        if let lineIndentationLevels = block.lineIndentationLevelsAfterReplacingText(
+            utf16Offset: range.location,
+            selectedUTF16Length: range.length,
+            updatedText: updatedBlock.text
+        ) {
+            updatedBlock.lineIndentationLevels = lineIndentationLevels
+        }
+        guard updatedBlock.text != beforeText else {
             return nil
         }
-        applySelection(afterSelection, notify: true)
+        let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
+            blockID: resolvedBlockID,
+            utf16Offset: range.location + (suggestion.insertionText as NSString).length
+        ))
         undoController?.registerTextEdit(
             blockID: resolvedBlockID,
             beforeText: beforeText,
@@ -60,9 +70,7 @@ extension BlockInputView {
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         )
-        syncDocumentStore(.replaceBlock(updatedBlock))
-        reloadDataKeepingFocus()
-        publishDocumentChange()
+        _ = applyGranularBlockReplacement(updatedBlock, at: index, selection: afterSelection)
         return afterSelection
     }
 }

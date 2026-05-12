@@ -23,6 +23,7 @@ Read the nearest `AGENTS.md` before editing. Current scopes:
 - First-time setup: `./scripts/setup.sh`.
 - Build: `./scripts/build.sh`.
 - Run the demo app: `./scripts/run-demo.sh`.
+- Run the 100k mutation benchmark: build `BlockInputKitDemo`, then run `.build/xcode/Build/Products/Debug/BlockInputKitDemo --benchmark-100k-mutations [iterations]`.
 - Test: `./scripts/test.sh`, or pass focused identifiers as arguments when supported.
 - Snapshot workflows use `./scripts/snapshots.sh`; verify snapshots before committing UI changes.
 - Lint: `./scripts/lint.sh`.

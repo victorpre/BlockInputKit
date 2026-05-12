@@ -25,14 +25,17 @@ final class BlockInputDocumentReturnTests: XCTestCase {
 
         let selection = document.handleReturn(in: blockID)
 
-        XCTAssertEqual(document.blocks.count, 1)
+        XCTAssertEqual(document.blocks.count, 2)
         XCTAssertEqual(document.blocks[0].kind, .bulletedListItem)
         XCTAssertEqual(document.blocks[0].indentationLevel, 2)
-        XCTAssertEqual(document.blocks[0].text, "Item\n")
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 5)))
+        XCTAssertEqual(document.blocks[0].text, "Item")
+        XCTAssertEqual(document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(document.blocks[1].indentationLevel, 2)
+        XCTAssertEqual(document.blocks[1].text, "")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
     }
 
-    func testReturnInListItemInsertsLineAtCursorOffset() {
+    func testReturnInListItemSplitsTextAtCursorOffset() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         var document = BlockInputDocument(blocks: [
             BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "BeforeAfter")
@@ -40,13 +43,14 @@ final class BlockInputDocumentReturnTests: XCTestCase {
 
         let selection = document.handleReturn(in: blockID, utf16Offset: 6)
 
-        XCTAssertEqual(document.blocks, [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before\nAfter")
-        ])
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 7)))
+        XCTAssertEqual(document.blocks.count, 2)
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before"))
+        XCTAssertEqual(document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(document.blocks[1].text, "After")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
     }
 
-    func testReturnInListItemReplacesSelectedTextWithNewLine() {
+    func testReturnInListItemReplacesSelectedTextWithSiblingItem() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         var document = BlockInputDocument(blocks: [
             BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "BeforeMiddleAfter")
@@ -54,157 +58,37 @@ final class BlockInputDocumentReturnTests: XCTestCase {
 
         let selection = document.handleReturn(in: blockID, utf16Offset: 6, selectedUTF16Length: 6)
 
-        XCTAssertEqual(document.blocks, [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before\nAfter")
-        ])
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 7)))
-    }
-
-    func testReturnReplacingSelectedTextInIndentedListItemContinuesLineIndentation() {
-        let blockID = BlockInputBlockID(rawValue: "bullet")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(
-                id: blockID,
-                kind: .bulletedListItem,
-                text: "One\nTwo",
-                lineIndentationLevels: [0, 1]
-            )
-        ])
-
-        let selection = document.handleReturn(in: blockID, utf16Offset: 4, selectedUTF16Length: 2)
-
-        XCTAssertEqual(document.blocks, [
-            BlockInputBlock(
-                id: blockID,
-                kind: .bulletedListItem,
-                text: "One\n\no",
-                lineIndentationLevels: [0, 1, 1]
-            )
-        ])
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 5)))
-    }
-
-    func testReturnReplacingSelectionFromLineBreakPreservesFollowingLineIndentation() {
-        let blockID = BlockInputBlockID(rawValue: "bullet")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(
-                id: blockID,
-                kind: .bulletedListItem,
-                text: "One\nTwo\nThree",
-                lineIndentationLevels: [0, 1, 2]
-            )
-        ])
-
-        let selection = document.handleReturn(in: blockID, utf16Offset: 3, selectedUTF16Length: 5)
-
-        XCTAssertEqual(document.blocks, [
-            BlockInputBlock(
-                id: blockID,
-                kind: .bulletedListItem,
-                text: "One\nThree",
-                lineIndentationLevels: [0, 2]
-            )
-        ])
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 4)))
-    }
-
-    func testReturnReplacingSelectionFromCarriageReturnPreservesFollowingLineIndentation() {
-        let blockID = BlockInputBlockID(rawValue: "bullet")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(
-                id: blockID,
-                kind: .bulletedListItem,
-                text: "One\rTwo\rThree",
-                lineIndentationLevels: [0, 1, 2]
-            )
-        ])
-
-        let selection = document.handleReturn(in: blockID, utf16Offset: 3, selectedUTF16Length: 5)
-
-        XCTAssertEqual(document.blocks, [
-            BlockInputBlock(
-                id: blockID,
-                kind: .bulletedListItem,
-                text: "One\nThree",
-                lineIndentationLevels: [0, 2]
-            )
-        ])
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 4)))
-    }
-
-    func testReturnReplacingSelectedListTextWithLineEndingKeepsFollowingLineIndentation() {
-        let blockID = BlockInputBlockID(rawValue: "bullet")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(
-                id: blockID,
-                kind: .bulletedListItem,
-                text: "One\nTwo\nThree",
-                lineIndentationLevels: [0, 1, 2]
-            )
-        ])
-
-        let selection = document.handleReturn(in: blockID, utf16Offset: 4, selectedUTF16Length: 4)
-
-        XCTAssertEqual(document.blocks, [
-            BlockInputBlock(
-                id: blockID,
-                kind: .bulletedListItem,
-                text: "One\n\nThree",
-                lineIndentationLevels: [0, 1, 2]
-            )
-        ])
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 5)))
-    }
-
-    func testReturnOnEmptyInlineListLineRemovesLineAndInsertsParagraphBelow() {
-        let blockID = BlockInputBlockID(rawValue: "bullet")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Item\n")
-        ])
-
-        let selection = document.handleReturn(in: blockID, utf16Offset: 5)
-
         XCTAssertEqual(document.blocks.count, 2)
-        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Item"))
-        XCTAssertEqual(document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before"))
+        XCTAssertEqual(document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(document.blocks[1].text, "After")
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
     }
 
-    func testReturnOnIndentedEmptyInlineListLineOutdentsBeforeExitingList() {
+    func testReturnReplacingSelectedTextInIndentedListItemContinuesCurrentIndentation() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         var document = BlockInputDocument(blocks: [
             BlockInputBlock(
                 id: blockID,
                 kind: .bulletedListItem,
-                text: "Item\n",
-                lineIndentationLevels: [0, 2]
+                text: "BeforeMiddleAfter",
+                indentationLevel: 1
             )
         ])
 
-        let firstSelection = document.handleReturn(in: blockID, utf16Offset: 5)
-
-        XCTAssertEqual(document.blocks, [
-            BlockInputBlock(
-                id: blockID,
-                kind: .bulletedListItem,
-                text: "Item\n",
-                lineIndentationLevels: [0, 1]
-            )
-        ])
-        XCTAssertEqual(firstSelection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 5)))
-
-        _ = document.handleReturn(in: blockID, utf16Offset: 5)
-
-        XCTAssertEqual(document.blocks, [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Item\n")
-        ])
-
-        let exitSelection = document.handleReturn(in: blockID, utf16Offset: 5)
+        let selection = document.handleReturn(in: blockID, utf16Offset: 6, selectedUTF16Length: 6)
 
         XCTAssertEqual(document.blocks.count, 2)
-        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Item"))
-        XCTAssertEqual(document.blocks[1].kind, .paragraph)
-        XCTAssertEqual(exitSelection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(
+            id: blockID,
+            kind: .bulletedListItem,
+            text: "Before",
+            indentationLevel: 1
+        ))
+        XCTAssertEqual(document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(document.blocks[1].text, "After")
+        XCTAssertEqual(document.blocks[1].indentationLevel, 1)
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
     }
 
     func testReturnInIndentedEmptyListBlockOutdentsBeforeExitingList() {
@@ -232,61 +116,19 @@ final class BlockInputDocumentReturnTests: XCTestCase {
         XCTAssertEqual(exitSelection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
-    func testReturnOnWhitespaceOnlyInlineListLineRemovesLineAndInsertsParagraphBelow() {
-        let blockID = BlockInputBlockID(rawValue: "bullet")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Item\n   ")
-        ])
-
-        let selection = document.handleReturn(in: blockID, utf16Offset: 8)
-
-        XCTAssertEqual(document.blocks.count, 2)
-        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Item"))
-        XCTAssertEqual(document.blocks[1].kind, .paragraph)
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
-    }
-
-    func testReturnOnMiddleEmptyInlineListLineSplitsAroundInsertedParagraph() {
-        let blockID = BlockInputBlockID(rawValue: "number")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(id: blockID, kind: .numberedListItem(start: 4), text: "First\n\nThird")
-        ])
-
-        let selection = document.handleReturn(in: blockID, utf16Offset: 6)
-
-        XCTAssertEqual(document.blocks.count, 3)
-        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .numberedListItem(start: 4), text: "First"))
-        XCTAssertEqual(document.blocks[1].kind, .paragraph)
-        XCTAssertEqual(document.blocks[2].kind, .numberedListItem(start: 5))
-        XCTAssertEqual(document.blocks[2].text, "Third")
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
-    }
-
-    func testReturnOnEmptyInlineListLinePreservesAdjacentEmptyLines() {
-        let blockID = BlockInputBlockID(rawValue: "bullet")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First\n\n\nFourth")
-        ])
-
-        _ = document.handleReturn(in: blockID, utf16Offset: 6)
-
-        XCTAssertEqual(document.blocks.count, 3)
-        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First"))
-        XCTAssertEqual(document.blocks[2].kind, .bulletedListItem)
-        XCTAssertEqual(document.blocks[2].text, "\nFourth")
-    }
-
-    func testReturnInNumberedListItemAddsLineInsideCurrentBlock() {
+    func testReturnInNumberedListItemInsertsNextNumberedBlock() {
         let blockID = BlockInputBlockID(rawValue: "number")
         var document = BlockInputDocument(blocks: [
             BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3), text: "Item")
         ])
 
-        _ = document.handleReturn(in: blockID)
+        let selection = document.handleReturn(in: blockID)
 
-        XCTAssertEqual(document.blocks, [
-            BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3), text: "Item\n")
-        ])
+        XCTAssertEqual(document.blocks.count, 2)
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3), text: "Item"))
+        XCTAssertEqual(document.blocks[1].kind, .numberedListItem(start: 4))
+        XCTAssertEqual(document.blocks[1].text, "")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
     }
 
     func testReturnInChecklistItemInsertsUncheckedChecklistItemBelow() {

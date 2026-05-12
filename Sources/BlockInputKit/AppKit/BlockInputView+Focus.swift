@@ -153,6 +153,48 @@ extension BlockInputView {
         }
     }
 
+    func restoreMountedSelection() {
+        switch selection {
+        case let .cursor(cursor):
+            guard let item = mountedBlockItem(for: cursor.blockID) else {
+                pendingFocus = cursor
+                return
+            }
+            item.focusText(atUTF16Offset: cursor.utf16Offset)
+            pendingFocus = nil
+        case let .text(textRange):
+            guard let item = mountedBlockItem(for: textRange.blockID) else {
+                return
+            }
+            item.focusText(inUTF16Range: textRange.range)
+        case let .blocks(blockIDs):
+            if !blockIDs.isEmpty, !isBecomingFirstResponder, window?.firstResponder !== self {
+                window?.makeFirstResponder(self)
+            }
+        case nil:
+            break
+        }
+    }
+
+    private func mountedBlockItem(for blockID: BlockInputBlockID) -> BlockInputBlockItem? {
+        guard let index = index(of: blockID),
+              let block = block(at: index) else {
+            return nil
+        }
+        let indexPath = IndexPath(item: index, section: 0)
+        guard let item = collectionView.item(at: indexPath) as? BlockInputBlockItem else {
+            return nil
+        }
+        item.configure(
+            block: block,
+            allowsReordering: allowsBlockReordering,
+            accentColor: dropIndicatorColor,
+            isSelected: isBlockSelected(block.id),
+            delegate: self
+        )
+        return item
+    }
+
     func reloadDataKeepingFocus() {
         focusRestoreGeneration += 1
         itemHeightCache.invalidateAll()

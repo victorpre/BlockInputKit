@@ -57,6 +57,75 @@ final class BlockInputDocumentStoreTests: XCTestCase {
         XCTAssertEqual(store.block(withID: thirdID)?.text, "Third")
     }
 
+    func testMemoryDocumentStoreUpdatesIndexesAfterMiddleInsertion() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let insertedID = BlockInputBlockID(rawValue: "inserted")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second"),
+            BlockInputBlock(id: thirdID, text: "Third")
+        ]))
+
+        store.insertBlocks([BlockInputBlock(id: insertedID, text: "Inserted")], at: 1)
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [firstID, insertedID, secondID, thirdID])
+        XCTAssertEqual(store.index(of: firstID), 0)
+        XCTAssertEqual(store.index(of: insertedID), 1)
+        XCTAssertEqual(store.index(of: secondID), 2)
+        XCTAssertEqual(store.index(of: thirdID), 3)
+        XCTAssertEqual(store.block(withID: secondID)?.text, "Second")
+    }
+
+    func testMemoryDocumentStoreUpdatesIndexesAfterMiddleDeletion() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second"),
+            BlockInputBlock(id: thirdID, text: "Third")
+        ]))
+
+        store.deleteBlocks(withIDs: [secondID])
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [firstID, thirdID])
+        XCTAssertEqual(store.index(of: firstID), 0)
+        XCTAssertEqual(store.index(of: thirdID), 1)
+        XCTAssertNil(store.index(of: secondID))
+        XCTAssertEqual(store.block(withID: thirdID)?.text, "Third")
+    }
+
+    func testMemoryDocumentStoreUpdatesIndexesAfterMoves() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        let fourthID = BlockInputBlockID(rawValue: "fourth")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second"),
+            BlockInputBlock(id: thirdID, text: "Third"),
+            BlockInputBlock(id: fourthID, text: "Fourth")
+        ]))
+
+        store.moveBlock(withID: secondID, to: 3)
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [firstID, thirdID, fourthID, secondID])
+        XCTAssertEqual(store.index(of: firstID), 0)
+        XCTAssertEqual(store.index(of: thirdID), 1)
+        XCTAssertEqual(store.index(of: fourthID), 2)
+        XCTAssertEqual(store.index(of: secondID), 3)
+
+        store.moveBlock(withID: fourthID, to: 0)
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [fourthID, firstID, thirdID, secondID])
+        XCTAssertEqual(store.index(of: fourthID), 0)
+        XCTAssertEqual(store.index(of: firstID), 1)
+        XCTAssertEqual(store.index(of: thirdID), 2)
+        XCTAssertEqual(store.index(of: secondID), 3)
+    }
+
     func testMemoryDocumentStorePreservesFirstIndexWhenIDsAreDuplicated() {
         let sharedID = BlockInputBlockID(rawValue: "shared")
         let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
@@ -66,6 +135,36 @@ final class BlockInputDocumentStoreTests: XCTestCase {
 
         XCTAssertEqual(store.index(of: sharedID), 0)
         XCTAssertEqual(store.block(withID: sharedID)?.text, "First")
+    }
+
+    func testMemoryDocumentStorePreservesFirstIndexWhenInsertedIDsAreDuplicated() {
+        let sharedID = BlockInputBlockID(rawValue: "shared")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: "first", text: "First")
+        ]))
+
+        store.insertBlocks([
+            BlockInputBlock(id: sharedID, text: "Inserted first"),
+            BlockInputBlock(id: sharedID, text: "Inserted second")
+        ], at: 1)
+
+        XCTAssertEqual(store.index(of: sharedID), 1)
+        XCTAssertEqual(store.block(withID: sharedID)?.text, "Inserted first")
+    }
+
+    func testMemoryDocumentStorePreservesFirstIndexWhenMovingDuplicateIDs() {
+        let sharedID = BlockInputBlockID(rawValue: "shared")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: sharedID, text: "First"),
+            BlockInputBlock(id: "middle", text: "Middle"),
+            BlockInputBlock(id: sharedID, text: "Second")
+        ]))
+
+        store.moveBlock(withID: sharedID, to: 2)
+
+        XCTAssertEqual(store.document.blocks.map(\.text), ["Middle", "Second", "First"])
+        XCTAssertEqual(store.index(of: sharedID), 1)
+        XCTAssertEqual(store.block(withID: sharedID)?.text, "Second")
     }
 
     func testDefaultGranularMutationsFallBackToDocumentReplacement() {

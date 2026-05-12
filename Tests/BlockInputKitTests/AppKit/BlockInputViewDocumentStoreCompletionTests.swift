@@ -118,7 +118,7 @@ final class BlockInputStoreCompletionTests: XCTestCase {
     }
 
     @MainActor
-    func testAcceptCompletionSuggestionRefreshesFromStoreBeforeMutating() {
+    func testAcceptCompletionSuggestionUsesCurrentStoreBlockBeforeMutating() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
             BlockInputBlock(id: blockID, text: "Old @al")

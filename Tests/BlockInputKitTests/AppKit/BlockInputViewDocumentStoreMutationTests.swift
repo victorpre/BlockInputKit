@@ -36,7 +36,7 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
     }
 
     @MainActor
-    func testTextUndoRefreshesFromStoreBeforeMutating() {
+    func testTextUndoUsesCurrentStoreBlockBeforeMutating() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
             BlockInputBlock(id: blockID, text: "Original")
@@ -68,7 +68,7 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
     }
 
     @MainActor
-    func testTextRedoRefreshesFromStoreBeforeMutating() {
+    func testTextRedoUsesCurrentStoreBlockBeforeMutating() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
@@ -162,6 +162,65 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
     }
 
     @MainActor
+    func testBlockInsertionStructuralUndoAndRedoPublishGranularStoreMutations() {
+        let blockID = BlockInputBlockID(rawValue: "heading")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .heading(level: 2), text: "Heading")
+        ]))
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(documentStore: store, undoController: undoController))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 7)), notify: false)
+        _ = view.insertBlockBelowCurrentBlock()
+        let insertedBlock = store.document.blocks[1]
+
+        store.resetCounts()
+        _ = view.undoStructuralEdit()
+
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.deletedBlockIDs, [[insertedBlock.id]])
+        XCTAssertEqual(store.document.blocks.map(\.id), [blockID])
+
+        store.resetCounts()
+        _ = view.redoStructuralEdit()
+
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].index, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks, [insertedBlock])
+        XCTAssertEqual(store.document.blocks.map(\.id), [blockID, insertedBlock.id])
+    }
+
+    @MainActor
+    func testFailedGranularUndoFallsBackWithoutDroppingUndoEntry() {
+        let blockID = BlockInputBlockID(rawValue: "heading")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .heading(level: 2), text: "Heading")
+        ]))
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(documentStore: store, undoController: undoController))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 7)), notify: false)
+        _ = view.insertBlockBelowCurrentBlock()
+        let insertedBlock = store.document.blocks[1]
+        store.deleteBlocks(withIDs: [insertedBlock.id])
+        store.resetCounts()
+
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.deletedBlockIDs, [insertedBlock.id])
+        XCTAssertEqual(store.document.blocks.map(\.id), [blockID])
+        store.resetCounts()
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(redo?.insertedBlocks, [insertedBlock])
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks, [insertedBlock])
+        XCTAssertEqual(store.document.blocks.map(\.id), [blockID, insertedBlock.id])
+    }
+
+    @MainActor
     func testChecklistTogglePublishesBlockReplacementToStore() {
         let blockID = BlockInputBlockID(rawValue: "check")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
@@ -227,7 +286,7 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
     }
 
     @MainActor
-    func testHorizontalRuleTypingShortcutPublishesDocumentReplacementToStore() throws {
+    func testHorizontalRuleTypingShortcutPublishesGranularStoreMutations() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
@@ -253,9 +312,11 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
         XCTAssertEqual(store.document.blocks[2].id, secondID)
         XCTAssertEqual(store.document.blocks[0].kind, .horizontalRule)
         XCTAssertEqual(store.document.blocks[1].kind, .paragraph)
-        XCTAssertEqual(store.replaceDocumentCount, 1)
-        XCTAssertEqual(store.replaceBlockIDs, [])
-        XCTAssertEqual(store.insertedBlockBatches.count, 0)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [firstID])
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].index, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks, [store.document.blocks[1]])
     }
 
     @MainActor

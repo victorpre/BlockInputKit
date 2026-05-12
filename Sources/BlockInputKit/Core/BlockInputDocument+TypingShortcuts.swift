@@ -16,6 +16,18 @@ extension BlockInputDocument {
         guard let block = block(withID: blockID) else {
             return nil
         }
+        return typingShortcut(
+            for: block,
+            proposedText: proposedText,
+            proposedUTF16Offset: proposedUTF16Offset
+        )
+    }
+
+    func typingShortcut(
+        for block: BlockInputBlock,
+        proposedText: String,
+        proposedUTF16Offset: Int
+    ) -> TypingShortcut? {
         guard block.kind == .paragraph || block.kind.isHeading || block.kind == .bulletedListItem else {
             return nil
         }
@@ -206,7 +218,7 @@ private enum BlockInputTypingShortcutParser {
     }
 }
 
-private extension BlockInputBlockKind {
+extension BlockInputBlockKind {
     var isHeading: Bool {
         if case .heading = self {
             return true

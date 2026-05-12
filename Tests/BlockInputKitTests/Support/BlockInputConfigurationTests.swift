@@ -36,6 +36,8 @@ final class BlockInputConfigurationTests: XCTestCase {
         let provider = ConfigurationCompletionProvider()
         let undoController = BlockInputUndoController()
         let view = BlockInputView()
+        let onDocumentMutation: (BlockInputDocumentChange) -> Void = { _ in }
+        let onDocumentChange: (BlockInputDocument) -> Void = { _ in }
         let onFocusChange: (Bool) -> Void = { _ in }
 
         view.configure(BlockInputConfiguration(
@@ -43,6 +45,9 @@ final class BlockInputConfigurationTests: XCTestCase {
             dropIndicatorColor: .systemPink,
             undoController: undoController,
             completionProvider: provider,
+            onDocumentMutation: onDocumentMutation,
+            onDocumentChange: onDocumentChange,
+            documentChangeSnapshotDelay: 0.01,
             onFocusChange: onFocusChange
         ))
 
@@ -50,6 +55,9 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(view.dropIndicatorColor, .systemPink)
         XCTAssertTrue(view.undoController === undoController)
         XCTAssertTrue(view.completionProvider === provider)
+        XCTAssertNotNil(view.onDocumentMutation)
+        XCTAssertNotNil(view.onDocumentChange)
+        XCTAssertEqual(view.documentChangeSnapshotDelay, 0.01)
         XCTAssertNotNil(view.onFocusChange)
     }
 }

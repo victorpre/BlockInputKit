@@ -31,6 +31,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     private(set) var blockID: BlockInputBlockID?
     var renderedBlock: BlockInputBlock?
     private var selectionBeforeTextChange: BlockInputSelection?
+    // Programmatic reuse/configuration can move NSTextView selection; do not
+    // report that as user selection, especially on large store-backed docs.
+    private var isConfiguringBlock = false
     var handleWidthConstraint: NSLayoutConstraint?
     var kindLabelLeadingConstraint: NSLayoutConstraint?
     var kindLabelWidthConstraint: NSLayoutConstraint?
@@ -115,6 +118,8 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) {
+        isConfiguringBlock = true
+        defer { isConfiguringBlock = false }
         blockID = block.id
         renderedBlock = block
         self.delegate = delegate
@@ -124,7 +129,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         horizontalRuleView.blockItem = self
         horizontalRuleView.accentColor = accentColor
         textView.blockItem = self
-        textView.string = block.kind == .horizontalRule ? "" : block.text
+        let text = block.kind == .horizontalRule ? "" : block.text
+        if textView.string != text {
+            textView.string = text
+        }
         configureBlockKindChrome(block: block)
         setBlockSelection(isSelected)
         handleView.isEnabled = allowsReordering
@@ -174,6 +182,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     func textDidChange(_ notification: Notification) {
+        guard !isConfiguringBlock else {
+            return
+        }
         guard let blockID else {
             return
         }
@@ -203,6 +214,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
+        guard !isConfiguringBlock else {
+            return
+        }
         guard let blockID else {
             return
         }

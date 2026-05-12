@@ -31,10 +31,10 @@ final class BlockInputViewPerformanceTests: XCTestCase {
         let (blockID, document) = largeDocument(targetText: "Editable")
         let store = DocumentReadCountingStore(document: document)
         let view = BlockInputView()
-        var publishedDocument: BlockInputDocument?
+        var publishedMutations: [BlockInputDocumentChange] = []
         view.configure(BlockInputConfiguration(
             documentStore: store,
-            onDocumentChange: { publishedDocument = $0 }
+            onDocumentMutation: { publishedMutations.append($0) }
         ))
         let item = BlockInputBlockItem.configuredForTesting(
             block: try XCTUnwrap(store.block(withID: blockID)),
@@ -52,7 +52,7 @@ final class BlockInputViewPerformanceTests: XCTestCase {
         XCTAssertEqual(store.documentReadCount, 0)
         XCTAssertEqual(store.replacedBlockIDs, [blockID])
         XCTAssertEqual(store.block(withID: blockID)?.text, "Editable text")
-        XCTAssertEqual(publishedDocument?.block(withID: blockID)?.text, "Editable text")
+        XCTAssertEqual(publishedMutations, [.replaceBlock(try XCTUnwrap(store.block(withID: blockID)))])
     }
 
     func testStoreBackedTypingRefreshesStaleCacheBeforePublishingDocument() throws {
@@ -165,6 +165,56 @@ final class BlockInputViewPerformanceTests: XCTestCase {
         XCTAssertEqual(view.document.block(withID: blockID)?.indentationLevel, 1)
         XCTAssertFalse(layout.didInvalidateDelegateMetrics)
         XCTAssertFalse(layout.didInvalidateEverything)
+    }
+
+    func testStoreBackedReturnAfterHeadingDoesNotReadFullDocumentSnapshot() {
+        let targetIndex = 50_000
+        let blockID = BlockInputBlockID(rawValue: "block-\(targetIndex)")
+        let document = BlockInputDocument(blocks: (0..<100_000).map { index in
+            BlockInputBlock(
+                id: BlockInputBlockID(rawValue: "block-\(index)"),
+                kind: index == targetIndex ? .heading(level: 2) : .paragraph,
+                text: index == targetIndex ? "Heading" : "Block \(index)"
+            )
+        })
+        let store = DocumentReadCountingStore(document: document)
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 7)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.documentReadCount, 0)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].index, targetIndex + 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks.first?.kind, .paragraph)
+    }
+
+    func testStoreBackedReturnAtEndOfListItemDoesNotReadFullDocumentSnapshot() {
+        let targetIndex = 50_000
+        let blockID = BlockInputBlockID(rawValue: "block-\(targetIndex)")
+        let document = BlockInputDocument(blocks: (0..<100_000).map { index in
+            BlockInputBlock(
+                id: BlockInputBlockID(rawValue: "block-\(index)"),
+                kind: index == targetIndex ? .bulletedListItem : .paragraph,
+                text: index == targetIndex ? "List item" : "Block \(index)"
+            )
+        })
+        let store = DocumentReadCountingStore(document: document)
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 9)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.documentReadCount, 0)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].index, targetIndex + 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks.first?.kind, .bulletedListItem)
     }
 
     func testStoreBackedIndentInvalidatesLayoutWhenWrappingHeightChanges() throws {
@@ -302,56 +352,5 @@ private final class TrackingCollectionViewFlowLayout: NSCollectionViewFlowLayout
             didInvalidateDelegateMetrics
             || (context as? NSCollectionViewFlowLayoutInvalidationContext)?.invalidateFlowLayoutDelegateMetrics == true
         super.invalidateLayout(with: context)
-    }
-}
-
-private final class DocumentReadCountingStore: BlockInputDocumentStore {
-    private var storedDocument: BlockInputDocument
-    private(set) var documentReadCount = 0
-    private(set) var replacedBlockIDs: [BlockInputBlockID] = []
-
-    var document: BlockInputDocument {
-        documentReadCount += 1
-        return storedDocument
-    }
-
-    var blockCount: Int {
-        storedDocument.blocks.count
-    }
-
-    init(document: BlockInputDocument) {
-        storedDocument = document
-    }
-
-    func resetCounts() {
-        documentReadCount = 0
-        replacedBlockIDs = []
-    }
-
-    func block(at index: Int) -> BlockInputBlock? {
-        guard storedDocument.blocks.indices.contains(index) else {
-            return nil
-        }
-        return storedDocument.blocks[index]
-    }
-
-    func block(withID id: BlockInputBlockID) -> BlockInputBlock? {
-        storedDocument.block(withID: id)
-    }
-
-    func index(of id: BlockInputBlockID) -> Int? {
-        storedDocument.index(of: id)
-    }
-
-    func replaceDocument(_ document: BlockInputDocument) {
-        storedDocument = document
-    }
-
-    func replaceBlock(_ block: BlockInputBlock) {
-        replacedBlockIDs.append(block.id)
-        guard let index = storedDocument.index(of: block.id) else {
-            return
-        }
-        storedDocument.blocks[index] = block
     }
 }

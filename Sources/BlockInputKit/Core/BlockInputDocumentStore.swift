@@ -42,6 +42,12 @@ public protocol BlockInputDocumentStore: AnyObject {
     func moveBlock(withID id: BlockInputBlockID, to index: Int)
 }
 
+/// Optional store capability for producing full snapshots away from the main actor.
+public protocol BlockInputBackgroundSnapshotStore: BlockInputDocumentStore, Sendable {
+    /// Returns a consistent full-document snapshot from a background thread.
+    func backgroundDocumentSnapshot() -> BlockInputDocument
+}
+
 public extension BlockInputDocumentStore {
     var blockCount: Int {
         document.blocks.count
@@ -106,67 +112,180 @@ public extension BlockInputDocumentStore {
 }
 
 /// In-memory store for simple editors and tests.
-public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore {
+public final class BlockInputMemoryDocumentStore: BlockInputBackgroundSnapshotStore, @unchecked Sendable {
     /// Current document snapshot.
-    public private(set) var document: BlockInputDocument
+    public var document: BlockInputDocument {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedDocument
+    }
+
+    public var blockCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedDocument.blocks.count
+    }
+
+    private var storedDocument: BlockInputDocument
     private var indexesByID: [BlockInputBlockID: Int]
+    private let lock = NSLock()
+    // Inserts and deletes leave suffix indexes stale; rebuild lazily only when
+    // a later lookup asks for one, keeping 100k-demo mutations responsive.
+    private var indexesNeedRebuild = false
 
     public init(document: BlockInputDocument = BlockInputDocument()) {
-        self.document = document
+        storedDocument = document
         indexesByID = Self.indexesByID(for: document)
     }
 
+    public func backgroundDocumentSnapshot() -> BlockInputDocument {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedDocument.detachedStorage()
+    }
+
+    public func block(at index: Int) -> BlockInputBlock? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard storedDocument.blocks.indices.contains(index) else {
+            return nil
+        }
+        return storedDocument.blocks[index]
+    }
+
     public func replaceDocument(_ document: BlockInputDocument) {
-        self.document = document
+        lock.lock()
+        defer { lock.unlock() }
+        storedDocument = document
         rebuildIndexes()
     }
 
     public func block(withID id: BlockInputBlockID) -> BlockInputBlock? {
-        guard let index = indexesByID[id],
-              document.blocks.indices.contains(index),
-              document.blocks[index].id == id else {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let index = unlockedIndex(of: id) else {
             return nil
         }
-        return document.blocks[index]
+        return storedDocument.blocks[index]
     }
 
     public func index(of id: BlockInputBlockID) -> Int? {
+        lock.lock()
+        defer { lock.unlock() }
+        return unlockedIndex(of: id)
+    }
+
+    public func replaceBlock(_ block: BlockInputBlock) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let index = unlockedIndex(of: block.id) else {
+            return
+        }
+        storedDocument.blocks[index] = block
+    }
+
+    public func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard storedDocument.insertBlocks(blocks, at: index) != nil else {
+            return
+        }
+        let insertionIndex = min(max(index, 0), storedDocument.blocks.count - blocks.count)
+        indexesNeedRebuild = true
+        for (offset, block) in blocks.enumerated() {
+            let insertedIndex = insertionIndex + offset
+            if let previousIndex = indexesByID[block.id],
+               previousIndex <= insertedIndex {
+                continue
+            } else {
+                indexesByID[block.id] = insertedIndex
+            }
+        }
+    }
+
+    public func deleteBlocks(withIDs ids: [BlockInputBlockID]) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !ids.isEmpty else {
+            return
+        }
+        if ids.count == 1,
+           let id = ids.first,
+           let index = unlockedIndex(of: id) {
+            storedDocument.blocks.remove(at: index)
+            indexesByID[id] = nil
+            indexesNeedRebuild = true
+            return
+        }
+        let deletedIDs = Set(ids)
+        storedDocument.blocks.removeAll { deletedIDs.contains($0.id) }
+        deletedIDs.forEach { indexesByID[$0] = nil }
+        indexesNeedRebuild = true
+    }
+
+    public func moveBlock(withID id: BlockInputBlockID, to index: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        if indexesNeedRebuild {
+            rebuildIndexes()
+        }
+        guard let sourceIndex = unlockedIndex(of: id) else {
+            return
+        }
+        let finalTargetIndex = min(max(index, 0), storedDocument.blocks.count - 1)
+        guard finalTargetIndex != sourceIndex else {
+            return
+        }
+        guard storedDocument.moveBlock(blockID: id, to: finalTargetIndex) != nil else {
+            return
+        }
+        updateIndexesAfterMove(from: sourceIndex, to: finalTargetIndex)
+    }
+
+    private func unlockedIndex(of id: BlockInputBlockID) -> Int? {
+        if let index = indexesByID[id],
+           storedDocument.blocks.indices.contains(index),
+           storedDocument.blocks[index].id == id {
+            return index
+        }
+        guard indexesNeedRebuild else {
+            return nil
+        }
+        rebuildIndexes()
         guard let index = indexesByID[id],
-              document.blocks.indices.contains(index),
-              document.blocks[index].id == id else {
+              storedDocument.blocks.indices.contains(index),
+              storedDocument.blocks[index].id == id else {
             return nil
         }
         return index
     }
 
-    public func replaceBlock(_ block: BlockInputBlock) {
-        guard let index = index(of: block.id) else {
-            return
+    private func updateIndexesAfterMove(from sourceIndex: Int, to targetIndex: Int) {
+        // Reindex only the shifted run; duplicate IDs still need a full
+        // first-occurrence rebuild to preserve stable lookup semantics.
+        let affectedRange = min(sourceIndex, targetIndex)...max(sourceIndex, targetIndex)
+        var affectedIDs = Set<BlockInputBlockID>()
+        for index in affectedRange {
+            let blockID = storedDocument.blocks[index].id
+            guard affectedIDs.insert(blockID).inserted else {
+                rebuildIndexes()
+                return
+            }
+            if let existingIndex = indexesByID[blockID],
+               !affectedRange.contains(existingIndex) {
+                rebuildIndexes()
+                return
+            }
         }
-        document.blocks[index] = block
-    }
-
-    public func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
-        document.insertBlocks(blocks, at: index)
-        rebuildIndexes()
-    }
-
-    public func deleteBlocks(withIDs ids: [BlockInputBlockID]) {
-        guard !ids.isEmpty else {
-            return
+        for index in affectedRange {
+            indexesByID[storedDocument.blocks[index].id] = index
         }
-        let deletedIDs = Set(ids)
-        document.blocks.removeAll { deletedIDs.contains($0.id) }
-        rebuildIndexes()
-    }
-
-    public func moveBlock(withID id: BlockInputBlockID, to index: Int) {
-        document.moveBlock(blockID: id, to: index)
-        rebuildIndexes()
+        indexesNeedRebuild = false
     }
 
     private func rebuildIndexes() {
-        indexesByID = Self.indexesByID(for: document)
+        indexesByID = Self.indexesByID(for: storedDocument)
+        indexesNeedRebuild = false
     }
 
     private static func indexesByID(for document: BlockInputDocument) -> [BlockInputBlockID: Int] {

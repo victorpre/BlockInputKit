@@ -161,8 +161,8 @@ final class DemoWindowController: NSWindowController {
             allowsBlockReordering: reorderCheckbox.state == .on,
             undoController: undoController,
             completionProvider: completionProvider,
-            onDocumentChange: { [weak self] document in
-                self?.updateStatus(for: document)
+            onDocumentMutation: { [weak self] _ in
+                self?.updateStatusForCurrentStore()
             },
             onSelectionChange: { [weak self] selection in
                 self?.updateSelection(selection)
@@ -180,7 +180,15 @@ final class DemoWindowController: NSWindowController {
     }
 
     private func updateStatus(for document: BlockInputDocument, prefix: String? = nil) {
-        let base = "\(document.blocks.count) blocks"
+        updateStatus(blockCount: document.blocks.count, prefix: prefix)
+    }
+
+    private func updateStatusForCurrentStore(prefix: String? = nil) {
+        updateStatus(blockCount: store.blockCount, prefix: prefix)
+    }
+
+    private func updateStatus(blockCount: Int, prefix: String? = nil) {
+        let base = "\(blockCount) blocks"
         statusLabel.stringValue = [prefix, base].compactMap { $0 }.joined(separator: " - ")
     }
 

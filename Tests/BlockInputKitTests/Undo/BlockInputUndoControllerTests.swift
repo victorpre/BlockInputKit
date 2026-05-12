@@ -90,6 +90,37 @@ final class BlockInputUndoControllerTests: XCTestCase {
         XCTAssertEqual(redo?.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 4)))
     }
 
+    func testStructuralUndoCanInsertBlocksWithoutFullDocumentPayload() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let insertedID = BlockInputBlockID(rawValue: "inserted")
+        let insertedBlock = BlockInputBlock(id: insertedID, text: "")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            insertedBlock
+        ])
+        let undoController = BlockInputUndoController()
+
+        undoController.registerBlockInsertionStructuralEdit(
+            actionName: "Insert Block",
+            insertedBlocks: [insertedBlock],
+            insertionIndex: 1,
+            selectionBefore: .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 5)),
+            selectionAfter: .cursor(BlockInputCursor(blockID: insertedID, utf16Offset: 0))
+        )
+
+        let undo = undoController.undoStructuralEdit(in: &document)
+        XCTAssertEqual(document.blocks.map(\.id), [firstID])
+        XCTAssertEqual(undo?.actionName, "Insert Block")
+        XCTAssertEqual(undo?.deletedBlockIDs, [insertedID])
+        XCTAssertEqual(undo?.selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 5)))
+
+        let redo = undoController.redoStructuralEdit(in: &document)
+        XCTAssertEqual(document.blocks.map(\.id), [firstID, insertedID])
+        XCTAssertEqual(redo?.insertedBlocks, [insertedBlock])
+        XCTAssertEqual(redo?.insertionIndex, 1)
+        XCTAssertEqual(redo?.selection, .cursor(BlockInputCursor(blockID: insertedID, utf16Offset: 0)))
+    }
+
     func testTextEditAfterStructuralUndoClearsStructuralRedo() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let before = BlockInputDocument(blocks: [

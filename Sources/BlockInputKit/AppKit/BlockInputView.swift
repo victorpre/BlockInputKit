@@ -3,7 +3,11 @@ import AppKit
 /// Primary AppKit editor surface for a structured block document.
 @MainActor
 public final class BlockInputView: NSView {
-    /// Current document snapshot rendered by the view.
+    /// Current document snapshot cached by the view.
+    ///
+    /// Store-backed large-document edits may leave this snapshot stale until the
+    /// next full refresh; use `BlockInputDocumentStore` callbacks as the source
+    /// of truth for large documents.
     public internal(set) var document = BlockInputDocument()
     /// Current block, text, or multi-block selection.
     public internal(set) var selection: BlockInputSelection?
@@ -19,9 +23,14 @@ public final class BlockInputView: NSView {
     var documentStore: (any BlockInputDocumentStore)?
     var undoController: BlockInputUndoController?
     var completionProvider: (any BlockInputCompletionProvider)?
+    var onDocumentMutation: ((BlockInputDocumentChange) -> Void)?
     var onDocumentChange: ((BlockInputDocument) -> Void)?
+    var documentChangeSnapshotDelay: TimeInterval = 0.25
     var onSelectionChange: ((BlockInputSelection?) -> Void)?
     var onFocusChange: ((Bool) -> Void)?
+    // Large store-backed granular inserts skip updating this duplicate snapshot
+    // so repeated Return in 100k-block documents stays on the indexed store path.
+    var isDocumentCacheSynchronized = true
     var publishedFocusState = false
     var pendingFocus: BlockInputCursor?
     var lastFocusedBlockID: BlockInputBlockID?
@@ -32,6 +41,8 @@ public final class BlockInputView: NSView {
     var focusRestoreGeneration = 0
     // Avoid re-entering NSWindow first-responder assignment while AppKit is already promoting this view.
     var isBecomingFirstResponder = false
+    var documentSnapshotGeneration = 0
+    var pendingDocumentSnapshotWorkItem: DispatchWorkItem?
 
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -55,13 +66,17 @@ public final class BlockInputView: NSView {
     func configure(_ configuration: BlockInputConfiguration, restoresFocus: Bool) {
         documentStore = configuration.documentStore
         document = configuration.document.detachedStorage()
+        isDocumentCacheSynchronized = true
         allowsBlockReordering = configuration.allowsBlockReordering
         dropIndicatorColor = configuration.dropIndicatorColor
         undoController = configuration.undoController
         completionProvider = configuration.completionProvider
+        onDocumentMutation = configuration.onDocumentMutation
         onDocumentChange = configuration.onDocumentChange
+        documentChangeSnapshotDelay = configuration.documentChangeSnapshotDelay
         onSelectionChange = configuration.onSelectionChange
         onFocusChange = configuration.onFocusChange
+        cancelPendingDocumentSnapshot()
         updateDropIndicatorColor()
         hideDropIndicator()
         clearStaleFocusState()
@@ -168,10 +183,13 @@ public final class BlockInputView: NSView {
     /// Deletes the active block if it is empty, preserving the required focus semantics.
     @discardableResult
     public func deleteCurrentEmptyBlockForBackspaceOrDelete() -> BlockInputSelection? {
-        refreshDocumentFromStore()
         guard let blockID = activeBlockID else {
             return nil
         }
+        if let selection = deleteCurrentEmptyBlockGranularly(blockID: blockID) {
+            return selection
+        }
+        refreshDocumentFromStore()
         return performStructuralEdit(
             named: "Delete Block",
             storeSyncAction: { beforeDocument, afterDocument, _ in
@@ -185,6 +203,49 @@ public final class BlockInputView: NSView {
                 document.deleteEmptyBlockForBackspaceOrDelete(blockID: blockID)
             }
         )
+    }
+
+    private func deleteCurrentEmptyBlockGranularly(blockID: BlockInputBlockID) -> BlockInputSelection? {
+        guard blockCount > 1,
+              let deletionIndex = index(of: blockID),
+              let deletedBlock = block(at: deletionIndex),
+              deletedBlock.isEmpty else {
+            return nil
+        }
+        let beforeSelection = selection
+        let afterSelection: BlockInputSelection?
+        if deletionIndex > 0, let previousBlock = block(at: deletionIndex - 1) {
+            afterSelection = .cursor(BlockInputCursor(
+                blockID: previousBlock.id,
+                utf16Offset: previousBlock.utf16Length
+            ))
+        } else if let nextBlock = block(at: deletionIndex + 1) {
+            afterSelection = .cursor(BlockInputCursor(blockID: nextBlock.id, utf16Offset: 0))
+        } else {
+            afterSelection = nil
+        }
+
+        if canSynchronizeCacheForGranularDeletion(deletedBlockCount: 1) {
+            guard document.blocks.indices.contains(deletionIndex),
+                  document.blocks[deletionIndex].id == blockID else {
+                return nil
+            }
+            document.blocks.remove(at: deletionIndex)
+        } else {
+            markDocumentCacheUnsynchronized()
+        }
+        syncDocumentStore(.deleteBlocks([blockID]))
+        applySelection(afterSelection, notify: true)
+        undoController?.registerBlockDeletionStructuralEdit(
+            actionName: "Delete Block",
+            deletedBlocks: [deletedBlock],
+            deletionIndex: deletionIndex,
+            selectionBefore: beforeSelection,
+            selectionAfter: afterSelection
+        )
+        deleteVisibleBlock(at: deletionIndex, deletedBlockIDs: [blockID])
+        publishDocumentChange()
+        return afterSelection
     }
 
     /// Deletes a selected horizontal rule block after the rule itself has focus-like selection.
@@ -273,7 +334,6 @@ public final class BlockInputView: NSView {
     /// Undoes the most recent text edit in the active block.
     @discardableResult
     public func undoTextEditInActiveBlock() -> BlockInputUndoResult? {
-        refreshDocumentFromStore()
         guard let blockID = activeBlockID else {
             return nil
         }
@@ -283,7 +343,6 @@ public final class BlockInputView: NSView {
     /// Redoes the most recent undone text edit in the active block.
     @discardableResult
     public func redoTextEditInActiveBlock() -> BlockInputUndoResult? {
-        refreshDocumentFromStore()
         guard let blockID = activeBlockID else {
             return nil
         }
@@ -293,6 +352,11 @@ public final class BlockInputView: NSView {
     /// Undoes the most recent structural edit.
     @discardableResult
     public func undoStructuralEdit() -> BlockInputUndoResult? {
+        if let result = undoController?.nextGranularStructuralUndoResult(),
+           applyGranularUndoResult(result) {
+            undoController?.commitGranularStructuralUndo()
+            return result
+        }
         refreshDocumentFromStore()
         guard let result = undoController?.undoStructuralEdit(in: &document) else {
             return nil
@@ -304,6 +368,11 @@ public final class BlockInputView: NSView {
     /// Redoes the most recent undone structural edit.
     @discardableResult
     public func redoStructuralEdit() -> BlockInputUndoResult? {
+        if let result = undoController?.nextGranularStructuralRedoResult(),
+           applyGranularUndoResult(result) {
+            undoController?.commitGranularStructuralRedo()
+            return result
+        }
         refreshDocumentFromStore()
         guard let result = undoController?.redoStructuralEdit(in: &document) else {
             return nil

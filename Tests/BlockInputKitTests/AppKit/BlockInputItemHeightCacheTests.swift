@@ -87,4 +87,114 @@ final class BlockInputItemHeightCacheTests: XCTestCase {
         XCTAssertEqual(secondHeight, 88)
         XCTAssertEqual(measurementCount, 3)
     }
+
+    func testInvalidatesCachedIndexesAtAndAfterInsertion() {
+        let cache = BlockInputItemHeightCache()
+        let blocks = [
+            BlockInputBlock(id: "first", text: "First"),
+            BlockInputBlock(id: "second", text: "Second"),
+            BlockInputBlock(id: "third", text: "Third")
+        ]
+        var measurementCount = 0
+
+        for (index, block) in blocks.enumerated() {
+            _ = cache.height(for: block, at: index, textWidth: 320) {
+                measurementCount += 1
+                return CGFloat(44 + index)
+            }
+        }
+        cache.invalidateFrom(1)
+
+        let firstHeight = cache.height(for: blocks[0], at: 0, textWidth: 320) {
+            measurementCount += 1
+            return 88
+        }
+        let secondHeight = cache.height(for: blocks[1], at: 1, textWidth: 320) {
+            measurementCount += 1
+            return 88
+        }
+        let thirdHeight = cache.height(for: blocks[2], at: 2, textWidth: 320) {
+            measurementCount += 1
+            return 99
+        }
+
+        XCTAssertEqual(firstHeight, 44)
+        XCTAssertEqual(secondHeight, 88)
+        XCTAssertEqual(thirdHeight, 99)
+        XCTAssertEqual(measurementCount, 5)
+    }
+
+    func testInsertItemsShiftsLaterEntries() {
+        let cache = BlockInputItemHeightCache()
+        let firstBlock = BlockInputBlock(id: "first", text: "First")
+        let secondBlock = BlockInputBlock(id: "second", text: "Second")
+        _ = cache.height(for: firstBlock, at: 0, textWidth: 320) { 40 }
+        _ = cache.height(for: secondBlock, at: 1, textWidth: 320) { 50 }
+
+        cache.insertItems(at: 1, count: 1)
+
+        let shiftedHeight = cache.height(for: secondBlock, at: 2, textWidth: 320) {
+            XCTFail("Expected shifted cached height")
+            return 60
+        }
+        XCTAssertEqual(shiftedHeight, 50)
+    }
+
+    func testInvalidateByBlockIDTargetsEntryAfterInsert() {
+        let cache = BlockInputItemHeightCache()
+        let firstBlock = BlockInputBlock(id: "first", text: "First")
+        let secondBlock = BlockInputBlock(id: "second", text: "Second")
+        let thirdBlock = BlockInputBlock(id: "third", text: "Third")
+        _ = cache.height(for: firstBlock, at: 0, textWidth: 320) { 40 }
+        _ = cache.height(for: secondBlock, at: 1, textWidth: 320) { 50 }
+        _ = cache.height(for: thirdBlock, at: 2, textWidth: 320) { 60 }
+
+        cache.insertItems(at: 1, count: 1)
+        cache.invalidate(blockID: thirdBlock.id)
+
+        let shiftedHeight = cache.height(for: thirdBlock, at: 3, textWidth: 320) {
+            70
+        }
+        XCTAssertEqual(shiftedHeight, 70)
+    }
+
+    func testDeleteItemsShiftsLaterEntries() {
+        let cache = BlockInputItemHeightCache()
+        let firstBlock = BlockInputBlock(id: "first", text: "First")
+        let secondBlock = BlockInputBlock(id: "second", text: "Second")
+        let thirdBlock = BlockInputBlock(id: "third", text: "Third")
+        _ = cache.height(for: firstBlock, at: 0, textWidth: 320) { 40 }
+        _ = cache.height(for: secondBlock, at: 1, textWidth: 320) { 50 }
+        _ = cache.height(for: thirdBlock, at: 2, textWidth: 320) { 60 }
+
+        cache.deleteItems(at: 1, count: 1)
+
+        let shiftedHeight = cache.height(for: thirdBlock, at: 1, textWidth: 320) {
+            XCTFail("Expected shifted cached height")
+            return 70
+        }
+        XCTAssertEqual(shiftedHeight, 60)
+    }
+
+    func testDeleteItemsInvalidatesDeletedBlockIDWithoutRemappingShiftedEntries() {
+        let cache = BlockInputItemHeightCache()
+        let firstBlock = BlockInputBlock(id: "first", text: "First")
+        let secondBlock = BlockInputBlock(id: "second", text: "Second")
+        let thirdBlock = BlockInputBlock(id: "third", text: "Third")
+        _ = cache.height(for: firstBlock, at: 0, textWidth: 320) { 40 }
+        _ = cache.height(for: secondBlock, at: 1, textWidth: 320) { 50 }
+        _ = cache.height(for: thirdBlock, at: 2, textWidth: 320) { 60 }
+
+        cache.deleteItems(at: 1, count: 1, deletedBlockIDs: [secondBlock.id])
+
+        let deletedHeight = cache.height(for: secondBlock, at: 1, textWidth: 320) {
+            70
+        }
+        let shiftedHeight = cache.height(for: thirdBlock, at: 1, textWidth: 320) {
+            XCTFail("Expected shifted cached height")
+            return 80
+        }
+        XCTAssertEqual(deletedHeight, 70)
+        XCTAssertEqual(shiftedHeight, 60)
+    }
 }

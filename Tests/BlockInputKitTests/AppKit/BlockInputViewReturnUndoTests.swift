@@ -27,7 +27,7 @@ final class BlockInputViewReturnUndoTests: XCTestCase {
         XCTAssertEqual(view.document.blocks, [BlockInputBlock(id: blockID, kind: .paragraph)])
     }
 
-    func testReturnInInlineBlockUsesInsertLineStructuralUndoAction() {
+    func testReturnInListBlockUsesInsertBlockStructuralUndoAction() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         let undoController = BlockInputUndoController()
         let view = BlockInputView()
@@ -42,17 +42,18 @@ final class BlockInputViewReturnUndoTests: XCTestCase {
         _ = view.insertBlockBelowCurrentBlock()
         let undo = view.undoStructuralEdit()
 
-        XCTAssertEqual(undo?.actionName, "Insert Line")
+        XCTAssertEqual(undo?.actionName, "Insert Block")
         XCTAssertEqual(view.document.blocks, [
             BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "BeforeAfter")
         ])
 
         let redo = view.redoStructuralEdit()
 
-        XCTAssertEqual(redo?.actionName, "Insert Line")
-        XCTAssertEqual(view.document.blocks, [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before\nfter")
-        ])
+        XCTAssertEqual(redo?.actionName, "Insert Block")
+        XCTAssertEqual(view.document.blocks.count, 2)
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before"))
+        XCTAssertEqual(view.document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(view.document.blocks[1].text, "fter")
     }
 
     func testReturnOnEmptyInlineListLineUsesInsertBlockStructuralUndoAction() {
@@ -80,7 +81,8 @@ final class BlockInputViewReturnUndoTests: XCTestCase {
         XCTAssertEqual(redo?.actionName, "Insert Block")
         XCTAssertEqual(view.document.blocks.count, 2)
         XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before"))
-        XCTAssertEqual(view.document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(view.document.blocks[1].text, "")
     }
 
     func testReturnInChecklistItemUsesInsertBlockStructuralUndoAction() {
@@ -117,7 +119,7 @@ final class BlockInputViewReturnUndoTests: XCTestCase {
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
     }
 
-    func testReturnOnIndentedEmptyInlineListLineUsesOutdentStructuralUndoAction() {
+    func testReturnOnIndentedTrailingListLineInsertsIndentedSiblingBlock() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         let undoController = BlockInputUndoController()
         let view = BlockInputView()
@@ -137,7 +139,7 @@ final class BlockInputViewReturnUndoTests: XCTestCase {
         _ = view.insertBlockBelowCurrentBlock()
         let undo = view.undoStructuralEdit()
 
-        XCTAssertEqual(undo?.actionName, "Outdent Block")
+        XCTAssertEqual(undo?.actionName, "Insert Block")
         XCTAssertEqual(view.document.blocks, [
             BlockInputBlock(
                 id: blockID,
@@ -149,10 +151,12 @@ final class BlockInputViewReturnUndoTests: XCTestCase {
 
         let redo = view.redoStructuralEdit()
 
-        XCTAssertEqual(redo?.actionName, "Outdent Block")
-        XCTAssertEqual(view.document.blocks, [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before\n")
-        ])
+        XCTAssertEqual(redo?.actionName, "Insert Block")
+        XCTAssertEqual(view.document.blocks.count, 2)
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before"))
+        XCTAssertEqual(view.document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(view.document.blocks[1].indentationLevel, 1)
+        XCTAssertEqual(view.document.blocks[1].text, "")
     }
 
     func testReturnOnIndentedEmptyChecklistItemUsesOutdentStructuralUndoAction() {
@@ -183,6 +187,73 @@ final class BlockInputViewReturnUndoTests: XCTestCase {
         ])
     }
 
+    func testReturnOnIndentedEmptyNumberedListItemContinuesParentSequence() {
+        let childID = BlockInputBlockID(rawValue: "child")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: "parent", kind: .numberedListItem(start: 1), text: "Parent"),
+            BlockInputBlock(id: childID, kind: .numberedListItem(start: 1), indentationLevel: 1)
+        ])))
+        view.applySelection(.cursor(BlockInputCursor(blockID: childID, utf16Offset: 0)), notify: false)
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(view.document.blocks[1].kind, .numberedListItem(start: 2))
+        XCTAssertEqual(view.document.blocks[1].indentationLevel, 0)
+        XCTAssertEqual(view.document.blocks[1].lineIndentationLevels, [])
+    }
+
+    func testReturnOnPerLineIndentedEmptyNumberedListItemOutdentsLine() {
+        let childID = BlockInputBlockID(rawValue: "child")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "parent", kind: .numberedListItem(start: 1), text: "Parent"),
+                BlockInputBlock(id: childID, kind: .numberedListItem(start: 1), lineIndentationLevels: [1])
+            ]),
+            undoController: undoController
+        ))
+        view.applySelection(.cursor(BlockInputCursor(blockID: childID, utf16Offset: 0)), notify: false)
+
+        _ = view.insertBlockBelowCurrentBlock()
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Outdent Block")
+        XCTAssertEqual(view.document.blocks[1], BlockInputBlock(
+            id: childID,
+            kind: .numberedListItem(start: 1),
+            lineIndentationLevels: [1]
+        ))
+
+        _ = view.redoStructuralEdit()
+
+        XCTAssertEqual(view.document.blocks[1].kind, .numberedListItem(start: 2))
+        XCTAssertEqual(view.document.blocks[1].indentationLevel, 0)
+        XCTAssertEqual(view.document.blocks[1].lineIndentationLevels, [])
+    }
+
+    func testReturnOnPerLineIndentedEmptyNumberedListItemContinuesPerLineSiblingSequence() {
+        let childID = BlockInputBlockID(rawValue: "child")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: "parent", kind: .numberedListItem(start: 1), text: "Parent"),
+            BlockInputBlock(
+                id: "previous-child",
+                kind: .numberedListItem(start: 1),
+                text: "Previous child",
+                lineIndentationLevels: [1]
+            ),
+            BlockInputBlock(id: childID, kind: .numberedListItem(start: 1), lineIndentationLevels: [2])
+        ])))
+        view.applySelection(.cursor(BlockInputCursor(blockID: childID, utf16Offset: 0)), notify: false)
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(view.document.blocks[2].kind, .numberedListItem(start: 2))
+        XCTAssertEqual(view.document.blocks[2].lineIndentationLevels, [1])
+    }
+
     func testReturnOnMiddleEmptyInlineListLineRestoresSplitWithStructuralUndo() {
         let blockID = BlockInputBlockID(rawValue: "number")
         let undoController = BlockInputUndoController()
@@ -206,10 +277,36 @@ final class BlockInputViewReturnUndoTests: XCTestCase {
         let redo = view.redoStructuralEdit()
 
         XCTAssertEqual(redo?.actionName, "Insert Block")
-        XCTAssertEqual(view.document.blocks.count, 3)
+        XCTAssertEqual(view.document.blocks.count, 2)
         XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .numberedListItem(start: 4), text: "First"))
-        XCTAssertEqual(view.document.blocks[1].kind, .paragraph)
-        XCTAssertEqual(view.document.blocks[2].kind, .numberedListItem(start: 5))
-        XCTAssertEqual(view.document.blocks[2].text, "Third")
+        XCTAssertEqual(view.document.blocks[1].kind, .numberedListItem(start: 5))
+        XCTAssertEqual(view.document.blocks[1].text, "\nThird")
+    }
+
+    func testMountedTrailingQuoteLineExitDoesNotOverlapFollowingBlock() throws {
+        let quoteID = BlockInputBlockID(rawValue: "quote")
+        let trailingID = BlockInputBlockID(rawValue: "trailing")
+        let quoteText = "Focus, selection, return, delete, and Cmd+A are coordinated across blocks.\nd\nd\n"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "intro", text: "Each visible block owns its own AppKit text input."),
+            BlockInputBlock(id: quoteID, kind: .quote, text: quoteText),
+            BlockInputBlock(id: trailingID, text: "Try slash query: /code")
+        ])
+        mounted.view.applySelection(.cursor(BlockInputCursor(
+            blockID: quoteID,
+            utf16Offset: (quoteText as NSString).length
+        )), notify: false)
+
+        _ = mounted.view.insertBlockBelowCurrentBlock()
+        mounted.view.layoutSubtreeIfNeeded()
+        mounted.view.collectionView.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(mounted.view.document.blocks.map(\.id), ["intro", quoteID, mounted.view.document.blocks[2].id, trailingID])
+        let quoteItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1))
+        let insertedItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 2))
+        let trailingItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 3))
+
+        XCTAssertLessThanOrEqual(quoteItem.view.frame.maxY, insertedItem.view.frame.minY + 0.5)
+        XCTAssertLessThanOrEqual(insertedItem.view.frame.maxY, trailingItem.view.frame.minY + 0.5)
     }
 }
