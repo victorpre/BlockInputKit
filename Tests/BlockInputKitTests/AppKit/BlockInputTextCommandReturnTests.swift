@@ -50,7 +50,7 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
         XCTAssertEqual(view.document.blocks[0].indentationLevel, 1)
         XCTAssertEqual(view.document.blocks[0].text, "First\n")
         XCTAssertEqual(textView.string, "First\n")
-        XCTAssertEqual(item.testingKindLabel?.stringValue, "◦\n◦")
+        XCTAssertEqual(item.testingMarkerView?.markerLines.map(\.text).joined(separator: "\n"), "◦\n◦")
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)))
 
         _ = view.undoTextEditInActiveBlock()

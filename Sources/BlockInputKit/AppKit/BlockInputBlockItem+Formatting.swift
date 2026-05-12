@@ -157,7 +157,11 @@ extension BlockInputBlockItem {
                 )
             }
         default:
-            return BlockInputLineBreaks.lines(in: prefixes(for: block))
+            let prefixes = prefixes(for: block)
+            guard !prefixes.isEmpty else {
+                return []
+            }
+            return BlockInputLineBreaks.lines(in: prefixes)
                 .enumerated()
                 .map { lineIndex, marker in
                     BlockInputMarkerView.MarkerLine(
@@ -314,39 +318,42 @@ extension BlockInputBlockItem {
         layoutManager.ensureLayout(for: textContainer)
         let textLength = (textView.string as NSString).length
         let lineStarts = BlockInputLineBreaks.lineStartOffsets(in: textView.string)
-        let offsets = lineStarts.prefix(kindLabel.markerLines.count).enumerated().map { lineIndex, lineStart in
-            let lineFragmentY = lineFragmentMinY(
+        let metrics = lineStarts.prefix(kindLabel.markerLines.count).enumerated().map { lineIndex, lineStart in
+            let lineFragment = markerAlignmentRect(
                 lineIndex: lineIndex,
                 lineStart: lineStart,
                 textLength: textLength,
                 layoutManager: layoutManager
             )
-            let textPoint = NSPoint(x: 0, y: textView.textContainerOrigin.y + lineFragmentY)
+            let textPoint = NSPoint(x: 0, y: textView.textContainerOrigin.y + lineFragment.minY)
             let itemPoint = textView.convert(textPoint, to: view)
             let markerPoint = kindLabel.convert(itemPoint, from: view)
-            return max(0, markerPoint.y)
+            return (yOffset: markerPoint.y, height: lineFragment.height)
         }
-        kindLabel.setMarkerLineYOffsets(Array(offsets))
+        kindLabel.setMarkerLineMetrics(
+            yOffsets: metrics.map(\.yOffset),
+            heights: metrics.map(\.height)
+        )
     }
 
-    private func lineFragmentMinY(
+    private func markerAlignmentRect(
         lineIndex: Int,
         lineStart: Int,
         textLength: Int,
         layoutManager: NSLayoutManager
-    ) -> CGFloat {
+    ) -> NSRect {
         guard textLength > 0, lineStart < textLength else {
             let extraLineFragmentRect = layoutManager.extraLineFragmentRect
             guard !extraLineFragmentRect.isEmpty else {
                 let font = Self.font(for: renderedBlock?.kind ?? .paragraph)
-                return CGFloat(lineIndex) * ceil(font.ascender - font.descender + font.leading)
+                let lineHeight = ceil(font.ascender - font.descender + font.leading)
+                return NSRect(x: 0, y: CGFloat(lineIndex) * lineHeight, width: 0, height: lineHeight)
             }
-            return extraLineFragmentRect.minY
+            return extraLineFragmentRect
         }
         let glyphIndex = layoutManager.glyphIndexForCharacter(at: lineStart)
-        return layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil).minY
+        return layoutManager.lineFragmentUsedRect(forGlyphAt: glyphIndex, effectiveRange: nil)
     }
-
 }
 
 private extension BlockInputBlockKind {

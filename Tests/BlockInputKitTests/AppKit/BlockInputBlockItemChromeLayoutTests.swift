@@ -74,7 +74,8 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
         )
         item.view.layoutSubtreeIfNeeded()
 
-        XCTAssertEqual(try XCTUnwrap(item.testingKindLabel).stringValue, "▪")
+        let markerView = try XCTUnwrap(item.testingMarkerView)
+        XCTAssertEqual(markerView.markerLines.map(\.text), ["▪"])
         XCTAssertGreaterThanOrEqual(scrollView.frame.minX - rootMinX, 48)
     }
 

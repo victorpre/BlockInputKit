@@ -2,7 +2,7 @@ import AppKit
 
 final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let reuseIdentifier = NSUserInterfaceItemIdentifier("BlockInputBlockItem")
-    static let chromeFrameAlignmentOffset: CGFloat = -2
+    static let chromeFrameAlignmentOffset: CGFloat = 0
     static let checklistButtonBaseLeading: CGFloat = chromeFrameAlignmentOffset
 
     static let handleWidth: CGFloat = 24
@@ -13,14 +13,14 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let minimumMarkerTextGap: CGFloat = 4
     static let defaultTextLeading: CGFloat = 4
     // Mirrors the NSTextView inset plus line-fragment padding so external chrome starts at the plain-text glyph column.
-    static let textContainerContentLeading: CGFloat = 11
+    static let textContainerContentLeading: CGFloat = 9
     static let markerAlignmentLeading: CGFloat = markerGutterWidth + defaultTextLeading + textContainerContentLeading
     static let listTextLeading: CGFloat = -textContainerContentLeading
     static let quoteBarIdentifier = NSUserInterfaceItemIdentifier("BlockInputQuoteBarView")
     private static let quoteTextLeading: CGFloat = 7
 
     let handleView = BlockInputDragHandleView()
-    let kindLabel = BlockInputMarkerView(labelWithString: "")
+    let kindLabel = BlockInputMarkerView()
     let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     let quoteBarView = NSView()
     let scrollView = NSScrollView()
@@ -326,7 +326,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         scrollViewTopConstraint?.constant = 0
         scrollViewBottomConstraint?.constant = 0
         handleTopConstraint?.constant = verticalMetrics.chromeTopConstant
-        kindLabelTopConstraint?.constant = verticalMetrics.chromeTopConstant
+        kindLabelTopConstraint?.constant = 0
         checklistButtonTopConstraint?.constant = verticalMetrics.checklistButtonTopConstant(
             font: Self.font(for: block.kind),
             checkboxHeight: Self.checklistButtonHeight
@@ -446,7 +446,7 @@ extension BlockInputBlockItem {
         scrollViewTopConstraint?.constant = 0
         scrollViewBottomConstraint?.constant = 0
         handleTopConstraint?.constant = BlockInputBlockItemVerticalMetrics.standard.chromeTopConstant
-        kindLabelTopConstraint?.constant = BlockInputBlockItemVerticalMetrics.standard.chromeTopConstant
+        kindLabelTopConstraint?.constant = 0
         checklistButtonTopConstraint?.constant = BlockInputBlockItemVerticalMetrics.standard.checklistButtonTopConstant(
             font: Self.font(for: .paragraph),
             checkboxHeight: Self.checklistButtonHeight

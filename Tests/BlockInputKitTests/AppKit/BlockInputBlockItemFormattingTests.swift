@@ -44,7 +44,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
 
         let textView = try XCTUnwrap(item.testingTextView)
         let kindLabel = try XCTUnwrap(item.testingKindLabel)
-        XCTAssertEqual(kindLabel.stringValue, "")
+        XCTAssertEqual(kindLabel.markerLines, [])
         XCTAssertEqual(textView.font?.pointSize, BlockInputBlockItem.font(for: .heading(level: 2)).pointSize)
         XCTAssertGreaterThan(
             BlockInputBlockItem.height(for: BlockInputBlock(kind: .heading(level: 1), text: "Title"), textWidth: 240),
@@ -60,7 +60,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
             delegate: BlockInputView()
         )
 
-        XCTAssertEqual(try XCTUnwrap(item.testingKindLabel).stringValue, "")
+        XCTAssertEqual(try XCTUnwrap(item.testingKindLabel).markerLines, [])
         XCTAssertFalse(try XCTUnwrap(item.testingQuoteBarView).isHidden)
 
         item.configure(
@@ -86,7 +86,6 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
         )
 
         let markerView = try XCTUnwrap(item.testingMarkerView)
-        XCTAssertEqual(markerView.stringValue, "\n\n")
         XCTAssertEqual(markerView.markerLines, [
             BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 0),
             BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 2, checkboxState: .unchecked),
@@ -108,7 +107,6 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
         )
 
         let markerView = try XCTUnwrap(item.testingMarkerView)
-        XCTAssertEqual(markerView.stringValue, "\n")
         XCTAssertEqual(markerView.markerLines, [
             BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 0),
             BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 0, checkboxState: .checked)

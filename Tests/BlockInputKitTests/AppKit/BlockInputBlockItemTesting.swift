@@ -41,14 +41,8 @@ extension BlockInputBlockItem {
         }
     }
 
-    var testingKindLabel: NSTextField? {
-        let handleView = testingHandleView
-        return view.firstDescendant(of: NSTextField.self) { textField in
-            guard let handleView else {
-                return true
-            }
-            return textField !== handleView
-        }
+    var testingKindLabel: BlockInputMarkerView? {
+        testingMarkerView
     }
 
     var testingMarkerView: BlockInputMarkerView? {

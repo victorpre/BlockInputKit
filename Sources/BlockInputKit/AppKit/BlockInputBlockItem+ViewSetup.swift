@@ -24,9 +24,7 @@ extension BlockInputBlockItem {
 
     private func setupKindLabel() {
         kindLabel.font = .preferredFont(forTextStyle: .body)
-        kindLabel.alignment = .right
         kindLabel.textColor = .tertiaryLabelColor
-        kindLabel.maximumNumberOfLines = 0
     }
 
     private func setupChecklistButton() {
@@ -99,8 +97,7 @@ extension BlockInputBlockItem {
         )
         self.handleTopConstraint = handleTopConstraint
         let kindLabelTopConstraint = kindLabel.topAnchor.constraint(
-            equalTo: view.topAnchor,
-            constant: BlockInputBlockItemVerticalMetrics.standard.chromeTopConstant
+            equalTo: view.topAnchor
         )
         self.kindLabelTopConstraint = kindLabelTopConstraint
         let checklistButtonTopConstraint = checklistButton.topAnchor.constraint(
@@ -117,6 +114,7 @@ extension BlockInputBlockItem {
             handleWidthConstraint,
             kindLabelLeadingConstraint,
             kindLabelTopConstraint,
+            kindLabel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             kindLabelWidthConstraint,
             checklistButtonLeadingConstraint,
             checklistButtonTopConstraint,

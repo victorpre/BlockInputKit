@@ -1,7 +1,7 @@
 import AppKit
 
 /// Draws per-line block markers aligned to the text view's line fragments.
-final class BlockInputMarkerView: NSTextField {
+final class BlockInputMarkerView: NSView {
     struct MarkerLine: Equatable {
         var text: String
         var indentationLevel: Int
@@ -23,30 +23,70 @@ final class BlockInputMarkerView: NSTextField {
         case checked
     }
 
-    private static let textMarkerVerticalAdjustment: CGFloat = -1
-
     private(set) var markerLines: [MarkerLine] = []
     private(set) var markerLineYOffsets: [CGFloat] = []
+    private(set) var markerLineHeights: [CGFloat] = []
+
+    var font: NSFont? {
+        didSet {
+            invalidateIntrinsicContentSize()
+            needsDisplay = true
+        }
+    }
+    var textColor: NSColor? {
+        didSet {
+            needsDisplay = true
+        }
+    }
 
     override var isFlipped: Bool {
         true
     }
 
+    convenience init() {
+        self.init(frame: .zero)
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setContentHuggingPriority(.defaultLow, for: .horizontal)
+        setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        setAccessibilityElement(false)
+        setAccessibilityRole(.staticText)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     func setMarkerLines(_ markerLines: [MarkerLine]) {
         self.markerLines = markerLines
         markerLineYOffsets = []
-        stringValue = markerLines.map(\.text).joined(separator: "\n")
+        markerLineHeights = []
+        let accessibilityLabel = markerLines
+            .map(\.text)
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        setAccessibilityElement(!accessibilityLabel.isEmpty)
+        setAccessibilityLabel(accessibilityLabel)
+        invalidateIntrinsicContentSize()
+        needsDisplay = true
+    }
+
+    func setMarkerLineMetrics(yOffsets: [CGFloat], heights: [CGFloat]) {
+        markerLineYOffsets = yOffsets
+        markerLineHeights = heights
+        invalidateIntrinsicContentSize()
         needsDisplay = true
     }
 
     func setMarkerLineYOffsets(_ markerLineYOffsets: [CGFloat]) {
-        self.markerLineYOffsets = markerLineYOffsets
-        needsDisplay = true
+        setMarkerLineMetrics(yOffsets: markerLineYOffsets, heights: [])
     }
 
     override func draw(_ dirtyRect: NSRect) {
         guard !markerLines.isEmpty else {
-            super.draw(dirtyRect)
             return
         }
         let resolvedFont = font ?? .preferredFont(forTextStyle: .body)
@@ -57,23 +97,48 @@ final class BlockInputMarkerView: NSTextField {
         let lineHeight = ceil(resolvedFont.ascender - resolvedFont.descender + resolvedFont.leading)
         for (lineIndex, markerLine) in markerLines.enumerated() {
             let lineY = yOffset(forLineAt: lineIndex, lineHeight: lineHeight)
-            if drawChecklistMarker(markerLine, lineY: lineY, lineHeight: lineHeight) {
+            let markerLineHeight = markerLineHeight(forLineAt: lineIndex, defaultLineHeight: lineHeight)
+            if drawChecklistMarker(
+                markerLine,
+                lineY: lineY,
+                lineHeight: markerLineHeight
+            ) {
                 continue
             }
             guard !markerLine.text.isEmpty else {
                 continue
             }
-            if drawUnorderedListMarker(markerLine, lineY: lineY, lineHeight: lineHeight) {
+            if drawUnorderedListMarker(
+                markerLine,
+                lineY: lineY,
+                lineHeight: markerLineHeight,
+                font: resolvedFont
+            ) {
                 continue
             }
             let markerSize = (markerLine.text as NSString).size(withAttributes: attributes)
             let xPosition = Self.markerGlyphXPosition(indentationLevel: markerLine.indentationLevel, markerWidth: markerSize.width)
-            let yPosition = Self.textMarkerYPosition(lineY: lineY, lineHeight: lineHeight, markerHeight: markerSize.height)
+            let yPosition = Self.textMarkerYPosition(
+                lineY: lineY,
+                lineHeight: markerLineHeight,
+                markerHeight: markerSize.height
+            )
             (markerLine.text as NSString).draw(
                 at: NSPoint(x: xPosition, y: yPosition),
                 withAttributes: attributes
             )
         }
+    }
+
+    override var intrinsicContentSize: NSSize {
+        let resolvedFont = font ?? .preferredFont(forTextStyle: .body)
+        let lineHeight = ceil(resolvedFont.ascender - resolvedFont.descender + resolvedFont.leading)
+        let measuredHeight = markerLineYOffsets.enumerated().reduce(CGFloat.zero) { height, indexedOffset in
+            let lineHeight = markerLineHeight(forLineAt: indexedOffset.offset, defaultLineHeight: lineHeight)
+            return max(height, indexedOffset.element + lineHeight)
+        }
+        let fallbackHeight = CGFloat(max(markerLines.count, 1)) * lineHeight
+        return NSSize(width: Self.noIntrinsicMetric, height: max(measuredHeight, fallbackHeight))
     }
 
     private func yOffset(forLineAt lineIndex: Int, lineHeight: CGFloat) -> CGFloat {
@@ -83,12 +148,24 @@ final class BlockInputMarkerView: NSTextField {
         return markerLineYOffsets[lineIndex]
     }
 
-    private func drawUnorderedListMarker(_ markerLine: MarkerLine, lineY: CGFloat, lineHeight: CGFloat) -> Bool {
+    private func markerLineHeight(forLineAt lineIndex: Int, defaultLineHeight: CGFloat) -> CGFloat {
+        guard markerLineHeights.indices.contains(lineIndex) else {
+            return defaultLineHeight
+        }
+        return markerLineHeights[lineIndex] > 0 ? markerLineHeights[lineIndex] : defaultLineHeight
+    }
+
+    private func drawUnorderedListMarker(
+        _ markerLine: MarkerLine,
+        lineY: CGFloat,
+        lineHeight: CGFloat,
+        font: NSFont
+    ) -> Bool {
         guard let markerStyle = UnorderedMarkerStyle(text: markerLine.text) else {
             return false
         }
         let color = textColor ?? NSColor.tertiaryLabelColor
-        let markerSize = markerStyle.size
+        let markerSize = markerStyle.size(forPointSize: font.pointSize)
         let markerFrame = NSRect(
             x: Self.markerGlyphXPosition(indentationLevel: markerLine.indentationLevel, markerWidth: markerSize),
             y: lineY + max(0, (lineHeight - markerSize) / 2),
@@ -113,7 +190,7 @@ final class BlockInputMarkerView: NSTextField {
         guard let checkboxState = markerLine.checkboxState else {
             return false
         }
-        let markerSize: CGFloat = 16
+        let markerSize = Self.scaledMarkerSize(16, forPointSize: (font ?? .preferredFont(forTextStyle: .body)).pointSize)
         let markerFrame = NSRect(
             x: Self.markerGlyphXPosition(indentationLevel: markerLine.indentationLevel, markerWidth: markerSize),
             y: lineY + max(0, (lineHeight - markerSize) / 2),
@@ -144,7 +221,11 @@ final class BlockInputMarkerView: NSTextField {
     }
 
     static func textMarkerYPosition(lineY: CGFloat, lineHeight: CGFloat, markerHeight: CGFloat) -> CGFloat {
-        lineY + max(0, (lineHeight - markerHeight) / 2) + textMarkerVerticalAdjustment
+        lineY + max(0, (lineHeight - markerHeight) / 2)
+    }
+
+    private static func scaledMarkerSize(_ size: CGFloat, forPointSize pointSize: CGFloat) -> CGFloat {
+        size * pointSize / NSFont.systemFontSize
     }
 }
 
@@ -166,14 +247,16 @@ private enum UnorderedMarkerStyle {
         }
     }
 
-    var size: CGFloat {
+    func size(forPointSize pointSize: CGFloat) -> CGFloat {
+        let baseSize: CGFloat
         switch self {
         case .filledCircle:
-            return 7.5
+            baseSize = 7.5
         case .hollowCircle:
-            return 8.5
+            baseSize = 8.5
         case .filledSquare:
-            return 7
+            baseSize = 7
         }
+        return baseSize * pointSize / NSFont.systemFontSize
     }
 }
