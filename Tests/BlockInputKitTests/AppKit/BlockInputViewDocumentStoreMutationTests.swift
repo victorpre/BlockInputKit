@@ -129,6 +129,39 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
     }
 
     @MainActor
+    func testBlockReplacementStructuralUndoAndRedoPublishBlockReplacementToStore() throws {
+        let blockID = BlockInputBlockID(rawValue: "list")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Editable")
+        ]))
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(documentStore: store, undoController: undoController))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: try XCTUnwrap(store.block(withID: blockID)),
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
+
+        store.resetCounts()
+        _ = view.undoStructuralEdit()
+
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+        XCTAssertEqual(store.document.block(withID: blockID)?.indentationLevel, 0)
+
+        store.resetCounts()
+        _ = view.redoStructuralEdit()
+
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+        XCTAssertEqual(store.document.block(withID: blockID)?.indentationLevel, 1)
+    }
+
+    @MainActor
     func testChecklistTogglePublishesBlockReplacementToStore() {
         let blockID = BlockInputBlockID(rawValue: "check")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [

@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 extension BlockInputView {
     enum StoreSyncAction {
@@ -33,8 +33,33 @@ extension BlockInputView {
 
     func refreshDocumentFromStore() {
         if let documentStore {
-            document = documentStore.document
+            document = documentStore.document.detachedStorage()
         }
+    }
+
+    @discardableResult
+    func replaceCachedBlock(_ block: BlockInputBlock, at index: Int) -> Bool {
+        if document.blocks.indices.contains(index),
+           document.blocks[index].id == block.id {
+            document.blocks[index] = block
+            return true
+        }
+
+        refreshDocumentFromStore()
+        guard document.blocks.indices.contains(index),
+              document.blocks[index].id == block.id else {
+            return false
+        }
+        document.blocks[index] = block
+        return true
+    }
+
+    func invalidateLayoutForBlock(at index: Int) {
+        itemHeightCache.invalidate(at: index)
+        // Height changes must reflow every following item; invalidating only
+        // the edited item leaves later collection-view frames stale.
+        collectionView.collectionViewLayout?.invalidateLayout()
+        collectionView.layoutSubtreeIfNeeded()
     }
 
     func performStructuralEdit(
@@ -71,13 +96,17 @@ extension BlockInputView {
         return afterSelection
     }
 
-    func applyUndoResult(_ result: BlockInputUndoResult, storeSyncAction: StoreSyncAction = .replaceDocument) {
-        syncDocumentStore(storeSyncAction)
+    func applyUndoResult(_ result: BlockInputUndoResult, storeSyncAction: StoreSyncAction? = nil) {
+        syncDocumentStore(storeSyncAction ?? defaultStoreSyncAction(for: result))
         let restoredSelection = result.selection.flatMap { selection -> BlockInputSelection? in
             containsValidSelection(selection) ? selection : nil
         }
         applySelection(restoredSelection, notify: true)
         reloadDataKeepingFocus()
         publishDocumentChange()
+    }
+
+    private func defaultStoreSyncAction(for result: BlockInputUndoResult) -> StoreSyncAction {
+        result.replacedBlock.map(StoreSyncAction.replaceBlock) ?? .replaceDocument
     }
 }

@@ -155,6 +155,7 @@ extension BlockInputView {
 
     func reloadDataKeepingFocus() {
         focusRestoreGeneration += 1
+        itemHeightCache.invalidateAll()
         let generation = focusRestoreGeneration
         collectionView.reloadData()
         collectionView.collectionViewLayout?.invalidateLayout()
@@ -174,6 +175,7 @@ extension BlockInputView {
 
     func reloadDataWithoutRestoringFocus() {
         focusRestoreGeneration += 1
+        itemHeightCache.invalidateAll()
         collectionView.reloadData()
         collectionView.collectionViewLayout?.invalidateLayout()
         collectionView.layoutSubtreeIfNeeded()

@@ -3,8 +3,9 @@ import Foundation
 /// Document storage boundary used by the editor and host app.
 ///
 /// The editor reads blocks by index and stable ID so hosts can keep large
-/// documents outside of the view. Hosts can override the granular mutation
-/// methods to avoid full document replacement on common editor operations.
+/// documents outside of the view. Large host stores should keep these indexed
+/// read methods cheap and override the granular mutation methods to avoid full
+/// document replacement on common editor operations.
 public protocol BlockInputDocumentStore: AnyObject {
     /// Current document snapshot.
     var document: BlockInputDocument { get }
@@ -108,17 +109,38 @@ public extension BlockInputDocumentStore {
 public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore {
     /// Current document snapshot.
     public private(set) var document: BlockInputDocument
+    private var indexesByID: [BlockInputBlockID: Int]
 
     public init(document: BlockInputDocument = BlockInputDocument()) {
         self.document = document
+        indexesByID = Self.indexesByID(for: document)
     }
 
     public func replaceDocument(_ document: BlockInputDocument) {
         self.document = document
+        rebuildIndexes()
+    }
+
+    public func block(withID id: BlockInputBlockID) -> BlockInputBlock? {
+        guard let index = indexesByID[id],
+              document.blocks.indices.contains(index),
+              document.blocks[index].id == id else {
+            return nil
+        }
+        return document.blocks[index]
+    }
+
+    public func index(of id: BlockInputBlockID) -> Int? {
+        guard let index = indexesByID[id],
+              document.blocks.indices.contains(index),
+              document.blocks[index].id == id else {
+            return nil
+        }
+        return index
     }
 
     public func replaceBlock(_ block: BlockInputBlock) {
-        guard let index = document.index(of: block.id) else {
+        guard let index = index(of: block.id) else {
             return
         }
         document.blocks[index] = block
@@ -126,6 +148,7 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore {
 
     public func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
         document.insertBlocks(blocks, at: index)
+        rebuildIndexes()
     }
 
     public func deleteBlocks(withIDs ids: [BlockInputBlockID]) {
@@ -134,9 +157,23 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore {
         }
         let deletedIDs = Set(ids)
         document.blocks.removeAll { deletedIDs.contains($0.id) }
+        rebuildIndexes()
     }
 
     public func moveBlock(withID id: BlockInputBlockID, to index: Int) {
         document.moveBlock(blockID: id, to: index)
+        rebuildIndexes()
+    }
+
+    private func rebuildIndexes() {
+        indexesByID = Self.indexesByID(for: document)
+    }
+
+    private static func indexesByID(for document: BlockInputDocument) -> [BlockInputBlockID: Int] {
+        var indexes: [BlockInputBlockID: Int] = [:]
+        for (index, block) in document.blocks.enumerated() where indexes[block.id] == nil {
+            indexes[block.id] = index
+        }
+        return indexes
     }
 }

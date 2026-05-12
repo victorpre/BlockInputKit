@@ -30,6 +30,9 @@ final class BlockInputDocumentStoreTests: XCTestCase {
         ]))
 
         XCTAssertEqual(store.document.blocks.map(\.id), [replacementID])
+        XCTAssertEqual(store.index(of: replacementID), 0)
+        XCTAssertNil(store.index(of: firstID))
+        XCTAssertEqual(store.block(withID: replacementID)?.text, "Replacement")
     }
 
     func testMemoryDocumentStoreAppliesGranularMutations() {
@@ -48,6 +51,21 @@ final class BlockInputDocumentStoreTests: XCTestCase {
 
         XCTAssertEqual(store.document.blocks.map(\.id), [thirdID, firstID])
         XCTAssertEqual(store.document.blocks.map(\.text), ["Third", "Updated"])
+        XCTAssertEqual(store.index(of: thirdID), 0)
+        XCTAssertEqual(store.index(of: firstID), 1)
+        XCTAssertNil(store.index(of: secondID))
+        XCTAssertEqual(store.block(withID: thirdID)?.text, "Third")
+    }
+
+    func testMemoryDocumentStorePreservesFirstIndexWhenIDsAreDuplicated() {
+        let sharedID = BlockInputBlockID(rawValue: "shared")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: sharedID, text: "First"),
+            BlockInputBlock(id: sharedID, text: "Second")
+        ]))
+
+        XCTAssertEqual(store.index(of: sharedID), 0)
+        XCTAssertEqual(store.block(withID: sharedID)?.text, "First")
     }
 
     func testDefaultGranularMutationsFallBackToDocumentReplacement() {

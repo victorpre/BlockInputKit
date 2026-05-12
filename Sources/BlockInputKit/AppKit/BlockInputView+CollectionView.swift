@@ -53,7 +53,13 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
         }
         let chromeWidth = BlockInputBlockItem.horizontalChromeWidth(allowsReordering: allowsBlockReordering)
         let textWidth = max(availableWidth - chromeWidth, 120)
-        let height = BlockInputBlockItem.height(for: block, textWidth: textWidth)
+        let height = itemHeightCache.height(
+            for: block,
+            at: indexPath.item,
+            textWidth: textWidth
+        ) {
+            BlockInputBlockItem.height(for: block, textWidth: textWidth)
+        }
         return NSSize(width: availableWidth, height: height)
     }
 }

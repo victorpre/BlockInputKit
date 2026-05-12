@@ -15,7 +15,7 @@ public final class BlockInputView: NSView {
     private let scrollView = NSScrollView()
     let collectionView = BlockInputCollectionView()
     let dropIndicatorView = NSView()
-    private let layout = NSCollectionViewFlowLayout()
+    private let layout = BlockInputCollectionViewFlowLayout()
     var documentStore: (any BlockInputDocumentStore)?
     var undoController: BlockInputUndoController?
     var completionProvider: (any BlockInputCompletionProvider)?
@@ -27,6 +27,7 @@ public final class BlockInputView: NSView {
     var lastFocusedBlockID: BlockInputBlockID?
     var selectedHorizontalRuleIndex: Int?
     var preferredNavigationX: CGFloat?
+    let itemHeightCache = BlockInputItemHeightCache()
     // Invalidates deferred selection restoration when a later reload should not restore focus.
     var focusRestoreGeneration = 0
     // Avoid re-entering NSWindow first-responder assignment while AppKit is already promoting this view.
@@ -53,7 +54,7 @@ public final class BlockInputView: NSView {
 
     func configure(_ configuration: BlockInputConfiguration, restoresFocus: Bool) {
         documentStore = configuration.documentStore
-        document = configuration.document
+        document = configuration.document.detachedStorage()
         allowsBlockReordering = configuration.allowsBlockReordering
         dropIndicatorColor = configuration.dropIndicatorColor
         undoController = configuration.undoController

@@ -118,7 +118,7 @@ The demo app includes:
 
 ## Performance Expectations
 
-BlockInputKit is designed for large documents. The AppKit surface uses `NSCollectionView` so visible items are reused instead of mounting every block view at once, and `BlockInputDocumentStore` supports indexed block reads for rendering. Common editor edits publish granular store mutations for block replacement, insertion, deletion, and movement; broad structural undo/redo can still publish a full document replacement. The demo includes a 100,000-block loading path to keep large-document behavior visible during development.
+BlockInputKit is designed for large documents. The AppKit surface uses `NSCollectionView` so visible items are reused instead of mounting every block view at once. `BlockInputDocumentStore` supports indexed block reads for rendering; large host stores should make `block(at:)`, `block(withID:)`, and `index(of:)` cheap. Common editor edits publish granular store mutations for block replacement, insertion, deletion, and movement; broad structural undo/redo can still publish a full document replacement. The demo includes a 100,000-block loading path to keep large-document behavior visible during development.
 
 ## Validation
 

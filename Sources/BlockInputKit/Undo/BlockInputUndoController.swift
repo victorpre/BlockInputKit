@@ -4,6 +4,13 @@ import Foundation
 public struct BlockInputUndoResult: Equatable, Sendable {
     public var selection: BlockInputSelection?
     public var actionName: String
+    var replacedBlock: BlockInputBlock?
+
+    init(selection: BlockInputSelection?, actionName: String, replacedBlock: BlockInputBlock? = nil) {
+        self.selection = selection
+        self.actionName = actionName
+        self.replacedBlock = replacedBlock
+    }
 }
 
 /// Coordinates per-block text undo with a separate structural undo stack.
@@ -66,6 +73,27 @@ public final class BlockInputUndoController {
         textRedoByBlockID = [:]
     }
 
+    /// Records a structural edit that replaces one block without snapshotting the full document.
+    func registerBlockReplacementStructuralEdit(
+        actionName: String,
+        beforeBlock: BlockInputBlock,
+        afterBlock: BlockInputBlock,
+        selectionBefore: BlockInputSelection?,
+        selectionAfter: BlockInputSelection?
+    ) {
+        guard beforeBlock != afterBlock else {
+            return
+        }
+        structuralUndoStack.append(BlockInputStructuralUndoEntry(
+            actionName: actionName,
+            payload: .blockReplacement(beforeBlock: beforeBlock, afterBlock: afterBlock),
+            selectionBefore: selectionBefore,
+            selectionAfter: selectionAfter
+        ))
+        structuralRedoStack = []
+        textRedoByBlockID = [:]
+    }
+
     /// Undoes the most recent text edit for a block.
     public func undoTextEdit(
         in document: inout BlockInputDocument,
@@ -110,8 +138,12 @@ public final class BlockInputUndoController {
             return nil
         }
         structuralRedoStack.append(entry)
-        document = entry.beforeDocument
-        return BlockInputUndoResult(selection: entry.selectionBefore, actionName: entry.actionName)
+        entry.payload.applyUndo(to: &document)
+        return BlockInputUndoResult(
+            selection: entry.selectionBefore,
+            actionName: entry.actionName,
+            replacedBlock: entry.payload.replacementBlockForUndo
+        )
     }
 
     /// Redoes the most recent undone structural edit.
@@ -120,8 +152,12 @@ public final class BlockInputUndoController {
             return nil
         }
         structuralUndoStack.append(entry)
-        document = entry.afterDocument
-        return BlockInputUndoResult(selection: entry.selectionAfter, actionName: entry.actionName)
+        entry.payload.applyRedo(to: &document)
+        return BlockInputUndoResult(
+            selection: entry.selectionAfter,
+            actionName: entry.actionName,
+            replacedBlock: entry.payload.replacementBlockForRedo
+        )
     }
 }
 
@@ -137,8 +173,76 @@ private struct BlockInputTextUndoEntry {
 
 private struct BlockInputStructuralUndoEntry {
     let actionName: String
-    let beforeDocument: BlockInputDocument
-    let afterDocument: BlockInputDocument
+    let payload: BlockInputStructuralUndoPayload
     let selectionBefore: BlockInputSelection?
     let selectionAfter: BlockInputSelection?
+
+    init(
+        actionName: String,
+        beforeDocument: BlockInputDocument,
+        afterDocument: BlockInputDocument,
+        selectionBefore: BlockInputSelection?,
+        selectionAfter: BlockInputSelection?
+    ) {
+        self.actionName = actionName
+        payload = .documentReplacement(beforeDocument: beforeDocument, afterDocument: afterDocument)
+        self.selectionBefore = selectionBefore
+        self.selectionAfter = selectionAfter
+    }
+
+    init(
+        actionName: String,
+        payload: BlockInputStructuralUndoPayload,
+        selectionBefore: BlockInputSelection?,
+        selectionAfter: BlockInputSelection?
+    ) {
+        self.actionName = actionName
+        self.payload = payload
+        self.selectionBefore = selectionBefore
+        self.selectionAfter = selectionAfter
+    }
+}
+
+private enum BlockInputStructuralUndoPayload {
+    case documentReplacement(beforeDocument: BlockInputDocument, afterDocument: BlockInputDocument)
+    case blockReplacement(beforeBlock: BlockInputBlock, afterBlock: BlockInputBlock)
+
+    var replacementBlockForUndo: BlockInputBlock? {
+        guard case let .blockReplacement(beforeBlock, _) = self else {
+            return nil
+        }
+        return beforeBlock
+    }
+
+    var replacementBlockForRedo: BlockInputBlock? {
+        guard case let .blockReplacement(_, afterBlock) = self else {
+            return nil
+        }
+        return afterBlock
+    }
+
+    func applyUndo(to document: inout BlockInputDocument) {
+        switch self {
+        case let .documentReplacement(beforeDocument, _):
+            document = beforeDocument
+        case let .blockReplacement(beforeBlock, _):
+            replace(beforeBlock, in: &document)
+        }
+    }
+
+    func applyRedo(to document: inout BlockInputDocument) {
+        switch self {
+        case let .documentReplacement(_, afterDocument):
+            document = afterDocument
+        case let .blockReplacement(_, afterBlock):
+            replace(afterBlock, in: &document)
+        }
+    }
+
+    private func replace(_ block: BlockInputBlock, in document: inout BlockInputDocument) {
+        guard let index = document.index(of: block.id) else {
+            return
+        }
+        document.blocks[index] = block
+    }
 }

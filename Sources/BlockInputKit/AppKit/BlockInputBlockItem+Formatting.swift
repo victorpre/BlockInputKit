@@ -7,16 +7,43 @@ extension BlockInputBlockItem {
             textWidth - measuredContentIndent(for: block),
             120
         )
+        let font = font(for: block.kind)
+        let metrics = verticalMetrics(for: block)
+        if isShortSingleLine(text, likelyFitting: availableTextWidth, font: font) {
+            return max(
+                metrics.minimumHeight,
+                singleLineTextHeight(font: font) + metrics.topContentInset + metrics.bottomContentInset + 2
+            )
+        }
         let boundingRect = (text as NSString).boundingRect(
             with: NSSize(width: availableTextWidth, height: CGFloat.greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: font(for: block.kind)]
+            attributes: [.font: font]
         )
-        let metrics = verticalMetrics(for: block)
         return max(
             metrics.minimumHeight,
             ceil(boundingRect.height) + metrics.topContentInset + metrics.bottomContentInset + 2
         )
+    }
+
+    private static func isShortSingleLine(_ text: String, likelyFitting width: CGFloat, font: NSFont) -> Bool {
+        guard text.rangeOfCharacter(from: .newlines) == nil else {
+            return false
+        }
+        guard text.utf16.count <= 24 else {
+            return false
+        }
+        let conservativeCharacterWidth = max(font.pointSize * 0.75, 1)
+        return CGFloat(text.utf16.count) * conservativeCharacterWidth <= width
+    }
+
+    private static func singleLineTextHeight(font: NSFont) -> CGFloat {
+        let boundingRect = (" " as NSString).boundingRect(
+            with: NSSize(width: 120, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font]
+        )
+        return ceil(boundingRect.height)
     }
 
     static func verticalMetrics(for block: BlockInputBlock) -> BlockInputBlockItemVerticalMetrics {

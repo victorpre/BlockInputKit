@@ -58,6 +58,38 @@ final class BlockInputUndoControllerTests: XCTestCase {
         XCTAssertEqual(redo?.selection, selectionAfter)
     }
 
+    func testStructuralUndoCanReplaceSingleBlock() {
+        let blockID = BlockInputBlockID(rawValue: "list")
+        let beforeBlock = BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Item")
+        var afterBlock = beforeBlock
+        afterBlock.indentationLevel = 1
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: "first", text: "First"),
+            afterBlock,
+            BlockInputBlock(id: "last", text: "Last")
+        ])
+        let undoController = BlockInputUndoController()
+
+        undoController.registerBlockReplacementStructuralEdit(
+            actionName: "Indent Block",
+            beforeBlock: beforeBlock,
+            afterBlock: afterBlock,
+            selectionBefore: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)),
+            selectionAfter: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 4))
+        )
+
+        let undo = undoController.undoStructuralEdit(in: &document)
+        XCTAssertEqual(document.blocks[0].text, "First")
+        XCTAssertEqual(document.blocks[1], beforeBlock)
+        XCTAssertEqual(document.blocks[2].text, "Last")
+        XCTAssertEqual(undo?.actionName, "Indent Block")
+        XCTAssertEqual(undo?.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+
+        let redo = undoController.redoStructuralEdit(in: &document)
+        XCTAssertEqual(document.blocks[1], afterBlock)
+        XCTAssertEqual(redo?.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 4)))
+    }
+
     func testTextEditAfterStructuralUndoClearsStructuralRedo() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let before = BlockInputDocument(blocks: [

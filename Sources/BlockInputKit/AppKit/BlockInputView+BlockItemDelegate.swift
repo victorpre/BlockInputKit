@@ -2,7 +2,6 @@ import AppKit
 
 extension BlockInputView: BlockInputBlockItemDelegate {
     func blockItemDidBeginEditing(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
-        refreshDocumentFromStore()
         guard index(of: blockID) != nil else {
             return
         }
@@ -21,19 +20,20 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         didChangeText text: String,
         selectionBefore capturedSelectionBefore: BlockInputSelection?
     ) {
-        refreshDocumentFromStore()
-        guard let index = index(of: blockID), document.blocks.indices.contains(index) else {
+        guard let index = index(of: blockID),
+              let beforeBlock = block(at: index),
+              beforeBlock.id == blockID else {
             return
         }
-        let beforeBlock = document.blocks[index]
         let beforeText = beforeBlock.text
         guard beforeText != text else {
             return
         }
-        if document.blocks[index].kind == .horizontalRule {
-            configureBlockItem(item, block: document.blocks[index])
+        if beforeBlock.kind == .horizontalRule {
+            configureBlockItem(item, block: beforeBlock)
             return
         }
+        replaceCachedBlock(beforeBlock, at: index)
         let selectedRange = item.currentSelectedRange
         let proposedOffset = selectedRange.location + selectedRange.length
         if let shortcutSelection = applyTypingShortcutIfNeeded(
@@ -72,14 +72,16 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         change: PlainTextChangeContext
     ) {
         let beforeSelection = change.selectionBefore ?? selection
-        document.blocks[index].text = change.afterText
+        var afterBlock = change.beforeBlock
+        afterBlock.text = change.afterText
         if let lineIndentationLevels = lineIndentationLevelsAfterTextChange(
             beforeBlock: change.beforeBlock,
             afterText: change.afterText,
             selectionBefore: change.selectionBefore
         ) {
-            document.blocks[index].lineIndentationLevels = lineIndentationLevels
+            afterBlock.lineIndentationLevels = lineIndentationLevels
         }
+        let didReplaceCachedBlock = replaceCachedBlock(afterBlock, at: index)
         let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
             blockID: change.beforeBlock.id,
             utf16Offset: change.proposedOffset
@@ -90,18 +92,41 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             beforeText: change.beforeBlock.text,
             afterText: change.afterText,
             beforeLineIndentationLevels: change.beforeBlock.lineIndentationLevels,
-            afterLineIndentationLevels: document.blocks[index].lineIndentationLevels,
+            afterLineIndentationLevels: afterBlock.lineIndentationLevels,
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         )
-        item.updateTextDependentChrome(for: document.blocks[index])
-        collectionView.collectionViewLayout?.invalidateLayout()
-        syncDocumentStore(.replaceBlock(document.blocks[index]))
+        item.updateTextDependentChrome(for: afterBlock)
+        if shouldInvalidateLayoutForTextChange(
+            item: item,
+            beforeBlock: change.beforeBlock,
+            afterBlock: afterBlock
+        ) {
+            invalidateLayoutForBlock(at: index)
+        }
+        syncDocumentStore(.replaceBlock(afterBlock))
+        if !didReplaceCachedBlock {
+            refreshDocumentFromStore()
+        }
         publishDocumentChange()
     }
 
+    private func shouldInvalidateLayoutForTextChange(
+        item: BlockInputBlockItem,
+        beforeBlock: BlockInputBlock,
+        afterBlock: BlockInputBlock
+    ) -> Bool {
+        let itemWidth = item.view.bounds.width > 0 ? item.view.bounds.width : collectionView.bounds.width
+        let textWidth = max(
+            itemWidth - BlockInputBlockItem.horizontalChromeWidth(allowsReordering: allowsBlockReordering),
+            120
+        )
+        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: textWidth)
+        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: textWidth)
+        return abs(beforeHeight - afterHeight) > 0.5
+    }
+
     func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID) {
-        refreshDocumentFromStore()
         guard let block = block(withID: blockID),
               block.kind != .horizontalRule else {
             return
@@ -246,14 +271,12 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         blockID: BlockInputBlockID,
         selectedRange: NSRange
     ) {
-        _ = performStructuralEdit(
+        _ = performBlockIndentationEdit(
             named: "Indent Block",
-            storeSyncAction: { _, afterDocument, _ in
-                afterDocument.block(withID: blockID).map(StoreSyncAction.replaceBlock) ?? .replaceDocument
-            },
-            edit: { document in
-                document.indentBlock(blockID: blockID, activeUTF16Offset: selectedRange.location)
-            }
+            item: item,
+            blockID: blockID,
+            selectedRange: selectedRange,
+            direction: .indent
         )
     }
 
@@ -262,14 +285,12 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         blockID: BlockInputBlockID,
         selectedRange: NSRange
     ) {
-        _ = performStructuralEdit(
+        _ = performBlockIndentationEdit(
             named: "Outdent Block",
-            storeSyncAction: { _, afterDocument, _ in
-                afterDocument.block(withID: blockID).map(StoreSyncAction.replaceBlock) ?? .replaceDocument
-            },
-            edit: { document in
-                document.outdentBlock(blockID: blockID, activeUTF16Offset: selectedRange.location)
-            }
+            item: item,
+            blockID: blockID,
+            selectedRange: selectedRange,
+            direction: .outdent
         )
     }
 
@@ -367,6 +388,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             delegate: self
         )
     }
+
 }
 
 private struct PlainTextChangeContext {
