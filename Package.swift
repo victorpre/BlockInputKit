@@ -46,7 +46,9 @@ let package = Package(
             ],
             exclude: [
                 "AGENTS.md",
-                "CLAUDE.md"
+                "CLAUDE.md",
+                "AppKit/Snapshots/AGENTS.md",
+                "AppKit/Snapshots/CLAUDE.md"
             ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")

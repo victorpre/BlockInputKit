@@ -128,6 +128,23 @@ BlockInputKit is designed for large documents. The AppKit surface uses `NSCollec
 ./scripts/lint.sh
 ```
 
+## Snapshot Tests
+
+Verify the representative AppKit snapshot suite:
+
+```sh
+./scripts/snapshots.sh verify
+```
+
+Verify or record a focused snapshot test:
+
+```sh
+./scripts/snapshots.sh verify BlockInputKitTests/BlockInputViewSnapshotTests
+./scripts/snapshots.sh record BlockInputKitTests/BlockInputViewSnapshotTests
+```
+
+When no test identifier is provided, `./scripts/snapshots.sh` defaults to `BlockInputKitTests/BlockInputViewSnapshotTests`.
+
 ## License
 
 BlockInputKit is licensed under the [GNU Lesser General Public License v3.0](LICENSE.txt).

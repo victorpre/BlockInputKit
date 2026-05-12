@@ -16,6 +16,7 @@ Read the nearest `AGENTS.md` before editing. Current scopes:
 - `.agents/AGENTS.md`: repo-local agent skills.
 - `Sources/BlockInputKit/AppKit/AGENTS.md`: AppKit editor surface, item reuse, focus/selection, and store sync.
 - `Tests/BlockInputKitTests/AGENTS.md`: test organization and coverage expectations.
+- `Tests/BlockInputKitTests/AppKit/Snapshots/AGENTS.md`: AppKit snapshot matrix and baseline expectations.
 
 ## Build And Test
 
@@ -23,13 +24,14 @@ Read the nearest `AGENTS.md` before editing. Current scopes:
 - Build: `./scripts/build.sh`.
 - Run the demo app: `./scripts/run-demo.sh`.
 - Test: `./scripts/test.sh`, or pass focused identifiers as arguments when supported.
+- Snapshot workflows use `./scripts/snapshots.sh`; verify snapshots before committing UI changes.
 - Lint: `./scripts/lint.sh`.
-- Ordered workflows must stay serial, never via `multi_tool_use.parallel`: build-then-run, build-then-test, lint-then-commit.
+- Ordered workflows must stay serial, never via `multi_tool_use.parallel`: build-then-run, build-then-test, record-then-verify, lint-then-commit.
 - Add temporary logs early when useful; observe them yourself, then remove them after confirming the fix.
 
 ### `xcsift` Output
 
-- Build/test wrappers should pipe `xcodebuild` through `xcsift -f toon -w` when installed; treat TOON `status` and `summary` as the concise result. `status` is generally `success` or `failed`.
+- Build/test/snapshot wrappers should pipe `xcodebuild` through `xcsift -f toon -w` when installed; treat TOON `status` and `summary` as the concise result. `status` is generally `success` or `failed`.
 - `summary:` contains indented count fields such as `errors`, `warnings`, `failed_tests`, and `linker_errors`; it can also include `passed_tests`, `build_time`, `test_time`, and `coverage_percent`.
 - Inspect TOON sections such as `errors[n]{file,line,message}`, `warnings[n]{file,line,message,type}`, `failed_tests`, `linker_errors`, `slow_tests`, `flaky_tests`, `build_info`, and `executables` when present.
 - In `errors[n]{file,line,message}` rows, values are ordered as file path, line number, and quoted message.
