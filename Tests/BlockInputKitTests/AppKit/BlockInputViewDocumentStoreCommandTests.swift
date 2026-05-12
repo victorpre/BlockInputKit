@@ -218,6 +218,62 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
     }
 
     @MainActor
+    func testReturnAtEndOfChecklistItemPublishesBlockInsertionToStore() {
+        let blockID = BlockInputBlockID(rawValue: "checklist")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "First")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 5)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [])
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].index, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks[0].kind, .checklistItem(isChecked: false))
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks[0].text, "")
+        XCTAssertEqual(store.document.blocks[0], BlockInputBlock(
+            id: blockID,
+            kind: .checklistItem(isChecked: true),
+            text: "First"
+        ))
+        XCTAssertEqual(store.document.blocks[1], store.insertedBlockBatches[0].blocks[0])
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    @MainActor
+    func testReturnInMiddleOfChecklistItemPublishesDocumentReplacementToStore() {
+        let blockID = BlockInputBlockID(rawValue: "checklist")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "BeforeAfter")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.replaceDocumentCount, 1)
+        XCTAssertEqual(store.replaceBlockIDs, [])
+        XCTAssertEqual(store.insertedBlockBatches.count, 0)
+        XCTAssertEqual(store.document.blocks.count, 2)
+        XCTAssertEqual(store.document.blocks[0], BlockInputBlock(
+            id: blockID,
+            kind: .checklistItem(isChecked: true),
+            text: "Before"
+        ))
+        XCTAssertEqual(store.document.blocks[1].kind, .checklistItem(isChecked: false))
+        XCTAssertEqual(store.document.blocks[1].text, "After")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    @MainActor
     func testReturnOnIndentedEmptyInlineListLinePublishesBlockReplacementToStore() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [

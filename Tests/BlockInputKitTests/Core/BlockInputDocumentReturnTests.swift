@@ -289,17 +289,85 @@ final class BlockInputDocumentReturnTests: XCTestCase {
         ])
     }
 
-    func testReturnInChecklistItemAddsLineInsideCurrentBlock() {
+    func testReturnInChecklistItemInsertsUncheckedChecklistItemBelow() {
         let blockID = BlockInputBlockID(rawValue: "check")
         var document = BlockInputDocument(blocks: [
             BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "Done", indentationLevel: 1)
         ])
 
+        let selection = document.handleReturn(in: blockID)
+
+        XCTAssertEqual(document.blocks.count, 2)
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "Done", indentationLevel: 1))
+        XCTAssertEqual(document.blocks[1].kind, .checklistItem(isChecked: false))
+        XCTAssertEqual(document.blocks[1].text, "")
+        XCTAssertEqual(document.blocks[1].indentationLevel, 1)
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    func testReturnInChecklistItemSplitsTextIntoUncheckedChecklistItemBelow() {
+        let blockID = BlockInputBlockID(rawValue: "check")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "BeforeAfter")
+        ])
+
+        let selection = document.handleReturn(in: blockID, utf16Offset: 6)
+
+        XCTAssertEqual(document.blocks.count, 2)
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "Before"))
+        XCTAssertEqual(document.blocks[1].kind, .checklistItem(isChecked: false))
+        XCTAssertEqual(document.blocks[1].text, "After")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    func testReturnInMultilineChecklistPreservesContinuationIndentation() {
+        let blockID = BlockInputBlockID(rawValue: "check")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(
+                id: blockID,
+                kind: .checklistItem(isChecked: true),
+                text: "One\nTwo\nThree",
+                lineIndentationLevels: [0, 1, 2]
+            )
+        ])
+
+        let selection = document.handleReturn(in: blockID, utf16Offset: 4)
+
+        XCTAssertEqual(document.blocks.count, 2)
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "One"))
+        XCTAssertEqual(document.blocks[1], BlockInputBlock(
+            id: document.blocks[1].id,
+            kind: .checklistItem(isChecked: false),
+            text: "Two\nThree",
+            indentationLevel: 1,
+            lineIndentationLevels: [1, 2]
+        ))
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    func testReturnInIndentedEmptyChecklistItemOutdentsBeforeExitingList() {
+        let blockID = BlockInputBlockID(rawValue: "check")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), indentationLevel: 2)
+        ])
+
+        let firstSelection = document.handleReturn(in: blockID)
+
+        XCTAssertEqual(document.blocks, [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), indentationLevel: 1)
+        ])
+        XCTAssertEqual(firstSelection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+
         _ = document.handleReturn(in: blockID)
 
         XCTAssertEqual(document.blocks, [
-            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "Done\n", indentationLevel: 1)
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false))
         ])
+
+        let exitSelection = document.handleReturn(in: blockID)
+
+        XCTAssertEqual(document.blocks, [BlockInputBlock(id: blockID, kind: .paragraph)])
+        XCTAssertEqual(exitSelection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
     func testReturnInQuoteAddsLineInsideCurrentBlock() {

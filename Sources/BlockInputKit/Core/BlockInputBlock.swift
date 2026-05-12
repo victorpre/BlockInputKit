@@ -365,9 +365,9 @@ extension BlockInputBlockKind {
 
     var acceptsInlineReturn: Bool {
         switch self {
-        case .code, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+        case .code, .quote, .bulletedListItem, .numberedListItem:
             return true
-        case .paragraph, .heading, .horizontalRule:
+        case .paragraph, .heading, .horizontalRule, .checklistItem:
             return false
         }
     }

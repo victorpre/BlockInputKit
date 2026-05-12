@@ -5,6 +5,22 @@ final class BlockInputMarkerView: NSTextField {
     struct MarkerLine: Equatable {
         var text: String
         var indentationLevel: Int
+        var checkboxState: CheckboxState?
+
+        init(
+            text: String,
+            indentationLevel: Int,
+            checkboxState: CheckboxState? = nil
+        ) {
+            self.text = text
+            self.indentationLevel = indentationLevel
+            self.checkboxState = checkboxState
+        }
+    }
+
+    enum CheckboxState: Equatable {
+        case unchecked
+        case checked
     }
 
     private static let textMarkerVerticalAdjustment: CGFloat = -1
@@ -39,8 +55,14 @@ final class BlockInputMarkerView: NSTextField {
             .foregroundColor: textColor ?? NSColor.tertiaryLabelColor
         ]
         let lineHeight = ceil(resolvedFont.ascender - resolvedFont.descender + resolvedFont.leading)
-        for (lineIndex, markerLine) in markerLines.enumerated() where !markerLine.text.isEmpty {
+        for (lineIndex, markerLine) in markerLines.enumerated() {
             let lineY = yOffset(forLineAt: lineIndex, lineHeight: lineHeight)
+            if drawChecklistMarker(markerLine, lineY: lineY, lineHeight: lineHeight) {
+                continue
+            }
+            guard !markerLine.text.isEmpty else {
+                continue
+            }
             if drawUnorderedListMarker(markerLine, lineY: lineY, lineHeight: lineHeight) {
                 continue
             }
@@ -83,6 +105,34 @@ final class BlockInputMarkerView: NSTextField {
             path.stroke()
         case .filledSquare:
             NSBezierPath(rect: markerFrame).fill()
+        }
+        return true
+    }
+
+    private func drawChecklistMarker(_ markerLine: MarkerLine, lineY: CGFloat, lineHeight: CGFloat) -> Bool {
+        guard let checkboxState = markerLine.checkboxState else {
+            return false
+        }
+        let markerSize: CGFloat = 16
+        let markerFrame = NSRect(
+            x: Self.markerGlyphXPosition(indentationLevel: markerLine.indentationLevel, markerWidth: markerSize),
+            y: lineY + max(0, (lineHeight - markerSize) / 2),
+            width: markerSize,
+            height: markerSize
+        )
+        let fillColor = NSColor.tertiaryLabelColor.withAlphaComponent(0.28)
+        fillColor.setFill()
+        NSBezierPath(roundedRect: markerFrame, xRadius: 5, yRadius: 5).fill()
+        if checkboxState == .checked {
+            let checkPath = NSBezierPath()
+            checkPath.lineWidth = 1.8
+            checkPath.lineCapStyle = .round
+            checkPath.lineJoinStyle = .round
+            checkPath.move(to: NSPoint(x: markerFrame.minX + 4, y: markerFrame.midY))
+            checkPath.line(to: NSPoint(x: markerFrame.minX + 7, y: markerFrame.maxY - 4))
+            checkPath.line(to: NSPoint(x: markerFrame.maxX - 4, y: markerFrame.minY + 4))
+            (textColor ?? NSColor.labelColor).withAlphaComponent(0.75).setStroke()
+            checkPath.stroke()
         }
         return true
     }

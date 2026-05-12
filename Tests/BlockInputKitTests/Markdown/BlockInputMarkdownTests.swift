@@ -38,8 +38,7 @@ final class BlockInputMarkdownTests: XCTestCase {
     func testMarkdownRoundTripsMultilineListBlocks() {
         let document = BlockInputDocument(blocks: [
             BlockInputBlock(id: "bullet", kind: .bulletedListItem, text: "One\nTwo\n", indentationLevel: 1),
-            BlockInputBlock(id: "number", kind: .numberedListItem(start: 3), text: "Three\nFour\n"),
-            BlockInputBlock(id: "check", kind: .checklistItem(isChecked: false), text: "Todo\nLater\n")
+            BlockInputBlock(id: "number", kind: .numberedListItem(start: 3), text: "Three\nFour\n")
         ])
 
         let parsed = BlockInputDocument(markdown: document.markdown)
@@ -47,6 +46,17 @@ final class BlockInputMarkdownTests: XCTestCase {
         XCTAssertEqual(parsed.blocks.map(\.kind), document.blocks.map(\.kind))
         XCTAssertEqual(parsed.blocks.map(\.text), document.blocks.map(\.text))
         XCTAssertEqual(parsed.blocks.map(\.indentationLevel), document.blocks.map(\.indentationLevel))
+    }
+
+    func testMarkdownKeepsChecklistItemsSeparate() {
+        let parsed = BlockInputDocument(markdown: "- [ ] Todo\n- [ ] Later\n- [x] Done")
+
+        XCTAssertEqual(parsed.blocks.map(\.kind), [
+            .checklistItem(isChecked: false),
+            .checklistItem(isChecked: false),
+            .checklistItem(isChecked: true)
+        ])
+        XCTAssertEqual(parsed.blocks.map(\.text), ["Todo", "Later", "Done"])
     }
 
     func testMarkdownRoundTripsPerLineListIndentation() {

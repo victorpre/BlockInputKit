@@ -50,7 +50,7 @@ extension BlockInputBlockItem {
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
         textView.textContainer?.widthTracksTextView = true
-        textView.textContainerInset = NSSize(width: 4, height: 6)
+        textView.textContainerInset = Self.standardTextContainerInset
         textView.backgroundColor = .clear
         textView.drawsBackground = false
         textView.isRichText = true
@@ -78,24 +78,63 @@ extension BlockInputBlockItem {
     }
 
     private func activateLayoutConstraints() {
+        NSLayoutConstraint.activate(chromeLayoutConstraints() + contentLayoutConstraints())
+    }
+
+    private func chromeLayoutConstraints() -> [NSLayoutConstraint] {
         let kindLabelLeadingConstraint = kindLabel.leadingAnchor.constraint(equalTo: handleView.trailingAnchor)
         self.kindLabelLeadingConstraint = kindLabelLeadingConstraint
         let kindLabelWidthConstraint = kindLabel.widthAnchor.constraint(equalToConstant: Self.markerGutterWidth)
         self.kindLabelWidthConstraint = kindLabelWidthConstraint
-
         let checklistButtonLeadingConstraint = checklistButton.leadingAnchor.constraint(
             equalTo: kindLabel.leadingAnchor,
             constant: Self.checklistButtonBaseLeading
         )
         self.checklistButtonLeadingConstraint = checklistButtonLeadingConstraint
-
         let handleWidthConstraint = handleView.widthAnchor.constraint(equalToConstant: Self.handleWidth)
         self.handleWidthConstraint = handleWidthConstraint
+        let handleTopConstraint = handleView.topAnchor.constraint(
+            equalTo: view.topAnchor,
+            constant: BlockInputBlockItemVerticalMetrics.standard.chromeTopConstant
+        )
+        self.handleTopConstraint = handleTopConstraint
+        let kindLabelTopConstraint = kindLabel.topAnchor.constraint(
+            equalTo: view.topAnchor,
+            constant: BlockInputBlockItemVerticalMetrics.standard.chromeTopConstant
+        )
+        self.kindLabelTopConstraint = kindLabelTopConstraint
+        let checklistButtonTopConstraint = checklistButton.topAnchor.constraint(
+            equalTo: view.topAnchor,
+            constant: BlockInputBlockItemVerticalMetrics.standard.checklistButtonTopConstant(
+                font: Self.font(for: .paragraph),
+                checkboxHeight: Self.checklistButtonHeight
+            )
+        )
+        self.checklistButtonTopConstraint = checklistButtonTopConstraint
+        return [
+            handleView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
+            handleTopConstraint,
+            handleWidthConstraint,
+            kindLabelLeadingConstraint,
+            kindLabelTopConstraint,
+            kindLabelWidthConstraint,
+            checklistButtonLeadingConstraint,
+            checklistButtonTopConstraint,
+            checklistButton.widthAnchor.constraint(equalToConstant: Self.checklistButtonHeight),
+            checklistButton.heightAnchor.constraint(equalToConstant: Self.checklistButtonHeight)
+        ]
+    }
+
+    private func contentLayoutConstraints() -> [NSLayoutConstraint] {
         let scrollViewLeadingConstraint = scrollView.leadingAnchor.constraint(
             equalTo: kindLabel.trailingAnchor,
             constant: Self.defaultTextLeading
         )
         self.scrollViewLeadingConstraint = scrollViewLeadingConstraint
+        let scrollViewTopConstraint = scrollView.topAnchor.constraint(equalTo: view.topAnchor)
+        self.scrollViewTopConstraint = scrollViewTopConstraint
+        let scrollViewBottomConstraint = scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        self.scrollViewBottomConstraint = scrollViewBottomConstraint
         let horizontalRuleLeadingConstraint = horizontalRuleView.leadingAnchor.constraint(
             equalTo: scrollView.leadingAnchor,
             constant: Self.defaultTextLeading + 4
@@ -106,35 +145,19 @@ extension BlockInputBlockItem {
             constant: Self.chromeFrameAlignmentOffset
         )
         self.quoteBarLeadingConstraint = quoteBarLeadingConstraint
-
-        NSLayoutConstraint.activate([
-            handleView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
-            handleView.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
-            handleWidthConstraint,
-
-            kindLabelLeadingConstraint,
-            kindLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
-            kindLabelWidthConstraint,
-
-            checklistButtonLeadingConstraint,
-            checklistButton.centerYAnchor.constraint(equalTo: kindLabel.centerYAnchor),
-            checklistButton.widthAnchor.constraint(equalToConstant: 18),
-            checklistButton.heightAnchor.constraint(equalToConstant: 18),
-
+        return [
             quoteBarLeadingConstraint,
             quoteBarView.topAnchor.constraint(equalTo: view.topAnchor, constant: 7),
             quoteBarView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -7),
             quoteBarView.widthAnchor.constraint(equalToConstant: 3),
-
             scrollViewLeadingConstraint,
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
+            scrollViewTopConstraint,
+            scrollViewBottomConstraint,
             horizontalRuleLeadingConstraint,
             horizontalRuleView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -4),
             horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             horizontalRuleView.heightAnchor.constraint(equalToConstant: 8)
-        ])
+        ]
     }
 }

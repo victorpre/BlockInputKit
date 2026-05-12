@@ -1,0 +1,184 @@
+import Foundation
+
+public extension BlockInputDocument {
+    /// Applies Return key semantics for a block editor.
+    @discardableResult
+    mutating func handleReturn(
+        in blockID: BlockInputBlockID,
+        utf16Offset: Int? = nil,
+        selectedUTF16Length: Int = 0
+    ) -> BlockInputSelection? {
+        guard let index = index(of: blockID) else {
+            return nil
+        }
+        let currentBlock = blocks[index]
+        if currentBlock.isEmpty, currentBlock.kind.exitsToParagraphOnEmptyReturn {
+            if currentBlock.kind.supportsIndentation,
+               outdentEmptyListBlock(at: index) {
+                return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
+            }
+            blocks[index] = BlockInputBlock(id: blockID, kind: .paragraph)
+            return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
+        }
+        if case .checklistItem = currentBlock.kind {
+            return insertChecklistItemAfterReturn(
+                at: index,
+                utf16Offset: utf16Offset,
+                selectedUTF16Length: selectedUTF16Length
+            )
+        }
+        if currentBlock.kind.acceptsInlineReturn {
+            let insertionOffset = min(max(utf16Offset ?? currentBlock.utf16Length, 0), currentBlock.utf16Length)
+            let mutableText = NSMutableString(string: currentBlock.text)
+            let replacementLength = min(max(selectedUTF16Length, 0), currentBlock.utf16Length - insertionOffset)
+            if replacementLength == 0,
+               let removalRange = currentBlock.emptyInlineLineRemovalRangeForReturn(utf16Offset: insertionOffset) {
+                if outdentEmptyInlineLineIfNeeded(at: index, utf16Offset: insertionOffset) {
+                    return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: insertionOffset))
+                }
+                return exitInlineBlock(at: index, removing: removalRange)
+            }
+            mutableText.replaceCharacters(in: NSRange(location: insertionOffset, length: replacementLength), with: "\n")
+            let updatedText = mutableText as String
+            blocks[index].text = updatedText
+            if let lineIndentationLevels = currentBlock.lineIndentationLevelsAfterReplacingTextWithLineEnding(
+                utf16Offset: insertionOffset,
+                selectedUTF16Length: replacementLength,
+                updatedText: updatedText
+            ) {
+                blocks[index].lineIndentationLevels = lineIndentationLevels
+            }
+            return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: insertionOffset + 1))
+        }
+        return insertBlock(BlockInputBlock(), at: index + 1)
+    }
+}
+
+private extension BlockInputDocument {
+    mutating func insertChecklistItemAfterReturn(
+        at index: Int,
+        utf16Offset: Int?,
+        selectedUTF16Length: Int
+    ) -> BlockInputSelection {
+        let currentBlock = blocks[index]
+        let textStorage = currentBlock.text as NSString
+        let insertionOffset = min(max(utf16Offset ?? currentBlock.utf16Length, 0), textStorage.length)
+        let replacementLength = min(max(selectedUTF16Length, 0), textStorage.length - insertionOffset)
+        let prefix = Self.removingOneTrailingLineEnding(textStorage.substring(to: insertionOffset))
+        let suffix = textStorage.substring(from: insertionOffset + replacementLength)
+        let insertedLineIndentationLevels = checklistLineIndentationLevelsAfterReturn(
+            in: currentBlock,
+            insertionOffset: insertionOffset,
+            suffixOffset: insertionOffset + replacementLength,
+            suffix: suffix
+        )
+        blocks[index].text = prefix
+        let insertedBlock = BlockInputBlock(
+            kind: .checklistItem(isChecked: false),
+            text: suffix,
+            indentationLevel: insertedLineIndentationLevels.first ?? currentBlock.indentationLevel(forLine: 0),
+            lineIndentationLevels: insertedLineIndentationLevels
+        )
+        blocks.insert(insertedBlock, at: index + 1)
+        return .cursor(BlockInputCursor(blockID: insertedBlock.id, utf16Offset: 0))
+    }
+
+    func checklistLineIndentationLevelsAfterReturn(
+        in block: BlockInputBlock,
+        insertionOffset: Int,
+        suffixOffset: Int,
+        suffix: String
+    ) -> [Int] {
+        let insertionLineIndex = block.lineIndex(containingUTF16Offset: insertionOffset)
+        return BlockInputLineBreaks.lineStartOffsets(in: suffix).map { suffixLineStart in
+            guard suffixLineStart > 0 else {
+                return block.indentationLevel(forLine: insertionLineIndex)
+            }
+            return block.indentationLevel(forLine: block.lineIndex(containingUTF16Offset: suffixOffset + suffixLineStart))
+        }
+    }
+
+    mutating func outdentEmptyListBlock(at index: Int) -> Bool {
+        guard blocks[index].kind.supportsIndentation else {
+            return false
+        }
+        let lineIndentation = blocks[index].indentationLevel(forLine: 0)
+        guard lineIndentation > 0 else {
+            return false
+        }
+        if blocks[index].lineIndentationLevels.isEmpty {
+            blocks[index].indentationLevel -= 1
+            return true
+        }
+        blocks[index].setIndentationLevel(lineIndentation - 1, forLine: 0)
+        return true
+    }
+
+    mutating func outdentEmptyInlineLineIfNeeded(at index: Int, utf16Offset: Int) -> Bool {
+        guard blocks[index].kind.supportsIndentation else {
+            return false
+        }
+        let lineIndex = blocks[index].lineIndex(containingUTF16Offset: utf16Offset)
+        let indentationLevel = blocks[index].indentationLevel(forLine: lineIndex)
+        guard indentationLevel > 0 else {
+            return false
+        }
+        blocks[index].setIndentationLevel(indentationLevel - 1, forLine: lineIndex)
+        return true
+    }
+
+    mutating func exitInlineBlock(at index: Int, removing removalRange: NSRange) -> BlockInputSelection {
+        let currentBlock = blocks[index]
+        let textStorage = currentBlock.text as NSString
+        let prefix = Self.removingOneTrailingLineEnding(textStorage.substring(to: removalRange.location))
+        let suffix = textStorage.substring(from: NSMaxRange(removalRange))
+        if prefix.isEmpty {
+            blocks[index] = BlockInputBlock(id: currentBlock.id, kind: .paragraph)
+            insertContinuationBlockIfNeeded(from: currentBlock, text: suffix, afterPrefix: prefix, at: index + 1)
+            return .cursor(BlockInputCursor(blockID: currentBlock.id, utf16Offset: 0))
+        }
+
+        blocks[index].text = prefix
+        let paragraph = BlockInputBlock()
+        blocks.insert(paragraph, at: index + 1)
+        insertContinuationBlockIfNeeded(from: currentBlock, text: suffix, afterPrefix: prefix, at: index + 2)
+        return .cursor(BlockInputCursor(blockID: paragraph.id, utf16Offset: 0))
+    }
+
+    mutating func insertContinuationBlockIfNeeded(
+        from block: BlockInputBlock,
+        text: String,
+        afterPrefix prefix: String,
+        at index: Int
+    ) {
+        guard !text.isEmpty else {
+            return
+        }
+        var continuationBlock = block
+        continuationBlock.id = .unique()
+        continuationBlock.kind = continuationKind(for: block.kind, afterPrefix: prefix)
+        continuationBlock.text = text
+        blocks.insert(continuationBlock, at: index)
+    }
+
+    func continuationKind(for kind: BlockInputBlockKind, afterPrefix prefix: String) -> BlockInputBlockKind {
+        guard case let .numberedListItem(start) = kind else {
+            return kind
+        }
+        return .numberedListItem(start: start + Self.lineCount(in: prefix))
+    }
+
+    static func lineCount(in text: String) -> Int {
+        text.isEmpty ? 0 : BlockInputLineBreaks.lineCount(in: text)
+    }
+
+    static func removingOneTrailingLineEnding(_ text: String) -> String {
+        if text.hasSuffix("\r\n") {
+            return String(text.dropLast(2))
+        }
+        guard text.last == "\n" || text.last == "\r" else {
+            return text
+        }
+        return String(text.dropLast())
+    }
+}

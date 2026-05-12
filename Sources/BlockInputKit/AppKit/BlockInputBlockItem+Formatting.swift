@@ -12,7 +12,18 @@ extension BlockInputBlockItem {
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: [.font: font(for: block.kind)]
         )
-        return max(34, ceil(boundingRect.height) + 14)
+        let metrics = verticalMetrics(for: block)
+        return max(
+            metrics.minimumHeight,
+            ceil(boundingRect.height) + metrics.topContentInset + metrics.bottomContentInset + 2
+        )
+    }
+
+    static func verticalMetrics(for block: BlockInputBlock) -> BlockInputBlockItemVerticalMetrics {
+        guard case .checklistItem = block.kind else {
+            return .standard
+        }
+        return .checklist
     }
 
     static func prefix(for kind: BlockInputBlockKind, indentationLevel: Int) -> String {
@@ -134,13 +145,15 @@ extension BlockInputBlockItem {
             guard lineCount > 1 else {
                 return []
             }
+            let checkboxState: BlockInputMarkerView.CheckboxState = isChecked ? .checked : .unchecked
             return (0..<lineCount).map { lineIndex in
                 if lineIndex == 0 {
                     return BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 0)
                 }
                 return BlockInputMarkerView.MarkerLine(
-                    text: prefix(for: .checklistItem(isChecked: isChecked), indentationLevel: block.indentationLevel(forLine: lineIndex)),
-                    indentationLevel: markerIndentationLevel(for: block, lineIndex: lineIndex)
+                    text: "",
+                    indentationLevel: markerIndentationLevel(for: block, lineIndex: lineIndex),
+                    checkboxState: checkboxState
                 )
             }
         default:

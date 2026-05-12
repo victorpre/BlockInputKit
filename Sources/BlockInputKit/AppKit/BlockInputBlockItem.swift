@@ -18,6 +18,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let listTextLeading: CGFloat = -textContainerContentLeading
     static let quoteBarIdentifier = NSUserInterfaceItemIdentifier("BlockInputQuoteBarView")
     private static let quoteTextLeading: CGFloat = 7
+
     let handleView = BlockInputDragHandleView()
     let kindLabel = BlockInputMarkerView(labelWithString: "")
     let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
@@ -35,6 +36,11 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var kindLabelWidthConstraint: NSLayoutConstraint?
     var checklistButtonLeadingConstraint: NSLayoutConstraint?
     var scrollViewLeadingConstraint: NSLayoutConstraint?
+    var scrollViewTopConstraint: NSLayoutConstraint?
+    var scrollViewBottomConstraint: NSLayoutConstraint?
+    var handleTopConstraint: NSLayoutConstraint?
+    var kindLabelTopConstraint: NSLayoutConstraint?
+    var checklistButtonTopConstraint: NSLayoutConstraint?
     var quoteBarLeadingConstraint: NSLayoutConstraint?
     var horizontalRuleLeadingConstraint: NSLayoutConstraint?
     private var isHorizontalRule = false
@@ -72,41 +78,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     override func prepareForReuse() {
         super.prepareForReuse()
         clearConfiguration()
-    }
-
-    func clearConfiguration() {
-        blockID = nil
-        renderedBlock = nil
-        delegate = nil
-        selectionBeforeTextChange = nil
-        isHorizontalRule = false
-        view.layer?.backgroundColor = NSColor.clear.cgColor
-        handleView.blockItem = nil
-        horizontalRuleView.blockItem = nil
-        horizontalRuleView.resetForReuse()
-        textView.blockItem = nil
-        textView.string = ""
-        textView.isEditable = true
-        scrollView.isHidden = false
-        scrollViewLeadingConstraint?.constant = Self.defaultTextLeading
-        quoteBarLeadingConstraint?.constant = Self.chromeFrameAlignmentOffset
-        horizontalRuleLeadingConstraint?.constant = Self.defaultTextLeading + 4
-        quoteBarView.isHidden = true
-        quoteBarView.alphaValue = 0
-        textView.setSelectedRange(NSRange(location: 0, length: 0))
-        textView.font = Self.font(for: .paragraph)
-        kindLabel.setMarkerLines([])
-        kindLabelLeadingConstraint?.constant = 0
-        kindLabelWidthConstraint?.constant = Self.markerGutterWidth
-        checklistButton.state = .off
-        checklistButton.isHidden = true
-        checklistButton.isEnabled = false
-        checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
-        handleView.isEnabled = false
-        handleView.isHidden = true
-        handleView.alphaValue = 0
-        handleView.toolTip = nil
-        handleWidthConstraint?.constant = 0
     }
 
     override func viewDidLayout() {
@@ -347,9 +318,19 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         let isHorizontalRule = kind == .horizontalRule
         let contentIndent = Self.contentIndent(for: block)
         let perLineContentIndent = Self.perLineContentIndent(for: block)
+        let verticalMetrics = Self.verticalMetrics(for: block)
+        textView.textContainerInset = verticalMetrics.textContainerInset
         textView.isEditable = !isHorizontalRule
         applyTextAttributes(for: block)
         scrollView.isHidden = isHorizontalRule
+        scrollViewTopConstraint?.constant = 0
+        scrollViewBottomConstraint?.constant = 0
+        handleTopConstraint?.constant = verticalMetrics.chromeTopConstant
+        kindLabelTopConstraint?.constant = verticalMetrics.chromeTopConstant
+        checklistButtonTopConstraint?.constant = verticalMetrics.checklistButtonTopConstant(
+            font: Self.font(for: block.kind),
+            checkboxHeight: Self.checklistButtonHeight
+        )
         kindLabelLeadingConstraint?.constant = kindLabelLeadingConstant(for: block, contentIndent: contentIndent)
         kindLabelWidthConstraint?.constant = kindLabelWidthConstant(for: block, perLineContentIndent: perLineContentIndent)
         scrollViewLeadingConstraint?.constant = textLeadingConstant(
@@ -443,4 +424,50 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         return image
     }
 
+}
+
+extension BlockInputBlockItem {
+    func clearConfiguration() {
+        blockID = nil
+        renderedBlock = nil
+        delegate = nil
+        selectionBeforeTextChange = nil
+        isHorizontalRule = false
+        view.layer?.backgroundColor = NSColor.clear.cgColor
+        handleView.blockItem = nil
+        horizontalRuleView.blockItem = nil
+        horizontalRuleView.resetForReuse()
+        textView.blockItem = nil
+        textView.string = ""
+        textView.isEditable = true
+        textView.textContainerInset = Self.standardTextContainerInset
+        scrollView.isHidden = false
+        scrollViewLeadingConstraint?.constant = Self.defaultTextLeading
+        scrollViewTopConstraint?.constant = 0
+        scrollViewBottomConstraint?.constant = 0
+        handleTopConstraint?.constant = BlockInputBlockItemVerticalMetrics.standard.chromeTopConstant
+        kindLabelTopConstraint?.constant = BlockInputBlockItemVerticalMetrics.standard.chromeTopConstant
+        checklistButtonTopConstraint?.constant = BlockInputBlockItemVerticalMetrics.standard.checklistButtonTopConstant(
+            font: Self.font(for: .paragraph),
+            checkboxHeight: Self.checklistButtonHeight
+        )
+        quoteBarLeadingConstraint?.constant = Self.chromeFrameAlignmentOffset
+        horizontalRuleLeadingConstraint?.constant = Self.defaultTextLeading + 4
+        quoteBarView.isHidden = true
+        quoteBarView.alphaValue = 0
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        textView.font = Self.font(for: .paragraph)
+        kindLabel.setMarkerLines([])
+        kindLabelLeadingConstraint?.constant = 0
+        kindLabelWidthConstraint?.constant = Self.markerGutterWidth
+        checklistButton.state = .off
+        checklistButton.isHidden = true
+        checklistButton.isEnabled = false
+        checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
+        handleView.isEnabled = false
+        handleView.isHidden = true
+        handleView.alphaValue = 0
+        handleView.toolTip = nil
+        handleWidthConstraint?.constant = 0
+    }
 }

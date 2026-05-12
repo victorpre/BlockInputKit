@@ -191,8 +191,8 @@ enum BlockInputMarkdownImporter {
                 lineIndentationLevels: lineIndentationLevels,
                 nextIndentationLevel: nextBlock.indentationLevel
             )
-        case let (.checklistItem(isChecked), .checklistItem(nextIsChecked)):
-            return isChecked == nextIsChecked
+        case (.checklistItem, .checklistItem):
+            return false
         default:
             return false
         }

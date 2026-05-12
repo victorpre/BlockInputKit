@@ -62,6 +62,52 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
         XCTAssertEqual(view.document.blocks[0].text, "First\n")
     }
 
+    func testReturnCommandInChecklistCreatesSiblingChecklistBlockThroughDelegatePath() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), text: "First")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 5, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+
+        XCTAssertEqual(view.document.blocks.count, 2)
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), text: "First"))
+        XCTAssertEqual(view.document.blocks[1].kind, .checklistItem(isChecked: false))
+        XCTAssertEqual(view.document.blocks[1].text, "")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    func testReturnCommandInChecklistReplacesSelectionThroughDelegatePath() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "BeforeAfter")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 6, length: 5))
+
+        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+
+        XCTAssertEqual(view.document.blocks.count, 2)
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "Before"))
+        XCTAssertEqual(view.document.blocks[1].kind, .checklistItem(isChecked: false))
+        XCTAssertEqual(view.document.blocks[1].text, "")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
+    }
+
     func testReturnCommandContinuesCurrentLineIndentationThroughDelegatePath() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let undoController = BlockInputUndoController()

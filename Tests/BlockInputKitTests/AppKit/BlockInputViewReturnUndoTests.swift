@@ -83,6 +83,40 @@ final class BlockInputViewReturnUndoTests: XCTestCase {
         XCTAssertEqual(view.document.blocks[1].kind, .paragraph)
     }
 
+    func testReturnInChecklistItemUsesInsertBlockStructuralUndoAction() {
+        let blockID = BlockInputBlockID(rawValue: "checklist")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "BeforeAfter")
+            ]),
+            undoController: undoController
+        ))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)), notify: false)
+
+        _ = view.insertBlockBelowCurrentBlock()
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Insert Block")
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "BeforeAfter")
+        ])
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(redo?.actionName, "Insert Block")
+        XCTAssertEqual(view.document.blocks.count, 2)
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(
+            id: blockID,
+            kind: .checklistItem(isChecked: true),
+            text: "Before"
+        ))
+        XCTAssertEqual(view.document.blocks[1].kind, .checklistItem(isChecked: false))
+        XCTAssertEqual(view.document.blocks[1].text, "After")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
+    }
+
     func testReturnOnIndentedEmptyInlineListLineUsesOutdentStructuralUndoAction() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         let undoController = BlockInputUndoController()
@@ -118,6 +152,34 @@ final class BlockInputViewReturnUndoTests: XCTestCase {
         XCTAssertEqual(redo?.actionName, "Outdent Block")
         XCTAssertEqual(view.document.blocks, [
             BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Before\n")
+        ])
+    }
+
+    func testReturnOnIndentedEmptyChecklistItemUsesOutdentStructuralUndoAction() {
+        let blockID = BlockInputBlockID(rawValue: "checklist")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), indentationLevel: 1)
+            ]),
+            undoController: undoController
+        ))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+
+        _ = view.insertBlockBelowCurrentBlock()
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Outdent Block")
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), indentationLevel: 1)
+        ])
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(redo?.actionName, "Outdent Block")
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false))
         ])
     }
 

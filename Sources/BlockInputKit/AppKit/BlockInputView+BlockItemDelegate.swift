@@ -134,7 +134,11 @@ extension BlockInputView: BlockInputBlockItemDelegate {
            ) {
             return false
         }
-        applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: selectedRange.location)), notify: false)
+        if selectedRange.length == 0 {
+            applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: selectedRange.location)), notify: false)
+        } else {
+            applySelection(.text(BlockInputTextRange(blockID: blockID, range: selectedRange)), notify: false)
+        }
         insertBlockBelowCurrentBlock()
         return true
     }

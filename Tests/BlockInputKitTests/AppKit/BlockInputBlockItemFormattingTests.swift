@@ -73,7 +73,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     }
 
     @MainActor
-    func testPerLineChecklistIndentationUsesFirstLineCheckboxAndRemainingLinePrefixes() throws {
+    func testPerLineChecklistIndentationUsesFirstLineCheckboxAndRemainingLineCheckboxMarkers() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(
                 id: "checklist",
@@ -86,13 +86,63 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
         )
 
         let markerView = try XCTUnwrap(item.testingMarkerView)
-        XCTAssertEqual(markerView.stringValue, "\n[ ]\n[ ]")
+        XCTAssertEqual(markerView.stringValue, "\n\n")
         XCTAssertEqual(markerView.markerLines, [
             BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 0),
-            BlockInputMarkerView.MarkerLine(text: "[ ]", indentationLevel: 2),
-            BlockInputMarkerView.MarkerLine(text: "[ ]", indentationLevel: 1)
+            BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 2, checkboxState: .unchecked),
+            BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 1, checkboxState: .unchecked)
         ])
         XCTAssertFalse(try XCTUnwrap(item.testingChecklistButton).isHidden)
+    }
+
+    @MainActor
+    func testPerLineCheckedChecklistUsesCheckedCheckboxMarkers() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(
+                id: "checklist",
+                kind: .checklistItem(isChecked: true),
+                text: "One\nTwo"
+            ),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+
+        let markerView = try XCTUnwrap(item.testingMarkerView)
+        XCTAssertEqual(markerView.stringValue, "\n")
+        XCTAssertEqual(markerView.markerLines, [
+            BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 0),
+            BlockInputMarkerView.MarkerLine(text: "", indentationLevel: 0, checkboxState: .checked)
+        ])
+    }
+
+    @MainActor
+    func testChecklistButtonStaysAlignedToFirstLineWhenTextBecomesMultiline() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(
+                id: "checklist",
+                kind: .checklistItem(isChecked: false),
+                text: "One"
+            ),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        item.view.frame = NSRect(x: 0, y: 0, width: 420, height: 80)
+        item.view.layoutSubtreeIfNeeded()
+        let checkbox = try XCTUnwrap(item.testingChecklistButton)
+        let singleLineCheckboxMinY = checkbox.frame.minY
+
+        item.configure(
+            block: BlockInputBlock(
+                id: "checklist",
+                kind: .checklistItem(isChecked: false),
+                text: "One\n"
+            ),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        item.view.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(checkbox.frame.minY, singleLineCheckboxMinY, accuracy: 0.5)
     }
 
     @MainActor
