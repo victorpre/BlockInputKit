@@ -179,7 +179,10 @@ final class BlockInputViewPerformanceTests: XCTestCase {
         })
         let store = DocumentReadCountingStore(document: document)
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
-        view.configure(BlockInputConfiguration(documentStore: store))
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            undoController: BlockInputUndoController()
+        ))
         view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 7)), notify: false)
         store.resetCounts()
 

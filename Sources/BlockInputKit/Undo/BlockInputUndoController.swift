@@ -5,24 +5,33 @@ public struct BlockInputUndoResult: Equatable, Sendable {
     public var selection: BlockInputSelection?
     public var actionName: String
     var replacedBlock: BlockInputBlock?
+    var replacedBlocks: [BlockInputBlock]?
     var insertedBlocks: [BlockInputBlock]?
     var insertionIndex: Int?
     var deletedBlockIDs: [BlockInputBlockID]?
+    var movedBlockID: BlockInputBlockID?
+    var moveIndex: Int?
 
     init(
         selection: BlockInputSelection?,
         actionName: String,
         replacedBlock: BlockInputBlock? = nil,
+        replacedBlocks: [BlockInputBlock]? = nil,
         insertedBlocks: [BlockInputBlock]? = nil,
         insertionIndex: Int? = nil,
-        deletedBlockIDs: [BlockInputBlockID]? = nil
+        deletedBlockIDs: [BlockInputBlockID]? = nil,
+        movedBlockID: BlockInputBlockID? = nil,
+        moveIndex: Int? = nil
     ) {
         self.selection = selection
         self.actionName = actionName
         self.replacedBlock = replacedBlock
+        self.replacedBlocks = replacedBlocks
         self.insertedBlocks = insertedBlocks
         self.insertionIndex = insertionIndex
         self.deletedBlockIDs = deletedBlockIDs
+        self.movedBlockID = movedBlockID
+        self.moveIndex = moveIndex
     }
 }
 
@@ -42,6 +51,17 @@ struct BlockInputReplaceDeleteEdit {
     var afterBlock: BlockInputBlock
     var deletedBlocks: [BlockInputBlock]
     var deletionIndex: Int
+    var selectionBefore: BlockInputSelection?
+    var selectionAfter: BlockInputSelection?
+}
+
+struct BlockInputMoveEdit {
+    var actionName: String
+    var blockID: BlockInputBlockID
+    var beforeIndex: Int
+    var afterIndex: Int
+    var beforeChangedBlocks: [BlockInputBlock]
+    var afterChangedBlocks: [BlockInputBlock]
     var selectionBefore: BlockInputSelection?
     var selectionAfter: BlockInputSelection?
 }
@@ -188,6 +208,24 @@ public final class BlockInputUndoController {
                 afterBlock: edit.afterBlock,
                 deletedBlocks: edit.deletedBlocks,
                 deletionIndex: edit.deletionIndex
+            ),
+            selectionBefore: edit.selectionBefore,
+            selectionAfter: edit.selectionAfter
+        ))
+        structuralRedoStack = []
+        textRedoByBlockID = [:]
+    }
+
+    /// Records a structural move without snapshotting the full document.
+    func registerBlockMoveStructuralEdit(_ edit: BlockInputMoveEdit) {
+        structuralUndoStack.append(BlockInputStructuralUndoEntry(
+            actionName: edit.actionName,
+            payload: .blockMove(
+                blockID: edit.blockID,
+                beforeIndex: edit.beforeIndex,
+                afterIndex: edit.afterIndex,
+                beforeChangedBlocks: edit.beforeChangedBlocks,
+                afterChangedBlocks: edit.afterChangedBlocks
             ),
             selectionBefore: edit.selectionBefore,
             selectionAfter: edit.selectionAfter

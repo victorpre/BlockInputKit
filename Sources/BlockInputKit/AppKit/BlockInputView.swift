@@ -313,20 +313,35 @@ public final class BlockInputView: NSView {
     /// Moves a block when reordering is enabled.
     @discardableResult
     public func moveBlock(blockID: BlockInputBlockID, to targetIndex: Int) -> BlockInputSelection? {
-        refreshDocumentFromStore()
         guard allowsBlockReordering else {
             return nil
         }
+        if let selection = moveStoreBackedLargeListBlock(blockID: blockID, to: targetIndex) {
+            return selection
+        }
+        var moveResult: BlockInputMoveResult?
+        var moveChangedBlocks: [BlockInputBlock] = []
         return performStructuralEdit(
             named: "Move Block",
-            storeSyncAction: { _, afterDocument, _ in
-                guard let finalIndex = afterDocument.index(of: blockID) else {
+            storeSyncAction: { _, _, _ in
+                guard let finalIndex = moveResult?.finalIndex else {
                     return .replaceDocument
+                }
+                let changedBlocks = moveChangedBlocks
+                if !changedBlocks.isEmpty {
+                    return .moveBlockAndReplaceChangedBlocks(
+                        blockID,
+                        targetIndex: finalIndex,
+                        changedBlocks: changedBlocks
+                    )
                 }
                 return .moveBlock(blockID, targetIndex: finalIndex)
             },
             edit: { document in
-                document.moveBlock(blockID: blockID, to: targetIndex)
+                let result = document.moveBlockWithChangedBlocks(blockID: blockID, to: targetIndex)
+                moveResult = result
+                moveChangedBlocks = result?.changedBlocks ?? []
+                return result?.selection
             }
         )
     }

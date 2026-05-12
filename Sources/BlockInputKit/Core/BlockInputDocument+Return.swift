@@ -121,9 +121,11 @@ private extension BlockInputDocument {
         }
         if blocks[index].lineIndentationLevels.isEmpty {
             blocks[index].indentationLevel -= 1
+            normalizeNumberedListStartsIfNeeded(around: index)
             return true
         }
         blocks[index].setIndentationLevel(lineIndentation - 1, forLine: 0)
+        normalizeNumberedListStartsIfNeeded(around: index)
         return true
     }
 

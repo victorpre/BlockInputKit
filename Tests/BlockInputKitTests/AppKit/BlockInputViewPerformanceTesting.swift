@@ -8,6 +8,7 @@ final class DocumentReadCountingStore: BlockInputDocumentStore {
     private(set) var replacedBlockIDs: [BlockInputBlockID] = []
     private(set) var insertedBlockBatches: [(blocks: [BlockInputBlock], index: Int)] = []
     private(set) var deletedBlockIDs: [[BlockInputBlockID]] = []
+    private(set) var movedBlocks: [(id: BlockInputBlockID, index: Int)] = []
 
     var document: BlockInputDocument {
         documentReadCount += 1
@@ -29,6 +30,7 @@ final class DocumentReadCountingStore: BlockInputDocumentStore {
         replacedBlockIDs = []
         insertedBlockBatches = []
         deletedBlockIDs = []
+        movedBlocks = []
     }
 
     func block(at index: Int) -> BlockInputBlock? {
@@ -69,5 +71,10 @@ final class DocumentReadCountingStore: BlockInputDocumentStore {
         deletedBlockIDs.append(ids)
         let deletedIDs = Set(ids)
         storedDocument.blocks.removeAll { deletedIDs.contains($0.id) }
+    }
+
+    func moveBlock(withID id: BlockInputBlockID, to index: Int) {
+        movedBlocks.append((id, index))
+        storedDocument.moveBlock(blockID: id, to: index)
     }
 }

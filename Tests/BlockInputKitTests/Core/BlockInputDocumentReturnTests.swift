@@ -116,6 +116,62 @@ final class BlockInputDocumentReturnTests: XCTestCase {
         XCTAssertEqual(exitSelection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
+    func testReturnOutdentingEmptyNumberedListItemContinuesParentSequence() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let childID = BlockInputBlockID(rawValue: "child")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, kind: .numberedListItem(start: 1), text: "One"),
+            BlockInputBlock(id: childID, kind: .numberedListItem(start: 1), indentationLevel: 1)
+        ])
+
+        _ = document.handleReturn(in: childID)
+
+        XCTAssertEqual(document.blocks[1].kind, .numberedListItem(start: 2))
+        XCTAssertEqual(document.blocks[1].indentationLevel, 0)
+    }
+
+    func testReturnOutdentingEmptyNumberedListItemWithPerLineIndentationContinuesParentSequence() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let childID = BlockInputBlockID(rawValue: "child")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, kind: .numberedListItem(start: 1), text: "One"),
+            BlockInputBlock(
+                id: childID,
+                kind: .numberedListItem(start: 1),
+                lineIndentationLevels: [1]
+            )
+        ])
+
+        _ = document.handleReturn(in: childID)
+
+        XCTAssertEqual(document.blocks[1].kind, .numberedListItem(start: 2))
+        XCTAssertEqual(document.blocks[1].lineIndentationLevels, [])
+    }
+
+    func testReturnOutdentingEmptyNumberedListItemContinuesPerLineSiblingSequence() {
+        let previousChildID = BlockInputBlockID(rawValue: "previous-child")
+        let childID = BlockInputBlockID(rawValue: "child")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: "parent", kind: .numberedListItem(start: 1), text: "Parent"),
+            BlockInputBlock(
+                id: previousChildID,
+                kind: .numberedListItem(start: 1),
+                text: "Previous child",
+                lineIndentationLevels: [1]
+            ),
+            BlockInputBlock(
+                id: childID,
+                kind: .numberedListItem(start: 1),
+                lineIndentationLevels: [2]
+            )
+        ])
+
+        _ = document.handleReturn(in: childID)
+
+        XCTAssertEqual(document.blocks[2].kind, .numberedListItem(start: 2))
+        XCTAssertEqual(document.blocks[2].lineIndentationLevels, [1])
+    }
+
     func testReturnInNumberedListItemInsertsNextNumberedBlock() {
         let blockID = BlockInputBlockID(rawValue: "number")
         var document = BlockInputDocument(blocks: [

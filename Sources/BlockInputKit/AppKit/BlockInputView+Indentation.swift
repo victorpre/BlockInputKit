@@ -13,13 +13,17 @@ extension BlockInputView {
         selectedRange: NSRange,
         direction: IndentationDirection
     ) -> BlockInputSelection? {
+        if !isDocumentCacheSynchronized {
+            refreshDocumentFromStore()
+        }
         guard let index = index(of: blockID),
               let beforeBlock = block(at: index),
               beforeBlock.kind.supportsIndentation else {
             return nil
         }
         let beforeSelection = selection
-        guard let (afterBlock, afterSelection) = indentedBlock(
+        let beforeDocument = document
+        guard let indentationResult = indentedBlock(
             from: beforeBlock,
             blockID: blockID,
             selectedRange: selectedRange,
@@ -27,36 +31,148 @@ extension BlockInputView {
         ) else {
             return nil
         }
-        guard beforeBlock != afterBlock else {
+        var afterBlock = indentationResult.0
+        let afterSelection = indentationResult.1
+        var afterDocument = document
+        afterDocument.blocks[index] = afterBlock
+        if afterBlock.kind.isNumberedListItem {
+            afterDocument.normalizeNumberedListStartsAround(index)
+        }
+        afterBlock = afterDocument.blocks[index]
+        let changedBlocks = changedBlocksAfterIndentation(
+            before: beforeDocument,
+            after: afterDocument,
+            around: index
+        )
+        guard !changedBlocks.isEmpty else {
             applySelection(afterSelection, notify: beforeSelection != afterSelection)
             return nil
         }
-        // Indentation is a one-block structural edit. Keep it off the generic
-        // document-snapshot path so Tab stays responsive in large documents.
-        syncDocumentStore(.replaceBlock(afterBlock))
-        _ = replaceCachedBlock(afterBlock, at: index)
-        applySelection(afterSelection, notify: true)
-        undoController?.registerBlockReplacementStructuralEdit(
-            actionName: actionName,
+        let edit = BlockInputIndentationEdit(
+            beforeDocument: beforeDocument,
+            afterDocument: afterDocument,
             beforeBlock: beforeBlock,
             afterBlock: afterBlock,
-            selectionBefore: beforeSelection,
-            selectionAfter: afterSelection
+            changedBlocks: changedBlocks,
+            beforeSelection: beforeSelection,
+            afterSelection: afterSelection,
+            blockIndex: index
         )
-        if item.representedBlockID == blockID {
-            item.updateTextDependentChrome(for: afterBlock)
-            if case let .cursor(cursor) = afterSelection {
-                item.setSelectedRange(NSRange(location: cursor.utf16Offset, length: 0))
-            }
-            item.view.needsLayout = true
-            item.view.layoutSubtreeIfNeeded()
-            if heightChangesAfterIndentation(item: item, beforeBlock: beforeBlock, afterBlock: afterBlock) {
-                resizeVisibleItem(item, for: afterBlock)
-                invalidateLayoutForBlock(at: index, editedItem: item, block: afterBlock)
-            }
+        applyIndentationEdit(edit, named: actionName, item: item)
+        return afterSelection
+    }
+
+    private func applyIndentationEdit(
+        _ edit: BlockInputIndentationEdit,
+        named actionName: String,
+        item: BlockInputBlockItem
+    ) {
+        // Most indentation edits replace one block; ordered-list renumbering may
+        // add sibling replacements so markers stay visually consistent.
+        for changedBlock in edit.changedBlocks {
+            syncDocumentStore(.replaceBlock(changedBlock))
+        }
+        document = edit.afterDocument
+        applySelection(edit.afterSelection, notify: true)
+        registerIndentationUndo(actionName: actionName, edit: edit)
+        if edit.changedBlocks.count == 1 {
+            updateVisibleItemAfterIndentation(
+                item,
+                beforeBlock: edit.beforeBlock,
+                afterBlock: edit.afterBlock,
+                afterSelection: edit.afterSelection,
+                index: edit.blockIndex
+            )
+        } else {
+            reloadDataKeepingFocus()
         }
         publishDocumentChange()
-        return afterSelection
+    }
+
+    private func changedBlocksAfterIndentation(
+        before beforeDocument: BlockInputDocument,
+        after afterDocument: BlockInputDocument,
+        around index: Int
+    ) -> [BlockInputBlock] {
+        guard beforeDocument.blocks.indices.contains(index),
+              afterDocument.blocks.indices.contains(index) else {
+            return changedBlocksByID(before: beforeDocument, after: afterDocument)
+        }
+        let beforeBlock = beforeDocument.blocks[index]
+        let afterBlock = afterDocument.blocks[index]
+        guard beforeBlock.kind.isNumberedListItem || afterBlock.kind.isNumberedListItem else {
+            return beforeBlock == afterBlock ? [] : [afterBlock]
+        }
+        guard let listRange = afterDocument.listRangeForIndentationChange(around: index) else {
+            return beforeBlock == afterBlock ? [] : [afterBlock]
+        }
+        return listRange.compactMap { changedIndex in
+            guard beforeDocument.blocks.indices.contains(changedIndex) else {
+                return afterDocument.blocks[changedIndex]
+            }
+            return beforeDocument.blocks[changedIndex] == afterDocument.blocks[changedIndex]
+                ? nil
+                : afterDocument.blocks[changedIndex]
+        }
+    }
+
+    private func registerIndentationUndo(
+        actionName: String,
+        edit: BlockInputIndentationEdit
+    ) {
+        if edit.changedBlocks.count == 1 {
+            undoController?.registerBlockReplacementStructuralEdit(
+                actionName: actionName,
+                beforeBlock: edit.beforeBlock,
+                afterBlock: edit.afterBlock,
+                selectionBefore: edit.beforeSelection,
+                selectionAfter: edit.afterSelection
+            )
+            return
+        }
+        undoController?.registerStructuralEdit(
+            actionName: actionName,
+            beforeDocument: edit.beforeDocument,
+            afterDocument: edit.afterDocument,
+            selectionBefore: edit.beforeSelection,
+            selectionAfter: edit.afterSelection
+        )
+    }
+
+    private func updateVisibleItemAfterIndentation(
+        _ item: BlockInputBlockItem,
+        beforeBlock: BlockInputBlock,
+        afterBlock: BlockInputBlock,
+        afterSelection: BlockInputSelection,
+        index: Int
+    ) {
+        guard item.representedBlockID == afterBlock.id else {
+            return
+        }
+        refreshIndentedItem(item, for: afterBlock)
+        if case let .cursor(cursor) = afterSelection {
+            item.setSelectedRange(NSRange(location: cursor.utf16Offset, length: 0))
+        }
+        item.view.needsLayout = true
+        item.view.layoutSubtreeIfNeeded()
+        if heightChangesAfterIndentation(item: item, beforeBlock: beforeBlock, afterBlock: afterBlock) {
+            resizeVisibleItem(item, for: afterBlock)
+            invalidateLayoutForBlock(at: index, editedItem: item, block: afterBlock)
+        }
+    }
+
+    private func refreshIndentedItem(_ item: BlockInputBlockItem, for block: BlockInputBlock) {
+        guard item.currentText != block.text else {
+            item.updateTextDependentChrome(for: block)
+            return
+        }
+        item.configure(
+            block: block,
+            allowsReordering: allowsBlockReordering,
+            accentColor: dropIndicatorColor,
+            isSelected: isBlockSelected(block.id),
+            delegate: self
+        )
     }
 
     private func heightChangesAfterIndentation(
@@ -81,8 +197,9 @@ extension BlockInputView {
         direction: IndentationDirection
     ) -> (BlockInputBlock, BlockInputSelection)? {
         var afterBlock = beforeBlock
-        if beforeBlock.text.contains("\n") {
-            let lineIndex = beforeBlock.lineIndex(containingUTF16Offset: selectedRange.location)
+        let selectedOffset = min(max(selectedRange.location, 0), beforeBlock.utf16Length)
+        if beforeBlock.text.contains("\n") || !beforeBlock.lineIndentationLevels.isEmpty {
+            let lineIndex = beforeBlock.lineIndex(containingUTF16Offset: selectedOffset)
             guard updateLineIndentation(in: &afterBlock, lineIndex: lineIndex, direction: direction) else {
                 return nil
             }
@@ -93,7 +210,7 @@ extension BlockInputView {
         }
         let selection = BlockInputSelection.cursor(BlockInputCursor(
             blockID: blockID,
-            utf16Offset: selectedRange.location
+            utf16Offset: selectedOffset
         ))
         return (afterBlock, selection)
     }
@@ -131,6 +248,57 @@ extension BlockInputView {
             }
             block.indentationLevel = max(0, block.indentationLevel - 1)
             return true
+        }
+    }
+
+}
+
+private struct BlockInputIndentationEdit {
+    var beforeDocument: BlockInputDocument
+    var afterDocument: BlockInputDocument
+    var beforeBlock: BlockInputBlock
+    var afterBlock: BlockInputBlock
+    var changedBlocks: [BlockInputBlock]
+    var beforeSelection: BlockInputSelection?
+    var afterSelection: BlockInputSelection
+    var blockIndex: Int
+}
+
+private extension BlockInputDocument {
+    func listRangeForIndentationChange(around index: Int) -> Range<Int>? {
+        guard !blocks.isEmpty else {
+            return nil
+        }
+        let clampedIndex = min(max(index, 0), blocks.count - 1)
+        guard blocks[clampedIndex].kind.isListItem else {
+            return nil
+        }
+        var lowerBound = clampedIndex
+        while lowerBound > 0, blocks[lowerBound - 1].kind.isListItem {
+            lowerBound -= 1
+        }
+        var upperBound = clampedIndex + 1
+        while upperBound < blocks.count, blocks[upperBound].kind.isListItem {
+            upperBound += 1
+        }
+        return lowerBound..<upperBound
+    }
+}
+
+private extension BlockInputBlockKind {
+    var isNumberedListItem: Bool {
+        if case .numberedListItem = self {
+            return true
+        }
+        return false
+    }
+
+    var isListItem: Bool {
+        switch self {
+        case .bulletedListItem, .numberedListItem, .checklistItem:
+            return true
+        case .paragraph, .heading, .code, .horizontalRule, .quote:
+            return false
         }
     }
 }

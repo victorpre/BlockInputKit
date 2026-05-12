@@ -28,13 +28,7 @@ extension BlockInputBlockItem {
         guard selectedRange.length == 0 else {
             return false
         }
-        if selectedRange.location == 0 {
-            return true
-        }
         let text = textView.string as NSString
-        guard selectedRange.location <= text.length else {
-            return false
-        }
-        return text.character(at: selectedRange.location - 1).isLineEnding
+        return selectedRange.location <= text.length
     }
 }

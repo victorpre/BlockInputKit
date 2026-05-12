@@ -33,10 +33,12 @@ enum DemoMutationBenchmark {
             store: context.store,
             view: context.view
         )
+        let reorderStats = measureOrderedReorder(iterations: iterations)
         print(paragraphStats.reportLine)
         print(listStats.reportLine)
         print(quoteStats.reportLine)
         print(quoteLineExitStats.reportLine)
+        print(reorderStats.reportLine)
         print("demo_100k_mutation_benchmark publishes=\(context.publishCount.value) blockCount=\(context.store.blockCount)")
     }
 
@@ -184,6 +186,51 @@ enum DemoMutationBenchmark {
         }
         return ReplacementStats(name: "quote_line_exit", replacements: replaceDurations, undos: undoDurations, redos: redoDurations)
     }
+
+    private static func measureOrderedReorder(iterations: Int) -> MoveStats {
+        let sourceIndex = 50_000
+        let sourceID = BlockInputBlockID(rawValue: "ordered-\(sourceIndex)")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: (0..<100_000).map { index in
+            BlockInputBlock(
+                id: BlockInputBlockID(rawValue: "ordered-\(index)"),
+                kind: .numberedListItem(start: index + 1),
+                text: "Ordered block \(index)"
+            )
+        }))
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            undoController: BlockInputUndoController()
+        ))
+        view.layoutSubtreeIfNeeded()
+        var moveDurations: [Double] = []
+        var undoDurations: [Double] = []
+        var redoDurations: [Double] = []
+        for _ in 0..<iterations {
+            let moveStart = CFAbsoluteTimeGetCurrent()
+            guard view.moveBlock(blockID: sourceID, to: sourceIndex + 1) != nil else {
+                print("demo_100k_mutation_benchmark_ordered_reorder_failed")
+                break
+            }
+            moveDurations.append((CFAbsoluteTimeGetCurrent() - moveStart) * 1_000)
+
+            let undoStart = CFAbsoluteTimeGetCurrent()
+            guard view.undoStructuralEdit() != nil else {
+                print("demo_100k_mutation_benchmark_ordered_reorder_undo_failed")
+                break
+            }
+            undoDurations.append((CFAbsoluteTimeGetCurrent() - undoStart) * 1_000)
+
+            let redoStart = CFAbsoluteTimeGetCurrent()
+            guard view.redoStructuralEdit() != nil else {
+                print("demo_100k_mutation_benchmark_ordered_reorder_redo_failed")
+                break
+            }
+            redoDurations.append((CFAbsoluteTimeGetCurrent() - redoStart) * 1_000)
+            _ = view.undoStructuralEdit()
+        }
+        return MoveStats(name: "ordered_reorder", moves: moveDurations, undos: undoDurations, redos: redoDurations)
+    }
 }
 
 private struct MutationStats {
@@ -241,6 +288,24 @@ private struct ReplacementStats {
             "redo_avg_ms=\(MutationStats.average(redos).roundedString) " +
             "redo_p95_ms=\(MutationStats.percentile(redos, 0.95).roundedString) " +
             "iterations=\([replacements.count, undos.count, redos.count].min() ?? 0)"
+    }
+}
+
+private struct MoveStats {
+    var name: String
+    var moves: [Double]
+    var undos: [Double]
+    var redos: [Double]
+
+    var reportLine: String {
+        "demo_100k_mutation_benchmark \(name) " +
+            "move_avg_ms=\(MutationStats.average(moves).roundedString) " +
+            "move_p95_ms=\(MutationStats.percentile(moves, 0.95).roundedString) " +
+            "undo_avg_ms=\(MutationStats.average(undos).roundedString) " +
+            "undo_p95_ms=\(MutationStats.percentile(undos, 0.95).roundedString) " +
+            "redo_avg_ms=\(MutationStats.average(redos).roundedString) " +
+            "redo_p95_ms=\(MutationStats.percentile(redos, 0.95).roundedString) " +
+            "iterations=\([moves.count, undos.count, redos.count].min() ?? 0)"
     }
 }
 

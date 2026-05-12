@@ -9,6 +9,7 @@ extension BlockInputView {
         case insertBlocks([BlockInputBlock], insertionIndex: Int)
         case deleteBlocks([BlockInputBlockID])
         case moveBlock(BlockInputBlockID, targetIndex: Int)
+        case moveBlockAndReplaceChangedBlocks(BlockInputBlockID, targetIndex: Int, changedBlocks: [BlockInputBlock])
     }
 
     func publishDocumentChange() {
@@ -43,6 +44,18 @@ extension BlockInputView {
             documentStore.deleteBlocks(withIDs: blockIDs)
         case let .moveBlock(blockID, targetIndex):
             documentStore.moveBlock(withID: blockID, to: targetIndex)
+        case let .moveBlockAndReplaceChangedBlocks(blockID, targetIndex, changedBlocks):
+            if let memoryStore = documentStore as? BlockInputMemoryDocumentStore {
+                memoryStore.moveBlockWithoutNormalizing(withID: blockID, to: targetIndex)
+            } else {
+                documentStore.moveBlock(withID: blockID, to: targetIndex)
+            }
+            publishDocumentMutation(.moveBlock(blockID, index: targetIndex))
+            for block in changedBlocks {
+                documentStore.replaceBlock(block)
+                publishDocumentMutation(.replaceBlock(block))
+            }
+            return
         }
         publishDocumentMutation(action.documentChange(document: document))
     }
@@ -284,6 +297,16 @@ extension BlockInputView {
 
     @discardableResult
     func applyGranularUndoResult(_ result: BlockInputUndoResult) -> Bool {
+        if let movedBlockID = result.movedBlockID,
+           let moveIndex = result.moveIndex {
+            return applyGranularMoveUndo(
+                blockID: movedBlockID,
+                to: moveIndex,
+                changedBlocks: result.replacedBlocks ?? [],
+                selection: result.selection
+            )
+        }
+
         if let replacedBlock = result.replacedBlock,
            let replacementIndex = index(of: replacedBlock.id) {
             if let insertedBlocks = result.insertedBlocks,
@@ -460,42 +483,8 @@ extension BlockInputView {
         return true
     }
 
-    private func validUndoSelection(_ selection: BlockInputSelection?) -> BlockInputSelection? {
+    func validUndoSelection(_ selection: BlockInputSelection?) -> BlockInputSelection? {
         selection.flatMap { containsValidSelection($0) ? $0 : nil }
     }
 
-    private func defaultStoreSyncAction(for result: BlockInputUndoResult) -> StoreSyncAction {
-        if result.replacedBlock != nil,
-           result.insertedBlocks != nil || result.deletedBlockIDs != nil {
-            return .replaceDocument
-        }
-        if let replacedBlock = result.replacedBlock {
-            return .replaceBlock(replacedBlock)
-        }
-        if let insertedBlocks = result.insertedBlocks,
-           let insertionIndex = result.insertionIndex {
-            return .insertBlocks(insertedBlocks, insertionIndex: insertionIndex)
-        }
-        if let deletedBlockIDs = result.deletedBlockIDs {
-            return .deleteBlocks(deletedBlockIDs)
-        }
-        return .replaceDocument
-    }
-}
-
-private extension BlockInputView.StoreSyncAction {
-    func documentChange(document: BlockInputDocument) -> BlockInputDocumentChange {
-        switch self {
-        case .replaceDocument:
-            return .replaceDocument(document)
-        case let .replaceBlock(block):
-            return .replaceBlock(block)
-        case let .insertBlocks(blocks, insertionIndex):
-            return .insertBlocks(blocks, index: insertionIndex)
-        case let .deleteBlocks(blockIDs):
-            return .deleteBlocks(blockIDs)
-        case let .moveBlock(blockID, targetIndex):
-            return .moveBlock(blockID, index: targetIndex)
-        }
-    }
 }

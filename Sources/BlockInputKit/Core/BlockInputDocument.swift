@@ -151,21 +151,6 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return .cursor(BlockInputCursor(blockID: blocks[index - 1].id, utf16Offset: cursorOffset))
     }
 
-    /// Moves a block to a document index and returns a block selection for the moved block.
-    @discardableResult
-    public mutating func moveBlock(blockID: BlockInputBlockID, to targetIndex: Int) -> BlockInputSelection? {
-        guard let sourceIndex = index(of: blockID) else {
-            return nil
-        }
-        let finalTargetIndex = min(max(targetIndex, 0), blocks.count - 1)
-        guard finalTargetIndex != sourceIndex else {
-            return nil
-        }
-        let block = blocks.remove(at: sourceIndex)
-        blocks.insert(block, at: finalTargetIndex)
-        return .blocks([block.id])
-    }
-
     /// Increases a block's nesting level.
     @discardableResult
     public mutating func indentBlock(
@@ -179,15 +164,17 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
             return nil
         }
         if let activeUTF16Offset,
-           blocks[index].text.contains("\n") {
+           blocks[index].text.contains("\n") || !blocks[index].lineIndentationLevels.isEmpty {
             let lineIndex = blocks[index].lineIndex(containingUTF16Offset: activeUTF16Offset)
             blocks[index].setIndentationLevel(
                 blocks[index].indentationLevel(forLine: lineIndex) + 1,
                 forLine: lineIndex
             )
+            normalizeNumberedListStartsIfNeeded(around: index)
             return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: activeUTF16Offset))
         }
         blocks[index].indentationLevel += 1
+        normalizeNumberedListStartsIfNeeded(around: index)
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: blocks[index].utf16Length))
     }
 
@@ -204,19 +191,21 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
             return nil
         }
         if let activeUTF16Offset,
-           blocks[index].text.contains("\n") {
+           blocks[index].text.contains("\n") || !blocks[index].lineIndentationLevels.isEmpty {
             let lineIndex = blocks[index].lineIndex(containingUTF16Offset: activeUTF16Offset)
             let currentLevel = blocks[index].indentationLevel(forLine: lineIndex)
             guard currentLevel > 0 else {
                 return nil
             }
             blocks[index].setIndentationLevel(currentLevel - 1, forLine: lineIndex)
+            normalizeNumberedListStartsIfNeeded(around: index)
             return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: activeUTF16Offset))
         }
         guard blocks[index].indentationLevel > 0 else {
             return nil
         }
         blocks[index].indentationLevel = max(0, blocks[index].indentationLevel - 1)
+        normalizeNumberedListStartsIfNeeded(around: index)
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: blocks[index].utf16Length))
     }
 
@@ -301,21 +290,6 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
             return .blocks(allBlockIDs)
         }
         return .text(fullRange)
-    }
-}
-
-extension BlockInputDocument {
-    func detachedStorage() -> Self {
-        // Keep editor-owned snapshots from sharing copy-on-write array storage
-        // with large host stores; per-block edits should not copy every block.
-        BlockInputDocument(blocks: blocks.map { $0 })
-    }
-}
-
-public extension BlockInputBlock {
-    /// Creates a new empty paragraph block.
-    static func emptyParagraph() -> Self {
-        BlockInputBlock(kind: .paragraph)
     }
 }
 

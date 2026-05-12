@@ -236,9 +236,32 @@ public final class BlockInputMemoryDocumentStore: BlockInputBackgroundSnapshotSt
         guard finalTargetIndex != sourceIndex else {
             return
         }
-        guard storedDocument.moveBlock(blockID: id, to: finalTargetIndex) != nil else {
+        guard storedDocument.moveBlockWithChangedBlocks(sourceIndex: sourceIndex, to: finalTargetIndex) != nil else {
             return
         }
+        updateIndexesAfterMove(from: sourceIndex, to: finalTargetIndex)
+    }
+
+    func moveBlockWithoutNormalizing(withID id: BlockInputBlockID, to index: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        if indexesNeedRebuild {
+            rebuildIndexes()
+        }
+        guard let sourceIndex = unlockedIndex(of: id) else {
+            return
+        }
+        let finalTargetIndex = min(max(index, 0), storedDocument.blocks.count - 1)
+        guard finalTargetIndex != sourceIndex else {
+            return
+        }
+        if abs(finalTargetIndex - sourceIndex) == 1 {
+            storedDocument.blocks.swapAt(sourceIndex, finalTargetIndex)
+            updateIndexesAfterMove(from: sourceIndex, to: finalTargetIndex)
+            return
+        }
+        let block = storedDocument.blocks.remove(at: sourceIndex)
+        storedDocument.blocks.insert(block, at: finalTargetIndex)
         updateIndexesAfterMove(from: sourceIndex, to: finalTargetIndex)
     }
 

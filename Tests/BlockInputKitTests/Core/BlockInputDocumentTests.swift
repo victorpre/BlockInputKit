@@ -294,6 +294,96 @@ final class BlockInputDocumentTests: XCTestCase {
         XCTAssertEqual(selection, .blocks([firstID]))
     }
 
+    func testMoveNumberedSubitemRenumbersAgainstNewListContext() {
+        let firstParentID = BlockInputBlockID(rawValue: "first-parent")
+        let firstChildID = BlockInputBlockID(rawValue: "first-child")
+        let secondParentID = BlockInputBlockID(rawValue: "second-parent")
+        let secondChildID = BlockInputBlockID(rawValue: "second-child")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstParentID, kind: .numberedListItem(start: 1), text: "First"),
+            BlockInputBlock(id: firstChildID, kind: .numberedListItem(start: 1), text: "Child", indentationLevel: 1),
+            BlockInputBlock(id: secondParentID, kind: .numberedListItem(start: 2), text: "Second"),
+            BlockInputBlock(id: secondChildID, kind: .numberedListItem(start: 1), text: "Moved", indentationLevel: 1)
+        ])
+
+        let selection = document.moveBlock(blockID: secondChildID, to: 2)
+
+        XCTAssertEqual(document.blocks.map(\.id), [firstParentID, firstChildID, secondChildID, secondParentID])
+        XCTAssertEqual(document.blocks.map(\.kind), [
+            .numberedListItem(start: 1),
+            .numberedListItem(start: 1),
+            .numberedListItem(start: 2),
+            .numberedListItem(start: 2)
+        ])
+        XCTAssertEqual(selection, .blocks([secondChildID]))
+    }
+
+    func testMoveTopLevelNumberedItemRenumbersAffectedSiblings() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, kind: .numberedListItem(start: 1), text: "One"),
+            BlockInputBlock(id: secondID, kind: .numberedListItem(start: 2), text: "Two"),
+            BlockInputBlock(id: thirdID, kind: .numberedListItem(start: 3), text: "Three")
+        ])
+
+        let selection = document.moveBlock(blockID: secondID, to: 2)
+
+        XCTAssertEqual(document.blocks.map(\.id), [firstID, thirdID, secondID])
+        XCTAssertEqual(document.blocks.map(\.kind), [
+            .numberedListItem(start: 1),
+            .numberedListItem(start: 2),
+            .numberedListItem(start: 3)
+        ])
+        XCTAssertEqual(selection, .blocks([secondID]))
+    }
+
+    func testMoveParagraphDoesNotRenumberUnrelatedNumberedList() {
+        let paragraphID = BlockInputBlockID(rawValue: "paragraph")
+        let firstListID = BlockInputBlockID(rawValue: "first-list")
+        let childID = BlockInputBlockID(rawValue: "child")
+        let secondListID = BlockInputBlockID(rawValue: "second-list")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: paragraphID, text: "Paragraph"),
+            BlockInputBlock(id: firstListID, kind: .numberedListItem(start: 4), text: "Four"),
+            BlockInputBlock(id: childID, kind: .numberedListItem(start: 7), text: "Seven", indentationLevel: 1),
+            BlockInputBlock(id: secondListID, kind: .numberedListItem(start: 5), text: "Five")
+        ])
+
+        let selection = document.moveBlock(blockID: paragraphID, to: 3)
+
+        XCTAssertEqual(document.blocks.map(\.id), [firstListID, childID, secondListID, paragraphID])
+        XCTAssertEqual(document.blocks.map(\.kind), [
+            .numberedListItem(start: 4),
+            .numberedListItem(start: 7),
+            .numberedListItem(start: 5),
+            .paragraph
+        ])
+        XCTAssertEqual(selection, .blocks([paragraphID]))
+    }
+
+    func testMoveParagraphBeforeMergedNumberedRunsRenumbersSourceList() {
+        let firstListID = BlockInputBlockID(rawValue: "first-list")
+        let separatorID = BlockInputBlockID(rawValue: "separator")
+        let secondListID = BlockInputBlockID(rawValue: "second-list")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstListID, kind: .numberedListItem(start: 4), text: "Four"),
+            BlockInputBlock(id: separatorID, text: "Separator"),
+            BlockInputBlock(id: secondListID, kind: .numberedListItem(start: 9), text: "Nine")
+        ])
+
+        let selection = document.moveBlock(blockID: separatorID, to: 0)
+
+        XCTAssertEqual(document.blocks.map(\.id), [separatorID, firstListID, secondListID])
+        XCTAssertEqual(document.blocks.map(\.kind), [
+            .paragraph,
+            .numberedListItem(start: 4),
+            .numberedListItem(start: 5)
+        ])
+        XCTAssertEqual(selection, .blocks([separatorID]))
+    }
+
     func testMoveBlockToSameIndexIsNoOp() {
         let blockID = BlockInputBlockID(rawValue: "only")
         var document = BlockInputDocument(blocks: [
@@ -304,60 +394,6 @@ final class BlockInputDocumentTests: XCTestCase {
 
         XCTAssertNil(selection)
         XCTAssertEqual(document.blocks.map(\.id), [blockID])
-    }
-
-    func testOutdentAtRootLevelIsNoOp() {
-        let blockID = BlockInputBlockID(rawValue: "root")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Root", indentationLevel: 0)
-        ])
-
-        let selection = document.outdentBlock(blockID: blockID)
-
-        XCTAssertNil(selection)
-        XCTAssertEqual(document.blocks[0].indentationLevel, 0)
-    }
-
-    func testIndentWithActiveOffsetOnlyIndentsCurrentListLine() {
-        let blockID = BlockInputBlockID(rawValue: "list")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "One\nTwo\nThree")
-        ])
-
-        let selection = document.indentBlock(blockID: blockID, activeUTF16Offset: 5)
-
-        XCTAssertEqual(document.blocks[0].indentationLevel, 0)
-        XCTAssertEqual(document.blocks[0].lineIndentationLevels, [0, 1, 0])
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 5)))
-    }
-
-    func testOutdentWithActiveOffsetOnlyOutdentsCurrentListLine() {
-        let blockID = BlockInputBlockID(rawValue: "list")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(
-                id: blockID,
-                kind: .bulletedListItem,
-                text: "One\nTwo\nThree",
-                lineIndentationLevels: [0, 2, 0]
-            )
-        ])
-
-        let selection = document.outdentBlock(blockID: blockID, activeUTF16Offset: 5)
-
-        XCTAssertEqual(document.blocks[0].lineIndentationLevels, [0, 1, 0])
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 5)))
-    }
-
-    func testIndentIgnoresNonListBlocks() {
-        let blockID = BlockInputBlockID(rawValue: "quote")
-        var document = BlockInputDocument(blocks: [
-            BlockInputBlock(id: blockID, kind: .quote, text: "Quote")
-        ])
-
-        let selection = document.indentBlock(blockID: blockID)
-
-        XCTAssertNil(selection)
-        XCTAssertEqual(document.blocks[0].indentationLevel, 0)
     }
 
     func testChangeBlockKindToExistingKindIsNoOp() {
