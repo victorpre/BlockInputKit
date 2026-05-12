@@ -228,6 +228,16 @@ extension BlockInputView {
         }
     }
 
+    func hideReorderHandles(except hoveredItem: BlockInputBlockItem? = nil) {
+        for item in collectionView.visibleItems() {
+            guard let blockItem = item as? BlockInputBlockItem,
+                  blockItem !== hoveredItem else {
+                continue
+            }
+            blockItem.setReorderHandleVisible(false, animated: false)
+        }
+    }
+
     func performStructuralEdit(
         named actionName: String,
         selectionBeforeOverride: BlockInputSelection? = nil,

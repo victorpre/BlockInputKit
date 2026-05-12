@@ -21,6 +21,7 @@ protocol BlockInputBlockItemDelegate: AnyObject {
     func blockItemDidRequestMergeWithPreviousBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRequestDeleteEmptyBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRequestUnwrapBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
+    func blockItemDidRevealReorderHandle(_ item: BlockInputBlockItem)
     func blockItemDidRequestSelectAll(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItem(
         _ item: BlockInputBlockItem,

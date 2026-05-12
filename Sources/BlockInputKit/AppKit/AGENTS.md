@@ -14,3 +14,4 @@
 - Keep multiline quote/code exits on granular replacement-plus-insertion operations; pressing Return on an empty inline line should not fall back to full document structural edits.
 - For non-large replacement-plus-insertion edits, do not mix `reloadItems` and `insertItems` after the document count has changed; reload the visible layout coherently to avoid overlapping rows.
 - Keep front-of-paragraph Backspace/Delete merges granular: replace the previous block and delete the current block.
+- Keep only one visible reorder handle revealed at a time.

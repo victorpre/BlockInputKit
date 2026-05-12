@@ -1,5 +1,6 @@
 import AppKit
 
+/// Row-height and chrome-alignment metrics for each rendered block family.
 struct BlockInputBlockItemVerticalMetrics {
     var textContainerInset: NSSize
     var topContentInset: CGFloat
@@ -13,6 +14,20 @@ struct BlockInputBlockItemVerticalMetrics {
         minimumHeight: 34
     )
 
+    static let textBlock = BlockInputBlockItemVerticalMetrics(
+        textContainerInset: NSSize(width: 4, height: 3),
+        topContentInset: 3,
+        bottomContentInset: 3,
+        minimumHeight: 29
+    )
+
+    static let textList = BlockInputBlockItemVerticalMetrics(
+        textContainerInset: NSSize(width: 4, height: 4),
+        topContentInset: 4,
+        bottomContentInset: 0,
+        minimumHeight: 24
+    )
+
     static let checklist = BlockInputBlockItemVerticalMetrics(
         textContainerInset: NSSize(width: 4, height: 4),
         topContentInset: 4,
@@ -20,8 +35,8 @@ struct BlockInputBlockItemVerticalMetrics {
         minimumHeight: 28
     )
 
-    var chromeTopConstant: CGFloat {
-        topContentInset + 2
+    func chromeTopConstant(font: NSFont, chromeHeight: CGFloat) -> CGFloat {
+        topContentInset + (font.blockInputLineHeight - chromeHeight) / 2
     }
 
     func checklistButtonTopConstant(font: NSFont, checkboxHeight: CGFloat) -> CGFloat {
@@ -30,9 +45,19 @@ struct BlockInputBlockItemVerticalMetrics {
 }
 
 extension BlockInputBlockItem {
+    static let dragHandleHeight: CGFloat = 14
     static let checklistButtonHeight: CGFloat = 18
     static let standardTextContainerInset = NSSize(width: 4, height: 6)
+    static let textBlockTextContainerInset = NSSize(width: 4, height: 3)
+    static let textListTextContainerInset = NSSize(width: 4, height: 4)
     static let checklistTextContainerInset = NSSize(width: 4, height: 4)
+
+    static func dragHandleTopConstant(
+        for kind: BlockInputBlockKind,
+        metrics: BlockInputBlockItemVerticalMetrics
+    ) -> CGFloat {
+        metrics.chromeTopConstant(font: font(for: kind), chromeHeight: dragHandleHeight)
+    }
 }
 
 private extension NSFont {

@@ -1,5 +1,6 @@
 import AppKit
 
+/// Collection item that owns one AppKit text input plus block-specific chrome for a single document block.
 final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let reuseIdentifier = NSUserInterfaceItemIdentifier("BlockInputBlockItem")
     static let chromeFrameAlignmentOffset: CGFloat = 0
@@ -17,7 +18,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let markerAlignmentLeading: CGFloat = markerGutterWidth + defaultTextLeading + textContainerContentLeading
     static let listTextLeading: CGFloat = -textContainerContentLeading
     static let quoteBarIdentifier = NSUserInterfaceItemIdentifier("BlockInputQuoteBarView")
-    private static let quoteTextLeading: CGFloat = 7
+    static let quoteBarWidth: CGFloat = 6
+    static let minimumQuoteBarHeight: CGFloat = 32
+    static let quoteBarVerticalInset: CGFloat = 2
+    private static let quoteTextLeading: CGFloat = 9
 
     let handleView = BlockInputDragHandleView()
     let kindLabel = BlockInputMarkerView()
@@ -45,6 +49,8 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var kindLabelTopConstraint: NSLayoutConstraint?
     var checklistButtonTopConstraint: NSLayoutConstraint?
     var quoteBarLeadingConstraint: NSLayoutConstraint?
+    var quoteBarTopConstraint: NSLayoutConstraint?
+    var quoteBarBottomConstraint: NSLayoutConstraint?
     var horizontalRuleLeadingConstraint: NSLayoutConstraint?
     private var isHorizontalRule = false
 
@@ -85,22 +91,19 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        updateTextViewDocumentFrame()
         updateHoverTrackingArea()
         updateMarkerLineYOffsets()
+        updateQuoteBarVerticalExtent()
     }
 
     override func mouseEntered(with event: NSEvent) {
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
-            handleView.animator().alphaValue = handleView.isEnabled ? 1 : 0
-        }
+        delegate?.blockItemDidRevealReorderHandle(self)
+        setReorderHandleVisible(true)
     }
 
     override func mouseExited(with event: NSEvent) {
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
-            handleView.animator().alphaValue = 0
-        }
+        setReorderHandleVisible(false)
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -339,7 +342,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         scrollView.isHidden = isHorizontalRule
         scrollViewTopConstraint?.constant = 0
         scrollViewBottomConstraint?.constant = 0
-        handleTopConstraint?.constant = verticalMetrics.chromeTopConstant
+        handleTopConstraint?.constant = Self.dragHandleTopConstant(for: block.kind, metrics: verticalMetrics)
         kindLabelTopConstraint?.constant = 0
         checklistButtonTopConstraint?.constant = verticalMetrics.checklistButtonTopConstant(
             font: Self.font(for: block.kind),
@@ -356,6 +359,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         quoteBarView.alphaValue = quoteBarView.isHidden ? 0 : 1
         horizontalRuleView.setVisible(isHorizontalRule)
         applyKindLabelAttributes(for: block)
+        updateQuoteBarVerticalExtent()
         switch kind {
         case let .checklistItem(isChecked):
             checklistButton.isHidden = false
@@ -459,13 +463,15 @@ extension BlockInputBlockItem {
         scrollViewLeadingConstraint?.constant = Self.defaultTextLeading
         scrollViewTopConstraint?.constant = 0
         scrollViewBottomConstraint?.constant = 0
-        handleTopConstraint?.constant = BlockInputBlockItemVerticalMetrics.standard.chromeTopConstant
+        handleTopConstraint?.constant = Self.dragHandleTopConstant(for: .paragraph, metrics: .standard)
         kindLabelTopConstraint?.constant = 0
         checklistButtonTopConstraint?.constant = BlockInputBlockItemVerticalMetrics.standard.checklistButtonTopConstant(
             font: Self.font(for: .paragraph),
             checkboxHeight: Self.checklistButtonHeight
         )
         quoteBarLeadingConstraint?.constant = Self.chromeFrameAlignmentOffset
+        quoteBarTopConstraint?.constant = Self.quoteBarVerticalInset
+        quoteBarBottomConstraint?.constant = -Self.quoteBarVerticalInset
         horizontalRuleLeadingConstraint?.constant = Self.defaultTextLeading + 4
         quoteBarView.isHidden = true
         quoteBarView.alphaValue = 0

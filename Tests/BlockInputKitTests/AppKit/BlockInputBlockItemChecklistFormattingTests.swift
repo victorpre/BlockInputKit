@@ -18,6 +18,30 @@ final class BlockInputChecklistFormattingTests: XCTestCase {
     }
 
     @MainActor
+    func testOrderedAndUnorderedListHeightsUseTextListVerticalMetrics() {
+        let paragraphHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(kind: .paragraph, text: "Task"),
+            textWidth: 240
+        )
+        let unorderedHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(kind: .bulletedListItem, text: "Task"),
+            textWidth: 240
+        )
+        let orderedHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(kind: .numberedListItem(start: 1), text: "Task"),
+            textWidth: 240
+        )
+        let checklistHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(kind: .checklistItem(isChecked: false), text: "Task"),
+            textWidth: 240
+        )
+
+        XCTAssertLessThan(unorderedHeight, paragraphHeight)
+        XCTAssertLessThan(unorderedHeight, checklistHeight)
+        XCTAssertEqual(unorderedHeight, orderedHeight)
+    }
+
+    @MainActor
     func testChecklistTextInsetIsResetWhenItemIsReconfigured() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "check", kind: .checklistItem(isChecked: false), text: "Task"),
@@ -34,7 +58,7 @@ final class BlockInputChecklistFormattingTests: XCTestCase {
             delegate: BlockInputView()
         )
 
-        XCTAssertEqual(textView.textContainerInset, BlockInputBlockItem.standardTextContainerInset)
+        XCTAssertEqual(textView.textContainerInset, BlockInputBlockItem.textBlockTextContainerInset)
     }
 
     @MainActor

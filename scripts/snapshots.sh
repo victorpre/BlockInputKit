@@ -42,28 +42,35 @@ fi
 tmp_args=$(mktemp)
 trap 'rm -f "$tmp_args"' EXIT
 
+swift_filters=()
 for test_name in "$@"; do
   printf '%s\0' "-only-testing:$test_name" >> "$tmp_args"
+  swift_filters+=("${test_name//\//.}")
 done
+swift_filter=$(
+  IFS='|'
+  echo "${swift_filters[*]}"
+)
 
 run_tests() {
   if command -v xcsift >/dev/null 2>&1; then
-    set +e
-    xargs -0 xcodebuild \
-      -scheme BlockInputKit-Package \
-      -destination 'platform=macOS' \
-      -derivedDataPath .build/xcode \
-      test < "$tmp_args" 2>&1 | xcsift -f toon -w
-    statuses=("${PIPESTATUS[@]}")
-    set -e
+    (
+      set +e
+      xargs -0 xcodebuild \
+        -scheme BlockInputKit-Package \
+        -destination 'platform=macOS' \
+        -derivedDataPath .build/xcode \
+        test < "$tmp_args" 2>&1 | xcsift -f toon -w
+      statuses=("${PIPESTATUS[@]}")
 
-    status=0
-    for pipeline_status in "${statuses[@]}"; do
-      if [ "$pipeline_status" -ne 0 ]; then
-        status=$pipeline_status
-      fi
-    done
-    return "$status"
+      status=0
+      for pipeline_status in "${statuses[@]}"; do
+        if [ "$pipeline_status" -ne 0 ]; then
+          status=$pipeline_status
+        fi
+      done
+      exit "$status"
+    )
   else
     xargs -0 xcodebuild \
       -scheme BlockInputKit-Package \
@@ -71,6 +78,10 @@ run_tests() {
       -derivedDataPath .build/xcode \
       test < "$tmp_args"
   fi
+}
+
+record_tests() {
+  env SNAPSHOT_TESTING_RECORD=all swift test --filter "$swift_filter"
 }
 
 if [ "$mode" = "verify" ]; then
@@ -82,10 +93,8 @@ fi
 # Point-Free SnapshotTesting exits non-zero after recording new references.
 # Verify immediately afterward so the script only succeeds when baselines are usable.
 set +e
-export SNAPSHOT_TESTING_RECORD=all
-run_tests
+record_tests
 record_status=$?
-unset SNAPSHOT_TESTING_RECORD
 set -e
 
 if [ "$record_status" -ne 0 ]; then

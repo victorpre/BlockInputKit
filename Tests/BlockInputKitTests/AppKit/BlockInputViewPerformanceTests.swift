@@ -262,8 +262,121 @@ final class BlockInputViewPerformanceTests: XCTestCase {
         context.item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
 
         XCTAssertEqual(context.store.block(withID: context.blockID)?.text, "Second\nedited")
+        XCTAssertEqual(
+            context.item.view.frame.height,
+            BlockInputBlockItem.height(
+                for: BlockInputBlock(id: context.blockID, text: "Second\nedited"),
+                textWidth: 664
+            ),
+            accuracy: 0.5
+        )
         XCTAssertEqual(context.layout.invalidatedItemIndexPaths, [])
-        XCTAssertTrue(context.layout.didInvalidateEverything)
+        XCTAssertTrue(context.layout.didInvalidateDelegateMetrics)
+        XCTAssertFalse(context.layout.didInvalidateEverything)
+    }
+
+    func testStoreBackedQuoteTypingResizesVisibleItemWhenHeightChanges() throws {
+        let quoteBlock = BlockInputBlock(id: "second", kind: .quote, text: "Second")
+        let context = try typingLayoutTestContext(block: quoteBlock)
+        let textView = try XCTUnwrap(context.item.testingTextView)
+
+        textView.string = "Second\nedited\nagain"
+        textView.setSelectedRange(NSRange(location: 19, length: 0))
+        context.item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertEqual(context.store.block(withID: context.blockID)?.text, "Second\nedited\nagain")
+        XCTAssertEqual(
+            context.item.view.frame.height,
+            BlockInputBlockItem.height(
+                for: BlockInputBlock(id: context.blockID, kind: .quote, text: "Second\nedited\nagain"),
+                textWidth: 664
+            ),
+            accuracy: 0.5
+        )
+        XCTAssertTrue(context.layout.didInvalidateDelegateMetrics)
+        XCTAssertFalse(context.layout.didInvalidateEverything)
+    }
+
+    func testStoreBackedQuoteTypingShrinksVisibleItemWhenLinesAreRemoved() throws {
+        let quoteBlock = BlockInputBlock(id: "second", kind: .quote, text: "First\nSecond\nThird\nFourth")
+        let context = try typingLayoutTestContext(block: quoteBlock)
+        let textView = try XCTUnwrap(context.item.testingTextView)
+        let startingHeight = BlockInputBlockItem.height(for: quoteBlock, textWidth: 664)
+        context.item.view.frame.size.height = startingHeight
+
+        textView.string = "First\nSecond"
+        textView.setSelectedRange(NSRange(location: 12, length: 0))
+        context.item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        let expectedHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(id: context.blockID, kind: .quote, text: "First\nSecond"),
+            textWidth: 664
+        )
+        XCTAssertLessThan(expectedHeight, startingHeight)
+        XCTAssertEqual(context.item.view.frame.height, expectedHeight, accuracy: 0.5)
+        XCTAssertTrue(context.layout.didInvalidateDelegateMetrics)
+        XCTAssertFalse(context.layout.didInvalidateEverything)
+    }
+
+    func testMountedQuoteTypingShrinksCollectionRowWhenLinesAreRemoved() throws {
+        let quoteID = BlockInputBlockID(rawValue: "quote")
+        let nextID = BlockInputBlockID(rawValue: "next")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: quoteID, kind: .quote, text: "First\nSecond\nThird\nFourth"),
+            BlockInputBlock(id: nextID, kind: .paragraph, text: "Next")
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let nextItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1))
+        let nextInitialMinY = nextItem.view.frame.minY
+
+        textView.string = "First\nSecond"
+        textView.setSelectedRange(NSRange(location: 12, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+        mounted.view.collectionView.layoutSubtreeIfNeeded()
+
+        let expectedHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(id: quoteID, kind: .quote, text: "First\nSecond"),
+            textWidth: 664
+        )
+        let updatedItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let updatedNextItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1))
+        XCTAssertEqual(updatedItem.view.frame.height, expectedHeight, accuracy: 0.5)
+        XCTAssertLessThan(
+            updatedNextItem.view.frame.minY,
+            nextInitialMinY,
+            "updatedItem=\(updatedItem.view.frame) updatedNext=\(updatedNextItem.view.frame) initialNextMinY=\(nextInitialMinY)"
+        )
+    }
+
+    func testMountedQuoteTypingMovesFollowingRowsWhenBlockGrows() throws {
+        let quoteID = BlockInputBlockID(rawValue: "quote")
+        let nextID = BlockInputBlockID(rawValue: "next")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: quoteID, kind: .quote, text: "First"),
+            BlockInputBlock(id: nextID, kind: .paragraph, text: "Next")
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let nextItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1))
+        let nextInitialMinY = nextItem.view.frame.minY
+
+        textView.string = "First\nSecond\nThird\nFourth"
+        textView.setSelectedRange(NSRange(location: 25, length: 0))
+        mounted.window.makeFirstResponder(textView)
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+        mounted.view.collectionView.layoutSubtreeIfNeeded()
+
+        let expectedHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(id: quoteID, kind: .quote, text: "First\nSecond\nThird\nFourth"),
+            textWidth: 664
+        )
+        let updatedItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let updatedNextItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1))
+        XCTAssertEqual(updatedItem.view.frame.height, expectedHeight, accuracy: 0.5)
+        XCTAssertGreaterThan(updatedNextItem.view.frame.minY, nextInitialMinY)
+        XCTAssertTrue(mounted.window.firstResponder === textView)
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: quoteID, utf16Offset: 25)))
     }
 
     func testStoreBackedListInlineReturnInvalidatesFullLayout() throws {
@@ -280,7 +393,8 @@ final class BlockInputViewPerformanceTests: XCTestCase {
 
         XCTAssertEqual(context.store.block(withID: context.blockID)?.text, "Second\nitem")
         XCTAssertEqual(context.layout.invalidatedItemIndexPaths, [])
-        XCTAssertTrue(context.layout.didInvalidateEverything)
+        XCTAssertTrue(context.layout.didInvalidateDelegateMetrics)
+        XCTAssertFalse(context.layout.didInvalidateEverything)
     }
 }
 

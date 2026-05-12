@@ -16,9 +16,7 @@ extension BlockInputBlockItem {
     }
 
     private func setupHandleView() {
-        handleView.font = .systemFont(ofSize: 13, weight: .semibold)
-        handleView.alignment = .center
-        handleView.textColor = .secondaryLabelColor
+        handleView.wantsLayer = true
         handleView.alphaValue = 0
     }
 
@@ -65,7 +63,7 @@ extension BlockInputBlockItem {
         quoteBarView.wantsLayer = true
         quoteBarView.identifier = Self.quoteBarIdentifier
         quoteBarView.layer?.backgroundColor = NSColor.separatorColor.cgColor
-        quoteBarView.layer?.cornerRadius = 1.5
+        quoteBarView.layer?.cornerRadius = Self.quoteBarWidth / 2
     }
 
     private func addArrangedSubviews() {
@@ -93,7 +91,10 @@ extension BlockInputBlockItem {
         self.handleWidthConstraint = handleWidthConstraint
         let handleTopConstraint = handleView.topAnchor.constraint(
             equalTo: view.topAnchor,
-            constant: BlockInputBlockItemVerticalMetrics.standard.chromeTopConstant
+            constant: BlockInputBlockItemVerticalMetrics.standard.chromeTopConstant(
+                font: Self.font(for: .paragraph),
+                chromeHeight: Self.dragHandleHeight
+            )
         )
         self.handleTopConstraint = handleTopConstraint
         let kindLabelTopConstraint = kindLabel.topAnchor.constraint(
@@ -143,11 +144,21 @@ extension BlockInputBlockItem {
             constant: Self.chromeFrameAlignmentOffset
         )
         self.quoteBarLeadingConstraint = quoteBarLeadingConstraint
+        let quoteBarTopConstraint = quoteBarView.topAnchor.constraint(
+            equalTo: view.topAnchor,
+            constant: Self.quoteBarVerticalInset
+        )
+        self.quoteBarTopConstraint = quoteBarTopConstraint
+        let quoteBarBottomConstraint = quoteBarView.bottomAnchor.constraint(
+            equalTo: view.bottomAnchor,
+            constant: -Self.quoteBarVerticalInset
+        )
+        self.quoteBarBottomConstraint = quoteBarBottomConstraint
         return [
             quoteBarLeadingConstraint,
-            quoteBarView.topAnchor.constraint(equalTo: view.topAnchor, constant: 7),
-            quoteBarView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -7),
-            quoteBarView.widthAnchor.constraint(equalToConstant: 3),
+            quoteBarTopConstraint,
+            quoteBarBottomConstraint,
+            quoteBarView.widthAnchor.constraint(equalToConstant: Self.quoteBarWidth),
             scrollViewLeadingConstraint,
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
             scrollViewTopConstraint,
@@ -155,7 +166,7 @@ extension BlockInputBlockItem {
             horizontalRuleLeadingConstraint,
             horizontalRuleView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -4),
             horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            horizontalRuleView.heightAnchor.constraint(equalToConstant: 8)
+            horizontalRuleView.heightAnchor.constraint(equalToConstant: 9)
         ]
     }
 }

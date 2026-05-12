@@ -76,6 +76,50 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertEqual(writer.string(forType: .blockInputBlockID), blockID.rawValue)
     }
 
+    func testHoveringReorderHandleHidesOtherVisibleHandles() throws {
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "first", text: "First"),
+            BlockInputBlock(id: "second", text: "Second")
+        ])
+        let firstItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let secondItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1))
+        let firstHandle = try XCTUnwrap(firstItem.testingHandleView)
+        let secondHandle = try XCTUnwrap(secondItem.testingHandleView)
+        let event = try XCTUnwrap(NSEvent.mouseEvent(
+            with: .mouseMoved,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: mounted.window.windowNumber,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 0,
+            pressure: 0
+        ))
+
+        firstItem.mouseEntered(with: event)
+        firstItem.setReorderHandleVisible(true, animated: false)
+        secondItem.mouseEntered(with: event)
+        secondItem.setReorderHandleVisible(true, animated: false)
+
+        XCTAssertEqual(firstHandle.alphaValue, 0)
+        XCTAssertEqual(secondHandle.alphaValue, 1)
+    }
+
+    func testHidingReorderHandleCancelsPendingFadeIn() throws {
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "first", text: "First")
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let handle = try XCTUnwrap(item.testingHandleView)
+
+        item.setReorderHandleVisible(true)
+        item.setReorderHandleVisible(false, animated: false)
+
+        XCTAssertEqual(handle.alphaValue, 0)
+        XCTAssertEqual(handle.layer?.animationKeys() ?? [], [])
+    }
+
     func testCanAcceptBlockReorderDropAcceptsKnownBlockID() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let view = configuredReorderView(blockIDs: [blockID])

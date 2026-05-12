@@ -61,7 +61,7 @@ final class BlockInputHorizontalRuleView: NSView {
         lineView.layer?.cornerRadius = 1
         addSubview(lineView)
 
-        let lineHeightConstraint = lineView.heightAnchor.constraint(equalToConstant: 1)
+        let lineHeightConstraint = lineView.heightAnchor.constraint(equalToConstant: 2)
         self.lineHeightConstraint = lineHeightConstraint
         NSLayoutConstraint.activate([
             lineView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -73,7 +73,7 @@ final class BlockInputHorizontalRuleView: NSView {
     }
 
     private func updateAppearance() {
-        lineHeightConstraint?.constant = isSelected ? 3 : 1
+        lineHeightConstraint?.constant = isSelected ? 4 : 2
         layer?.backgroundColor = isSelected
             ? accentColor.withAlphaComponent(0.18).cgColor
             : NSColor.clear.cgColor

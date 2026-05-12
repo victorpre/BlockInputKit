@@ -22,7 +22,7 @@ final class BlockInputViewHorizontalRuleTests: XCTestCase {
         XCTAssertEqual(mounted.view.selection, .blocks([ruleID]))
         XCTAssertTrue(mounted.window.firstResponder === mounted.view)
         XCTAssertEqual(ruleView.testingLineView?.layer?.backgroundColor, NSColor.systemPink.cgColor)
-        XCTAssertEqual(ruleView.testingLineHeight, 3)
+        XCTAssertEqual(ruleView.testingLineHeight, 4)
         XCTAssertTrue(mounted.view.dropIndicatorView.isHidden)
     }
 
@@ -40,8 +40,8 @@ final class BlockInputViewHorizontalRuleTests: XCTestCase {
         secondItem.mouseDown(with: try mouseDownEvent(windowNumber: mounted.window.windowNumber))
 
         XCTAssertEqual(mounted.view.selection, .blocks([secondRuleID]))
-        XCTAssertEqual(firstItem.testingHorizontalRuleSelectionView?.testingLineHeight, 1)
-        XCTAssertEqual(secondItem.testingHorizontalRuleSelectionView?.testingLineHeight, 3)
+        XCTAssertEqual(firstItem.testingHorizontalRuleSelectionView?.testingLineHeight, 2)
+        XCTAssertEqual(secondItem.testingHorizontalRuleSelectionView?.testingLineHeight, 4)
     }
 
     func testClickingHorizontalRuleVisuallySelectsOnlyClickedItemEvenWithDuplicateIDs() throws {
@@ -56,8 +56,8 @@ final class BlockInputViewHorizontalRuleTests: XCTestCase {
 
         secondItem.mouseDown(with: try mouseDownEvent(windowNumber: mounted.window.windowNumber))
 
-        XCTAssertEqual(firstItem.testingHorizontalRuleSelectionView?.testingLineHeight, 1)
-        XCTAssertEqual(secondItem.testingHorizontalRuleSelectionView?.testingLineHeight, 3)
+        XCTAssertEqual(firstItem.testingHorizontalRuleSelectionView?.testingLineHeight, 2)
+        XCTAssertEqual(secondItem.testingHorizontalRuleSelectionView?.testingLineHeight, 4)
     }
 
     func testDeleteKeyRemovesSelectedHorizontalRuleBlock() throws {

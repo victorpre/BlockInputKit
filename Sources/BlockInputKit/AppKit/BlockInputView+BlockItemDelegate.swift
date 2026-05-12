@@ -102,7 +102,8 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             beforeBlock: change.beforeBlock,
             afterBlock: afterBlock
         ) {
-            invalidateLayoutForBlock(at: index)
+            resizeVisibleItem(item, for: afterBlock)
+            invalidateLayoutForBlock(at: index, editedItem: item, block: afterBlock)
         }
         syncDocumentStore(.replaceBlock(afterBlock))
         if !didReplaceCachedBlock && isDocumentCacheSynchronized {
@@ -188,6 +189,10 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         }
         applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
         return deleteCurrentEmptyBlockForBackspaceOrDelete() != nil
+    }
+
+    func blockItemDidRevealReorderHandle(_ item: BlockInputBlockItem) {
+        hideReorderHandles(except: item)
     }
 
     func blockItemDidRequestUnwrapBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {

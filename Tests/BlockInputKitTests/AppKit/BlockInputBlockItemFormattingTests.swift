@@ -73,6 +73,30 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     }
 
     @MainActor
+    func testMultilineParagraphAndQuoteHeightsGrowWithTextLines() {
+        let paragraphSingleLine = BlockInputBlockItem.height(
+            for: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "First"),
+            textWidth: 360
+        )
+        let paragraphMultiline = BlockInputBlockItem.height(
+            for: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "First\nSecond\nThird"),
+            textWidth: 360
+        )
+        let quoteSingleLine = BlockInputBlockItem.height(
+            for: BlockInputBlock(id: "quote", kind: .quote, text: "First"),
+            textWidth: 360
+        )
+        let quoteMultiline = BlockInputBlockItem.height(
+            for: BlockInputBlock(id: "quote", kind: .quote, text: "First\nSecond\nThird"),
+            textWidth: 360
+        )
+
+        XCTAssertGreaterThan(paragraphMultiline, paragraphSingleLine)
+        XCTAssertGreaterThan(quoteMultiline, quoteSingleLine)
+        XCTAssertEqual(paragraphMultiline, quoteMultiline)
+    }
+
+    @MainActor
     func testPerLineChecklistIndentationUsesFirstLineCheckboxAndRemainingLineCheckboxMarkers() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(
@@ -225,7 +249,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     func testHeightUsesMinimumForEmptyBlocks() {
         let height = BlockInputBlockItem.height(for: .emptyParagraph(), textWidth: 240)
 
-        XCTAssertGreaterThanOrEqual(height, 34)
+        XCTAssertGreaterThanOrEqual(height, BlockInputBlockItemVerticalMetrics.textBlock.minimumHeight)
     }
 
     @MainActor
@@ -289,7 +313,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
         item.setBlockSelection(true)
 
         XCTAssertEqual(ruleView.testingLineView?.layer?.backgroundColor, NSColor.systemPink.cgColor)
-        XCTAssertEqual(ruleView.testingLineHeight, 3)
+        XCTAssertEqual(ruleView.testingLineHeight, 4)
         XCTAssertNotEqual(ruleView.layer?.backgroundColor, NSColor.clear.cgColor)
     }
 
@@ -334,7 +358,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
         let ruleView = try XCTUnwrap(item.testingHorizontalRuleSelectionView)
         XCTAssertTrue(ruleView.isHidden)
         XCTAssertEqual(ruleView.alphaValue, 0)
-        XCTAssertEqual(ruleView.testingLineHeight, 1)
+        XCTAssertEqual(ruleView.testingLineHeight, 2)
         XCTAssertEqual(ruleView.testingLineView?.layer?.backgroundColor, NSColor.separatorColor.cgColor)
         XCTAssertEqual(ruleView.layer?.backgroundColor, NSColor.clear.cgColor)
         XCTAssertEqual(try XCTUnwrap(item.testingTextView).string, "Plain")

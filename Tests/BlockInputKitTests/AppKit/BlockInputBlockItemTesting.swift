@@ -35,10 +35,8 @@ extension BlockInputBlockItem {
         }
     }
 
-    var testingHandleView: NSTextField? {
-        view.firstDescendant(of: NSTextField.self) { textField in
-            textField.stringValue == "::"
-        }
+    var testingHandleView: BlockInputDragHandleView? {
+        view.firstDescendant(of: BlockInputDragHandleView.self)
     }
 
     var testingKindLabel: BlockInputMarkerView? {
