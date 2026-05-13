@@ -3,6 +3,14 @@ import AppKit
 final class BlockInputTextView: NSTextView {
     weak var blockItem: BlockInputBlockItem?
 
+    override func keyDown(with event: NSEvent) {
+        if let editingShortcut = event.blockInputEditingShortcut {
+            performEditingShortcut(editingShortcut)
+            return
+        }
+        super.keyDown(with: event)
+    }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.blockInputIsSelectAllShortcut,
            let blockItem {
@@ -11,6 +19,10 @@ final class BlockInputTextView: NSTextView {
         }
         if let undoShortcut = event.blockInputUndoShortcut,
            blockItem?.requestUndoShortcut(undoShortcut) == true {
+            return true
+        }
+        if let editingShortcut = event.blockInputEditingShortcut {
+            performEditingShortcut(editingShortcut)
             return true
         }
         return super.performKeyEquivalent(with: event)
@@ -82,6 +94,17 @@ final class BlockInputTextView: NSTextView {
             return blockItem?.requestMoveVertically(.downward) == true
         default:
             return false
+        }
+    }
+
+    private func performEditingShortcut(_ shortcut: BlockInputEditingShortcut) {
+        switch shortcut {
+        case .copy:
+            copy(nil)
+        case .cut:
+            cut(nil)
+        case .paste:
+            paste(nil)
         }
     }
 }
