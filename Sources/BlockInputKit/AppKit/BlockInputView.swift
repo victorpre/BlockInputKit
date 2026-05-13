@@ -21,6 +21,7 @@ public final class BlockInputView: NSView {
     let dropIndicatorView = NSView()
     private let layout = BlockInputCollectionViewFlowLayout()
     var documentStore: (any BlockInputDocumentStore)?
+    var fallbackUndoController = BlockInputUndoController()
     var undoController: BlockInputUndoController?
     var completionProvider: (any BlockInputCompletionProvider)?
     var onDocumentMutation: ((BlockInputDocumentChange) -> Void)?
@@ -56,35 +57,6 @@ public final class BlockInputView: NSView {
 
     public override var acceptsFirstResponder: Bool {
         true
-    }
-
-    /// Applies configuration and reloads the editor from its document store.
-    public func configure(_ configuration: BlockInputConfiguration) {
-        configure(configuration, restoresFocus: true)
-    }
-
-    func configure(_ configuration: BlockInputConfiguration, restoresFocus: Bool) {
-        documentStore = configuration.documentStore
-        document = configuration.document.detachedStorage()
-        isDocumentCacheSynchronized = true
-        allowsBlockReordering = configuration.allowsBlockReordering
-        dropIndicatorColor = configuration.dropIndicatorColor
-        undoController = configuration.undoController
-        completionProvider = configuration.completionProvider
-        onDocumentMutation = configuration.onDocumentMutation
-        onDocumentChange = configuration.onDocumentChange
-        documentChangeSnapshotDelay = configuration.documentChangeSnapshotDelay
-        onSelectionChange = configuration.onSelectionChange
-        onFocusChange = configuration.onFocusChange
-        cancelPendingDocumentSnapshot()
-        updateDropIndicatorColor()
-        hideDropIndicator()
-        clearStaleFocusState()
-        if restoresFocus {
-            reloadDataKeepingFocus()
-        } else {
-            reloadDataWithoutRestoringFocus()
-        }
     }
 
     /// Focuses the editor like a single text field, preserving valid current selections.

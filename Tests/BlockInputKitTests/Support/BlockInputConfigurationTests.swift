@@ -60,6 +60,79 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(view.documentChangeSnapshotDelay, 0.01)
         XCTAssertNotNil(view.onFocusChange)
     }
+
+    @MainActor
+    func testDefaultUndoControllerResetsWhenViewReconfiguresToNewStore() throws {
+        let blockID = BlockInputBlockID(rawValue: "list")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        item.setSelectedRange(NSRange(location: 0, length: 0))
+        XCTAssertTrue(item.requestIndent())
+        XCTAssertEqual(view.document.blocks[0].indentationLevel, 1)
+
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Second")
+        ])))
+
+        XCTAssertNil(view.undoStructuralEdit())
+        XCTAssertEqual(view.document.blocks[0].text, "Second")
+        XCTAssertEqual(view.document.blocks[0].indentationLevel, 0)
+    }
+
+    @MainActor
+    func testDefaultUndoControllerSurvivesEquivalentDefaultStoreReconfigure() throws {
+        let blockID = BlockInputBlockID(rawValue: "list")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        item.setSelectedRange(NSRange(location: 0, length: 0))
+        XCTAssertTrue(item.requestIndent())
+        XCTAssertEqual(view.document.blocks[0].indentationLevel, 1)
+
+        view.configure(BlockInputConfiguration(document: view.document))
+
+        XCTAssertNotNil(view.undoStructuralEdit())
+        XCTAssertEqual(view.document.blocks[0].text, "First")
+        XCTAssertEqual(view.document.blocks[0].indentationLevel, 0)
+    }
+
+    @MainActor
+    func testDefaultUndoControllerResetsWhenDefaultConfigurationStoreIsReplaced() throws {
+        let blockID = BlockInputBlockID(rawValue: "list")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        item.setSelectedRange(NSRange(location: 0, length: 0))
+        XCTAssertTrue(item.requestIndent())
+        XCTAssertEqual(view.document.blocks[0].indentationLevel, 1)
+
+        var configuration = BlockInputConfiguration(document: view.document)
+        configuration.documentStore = BlockInputMemoryDocumentStore(document: view.document)
+        view.configure(configuration)
+
+        XCTAssertNil(view.undoStructuralEdit())
+        XCTAssertEqual(view.document.blocks[0].text, "First")
+        XCTAssertEqual(view.document.blocks[0].indentationLevel, 1)
+    }
 }
 
 private final class ConfigurationCompletionProvider: BlockInputCompletionProvider, @unchecked Sendable {

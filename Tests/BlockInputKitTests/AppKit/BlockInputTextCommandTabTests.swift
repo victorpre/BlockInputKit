@@ -26,6 +26,27 @@ final class BlockInputTextCommandTabTests: XCTestCase {
     }
 
     @MainActor
+    func testDefaultConfigurationUndoAndRedoAppliesTabIndent() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "First")
+            ])
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+        textView.setSelectedRange(NSRange(location: 2, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandZEvent()))
+        XCTAssertEqual(mounted.view.document.blocks[0].indentationLevel, 0)
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandShiftZEvent()))
+        XCTAssertEqual(mounted.view.document.blocks[0].indentationLevel, 1)
+    }
+
+    @MainActor
     func testTabCommandsIndentAndOutdentSingleLineItemWhenCaretIsInsideText() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let view = BlockInputView()

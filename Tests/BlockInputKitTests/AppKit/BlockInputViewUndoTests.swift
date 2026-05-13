@@ -212,6 +212,75 @@ final class BlockInputViewUndoTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks.count, 2)
     }
 
+    func testCommandZUndoesStructuralEditBeforeEarlierTextUndo() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let mounted = makeMountedBlockInputView(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Test word")
+            ]),
+            undoController: BlockInputUndoController()
+        )
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+
+        _ = item.textView(textView, shouldChangeTextIn: NSRange(location: 4, length: 5), replacementString: "")
+        textView.string = "Test"
+        textView.setSelectedRange(NSRange(location: 4, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+        textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
+
+        XCTAssertEqual(mounted.view.document.blocks[0].indentationLevel, 1)
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Test")
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandZEvent()))
+        XCTAssertEqual(mounted.view.document.blocks[0].indentationLevel, 0)
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Test")
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandZEvent()))
+        XCTAssertEqual(mounted.view.document.blocks[0].indentationLevel, 0)
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Test word")
+    }
+
+    func testCommandShiftZRedoesStructuralUndoBeforeEarlierTextUndo() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let mounted = makeMountedBlockInputView(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Test word")
+            ]),
+            undoController: BlockInputUndoController()
+        )
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
+        _ = item.textView(textView, shouldChangeTextIn: NSRange(location: 4, length: 5), replacementString: "")
+        textView.string = "Test"
+        textView.setSelectedRange(NSRange(location: 4, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertEqual(mounted.view.document.blocks[0].indentationLevel, 1)
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Test")
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandZEvent()))
+        XCTAssertEqual(mounted.view.document.blocks[0].indentationLevel, 1)
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Test word")
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandZEvent()))
+        XCTAssertEqual(mounted.view.document.blocks[0].indentationLevel, 0)
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Test word")
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandShiftZEvent()))
+        XCTAssertEqual(mounted.view.document.blocks[0].indentationLevel, 1)
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Test word")
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandShiftZEvent()))
+        XCTAssertEqual(mounted.view.document.blocks[0].indentationLevel, 1)
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Test")
+    }
+
     func testCommandZAndCommandShiftZRouteStructuralUndoFromEditorFocus() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let mounted = makeMountedBlockInputView(

@@ -101,9 +101,24 @@ extension BlockInputView: NSCollectionViewDelegate {
                 from: draggingInfo,
                 proposedItemIndex: proposedDropIndexPath.pointee.item
             )
-            proposedDropIndexPath.pointee = NSIndexPath(forItem: insertionIndex, inSection: 0)
+            let blockID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID)
+                .map(BlockInputBlockID.init(rawValue:))
+            let location = collectionView.convert(draggingInfo.draggingLocation, from: nil)
+            let targetIndex = blockID.flatMap {
+                collectionDropTargetIndex(
+                    forBlockID: $0,
+                    proposedItemIndex: insertionIndex,
+                    location: location
+                )
+            }
+            guard let blockID, let targetIndex, index(of: blockID) != targetIndex else {
+                hideDropIndicator()
+                return []
+            }
+            let indicatorIndex = dropIndicatorInsertionIndex(forBlockID: blockID, targetIndex: targetIndex)
+            proposedDropIndexPath.pointee = NSIndexPath(forItem: indicatorIndex, inSection: 0)
             proposedDropOperation.pointee = .before
-            showDropIndicator(atInsertionIndex: insertionIndex)
+            showDropIndicator(atInsertionIndex: indicatorIndex)
             return .move
         }
         if canAcceptFileDrop(draggingInfo) {
@@ -131,13 +146,21 @@ extension BlockInputView: NSCollectionViewDelegate {
             from: draggingInfo,
             proposedItemIndex: indexPath.item
         )
-        if canAcceptBlockReorderDrop(draggingInfo),
-           let rawID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID),
-           let targetIndex = collectionDropTargetIndex(
-            forBlockID: BlockInputBlockID(rawValue: rawID),
-            proposedItemIndex: insertionIndex
-           ) {
-            return moveBlock(blockID: BlockInputBlockID(rawValue: rawID), to: targetIndex) != nil
+        if canAcceptBlockReorderDrop(draggingInfo) {
+            guard let rawID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID) else {
+                return false
+            }
+            let blockID = BlockInputBlockID(rawValue: rawID)
+            guard let sourceIndex = index(of: blockID),
+                  let targetIndex = collectionDropTargetIndex(
+                      forBlockID: blockID,
+                      proposedItemIndex: insertionIndex,
+                      location: collectionView.convert(draggingInfo.draggingLocation, from: nil)
+                  ),
+                  targetIndex != sourceIndex else {
+                return false
+            }
+            return moveBlock(blockID: blockID, to: targetIndex) != nil
         }
         let fileURLs = fileURLs(from: draggingInfo.draggingPasteboard)
         if !fileURLs.isEmpty {
@@ -148,15 +171,36 @@ extension BlockInputView: NSCollectionViewDelegate {
 
     func collectionDropTargetIndex(
         forBlockID blockID: BlockInputBlockID,
-        proposedItemIndex: Int
+        proposedItemIndex: Int,
+        location: NSPoint? = nil
     ) -> Int? {
         guard let sourceIndex = index(of: blockID) else {
             return nil
         }
         if sourceIndex < proposedItemIndex {
-            return max(0, proposedItemIndex - 1)
+            if proposedItemIndex == sourceIndex + 1 {
+                guard location == nil else {
+                    return sourceIndex
+                }
+            }
+            let adjustedIndex = max(0, proposedItemIndex - 1)
+            if adjustedIndex == sourceIndex, proposedItemIndex < blockCount {
+                return proposedItemIndex
+            }
+            return adjustedIndex
         }
         return proposedItemIndex
+    }
+
+    func dropIndicatorInsertionIndex(
+        forBlockID blockID: BlockInputBlockID,
+        targetIndex: Int
+    ) -> Int {
+        guard let sourceIndex = index(of: blockID),
+              sourceIndex < targetIndex else {
+            return clampedInsertionIndex(targetIndex)
+        }
+        return clampedInsertionIndex(targetIndex + 1)
     }
 
     func canAcceptBlockReorderDrop(_ draggingInfo: NSDraggingInfo) -> Bool {

@@ -72,6 +72,8 @@ public final class BlockInputUndoController {
     private var textRedoByBlockID: [BlockInputBlockID: [BlockInputTextUndoEntry]] = [:]
     private var structuralUndoStack: [BlockInputStructuralUndoEntry] = []
     private var structuralRedoStack: [BlockInputStructuralUndoEntry] = []
+    private var undoOrder: [BlockInputHistoryOperation] = []
+    private var redoOrder: [BlockInputHistoryOperation] = []
 
     public init() {}
 
@@ -108,8 +110,10 @@ public final class BlockInputUndoController {
             selectionBefore: selectionBefore,
             selectionAfter: selectionAfter
         ))
+        undoOrder.append(.text(blockID))
         textRedoByBlockID[blockID] = []
         structuralRedoStack = []
+        redoOrder = []
     }
 
     /// Records a document-level structural edit.
@@ -130,8 +134,10 @@ public final class BlockInputUndoController {
             selectionBefore: selectionBefore,
             selectionAfter: selectionAfter
         ))
+        undoOrder.append(.structural)
         structuralRedoStack = []
         textRedoByBlockID = [:]
+        redoOrder = []
     }
 
     /// Records a structural edit that replaces one block without snapshotting the full document.
@@ -151,8 +157,10 @@ public final class BlockInputUndoController {
             selectionBefore: selectionBefore,
             selectionAfter: selectionAfter
         ))
+        undoOrder.append(.structural)
         structuralRedoStack = []
         textRedoByBlockID = [:]
+        redoOrder = []
     }
 
     /// Records a structural edit that inserts blocks without snapshotting the full document.
@@ -172,8 +180,10 @@ public final class BlockInputUndoController {
             selectionBefore: selectionBefore,
             selectionAfter: selectionAfter
         ))
+        undoOrder.append(.structural)
         structuralRedoStack = []
         textRedoByBlockID = [:]
+        redoOrder = []
     }
 
     /// Records a structural edit that replaces one block and inserts follow-up blocks.
@@ -192,8 +202,10 @@ public final class BlockInputUndoController {
             selectionBefore: edit.selectionBefore,
             selectionAfter: edit.selectionAfter
         ))
+        undoOrder.append(.structural)
         structuralRedoStack = []
         textRedoByBlockID = [:]
+        redoOrder = []
     }
 
     /// Records a structural edit that replaces one block and deletes follow-up blocks.
@@ -212,8 +224,10 @@ public final class BlockInputUndoController {
             selectionBefore: edit.selectionBefore,
             selectionAfter: edit.selectionAfter
         ))
+        undoOrder.append(.structural)
         structuralRedoStack = []
         textRedoByBlockID = [:]
+        redoOrder = []
     }
 
     /// Records a structural move without snapshotting the full document.
@@ -230,8 +244,10 @@ public final class BlockInputUndoController {
             selectionBefore: edit.selectionBefore,
             selectionAfter: edit.selectionAfter
         ))
+        undoOrder.append(.structural)
         structuralRedoStack = []
         textRedoByBlockID = [:]
+        redoOrder = []
     }
 
     /// Undoes the most recent text edit for a block.
@@ -246,6 +262,8 @@ public final class BlockInputUndoController {
         }
         textUndoByBlockID[blockID] = stack
         textRedoByBlockID[blockID, default: []].append(entry)
+        removeLastUndoOperation(.text(blockID))
+        redoOrder.append(.text(blockID))
         document.blocks[index].text = entry.beforeText
         if let beforeLineIndentationLevels = entry.beforeLineIndentationLevels {
             document.blocks[index].lineIndentationLevels = beforeLineIndentationLevels
@@ -262,6 +280,8 @@ public final class BlockInputUndoController {
         }
         textUndoByBlockID[block.id] = stack
         textRedoByBlockID[block.id, default: []].append(entry)
+        removeLastUndoOperation(.text(block.id))
+        redoOrder.append(.text(block.id))
         var replacement = block
         replacement.text = entry.beforeText
         if let beforeLineIndentationLevels = entry.beforeLineIndentationLevels {
@@ -286,6 +306,8 @@ public final class BlockInputUndoController {
         }
         textRedoByBlockID[blockID] = stack
         textUndoByBlockID[blockID, default: []].append(entry)
+        undoOrder.append(.text(blockID))
+        removeLastRedoOperation(.text(blockID))
         document.blocks[index].text = entry.afterText
         if let afterLineIndentationLevels = entry.afterLineIndentationLevels {
             document.blocks[index].lineIndentationLevels = afterLineIndentationLevels
@@ -302,6 +324,8 @@ public final class BlockInputUndoController {
         }
         textRedoByBlockID[block.id] = stack
         textUndoByBlockID[block.id, default: []].append(entry)
+        undoOrder.append(.text(block.id))
+        removeLastRedoOperation(.text(block.id))
         var replacement = block
         replacement.text = entry.afterText
         if let afterLineIndentationLevels = entry.afterLineIndentationLevels {
@@ -320,6 +344,8 @@ public final class BlockInputUndoController {
             return nil
         }
         structuralRedoStack.append(entry)
+        removeLastUndoOperation(.structural)
+        redoOrder.append(.structural)
         entry.payload.applyUndo(to: &document)
         return BlockInputUndoResult(
             selection: entry.selectionBefore,
@@ -337,6 +363,8 @@ public final class BlockInputUndoController {
             return nil
         }
         structuralUndoStack.append(entry)
+        undoOrder.append(.structural)
+        removeLastRedoOperation(.structural)
         entry.payload.applyRedo(to: &document)
         return BlockInputUndoResult(
             selection: entry.selectionAfter,
@@ -363,6 +391,8 @@ public final class BlockInputUndoController {
         }
         structuralUndoStack.removeLast()
         structuralRedoStack.append(entry)
+        removeLastUndoOperation(.structural)
+        redoOrder.append(.structural)
     }
 
     func nextGranularStructuralRedoResult() -> BlockInputUndoResult? {
@@ -380,6 +410,56 @@ public final class BlockInputUndoController {
         }
         structuralRedoStack.removeLast()
         structuralUndoStack.append(entry)
+        undoOrder.append(.structural)
+        removeLastRedoOperation(.structural)
+    }
+
+    func nextUndoOperation() -> BlockInputHistoryOperation? {
+        while let operation = undoOrder.last {
+            switch operation {
+            case let .text(blockID):
+                if canUndoTextEdit(in: blockID) {
+                    return operation
+                }
+            case .structural:
+                if !structuralUndoStack.isEmpty {
+                    return operation
+                }
+            }
+            undoOrder.removeLast()
+        }
+        return nil
+    }
+
+    func nextRedoOperation() -> BlockInputHistoryOperation? {
+        while let operation = redoOrder.last {
+            switch operation {
+            case let .text(blockID):
+                if canRedoTextEdit(in: blockID) {
+                    return operation
+                }
+            case .structural:
+                if !structuralRedoStack.isEmpty {
+                    return operation
+                }
+            }
+            redoOrder.removeLast()
+        }
+        return nil
+    }
+
+    private func removeLastRedoOperation(_ operation: BlockInputHistoryOperation) {
+        guard let index = redoOrder.lastIndex(of: operation) else {
+            return
+        }
+        redoOrder.remove(at: index)
+    }
+
+    private func removeLastUndoOperation(_ operation: BlockInputHistoryOperation) {
+        guard let index = undoOrder.lastIndex(of: operation) else {
+            return
+        }
+        undoOrder.remove(at: index)
     }
 
     /// Records a structural edit that deletes blocks without snapshotting the full document.
@@ -399,7 +479,14 @@ public final class BlockInputUndoController {
             selectionBefore: selectionBefore,
             selectionAfter: selectionAfter
         ))
+        undoOrder.append(.structural)
         structuralRedoStack = []
         textRedoByBlockID = [:]
+        redoOrder = []
     }
+}
+
+enum BlockInputHistoryOperation: Equatable {
+    case text(BlockInputBlockID)
+    case structural
 }

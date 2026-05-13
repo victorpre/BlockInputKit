@@ -4,6 +4,95 @@ import XCTest
 
 @MainActor
 final class BlockInputReorderNumberingTests: XCTestCase {
+    func testCollectionDropTargetKeepsAdjacentForwardMoveInsteadOfNoOp() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, kind: .numberedListItem(start: 1), text: "One"),
+            BlockInputBlock(id: secondID, kind: .numberedListItem(start: 2), text: "Two"),
+            BlockInputBlock(id: thirdID, kind: .numberedListItem(start: 3), text: "Three")
+        ])))
+
+        let targetIndex = view.collectionDropTargetIndex(
+            forBlockID: secondID,
+            proposedItemIndex: 2
+        )
+
+        XCTAssertEqual(targetIndex, 2)
+    }
+
+    func testAcceptDropSwapsAdjacentNestedNumberedItemsWhenDraggingFirstBelowSecond() throws {
+        let parentID = BlockInputBlockID(rawValue: "parent")
+        let firstChildID = BlockInputBlockID(rawValue: "first-child")
+        let secondChildID = BlockInputBlockID(rawValue: "second-child")
+        let nextID = BlockInputBlockID(rawValue: "next")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: parentID, kind: .numberedListItem(start: 1), text: "Parent"),
+            BlockInputBlock(id: firstChildID, kind: .numberedListItem(start: 1), text: "First", indentationLevel: 1),
+            BlockInputBlock(id: secondChildID, kind: .numberedListItem(start: 2), text: "Second", indentationLevel: 1),
+            BlockInputBlock(id: nextID, kind: .numberedListItem(start: 2), text: "Next")
+        ])
+        let secondAttributes = try XCTUnwrap(mounted.view.collectionView.layoutAttributesForItem(
+            at: IndexPath(item: 2, section: 0)
+        ))
+        let collectionLocation = NSPoint(x: secondAttributes.frame.midX, y: secondAttributes.frame.maxY - 1)
+        let windowLocation = mounted.view.collectionView.convert(collectionLocation, to: nil)
+
+        let accepted = mounted.view.collectionView(
+            mounted.view.collectionView,
+            acceptDrop: BlockInputDraggingInfo(blockID: firstChildID, location: windowLocation),
+            indexPath: IndexPath(item: 0, section: 0),
+            dropOperation: .before
+        )
+
+        XCTAssertTrue(accepted)
+        XCTAssertEqual(mounted.view.document.blocks.map(\.id), [parentID, secondChildID, firstChildID, nextID])
+        XCTAssertEqual(mounted.view.document.blocks.map(\.kind), [
+            .numberedListItem(start: 1),
+            .numberedListItem(start: 1),
+            .numberedListItem(start: 2),
+            .numberedListItem(start: 2)
+        ])
+        XCTAssertEqual(mounted.view.document.blocks.map(\.indentationLevel), [0, 1, 1, 0])
+    }
+
+    func testAcceptDropMovesNestedNumberedItemUnderNextParentAtAdjacentInsertionBoundary() throws {
+        let firstParentID = BlockInputBlockID(rawValue: "first-parent")
+        let firstChildID = BlockInputBlockID(rawValue: "first-child")
+        let secondChildID = BlockInputBlockID(rawValue: "second-child")
+        let secondParentID = BlockInputBlockID(rawValue: "second-parent")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: firstParentID, kind: .numberedListItem(start: 1), text: "First parent"),
+            BlockInputBlock(id: firstChildID, kind: .numberedListItem(start: 1), text: "First child", indentationLevel: 1),
+            BlockInputBlock(id: secondChildID, kind: .numberedListItem(start: 2), text: "Second child", indentationLevel: 1),
+            BlockInputBlock(id: secondParentID, kind: .numberedListItem(start: 2), text: "Second parent")
+        ])
+        let secondParentAttributes = try XCTUnwrap(mounted.view.collectionView.layoutAttributesForItem(
+            at: IndexPath(item: 3, section: 0)
+        ))
+        let collectionLocation = NSPoint(x: secondParentAttributes.frame.midX, y: secondParentAttributes.frame.maxY - 1)
+        let windowLocation = mounted.view.collectionView.convert(collectionLocation, to: nil)
+
+        let accepted = mounted.view.collectionView(
+            mounted.view.collectionView,
+            acceptDrop: BlockInputDraggingInfo(blockID: secondChildID, location: windowLocation),
+            indexPath: IndexPath(item: 0, section: 0),
+            dropOperation: .before
+        )
+
+        XCTAssertTrue(accepted)
+        XCTAssertEqual(mounted.view.document.blocks.map(\.id), [firstParentID, firstChildID, secondParentID, secondChildID])
+        XCTAssertEqual(mounted.view.document.blocks.map(\.kind), [
+            .numberedListItem(start: 1),
+            .numberedListItem(start: 1),
+            .numberedListItem(start: 2),
+            .numberedListItem(start: 1)
+        ])
+        XCTAssertEqual(mounted.view.document.blocks.map(\.indentationLevel), [0, 1, 0, 1])
+    }
+
     func testMoveNumberedSubitemPublishesRenumberedBlocksToStore() {
         let firstParentID = BlockInputBlockID(rawValue: "first-parent")
         let firstChildID = BlockInputBlockID(rawValue: "first-child")

@@ -40,7 +40,7 @@ final class BlockInputViewDropIndicatorTests: XCTestCase {
         XCTAssertEqual(insertionIndex, 2)
     }
 
-    func testValidateDropShowsInsertionIndicatorAtResolvedIndex() throws {
+    func testValidateDropRejectsNoOpWithinDraggedItemLowerHalf() throws {
         let secondID = BlockInputBlockID(rawValue: "second")
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "first", text: "First"),
@@ -65,13 +65,115 @@ final class BlockInputViewDropIndicatorTests: XCTestCase {
             )
         }
 
+        XCTAssertTrue(dragOperation.isEmpty)
+        XCTAssertEqual(indexPath.item, 0)
+        XCTAssertEqual(operation, .on)
+        XCTAssertTrue(mounted.view.dropIndicatorView.isHidden)
+    }
+
+    func testValidateDropRejectsNoOpBeforeAdjacentNextItem() throws {
+        let firstChildID = BlockInputBlockID(rawValue: "first-child")
+        let secondChildID = BlockInputBlockID(rawValue: "second-child")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "parent", kind: .numberedListItem(start: 1), text: "Parent"),
+            BlockInputBlock(id: firstChildID, kind: .numberedListItem(start: 1), text: "First", indentationLevel: 1),
+            BlockInputBlock(id: secondChildID, kind: .numberedListItem(start: 2), text: "Second", indentationLevel: 1),
+            BlockInputBlock(id: "next", kind: .numberedListItem(start: 2), text: "Next")
+        ])
+        let secondAttributes = try XCTUnwrap(mounted.view.collectionView.layoutAttributesForItem(
+            at: IndexPath(item: 2, section: 0)
+        ))
+        let collectionLocation = NSPoint(x: secondAttributes.frame.midX, y: secondAttributes.frame.minY + 1)
+        let windowLocation = mounted.view.collectionView.convert(collectionLocation, to: nil)
+        var indexPath = NSIndexPath(forItem: 0, inSection: 0)
+        var operation = NSCollectionView.DropOperation.on
+
+        let dragOperation = withUnsafeMutablePointer(to: &indexPath) { pointer in
+            mounted.view.collectionView(
+                mounted.view.collectionView,
+                validateDrop: BlockInputDraggingInfo(blockID: firstChildID, location: windowLocation),
+                proposedIndexPath: AutoreleasingUnsafeMutablePointer(pointer),
+                dropOperation: &operation
+            )
+        }
+
+        XCTAssertTrue(dragOperation.isEmpty)
+        XCTAssertEqual(indexPath.item, 0)
+        XCTAssertEqual(operation, .on)
+        XCTAssertTrue(mounted.view.dropIndicatorView.isHidden)
+    }
+
+    func testValidateDropKeepsUpwardInsertionIndicatorAtResolvedIndex() throws {
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "first", text: "First"),
+            BlockInputBlock(id: secondID, text: "Second"),
+            BlockInputBlock(id: thirdID, text: "Third")
+        ])
+        let secondAttributes = try XCTUnwrap(mounted.view.collectionView.layoutAttributesForItem(
+            at: IndexPath(item: 1, section: 0)
+        ))
+        let collectionLocation = NSPoint(x: secondAttributes.frame.midX, y: secondAttributes.frame.minY + 1)
+        let windowLocation = mounted.view.collectionView.convert(collectionLocation, to: nil)
+        var indexPath = NSIndexPath(forItem: 0, inSection: 0)
+        var operation = NSCollectionView.DropOperation.on
+
+        let dragOperation = withUnsafeMutablePointer(to: &indexPath) { pointer in
+            mounted.view.collectionView(
+                mounted.view.collectionView,
+                validateDrop: BlockInputDraggingInfo(blockID: thirdID, location: windowLocation),
+                proposedIndexPath: AutoreleasingUnsafeMutablePointer(pointer),
+                dropOperation: &operation
+            )
+        }
+
         XCTAssertTrue(dragOperation.contains(.move))
-        XCTAssertEqual(indexPath.item, 2)
+        XCTAssertEqual(indexPath.item, 1)
         XCTAssertEqual(operation, .before)
-        XCTAssertFalse(mounted.view.dropIndicatorView.isHidden)
         XCTAssertEqual(
             mounted.view.dropIndicatorView.frame.minY,
-            mounted.view.dropIndicatorFrame(forInsertionIndex: 2)?.minY
+            mounted.view.dropIndicatorFrame(forInsertionIndex: 1)?.minY
+        )
+    }
+
+    func testValidateDropShowsIndicatorBelowAdjacentNestedNumberedItem() throws {
+        let firstChildID = BlockInputBlockID(rawValue: "first-child")
+        let secondChildID = BlockInputBlockID(rawValue: "second-child")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "parent", kind: .numberedListItem(start: 1), text: "Parent"),
+            BlockInputBlock(id: firstChildID, kind: .numberedListItem(start: 1), text: "First", indentationLevel: 1),
+            BlockInputBlock(id: secondChildID, kind: .numberedListItem(start: 2), text: "Second", indentationLevel: 1),
+            BlockInputBlock(id: "next", kind: .numberedListItem(start: 2), text: "Next")
+        ])
+        let secondAttributes = try XCTUnwrap(mounted.view.collectionView.layoutAttributesForItem(
+            at: IndexPath(item: 2, section: 0)
+        ))
+        let collectionLocation = NSPoint(x: secondAttributes.frame.midX, y: secondAttributes.frame.maxY - 1)
+        let windowLocation = mounted.view.collectionView.convert(collectionLocation, to: nil)
+        var indexPath = NSIndexPath(forItem: 0, inSection: 0)
+        var operation = NSCollectionView.DropOperation.on
+
+        let dragOperation = withUnsafeMutablePointer(to: &indexPath) { pointer in
+            mounted.view.collectionView(
+                mounted.view.collectionView,
+                validateDrop: BlockInputDraggingInfo(blockID: firstChildID, location: windowLocation),
+                proposedIndexPath: AutoreleasingUnsafeMutablePointer(pointer),
+                dropOperation: &operation
+            )
+        }
+
+        XCTAssertTrue(dragOperation.contains(.move))
+        XCTAssertEqual(indexPath.item, 3)
+        XCTAssertEqual(operation, .before)
+        XCTAssertEqual(
+            mounted.view.dropIndicatorView.frame.minY,
+            mounted.view.dropIndicatorFrame(forInsertionIndex: 3)?.minY
+        )
+        XCTAssertEqual(
+            mounted.view.dropIndicatorView.frame.midY,
+            secondAttributes.frame.maxY,
+            accuracy: 1
         )
     }
 
@@ -99,6 +201,29 @@ final class BlockInputViewDropIndicatorTests: XCTestCase {
 
         XCTAssertTrue(accepted)
         XCTAssertEqual(mounted.view.document.blocks.map(\.id), [firstID, thirdID, secondID])
+    }
+
+    func testAcceptDropRejectsNoOpBlockReorderWithoutFallingThroughToFileInsertion() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])))
+
+        let accepted = view.collectionView(
+            view.collectionView,
+            acceptDrop: BlockInputDraggingInfo(
+                blockID: firstID,
+                fileURLs: [URL(fileURLWithPath: "/tmp/example.txt")]
+            ),
+            indexPath: IndexPath(item: 1, section: 0),
+            dropOperation: .before
+        )
+
+        XCTAssertFalse(accepted)
+        XCTAssertEqual(view.document.blocks.map(\.id), [firstID, secondID])
     }
 
     func testDropIndicatorUsesConfiguredColor() {

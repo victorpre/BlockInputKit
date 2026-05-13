@@ -3,12 +3,18 @@ import AppKit
 /// Runtime options and host integration points for a block input editor.
 public struct BlockInputConfiguration {
     /// Source of truth for the document shown by the editor.
-    public var documentStore: any BlockInputDocumentStore
+    public var documentStore: any BlockInputDocumentStore {
+        didSet {
+            usesDefaultDocumentStore = false
+        }
+    }
     /// Whether the leading drag handle can reorder blocks.
     public var allowsBlockReordering: Bool
     /// Color used for editor accent affordances, including drag insertion and selected horizontal rules.
     public var dropIndicatorColor: NSColor
     /// Undo coordinator used by text and structural editor operations.
+    ///
+    /// When nil, `BlockInputView` uses a view-owned undo controller.
     public var undoController: BlockInputUndoController?
     /// Host completion source for mentions and slash commands.
     public var completionProvider: (any BlockInputCompletionProvider)?
@@ -25,6 +31,7 @@ public struct BlockInputConfiguration {
     public var onSelectionChange: ((BlockInputSelection?) -> Void)?
     /// Called when the editor gains or loses AppKit focus.
     public var onFocusChange: ((Bool) -> Void)?
+    var usesDefaultDocumentStore: Bool
 
     /// Current document snapshot from `documentStore`.
     public var document: BlockInputDocument {
@@ -45,6 +52,7 @@ public struct BlockInputConfiguration {
         onSelectionChange: ((BlockInputSelection?) -> Void)? = nil,
         onFocusChange: ((Bool) -> Void)? = nil
     ) {
+        usesDefaultDocumentStore = documentStore == nil
         self.documentStore = documentStore ?? BlockInputMemoryDocumentStore(document: document)
         self.allowsBlockReordering = allowsBlockReordering
         self.dropIndicatorColor = dropIndicatorColor
