@@ -107,7 +107,7 @@ extension BlockInputView {
         if !shortcut.preservesIndentation {
             afterBlock.indentationLevel = 0
         }
-        let insertedBlock = BlockInputBlock(kind: .paragraph)
+        let insertedBlock = BlockInputBlock(kind: .paragraph, text: shortcut.insertedBlockText ?? "")
         let insertedBlocks = [insertedBlock]
         let insertionIndex = index + 1
         if canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) {
@@ -120,7 +120,7 @@ extension BlockInputView {
         }
         let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
             blockID: insertedBlock.id,
-            utf16Offset: 0
+            utf16Offset: min(shortcut.cursorOffset, insertedBlock.utf16Length)
         ))
         syncDocumentStore(.replaceBlock(afterBlock))
         syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: insertionIndex))

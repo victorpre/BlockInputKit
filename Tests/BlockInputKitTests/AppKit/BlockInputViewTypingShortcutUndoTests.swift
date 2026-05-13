@@ -144,4 +144,46 @@ final class BlockInputViewTypingShortcutUndoTests: XCTestCase {
         XCTAssertEqual(view.document.blocks[2].id, secondID)
         XCTAssertEqual(redo?.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
     }
+
+    func testHorizontalRuleTypingShortcutUndoRestoresTextMovedBelowRule() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: firstID, text: "Existing"),
+                BlockInputBlock(id: secondID, text: "Second")
+            ]),
+            undoController: undoController
+        ))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        _ = item.textView(textView, shouldChangeTextIn: NSRange(location: 0, length: 0), replacementString: "--- ")
+        textView.string = "--- Existing"
+        textView.setSelectedRange(NSRange(location: 4, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertEqual(view.document.blocks.map(\.kind), [.horizontalRule, .paragraph, .paragraph])
+        XCTAssertEqual(view.document.blocks[1].text, "Existing")
+
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Format Block")
+        XCTAssertEqual(view.document.blocks.map(\.id), [firstID, secondID])
+        XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[0].text, "Existing")
+        XCTAssertEqual(undo?.selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 0)))
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(redo?.actionName, "Format Block")
+        XCTAssertEqual(view.document.blocks.map(\.kind), [.horizontalRule, .paragraph, .paragraph])
+        XCTAssertEqual(view.document.blocks[1].text, "Existing")
+        XCTAssertEqual(view.document.blocks[2].id, secondID)
+    }
 }

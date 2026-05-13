@@ -6,6 +6,7 @@ extension BlockInputDocument {
         var text: String
         var cursorOffset: Int
         var preservesIndentation: Bool = false
+        var insertedBlockText: String?
     }
 
     func typingShortcut(
@@ -37,9 +38,10 @@ extension BlockInputDocument {
         let cursorOffset = max(0, proposedUTF16Offset - match.consumedUTF16Length)
         return TypingShortcut(
             kind: match.kind,
-            text: match.text,
+            text: match.kind == .horizontalRule ? "" : match.text,
             cursorOffset: min(cursorOffset, (match.text as NSString).length),
-            preservesIndentation: match.preservesIndentation
+            preservesIndentation: match.preservesIndentation,
+            insertedBlockText: match.kind == .horizontalRule ? match.text : nil
         )
     }
 
@@ -57,9 +59,12 @@ extension BlockInputDocument {
             blocks[index].indentationLevel = 0
         }
         if shortcut.kind == .horizontalRule {
-            let nextBlock = BlockInputBlock(kind: .paragraph)
+            let nextBlock = BlockInputBlock(kind: .paragraph, text: shortcut.insertedBlockText ?? "")
             blocks.insert(nextBlock, at: index + 1)
-            return .cursor(BlockInputCursor(blockID: nextBlock.id, utf16Offset: 0))
+            return .cursor(BlockInputCursor(
+                blockID: nextBlock.id,
+                utf16Offset: min(shortcut.cursorOffset, nextBlock.utf16Length)
+            ))
         }
         let offset = min(shortcut.cursorOffset, blocks[index].utf16Length)
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: offset))
@@ -96,11 +101,9 @@ private enum BlockInputTypingShortcutParser {
     }
 
     static func match(in text: String, currentKind: BlockInputBlockKind) -> Match? {
-        if text == "---", currentKind == .paragraph {
-            return Match(kind: .horizontalRule, text: "", consumedUTF16Length: 3)
-        }
-        if text == "--- ", currentKind == .paragraph {
-            return Match(kind: .horizontalRule, text: "", consumedUTF16Length: 4)
+        if currentKind == .paragraph,
+           let horizontalRule = horizontalRuleMatch(in: text) {
+            return horizontalRule
         }
         if currentKind != .bulletedListItem,
            let heading = headingMatch(in: text) {
@@ -116,6 +119,24 @@ private enum BlockInputTypingShortcutParser {
             ?? checklistMatch(in: text, consumesLeadingDash: true, preservesIndentation: false)
             ?? bulletMatch(in: text)
             ?? numberedListMatch(in: text)
+    }
+
+    private static func horizontalRuleMatch(in text: String) -> Match? {
+        if text == "---" {
+            return Match(kind: .horizontalRule, text: "", consumedUTF16Length: 3)
+        }
+        guard text.hasPrefix("--- ") else {
+            return nil
+        }
+        let suffixStart = text.index(text.startIndex, offsetBy: 4)
+        let suffix = text[suffixStart...]
+        let trimmedSuffix = suffix.drop { $0 == " " }
+        let trimmedLeadingSpaceCount = suffix.distance(from: suffix.startIndex, to: trimmedSuffix.startIndex)
+        return Match(
+            kind: .horizontalRule,
+            text: String(trimmedSuffix),
+            consumedUTF16Length: 4 + trimmedLeadingSpaceCount
+        )
     }
 
     private static func headingMatch(in text: String) -> Match? {

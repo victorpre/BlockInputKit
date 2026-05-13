@@ -53,6 +53,18 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     }
 
     @MainActor
+    func testTextViewDisablesAutomaticDashSubstitution() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", text: ""),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+
+        let textView = try XCTUnwrap(item.testingTextView)
+        XCTAssertFalse(textView.isAutomaticDashSubstitutionEnabled)
+    }
+
+    @MainActor
     func testQuoteUsesLeadingRuleInsteadOfMarkdownMarker() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "quote", kind: .quote, text: "Quoted"),

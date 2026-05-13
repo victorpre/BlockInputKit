@@ -256,6 +256,44 @@ final class BlockInputDocumentTypingShortcutTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
     }
 
+    func testTypingShortcutMovesTextAfterHorizontalRuleMarkerIntoParagraphBelow() {
+        let blockID = BlockInputBlockID(rawValue: "rule")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Existing")
+        ])
+        let shortcut = document.typingShortcut(
+            for: blockID,
+            proposedText: "--- Existing",
+            proposedUTF16Offset: 4
+        )
+
+        let selection = shortcut.flatMap { document.applyTypingShortcut(blockID: blockID, shortcut: $0) }
+
+        XCTAssertEqual(document.blocks[0].kind, .horizontalRule)
+        XCTAssertEqual(document.blocks[0].text, "")
+        XCTAssertEqual(document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(document.blocks[1].text, "Existing")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    func testTypingShortcutTrimsLeadingSpacesFromTextMovedBelowHorizontalRule() {
+        let blockID = BlockInputBlockID(rawValue: "rule")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Existing")
+        ])
+        let shortcut = document.typingShortcut(
+            for: blockID,
+            proposedText: "---    Existing",
+            proposedUTF16Offset: 15
+        )
+
+        let selection = shortcut.flatMap { document.applyTypingShortcut(blockID: blockID, shortcut: $0) }
+
+        XCTAssertEqual(document.blocks[0].kind, .horizontalRule)
+        XCTAssertEqual(document.blocks[1].text, "Existing")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 8)))
+    }
+
     func testTypingShortcutInsertsParagraphImmediatelyBelowHorizontalRuleInMiddleOfDocument() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

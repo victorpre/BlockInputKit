@@ -50,6 +50,7 @@ extension BlockInputBlockItem {
         textView.backgroundColor = .clear
         textView.drawsBackground = false
         textView.isRichText = true
+        textView.isAutomaticDashSubstitutionEnabled = false
         textView.allowsUndo = false
         textView.font = .preferredFont(forTextStyle: .body)
         textView.delegate = self
