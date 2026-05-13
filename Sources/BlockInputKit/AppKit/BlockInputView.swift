@@ -114,6 +114,11 @@ public final class BlockInputView: NSView {
            performUndoShortcut(undoShortcut) {
             return true
         }
+        // Copy needs a direct key-equivalent path; paste stays on NSText so insertion uses AppKit's normal edit pipeline.
+        if event.blockInputIsCopyShortcut,
+           copyActiveSelection() {
+            return true
+        }
         return super.performKeyEquivalent(with: event)
     }
 
@@ -132,6 +137,21 @@ public final class BlockInputView: NSView {
     @objc(redo:)
     func blockInputRedo(_ sender: Any?) {
         _ = performUndoShortcut(.redo)
+    }
+
+    @objc(copy:)
+    func blockInputCopy(_ sender: Any?) {
+        _ = copyActiveSelection()
+    }
+
+    @objc(cut:)
+    func blockInputCut(_ sender: Any?) {
+        _ = cutActiveSelection()
+    }
+
+    @objc(paste:)
+    func blockInputPaste(_ sender: Any?) {
+        _ = pasteIntoActiveSelection()
     }
 
     /// Focuses a specific block at a UTF-16 text offset.

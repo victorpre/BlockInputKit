@@ -15,5 +15,6 @@
 - For non-large replacement-plus-insertion edits, do not mix `reloadItems` and `insertItems` after the document count has changed; reload the visible layout coherently to avoid overlapping rows.
 - Keep front-of-paragraph Backspace/Delete merges granular: replace the previous block and delete the current block.
 - Keep only one visible reorder handle revealed at a time.
+- Keep clipboard shortcuts intentionally asymmetric: Cmd+C may use a direct key-equivalent path for editor/block selections, but paste should stay on AppKit `NSText`/responder actions to preserve native insertion semantics.
 - When indenting ordered-list blocks, normalize only the affected list run and publish replacement mutations for every block whose visible marker changes.
 - When reordering ordered-list blocks, keep nested marker starts normalized and publish replacement mutations from the model-reported changed blocks; large-document store-backed reorders should use the bounded list move path instead of full snapshots or whole-document diffs.

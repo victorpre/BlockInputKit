@@ -3,14 +3,6 @@ import AppKit
 final class BlockInputTextView: NSTextView {
     weak var blockItem: BlockInputBlockItem?
 
-    override func keyDown(with event: NSEvent) {
-        if let editingShortcut = event.blockInputEditingShortcut {
-            performEditingShortcut(editingShortcut)
-            return
-        }
-        super.keyDown(with: event)
-    }
-
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.blockInputIsSelectAllShortcut,
            let blockItem {
@@ -21,8 +13,9 @@ final class BlockInputTextView: NSTextView {
            blockItem?.requestUndoShortcut(undoShortcut) == true {
             return true
         }
-        if let editingShortcut = event.blockInputEditingShortcut {
-            performEditingShortcut(editingShortcut)
+        // Copy needs a direct key-equivalent path; paste stays on NSText so insertion uses AppKit's normal edit pipeline.
+        if event.blockInputIsCopyShortcut,
+           copySelectedPlainText() {
             return true
         }
         return super.performKeyEquivalent(with: event)
@@ -34,6 +27,21 @@ final class BlockInputTextView: NSTextView {
             return
         }
         blockItem.requestSelectAll()
+    }
+
+    override func copy(_ sender: Any?) {
+        guard copySelectedPlainText() else {
+            super.copy(sender)
+            return
+        }
+    }
+
+    override func cut(_ sender: Any?) {
+        guard copySelectedPlainText() else {
+            super.cut(sender)
+            return
+        }
+        delete(nil)
     }
 
     @objc(undo:)
@@ -97,14 +105,26 @@ final class BlockInputTextView: NSTextView {
         }
     }
 
-    private func performEditingShortcut(_ shortcut: BlockInputEditingShortcut) {
-        switch shortcut {
-        case .copy:
-            copy(nil)
-        case .cut:
-            cut(nil)
-        case .paste:
-            paste(nil)
+    private func copySelectedPlainText() -> Bool {
+        let range = selectedRange()
+        guard range.length > 0 else {
+            return false
         }
+        let copiedText = (string as NSString).substring(with: string.clampedRange(range))
+        guard !copiedText.isEmpty else {
+            return false
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(copiedText, forType: .string)
+        return true
+    }
+}
+
+private extension String {
+    func clampedRange(_ range: NSRange) -> NSRange {
+        let text = self as NSString
+        let location = min(max(range.location, 0), text.length)
+        let length = min(max(range.length, 0), max(text.length - location, 0))
+        return NSRange(location: location, length: length)
     }
 }
