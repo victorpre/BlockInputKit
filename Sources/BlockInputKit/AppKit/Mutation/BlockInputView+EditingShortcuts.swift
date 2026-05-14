@@ -54,11 +54,10 @@ extension BlockInputView {
     private func selectedPlainText() -> String? {
         switch selection {
         case let .text(textRange):
-            guard let block = block(withID: textRange.blockID),
-                  block.kind != .horizontalRule else {
+            guard let block = block(withID: textRange.blockID) else {
                 return nil
             }
-            return (block.text as NSString).substring(with: block.text.clampedRange(textRange.range))
+            return block.markdownAwareCopiedText(in: textRange.range)
         case let .blocks(blockIDs):
             let copiedBlocks = blocksForMarkdownCopy(blockIDs: blockIDs)
             guard !copiedBlocks.isEmpty else {
@@ -119,7 +118,23 @@ extension BlockInputView {
     }
 }
 
-private extension BlockInputBlock {
+extension BlockInputBlock {
+    func markdownAwareCopiedText(in range: NSRange) -> String? {
+        guard kind != .horizontalRule else {
+            return nil
+        }
+        let clampedRange = text.clampedRange(range)
+        guard clampedRange.length > 0 else {
+            return nil
+        }
+        if kind == .quote,
+           clampedRange.location == 0,
+           NSMaxRange(clampedRange) == utf16Length {
+            return BlockInputDocument(blocks: [self]).markdown
+        }
+        return (text as NSString).substring(with: clampedRange)
+    }
+
     mutating func applyPartialMarkdownCopyRange(_ range: NSRange) {
         let originalTextLength = utf16Length
         let clampedRange = text.clampedRange(range)

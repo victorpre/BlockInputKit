@@ -324,11 +324,17 @@ final class BlockInputTextView: NSTextView {
 
     private func copySelectedPlainText() -> Bool {
         let range = selectedRange()
-        guard range.length > 0 else {
-            return false
+        let copiedText: String?
+        if var block = blockItem?.renderedBlock {
+            block.text = string
+            copiedText = block.markdownAwareCopiedText(in: range)
+        } else {
+            let clampedRange = string.clampedRange(range)
+            copiedText = clampedRange.length > 0
+                ? (string as NSString).substring(with: clampedRange)
+                : nil
         }
-        let copiedText = (string as NSString).substring(with: string.clampedRange(range))
-        guard !copiedText.isEmpty else {
+        guard let copiedText, !copiedText.isEmpty else {
             return false
         }
         NSPasteboard.general.clearContents()
