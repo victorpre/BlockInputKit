@@ -19,12 +19,14 @@ Read the nearest `AGENTS.md` before editing. Current scopes:
 - `Sources/BlockInputKit/AppKit/Mutation/AGENTS.md`: AppKit store sync, editing operations, and command shortcuts.
 - `Sources/BlockInputKit/AppKit/Reordering/AGENTS.md`: AppKit reorder handles, drag starts, and ordered-list reorder normalization.
 - `Sources/BlockInputKit/AppKit/Selection/AGENTS.md`: AppKit keyboard, mouse, chrome, cancellation, and debug selection behavior.
+- `Sources/BlockInputKit/AppKit/SyntaxHighlighting/AGENTS.md`: AppKit lite syntax highlighting and code parsing.
 - `Tests/BlockInputKitTests/AGENTS.md`: test organization and coverage expectations.
 - `Tests/BlockInputKitTests/AppKit/BlockItem/AGENTS.md`: AppKit block item tests.
 - `Tests/BlockInputKitTests/AppKit/Mutation/AGENTS.md`: AppKit mutation and document-store tests.
 - `Tests/BlockInputKitTests/AppKit/Performance/AGENTS.md`: AppKit large-document and hot-path performance tests.
 - `Tests/BlockInputKitTests/AppKit/Reordering/AGENTS.md`: AppKit reordering tests.
 - `Tests/BlockInputKitTests/AppKit/Selection/AGENTS.md`: AppKit multi-selection and selection chrome tests.
+- `Tests/BlockInputKitTests/AppKit/SyntaxHighlighting/AGENTS.md`: AppKit syntax highlighting and code parser tests.
 - `Tests/BlockInputKitTests/AppKit/Snapshots/AGENTS.md`: AppKit snapshot matrix and baseline expectations.
 
 ## Build And Test

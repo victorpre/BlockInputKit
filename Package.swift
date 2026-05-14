@@ -33,7 +33,9 @@ let package = Package(
                 "AppKit/Reordering/AGENTS.md",
                 "AppKit/Reordering/CLAUDE.md",
                 "AppKit/Selection/AGENTS.md",
-                "AppKit/Selection/CLAUDE.md"
+                "AppKit/Selection/CLAUDE.md",
+                "AppKit/SyntaxHighlighting/AGENTS.md",
+                "AppKit/SyntaxHighlighting/CLAUDE.md"
             ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
@@ -65,6 +67,8 @@ let package = Package(
                 "AppKit/Reordering/CLAUDE.md",
                 "AppKit/Selection/AGENTS.md",
                 "AppKit/Selection/CLAUDE.md",
+                "AppKit/SyntaxHighlighting/AGENTS.md",
+                "AppKit/SyntaxHighlighting/CLAUDE.md",
                 "AppKit/Snapshots/AGENTS.md",
                 "AppKit/Snapshots/CLAUDE.md"
             ],
