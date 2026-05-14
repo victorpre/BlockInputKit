@@ -43,6 +43,17 @@ final class BlockInputBlockItemSelectionChromeTests: XCTestCase {
         XCTAssertEqual(ruleItem.testingSelectionBackgroundView.frame.minX, paragraphItem.testingSelectionBackgroundView.frame.minX)
     }
 
+    func testCodeBlockSelectionChromeUsesPlainTextLeadingEdge() throws {
+        let paragraphItem = selectedItemForWidthTesting(
+            block: BlockInputBlock(id: "paragraph", text: "Try mention query")
+        )
+        let codeItem = selectedItemForWidthTesting(
+            block: BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1")
+        )
+
+        XCTAssertEqual(codeItem.testingSelectionBackgroundView.frame.minX, paragraphItem.testingSelectionBackgroundView.frame.minX)
+    }
+
     func testPartialSelectionChromeCollapsesNativeTextSelection() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "paragraph", text: "BlockInputKit demo"),

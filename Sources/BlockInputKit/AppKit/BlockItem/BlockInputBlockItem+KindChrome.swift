@@ -12,6 +12,7 @@ extension BlockInputBlockItem {
         textView.isSelectable = !isHorizontalRule
         applyTextAttributes(for: block)
         scrollView.isHidden = isHorizontalRule
+        configureCodeBackground(for: block)
         scrollViewTopConstraint?.constant = 0
         scrollViewBottomConstraint?.constant = 0
         handleTopConstraint?.constant = Self.dragHandleTopConstant(for: block.kind, metrics: verticalMetrics)
@@ -62,6 +63,9 @@ extension BlockInputBlockItem {
         for block: BlockInputBlock,
         perLineContentIndent: CGFloat
     ) -> CGFloat {
+        guard block.kind.needsVisibleMarkerLane else {
+            return 0
+        }
         if block.kind == .quote {
             return 0
         }
@@ -89,6 +93,9 @@ extension BlockInputBlockItem {
     }
 
     static func markerGutterWidth(for block: BlockInputBlock) -> CGFloat {
+        guard block.kind.needsVisibleMarkerLane else {
+            return 0
+        }
         guard block.kind.supportsIndentation else {
             return markerGutterWidth
         }
@@ -112,5 +119,16 @@ extension BlockInputBlockItem {
         view.cacheDisplay(in: view.bounds, to: representation)
         image.addRepresentation(representation)
         return image
+    }
+}
+
+private extension BlockInputBlockKind {
+    var needsVisibleMarkerLane: Bool {
+        switch self {
+        case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+            return true
+        case .paragraph, .heading, .code, .horizontalRule:
+            return false
+        }
     }
 }

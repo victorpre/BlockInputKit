@@ -7,15 +7,17 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let checklistButtonBaseLeading: CGFloat = chromeFrameAlignmentOffset
 
     static let handleWidth: CGFloat = 24
-    static let horizontalChromeWidthWithHandle: CGFloat = 56
-    static let horizontalChromeWidthWithoutHandle: CGFloat = 32
+    static let handleLeading: CGFloat = 4
+    static let handleTrailingGap: CGFloat = 4
+    static let horizontalChromeWidthWithHandle: CGFloat = handleLeading + handleWidth + handleTrailingGap
+    static let horizontalChromeWidthWithoutHandle: CGFloat = handleLeading + handleTrailingGap
     static let markerGutterWidth: CGFloat = 24
     static let markerChromeWidth: CGFloat = 18
     static let minimumMarkerTextGap: CGFloat = 4
     static let defaultTextLeading: CGFloat = 4
     // Mirrors the NSTextView inset plus line-fragment padding so external chrome starts at the plain-text glyph column.
     static let textContainerContentLeading: CGFloat = 9
-    static let markerAlignmentLeading: CGFloat = markerGutterWidth + defaultTextLeading + textContainerContentLeading
+    static let markerAlignmentLeading: CGFloat = defaultTextLeading + textContainerContentLeading
     static let listTextLeading: CGFloat = -textContainerContentLeading
     static let quoteBarIdentifier = NSUserInterfaceItemIdentifier("BlockInputQuoteBarView")
     static let quoteBarWidth: CGFloat = 6
@@ -28,6 +30,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     let quoteBarView = NSView()
     let scrollView = NSScrollView()
+    let codeBackgroundView = NSView()
     let horizontalRuleView = BlockInputHorizontalRuleView()
     let selectionBackgroundView = BlockInputSelectionBackgroundView()
     let textView = BlockInputTextView()
@@ -43,6 +46,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var temporarySelectionHighlightRange: NSRange?
     var isTrackingBlockSelectionDrag = false
     var isDraggingBlockSelection = false
+    var renderedCodeColorScheme: BlockInputSyntaxColorScheme?
     var handleWidthConstraint: NSLayoutConstraint?
     var kindLabelLeadingConstraint: NSLayoutConstraint?
     var kindLabelWidthConstraint: NSLayoutConstraint?
@@ -96,8 +100,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        refreshCodeAppearanceIfNeeded()
         updateTextViewDocumentFrame()
         updateSelectionChromeFrame()
+        updateCodeBackgroundFrame()
         updateHoverTrackingArea()
         updateMarkerLineYOffsets()
         updateQuoteBarVerticalExtent()
@@ -440,6 +446,7 @@ extension BlockInputBlockItem {
         handleView.blockItem = nil
         horizontalRuleView.blockItem = nil
         horizontalRuleView.resetForReuse()
+        renderedCodeColorScheme = nil
         textView.cancelBlockSelectionDrag()
         textView.blockItem = nil
         finishBlockSelectionDrag()
@@ -447,6 +454,8 @@ extension BlockInputBlockItem {
         textView.isEditable = true
         textView.textContainerInset = Self.standardTextContainerInset
         scrollView.isHidden = false
+        codeBackgroundView.isHidden = true
+        codeBackgroundView.alphaValue = 0
         scrollViewLeadingConstraint?.constant = Self.defaultTextLeading
         scrollViewTopConstraint?.constant = 0
         scrollViewBottomConstraint?.constant = 0
@@ -466,7 +475,7 @@ extension BlockInputBlockItem {
         textView.font = Self.font(for: .paragraph)
         kindLabel.setMarkerLines([])
         kindLabelLeadingConstraint?.constant = 0
-        kindLabelWidthConstraint?.constant = Self.markerGutterWidth
+        kindLabelWidthConstraint?.constant = 0
         checklistButton.state = .off
         checklistButton.isHidden = true
         checklistButton.isEnabled = false

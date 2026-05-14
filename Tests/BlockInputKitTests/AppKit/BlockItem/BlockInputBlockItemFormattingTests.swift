@@ -6,7 +6,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     func testPrefixReflectsBlockKindAndIndentation() {
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .paragraph, indentationLevel: 2), "")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .heading(level: 3), indentationLevel: 0), "")
-        XCTAssertEqual(BlockInputBlockItem.prefix(for: .code(language: nil), indentationLevel: 1), "{}")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .code(language: nil), indentationLevel: 1), "")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .horizontalRule, indentationLevel: 0), "")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .quote, indentationLevel: 2), "")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 0), "•")

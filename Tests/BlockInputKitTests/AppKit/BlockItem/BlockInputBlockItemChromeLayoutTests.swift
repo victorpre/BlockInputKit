@@ -30,6 +30,43 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
     }
 
     @MainActor
+    func testPlainHeadingCodeAndRuleRowsReserveOnlyReorderHandleSpace() throws {
+        let view = BlockInputView()
+        let paragraphItem = configuredItem(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Plain"),
+            delegate: view
+        )
+        let paragraphScrollView = try XCTUnwrap(paragraphItem.testingTextScrollView)
+        XCTAssertEqual(paragraphScrollView.frame.minX, BlockInputBlockItem.horizontalChromeWidth(allowsReordering: true), accuracy: 0.5)
+        XCTAssertEqual(try XCTUnwrap(paragraphItem.testingMarkerView).frame.width, 0, accuracy: 0.5)
+
+        let noMarkerBlocks = [
+            BlockInputBlock(id: "heading", kind: .heading(level: 2), text: "Heading"),
+            BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1"),
+            BlockInputBlock(id: "rule", kind: .horizontalRule, text: "")
+        ]
+        for block in noMarkerBlocks {
+            let item = configuredItem(block: block, delegate: view)
+            XCTAssertEqual(try XCTUnwrap(item.testingMarkerView).frame.width, 0, accuracy: 0.5, "Unexpected marker lane for \(block.kind).")
+        }
+    }
+
+    @MainActor
+    func testPlainRowsWithoutReorderingReserveOnlyHandleMarginSpace() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Plain"),
+            allowsReordering: false,
+            delegate: BlockInputView()
+        )
+        item.view.frame = NSRect(x: 0, y: 0, width: 420, height: 60)
+        item.view.layoutSubtreeIfNeeded()
+
+        let scrollView = try XCTUnwrap(item.testingTextScrollView)
+        XCTAssertEqual(scrollView.frame.minX, BlockInputBlockItem.horizontalChromeWidth(allowsReordering: false), accuracy: 0.5)
+        XCTAssertEqual(try XCTUnwrap(item.testingMarkerView).frame.width, 0, accuracy: 0.5)
+    }
+
+    @MainActor
     func testReorderHandleCentersOnFirstRenderedTextLine() throws {
         let view = BlockInputView()
         let blocks = [
@@ -100,6 +137,30 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
         XCTAssertEqual(quoteBar.frame.width, BlockInputBlockItem.quoteBarWidth, accuracy: 0.5)
         XCTAssertEqual(quoteBar.frame.minX, paragraphTextMinX, accuracy: 0.5)
         XCTAssertGreaterThan(try textContentMinX(in: quoteItem) - quoteBar.frame.maxX, 8)
+    }
+
+    @MainActor
+    func testCodeBlockSurfaceAlignsWithPlainTextRowAndUsesRoundedChrome() throws {
+        let view = BlockInputView()
+        let paragraphItem = configuredItem(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Plain"),
+            delegate: view
+        )
+        let paragraphScrollView = try XCTUnwrap(paragraphItem.testingTextScrollView)
+        let codeItem = configuredItem(
+            block: BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1\nprint(value)"),
+            delegate: view
+        )
+        let codeSurface = codeItem.testingCodeBackgroundView
+        let codeScrollView = try XCTUnwrap(codeItem.testingTextScrollView)
+
+        XCTAssertFalse(codeSurface.isHidden)
+        XCTAssertEqual(codeSurface.frame.minX, paragraphScrollView.frame.minX, accuracy: 0.5)
+        XCTAssertEqual(codeScrollView.frame.minX, paragraphScrollView.frame.minX, accuracy: 0.5)
+        XCTAssertEqual(codeSurface.layer?.cornerRadius, 6)
+        XCTAssertEqual(codeSurface.layer?.borderWidth, 1)
+        XCTAssertNotNil(codeSurface.layer?.backgroundColor)
+        XCTAssertNotNil(codeSurface.layer?.borderColor)
     }
 
     @MainActor

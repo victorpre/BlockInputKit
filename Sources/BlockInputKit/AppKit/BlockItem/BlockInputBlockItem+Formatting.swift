@@ -77,10 +77,8 @@ extension BlockInputBlockItem {
 
     static func prefix(for kind: BlockInputBlockKind, indentationLevel: Int) -> String {
         switch kind {
-        case .paragraph, .heading, .horizontalRule, .quote:
+        case .paragraph, .heading, .code, .horizontalRule, .quote:
             return ""
-        case .code:
-            return "{}"
         case .bulletedListItem:
             return unorderedListMarker(indentationLevel: indentationLevel)
         case let .numberedListItem(start):
@@ -302,6 +300,7 @@ extension BlockInputBlockItem {
         textStorage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
         textStorage.removeAttribute(.kern, range: fullRange)
         textStorage.removeAttribute(.paragraphStyle, range: fullRange)
+        applyCodeBlockAttributes(for: block, textStorage: textStorage)
         applyLineIndentationAttributes(for: block, textStorage: textStorage)
         applyInlineCodeAttributes(for: block, textStorage: textStorage)
         textStorage.endEditing()

@@ -35,6 +35,10 @@ extension BlockInputBlockItem {
         }
     }
 
+    var testingCodeBackgroundView: NSView {
+        codeBackgroundView
+    }
+
     var testingHandleView: BlockInputDragHandleView? {
         view.firstDescendant(of: BlockInputDragHandleView.self)
     }

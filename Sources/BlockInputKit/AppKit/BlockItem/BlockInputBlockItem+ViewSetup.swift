@@ -9,6 +9,7 @@ extension BlockInputBlockItem {
         setupHandleView()
         setupKindLabel()
         setupChecklistButton()
+        setupCodeBackgroundView()
         setupTextView()
         setupHorizontalRuleView()
         setupQuoteBarView()
@@ -36,6 +37,14 @@ extension BlockInputBlockItem {
         checklistButton.isHidden = true
         checklistButton.toolTip = "Toggle checklist item"
         checklistButton.setAccessibilityLabel("Toggle checklist item")
+    }
+
+    private func setupCodeBackgroundView() {
+        codeBackgroundView.wantsLayer = true
+        codeBackgroundView.isHidden = true
+        codeBackgroundView.alphaValue = 0
+        codeBackgroundView.layer?.cornerRadius = 6
+        codeBackgroundView.layer?.borderWidth = 1
     }
 
     private func setupTextView() {
@@ -75,6 +84,8 @@ extension BlockInputBlockItem {
     }
 
     private func addArrangedSubviews() {
+        codeBackgroundView.translatesAutoresizingMaskIntoConstraints = true
+        view.addSubview(codeBackgroundView)
         selectionBackgroundView.translatesAutoresizingMaskIntoConstraints = true
         view.addSubview(selectionBackgroundView)
         for subview in [handleView, kindLabel, checklistButton, quoteBarView, scrollView, horizontalRuleView] {
@@ -90,7 +101,7 @@ extension BlockInputBlockItem {
     private func chromeLayoutConstraints() -> [NSLayoutConstraint] {
         let kindLabelLeadingConstraint = kindLabel.leadingAnchor.constraint(equalTo: handleView.trailingAnchor)
         self.kindLabelLeadingConstraint = kindLabelLeadingConstraint
-        let kindLabelWidthConstraint = kindLabel.widthAnchor.constraint(equalToConstant: Self.markerGutterWidth)
+        let kindLabelWidthConstraint = kindLabel.widthAnchor.constraint(equalToConstant: 0)
         self.kindLabelWidthConstraint = kindLabelWidthConstraint
         let checklistButtonLeadingConstraint = checklistButton.leadingAnchor.constraint(
             equalTo: kindLabel.leadingAnchor,
@@ -120,7 +131,7 @@ extension BlockInputBlockItem {
         )
         self.checklistButtonTopConstraint = checklistButtonTopConstraint
         return [
-            handleView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
+            handleView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Self.handleLeading),
             handleTopConstraint,
             handleWidthConstraint,
             kindLabelLeadingConstraint,

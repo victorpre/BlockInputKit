@@ -328,7 +328,6 @@ extension BlockInputBlockItem {
 
     private func standardTextSelectionLeadingX() -> CGFloat {
         handleView.frame.maxX
-            + Self.markerGutterWidth
             + Self.defaultTextLeading
             + textView.textContainerInset.width
     }
