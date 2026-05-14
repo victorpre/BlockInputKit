@@ -25,7 +25,15 @@ let package = Package(
             name: "BlockInputKit",
             exclude: [
                 "AppKit/AGENTS.md",
-                "AppKit/CLAUDE.md"
+                "AppKit/CLAUDE.md",
+                "AppKit/BlockItem/AGENTS.md",
+                "AppKit/BlockItem/CLAUDE.md",
+                "AppKit/Mutation/AGENTS.md",
+                "AppKit/Mutation/CLAUDE.md",
+                "AppKit/Reordering/AGENTS.md",
+                "AppKit/Reordering/CLAUDE.md",
+                "AppKit/Selection/AGENTS.md",
+                "AppKit/Selection/CLAUDE.md"
             ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
@@ -47,6 +55,16 @@ let package = Package(
             exclude: [
                 "AGENTS.md",
                 "CLAUDE.md",
+                "AppKit/BlockItem/AGENTS.md",
+                "AppKit/BlockItem/CLAUDE.md",
+                "AppKit/Mutation/AGENTS.md",
+                "AppKit/Mutation/CLAUDE.md",
+                "AppKit/Performance/AGENTS.md",
+                "AppKit/Performance/CLAUDE.md",
+                "AppKit/Reordering/AGENTS.md",
+                "AppKit/Reordering/CLAUDE.md",
+                "AppKit/Selection/AGENTS.md",
+                "AppKit/Selection/CLAUDE.md",
                 "AppKit/Snapshots/AGENTS.md",
                 "AppKit/Snapshots/CLAUDE.md"
             ],

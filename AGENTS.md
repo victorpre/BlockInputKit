@@ -14,8 +14,17 @@ Read the nearest `AGENTS.md` before editing. Current scopes:
 
 - `AGENTS.md`: repo-wide workflow.
 - `.agents/AGENTS.md`: repo-local agent skills.
-- `Sources/BlockInputKit/AppKit/AGENTS.md`: AppKit editor surface, item reuse, focus/selection, and store sync.
+- `Sources/BlockInputKit/AppKit/AGENTS.md`: AppKit editor surface and cross-cutting editor rules.
+- `Sources/BlockInputKit/AppKit/BlockItem/AGENTS.md`: AppKit block item reuse, chrome, markers, and metrics.
+- `Sources/BlockInputKit/AppKit/Mutation/AGENTS.md`: AppKit store sync, editing operations, and command shortcuts.
+- `Sources/BlockInputKit/AppKit/Reordering/AGENTS.md`: AppKit reorder handles, drag starts, and ordered-list reorder normalization.
+- `Sources/BlockInputKit/AppKit/Selection/AGENTS.md`: AppKit keyboard, mouse, chrome, cancellation, and debug selection behavior.
 - `Tests/BlockInputKitTests/AGENTS.md`: test organization and coverage expectations.
+- `Tests/BlockInputKitTests/AppKit/BlockItem/AGENTS.md`: AppKit block item tests.
+- `Tests/BlockInputKitTests/AppKit/Mutation/AGENTS.md`: AppKit mutation and document-store tests.
+- `Tests/BlockInputKitTests/AppKit/Performance/AGENTS.md`: AppKit large-document and hot-path performance tests.
+- `Tests/BlockInputKitTests/AppKit/Reordering/AGENTS.md`: AppKit reordering tests.
+- `Tests/BlockInputKitTests/AppKit/Selection/AGENTS.md`: AppKit multi-selection and selection chrome tests.
 - `Tests/BlockInputKitTests/AppKit/Snapshots/AGENTS.md`: AppKit snapshot matrix and baseline expectations.
 
 ## Build And Test

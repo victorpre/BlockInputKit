@@ -1,38 +1,6 @@
 ## AppKit Editor Surface
 
 - Keep AppKit editor behavior coordinated through `BlockInputView` and `BlockInputBlockItem` delegates instead of letting child `NSTextView` instances mutate document structure directly.
-- Preserve collection-view reuse assumptions: every item configuration must fully reset text, chrome, selection, drag handles, horizontal-rule state, and callbacks that can survive reuse.
-- Keep list marker rendering in `BlockInputMarkerView`; it custom-draws per-line markers so mixed-indent list items do not share one text-field alignment edge.
 - Cover focus, selection, keyboard command, drag/drop, and visual-state changes with mounted AppKit tests when model-only tests could miss visible `NSTextView` or `NSCollectionView` behavior.
-- Keep document-store synchronization granular when a single block replacement, insertion, deletion, or move accurately describes the mutation; fall back to full document replacement for multi-step structural edits.
 - Preserve large-document scrolling assumptions: avoid full layout invalidation for plain scroll-origin changes, and keep item height measurement cached or otherwise bounded to visible/layout-requested rows.
-- Suppress item delegate callbacks during programmatic block-item configuration; visible-row reuse in large documents must not report caret movement or force store index rebuilds.
-- Keep large-document structural undo/redo on granular store operations when the undo payload describes a single block replacement, insertion, deletion, or move.
-- Publish large-document edit notifications through `onDocumentMutation` for hot paths; keep full `onDocumentChange` snapshots deferred/coalesced so Return, Delete, Undo, and Redo do not read `documentStore.document` synchronously.
-- When remapping mounted collection items after large-document insert/delete, resize each item for its new block before manually reflowing visible rows; otherwise mixed paragraph/heading runs can show uneven spacing or clipped text.
-- Keep large-document same-row replacements, such as empty quote to paragraph, on mounted item reconfiguration instead of `reloadItems`; benchmark this with `--benchmark-100k-mutations`.
-- Keep multiline quote/code exits on granular replacement-plus-insertion operations; pressing Return on an empty inline line should not fall back to full document structural edits.
-- For non-large replacement-plus-insertion edits, do not mix `reloadItems` and `insertItems` after the document count has changed; reload the visible layout coherently to avoid overlapping rows.
-- Keep front-of-paragraph Backspace/Delete merges granular: replace the previous block and delete the current block.
-- Keep only one visible reorder handle revealed at a time.
-- Cancel multi-selection when block reordering starts from either the collection-view drag path or the leading reorder handle; do not wait for the drop.
-- Keep clipboard shortcuts intentionally asymmetric: Cmd+C may use a direct key-equivalent path for editor/block selections, but paste should stay on AppKit `NSText`/responder actions to preserve native insertion semantics.
-- Preserve Cmd+Up/Cmd+Down as document-boundary caret movement; they must not extend block selection.
-- Preserve Shift+Arrow multi-block selection state: keyboard-created block selections use a saved anchor/direction so opposite-direction Shift+Arrow contracts before expanding, and `NSTextView` Shift+Arrow fallbacks must still route through the editor when block selection or a contraction anchor is active.
-- Treat Shift+Arrow multi-block selections like one Markdown document: keep partial text endpoints when selection starts or ends inside a block, and exclude the caret block when expanding upward from offset 0 or downward from the block end.
-- Treat Shift+Left/Right as one Markdown document too: keep a horizontal selection anchor so opposite horizontal movement contracts first, move from a fully selected block into the first or last character of the adjacent text block, and preserve the adjusted active-edge X for subsequent Shift+Up/Down.
-- Preserve mouse-drag multi-selection parity with Shift+Arrow selection: text-view drags should carry a logical drag range or mouse-down anchor into `BlockInputView`, while the native `NSTextView` range stays collapsed so AppKit gray selection paint cannot overlay custom chrome.
-- Keep partial selection chrome line-fragmented for multiline blocks, especially code blocks; mouse drag and Shift+Arrow paths should both render selected code lines as separate segments instead of one block-sized rectangle.
-- Keep terminal-newline visual lines in selection and vertical movement helpers; AppKit folds the newline into the previous glyph line, but the editor should still treat the trailing blank line as an in-block line.
-- Commit same-block text-view drags from both `mouseUp(with:)` and the local drag monitor's `.leftMouseUp`; AppKit may deliver the release only through the monitor, and selection must persist after that path.
-- Leave modified clicks and multi-clicks on native `NSTextView` mouse tracking; only plain single-click drags should enter custom block-selection tracking.
-- Collapse stale native `NSTextView` selections whenever editor-level multi-selection chrome owns the visible selection; inactive gray AppKit selection should not layer over custom blue partial or whole-block chrome.
-- Do not disable `NSTextView.isSelectable` to hide native selection paint; keep caret/text-command mechanics alive and suppress gray selection with collapsed ranges plus clear selected-text backgrounds.
-- Keep partial multi-selection expansion anchored to the caret X position across blocks. The newly crossed block starts as a partial endpoint and becomes a whole middle block only when selection continues past it.
-- Plain Up/Down during multi-selection should cancel to the active edge where selection last extended, not blindly to the document-order start or end.
-- Route new multi-selection cancellation triggers through `BlockInputView+SelectionCancellation`; keyboard cancellation should restore a caret, while mouse-down and reorder-start cancellation should clear chrome without stealing the follow-up event.
-- Keep `BlockInputSelectionDebug` opt-in; demo or test hooks may observe it, but they must not enable selection debug output by default.
-- Keep mounted tests for Shift+Arrow and mouse-drag selection loops, including collapsed caret or drag anchors at block boundaries, partial selections that touch only one block edge, expansion, contraction back to full text selection, re-expansion, and text-view fallback events such as Shift-style boundary selectors or extra arrow-key flags like `.numericPad`.
-- Update `BlockInputMultiSelectionParityTests` whenever either Shift+Arrow or mouse-drag multi-selection behavior changes; it is the guardrail against visual or model drift between input paths.
-- When indenting ordered-list blocks, normalize only the affected list run and publish replacement mutations for every block whose visible marker changes.
-- When reordering ordered-list blocks, keep nested marker starts normalized and publish replacement mutations from the model-reported changed blocks; large-document store-backed reorders should use the bounded list move path instead of full snapshots or whole-document diffs.
+- Read the narrower `AGENTS.md` in `BlockItem`, `Mutation`, `Reordering`, and `Selection` before editing files in those scopes.

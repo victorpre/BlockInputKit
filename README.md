@@ -99,7 +99,7 @@ The demo app includes:
 ## Project Layout
 
 - `Sources/BlockInputKit/Core`: document, block, selection, typing shortcut, and store primitives.
-- `Sources/BlockInputKit/AppKit`: primary editor surface, collection items, text views, drag/drop, focus, and keyboard coordination.
+- `Sources/BlockInputKit/AppKit`: primary editor surface, with topical subfolders for block items, mutations, reordering, and selection behavior.
 - `Sources/BlockInputKit/Markdown`, `Completion`, `Undo`, `SwiftUI`, and `Support`: feature-specific library areas.
 - `Sources/BlockInputKitDemo`: demo app for exercising library behavior.
 - `Tests/BlockInputKitTests` mirrors the same high-level source areas for focused coverage.

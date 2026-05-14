@@ -1,0 +1,19 @@
+## Store Sync
+
+- Keep document-store synchronization granular when a single block replacement, insertion, deletion, or move accurately describes the mutation; fall back to full document replacement for multi-step structural edits.
+- Keep large-document structural undo/redo on granular store operations when the undo payload describes a single block replacement, insertion, deletion, or move.
+- Publish large-document edit notifications through `onDocumentMutation` for hot paths; keep full `onDocumentChange` snapshots deferred/coalesced so Return, Delete, Undo, and Redo do not read `documentStore.document` synchronously.
+
+## Editing Operations
+
+- Keep large-document same-row replacements, such as empty quote to paragraph, on mounted item reconfiguration instead of `reloadItems`; benchmark this with `--benchmark-100k-mutations`.
+- Keep multiline quote/code exits on granular replacement-plus-insertion operations; pressing Return on an empty inline line should not fall back to full document structural edits.
+- For non-large replacement-plus-insertion edits, do not mix `reloadItems` and `insertItems` after the document count has changed; reload the visible layout coherently to avoid overlapping rows.
+- When remapping mounted collection items after large-document insert/delete, resize each item for its new block before manually reflowing visible rows; otherwise mixed paragraph/heading runs can show uneven spacing or clipped text.
+- Keep front-of-paragraph Backspace/Delete merges granular: replace the previous block and delete the current block.
+- When indenting ordered-list blocks, normalize only the affected list run and publish replacement mutations for every block whose visible marker changes.
+
+## Shortcuts
+
+- Keep clipboard shortcuts intentionally asymmetric: Cmd+C may use a direct key-equivalent path for editor/block selections, but paste should stay on AppKit `NSText`/responder actions to preserve native insertion semantics.
+- Preserve Cmd+Up/Cmd+Down as document-boundary caret movement; they must not extend block selection.
