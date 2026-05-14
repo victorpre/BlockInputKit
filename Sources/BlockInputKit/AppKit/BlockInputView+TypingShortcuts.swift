@@ -214,7 +214,7 @@ private func validSelectionBeforeTypingShortcut(
             return nil
         }
         return selection
-    case .blocks:
+    case .blocks, .mixed:
         return nil
     }
 }

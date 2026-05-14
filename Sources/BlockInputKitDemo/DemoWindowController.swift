@@ -10,12 +10,15 @@ final class DemoWindowController: NSWindowController {
     private let selectionLabel = NSTextField(labelWithString: "")
     private let completionQueryField = NSTextField(string: "")
     private let completionResultsLabel = NSTextField(wrappingLabelWithString: "")
+    private let selectionDebugLabel = NSTextField(wrappingLabelWithString: "Selection debug: no events")
     private let markdownTextView = NSTextView()
     private let reorderCheckbox = NSButton(checkboxWithTitle: "Reordering", target: nil, action: nil)
 
     private var store = BlockInputMemoryDocumentStore(document: DemoData.mixedDocument())
     private var undoController = BlockInputUndoController()
     private var latestCompletionSuggestions: [BlockInputCompletionSuggestion] = []
+    nonisolated(unsafe) private var selectionDebugObserver: NSObjectProtocol?
+    private let isSelectionDebugEnabled = UserDefaults.standard.bool(forKey: selectionDebugEnabledKey)
 
     init() {
         let window = NSWindow(
@@ -27,9 +30,18 @@ final class DemoWindowController: NSWindowController {
         window.title = "BlockInputKit Demo"
         window.center()
         super.init(window: window)
+        if isSelectionDebugEnabled {
+            installSelectionDebugObserver()
+        }
         window.contentView = makeContentView()
         configureEditor()
         updateStatus(for: store.document)
+    }
+
+    deinit {
+        if let selectionDebugObserver {
+            NotificationCenter.default.removeObserver(selectionDebugObserver)
+        }
     }
 
     @available(*, unavailable)
@@ -130,10 +142,20 @@ final class DemoWindowController: NSWindowController {
     }
 
     private func makeStatusBar() -> NSView {
-        let stack = NSStackView(views: [statusLabel, selectionLabel])
-        stack.orientation = .horizontal
-        stack.spacing = 16
-        stack.distribution = .fillEqually
+        let statusStack = NSStackView(views: [statusLabel, selectionLabel])
+        statusStack.orientation = .horizontal
+        statusStack.spacing = 16
+        statusStack.distribution = .fillEqually
+
+        selectionDebugLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        selectionDebugLabel.textColor = .secondaryLabelColor
+        selectionDebugLabel.maximumNumberOfLines = 2
+        selectionDebugLabel.lineBreakMode = .byTruncatingMiddle
+
+        let views: [NSView] = isSelectionDebugEnabled ? [statusStack, selectionDebugLabel] : [statusStack]
+        let stack = NSStackView(views: views)
+        stack.orientation = .vertical
+        stack.spacing = 4
         return stack
     }
 
@@ -153,6 +175,21 @@ final class DemoWindowController: NSWindowController {
         let box = NSBox()
         box.boxType = .separator
         return box
+    }
+
+    private func installSelectionDebugObserver() {
+        selectionDebugObserver = NotificationCenter.default.addObserver(
+            forName: selectionDebugNotificationName,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let message = notification.userInfo?["message"] as? String else {
+                return
+            }
+            Task { @MainActor in
+                self?.selectionDebugLabel.stringValue = "Selection debug: \(message)"
+            }
+        }
     }
 
     private func configureEditor() {
@@ -200,6 +237,9 @@ final class DemoWindowController: NSWindowController {
             selectionLabel.stringValue = "Text: \(range.blockID.rawValue) \(range.range)"
         case .blocks(let blockIDs):
             selectionLabel.stringValue = "Blocks: \(blockIDs.count)"
+        case .mixed(let selection):
+            let partialCount = [selection.leadingTextRange, selection.trailingTextRange].compactMap { $0 }.count
+            selectionLabel.stringValue = "Mixed: \(selection.blockIDs.count + partialCount) blocks"
         case nil:
             selectionLabel.stringValue = "No selection"
         }
@@ -300,3 +340,6 @@ final class DemoWindowController: NSWindowController {
         updateStatus(for: editorView.document, prefix: selection == nil ? "Completion ignored" : "Inserted completion")
     }
 }
+
+private let selectionDebugEnabledKey = "BlockInputKitSelectionDebugEnabled"
+private let selectionDebugNotificationName = Notification.Name("BlockInputKitSelectionDebugEvent")

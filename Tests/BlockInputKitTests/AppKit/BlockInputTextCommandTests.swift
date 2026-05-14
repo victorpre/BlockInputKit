@@ -172,10 +172,9 @@ final class BlockInputTextCommandTests: XCTestCase {
 
         XCTAssertEqual(mounted.view.selection, .blocks([firstID, ruleID, secondID]))
         XCTAssertTrue(mounted.window.firstResponder === mounted.view)
-        let selectedBlockColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.18).cgColor
-        XCTAssertEqual(try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0)).view.layer?.backgroundColor, selectedBlockColor)
-        XCTAssertEqual(try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1)).view.layer?.backgroundColor, selectedBlockColor)
-        XCTAssertEqual(try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 2)).view.layer?.backgroundColor, selectedBlockColor)
+        XCTAssertFalse(try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0)).testingSelectionBackgroundView.isHidden)
+        XCTAssertFalse(try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1)).testingSelectionBackgroundView.isHidden)
+        XCTAssertFalse(try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 2)).testingSelectionBackgroundView.isHidden)
 
         mounted.view.keyDown(with: try keyDownEvent(keyCode: 51, characters: "\u{7F}"))
 

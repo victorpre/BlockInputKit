@@ -72,6 +72,16 @@ extension BlockInputBlockItem {
     var testingHorizontalRuleSelectionView: BlockInputHorizontalRuleView? {
         view.firstDescendant(of: BlockInputHorizontalRuleView.self)
     }
+
+    var testingSelectionBackgroundView: NSView {
+        selectionBackgroundView
+    }
+
+    var testingSelectionBackgroundSegmentFrames: [NSRect] {
+        selectionBackgroundView.segmentRects.map {
+            $0.offsetBy(dx: selectionBackgroundView.frame.minX, dy: selectionBackgroundView.frame.minY)
+        }
+    }
 }
 
 extension BlockInputHorizontalRuleView {

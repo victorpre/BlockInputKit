@@ -44,6 +44,10 @@ public final class BlockInputView: NSView {
     var isBecomingFirstResponder = false
     var documentSnapshotGeneration = 0
     var pendingDocumentSnapshotWorkItem: DispatchWorkItem?
+    nonisolated(unsafe) var selectionExpansionKeyMonitor: Any?
+    var lastNativeTextSelectionExpansion: BlockInputNativeTextSelectionExpansion?
+    var blockSelectionExpansion: BlockInputBlockSelectionExpansion?
+    var horizontalSelectionExpansion: BlockInputHorizontalSelectionExpansion?
 
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -53,6 +57,10 @@ public final class BlockInputView: NSView {
     public required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupCollectionView()
+    }
+
+    deinit {
+        if let selectionExpansionKeyMonitor { NSEvent.removeMonitor(selectionExpansionKeyMonitor) }
     }
 
     public override var acceptsFirstResponder: Bool {
@@ -89,31 +97,35 @@ public final class BlockInputView: NSView {
     }
 
     public override func keyDown(with event: NSEvent) {
-        if let direction = event.verticalMovementDirection,
-           moveSelectedBlockVertically(direction) {
-            return
-        }
+        if event.isCancelOperation, cancelMultiBlockSelection() { return }
+        if let direction = event.blockInputDocumentBoundaryDirection, moveCaretToDocumentBoundary(direction) { return }
+        if handleSelectionExpansionShortcut(event) { return }
+        if let direction = event.plainVerticalMovementDirection, collapseMultiBlockSelection(direction: direction) { return }
+        if let direction = event.verticalMovementDirection, moveSelectedBlockVertically(direction) { return }
         if event.isBackspaceOrDelete {
-            if selectedBlockCount == 1,
-               deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil {
-                return
-            }
-            if deleteSelectedBlocksForBackspaceOrDelete() != nil {
-                return
-            }
+            if selectedBlockCount == 1, deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil { return }
+            if deleteSelectedBlocksForBackspaceOrDelete() != nil { return }
         }
         super.keyDown(with: event)
     }
 
+    public override func doCommand(by selector: Selector) {
+        if selector == #selector(cancelOperation(_:)), cancelMultiBlockSelection() {
+            return
+        }
+        if selector == #selector(moveUp(_:)), collapseMultiBlockSelection(direction: .upward) { return }
+        if selector == #selector(moveDown(_:)), collapseMultiBlockSelection(direction: .downward) { return }
+        if handleDocumentBoundaryCommand(selector) ||
+            handleSelectionExpansionCommand(selector) ||
+            handleHorizontalSelectionAdjustmentCommand(selector) { return }
+        super.doCommand(by: selector)
+    }
+
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.blockInputIsSelectAllShortcut,
-           selectAllFromActiveSelection() {
-            return true
-        }
-        if let undoShortcut = event.blockInputUndoShortcut,
-           performUndoShortcut(undoShortcut) {
-            return true
-        }
+        if event.blockInputIsSelectAllShortcut, selectAllFromActiveSelection() { return true }
+        if let undoShortcut = event.blockInputUndoShortcut, performUndoShortcut(undoShortcut) { return true }
+        if let direction = event.blockInputDocumentBoundaryDirection, moveCaretToDocumentBoundary(direction) { return true }
+        if handleSelectionExpansionShortcut(event) { return true }
         // Copy needs a direct key-equivalent path; paste stays on NSText so insertion uses AppKit's normal edit pipeline.
         if event.blockInputIsCopyShortcut,
            copyActiveSelection() {
@@ -275,10 +287,13 @@ public final class BlockInputView: NSView {
         )
     }
 
-    /// Deletes the selected whole blocks after Cmd+A escalates to document-level selection.
+    /// Deletes the selected whole blocks.
     @discardableResult
     public func deleteSelectedBlocksForBackspaceOrDelete() -> BlockInputSelection? {
         refreshDocumentFromStore()
+        if case let .mixed(selection) = selection {
+            return deleteMixedSelection(selection)
+        }
         guard case let .blocks(blockIDs) = selection,
               !blockIDs.isEmpty else {
             return nil
@@ -298,6 +313,17 @@ public final class BlockInputView: NSView {
             },
             edit: { document in
                 document.deleteBlocks(blockIDs: blockIDs)
+            }
+        )
+    }
+
+    private func deleteMixedSelection(_ selection: BlockInputMixedSelection) -> BlockInputSelection? {
+        performStructuralEdit(
+            named: "Delete Selection",
+            storeSyncAction: { _, _, _ in .replaceDocument },
+            edit: { document in
+                let cursor = document.deleteMixedSelection(selection)
+                return cursor.map(BlockInputSelection.cursor)
             }
         )
     }
@@ -408,6 +434,7 @@ public final class BlockInputView: NSView {
         )
         collectionView.registerForDraggedTypes([.blockInputBlockID, .fileURL])
         collectionView.setDraggingSourceOperationMask(.move, forLocal: true)
+        installSelectionExpansionKeyMonitor()
 
         dropIndicatorView.wantsLayer = true
         dropIndicatorView.layer?.cornerRadius = 1
@@ -433,23 +460,4 @@ public final class BlockInputView: NSView {
         ])
     }
 
-}
-
-private extension NSEvent {
-    var verticalMovementDirection: BlockInputVerticalMovementDirection? {
-        if keyCode == 126 || charactersIgnoringModifiers == "\u{F700}" {
-            return .upward
-        }
-        if keyCode == 125 || charactersIgnoringModifiers == "\u{F701}" {
-            return .downward
-        }
-        return nil
-    }
-
-    var isBackspaceOrDelete: Bool {
-        keyCode == 51
-            || keyCode == 117
-            || charactersIgnoringModifiers == "\u{7F}"
-            || charactersIgnoringModifiers == "\u{F728}"
-    }
 }

@@ -46,17 +46,34 @@ extension BlockInputBlockItem {
     }
 
     func currentCaretTextContainerX() -> CGFloat? {
+        selectionExtentTextContainerX(.downward)
+    }
+
+    func selectionExtentTextContainerX(_ direction: BlockInputVerticalMovementDirection) -> CGFloat? {
+        let selectedRange = textView.selectedRange()
+        let offset = direction == .upward ? selectedRange.location : NSMaxRange(selectedRange)
+        return textContainerX(forUTF16Offset: offset)
+    }
+
+    func textContainerX(forUTF16Offset offset: Int) -> CGFloat? {
         guard let window = textView.window else {
             return nil
         }
         // AppKit reports caret rects in screen coordinates; convert back into text-container coordinates.
-        let caretRect = textView.firstRect(forCharacterRange: textView.selectedRange(), actualRange: nil)
+        let caretRect = textView.firstRect(forCharacterRange: NSRange(location: offset, length: 0), actualRange: nil)
         guard caretRect != .zero, !caretRect.isNull, !caretRect.isInfinite else {
             return nil
         }
         let windowPoint = window.convertPoint(fromScreen: caretRect.origin)
         let localPoint = textView.convert(windowPoint, from: nil)
         return localPoint.x - textView.textContainerOrigin.x
+    }
+
+    func utf16Offset(atWindowLocation windowLocation: NSPoint) -> Int {
+        let textLength = (textView.string as NSString).length
+        let localLocation = textView.convert(windowLocation, from: nil)
+        let offset = textView.characterIndexForInsertion(at: localLocation)
+        return min(max(offset, 0), textLength)
     }
 
     private func lineIndex(containingUTF16Offset offset: Int, lines: [TextLineFragment]) -> Int? {
@@ -104,6 +121,19 @@ extension BlockInputBlockItem {
             ))
             glyphIndex = NSMaxRange(lineGlyphRange)
         }
+        if text.hasTrailingLineEnding {
+            // NSLayoutManager folds a terminal newline into the previous glyph line. Add the visual blank line
+            // explicitly so Up/Down movement stays inside the block until the caret reaches a true boundary.
+            let emptyFinalLineRange = NSRange(location: text.length, length: 0)
+            fragments.append(TextLineFragment(
+                characterRange: emptyFinalLineRange,
+                insertionRange: emptyFinalLineRange,
+                usedRect: layoutManager.extraLineFragmentUsedRect.fallbackExtraLineFragmentUsedRect(
+                    after: fragments,
+                    in: textContainer
+                )
+            ))
+        }
         return fragments
     }
 }
@@ -129,6 +159,33 @@ private extension NSRange {
             upperBound -= 1
         }
         return NSRange(location: location, length: upperBound - location)
+    }
+}
+
+private extension NSString {
+    var hasTrailingLineEnding: Bool {
+        guard length > 0 else {
+            return false
+        }
+        let lastCharacter = character(at: length - 1)
+        return lastCharacter == 10 || lastCharacter == 13
+    }
+}
+
+private extension NSRect {
+    func fallbackExtraLineFragmentUsedRect(after fragments: [TextLineFragment], in textContainer: NSTextContainer) -> NSRect {
+        guard isEmpty else {
+            return self
+        }
+        if let last = fragments.last {
+            return NSRect(
+                x: last.usedRect.minX,
+                y: last.usedRect.maxY,
+                width: max(last.usedRect.width, 12),
+                height: max(last.usedRect.height, 1)
+            )
+        }
+        return NSRect(x: 0, y: 0, width: max(textContainer.size.width, 12), height: 1)
     }
 }
 

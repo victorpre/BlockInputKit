@@ -1,9 +1,110 @@
 import AppKit
 
+/// Text view wrapper that forwards block-aware commands and cross-block drag selection to its owning block item.
+///
+/// AppKit owns native text selection inside one `NSTextView`; this subclass captures enough range and anchor information
+/// during plain mouse drags for `BlockInputView` to promote the drag into the editor-level mixed selection model.
+///
+/// Modified clicks and multi-clicks stay on AppKit's native path so standard word, paragraph, and extended text-field
+/// gestures keep working. Plain drags use editor-owned selection chrome to avoid gray native selection paint layering
+/// over mixed block-selection endpoints.
 final class BlockInputTextView: NSTextView {
     weak var blockItem: BlockInputBlockItem?
+    var isDraggingBlockSelection = false
+    var blockSelectionDragMonitor: Any?
+    var blockSelectionDragTimer: Timer?
+    // Cross-block drags carry a logical text range while the native NSTextView selection stays collapsed. This keeps
+    // AppKit's inactive gray selection paint out of editor-owned partial selection chrome during mouse tracking.
+    var blockSelectionDragSelectedRange: NSRange?
+    var blockSelectionLocalDragRange: NSRange?
+    var blockSelectionDragAnchorOffset: Int?
+    // Native modified-click and multi-click gestures can re-enter mouseDragged/mouseUp during AppKit tracking. Keep that
+    // separate from the custom plain-drag state so native selection restoration cannot be consumed as a block drag.
+    var isUsingNativeMouseSelection = false
+
+    override func mouseDown(with event: NSEvent) {
+        _ = requestMouseDownCancelSelectionFromOwningBlock()
+        guard shouldTrackBlockSelectionDrag(for: event) else {
+            // Multi-click and modified-click selection are native NSTextView gestures; only plain single-click drags need
+            // custom tracking.
+            finishBlockSelectionDrag()
+            isUsingNativeMouseSelection = true
+            super.mouseDown(with: event)
+            isUsingNativeMouseSelection = false
+            return
+        }
+        blockItem?.beginBlockSelectionDrag()
+        isDraggingBlockSelection = false
+        let anchorOffset = blockSelectionDragAnchorOffset(for: event)
+        blockSelectionDragAnchorOffset = anchorOffset
+        blockSelectionDragSelectedRange = NSRange(location: anchorOffset, length: 0)
+        blockSelectionLocalDragRange = nil
+        installBlockSelectionDragMonitor()
+        installBlockSelectionDragTimer()
+        window?.makeFirstResponder(self)
+        setSelectedRange(NSRange(location: anchorOffset, length: 0))
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if isUsingNativeMouseSelection {
+            super.mouseDragged(with: event)
+            return
+        }
+        let localDragRange = blockSelectionDragRange(for: event)
+        blockSelectionDragSelectedRange = localDragRange
+        blockSelectionLocalDragRange = localDragRange
+        isDraggingBlockSelection = blockItem?.updateBlockSelectionDrag(
+            with: event,
+            selectedRange: localDragRange
+        ) == true
+        if isDraggingBlockSelection {
+            return
+        }
+        // Keep AppKit out of the native drag-selection path while block selection may be promoted. The visible selection
+        // chrome is editor-owned, and allowing `NSTextView` to build a native range here can leave gray selection paint
+        // over the custom blue endpoint background for the rest of the tracking cycle.
+        updateTrackedLocalTextSelection(localDragRange)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if isUsingNativeMouseSelection {
+            super.mouseUp(with: event)
+            isUsingNativeMouseSelection = false
+            return
+        }
+        if completeTrackedBlockSelectionMouseUp() {
+            return
+        }
+        super.mouseUp(with: event)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if event.isArrowKey {
+            BlockInputSelectionDebug.emit(
+                "text key key=\(event.debugKeyName) modifiers=\(event.debugModifierNames) range=\(selectedRange())"
+            )
+        }
+        if handleDocumentBoundaryShortcut(event) {
+            BlockInputSelectionDebug.emit("text key consumed document boundary")
+            return
+        }
+        if handleSelectionExpansionShortcut(event) {
+            BlockInputSelectionDebug.emit("text key consumed")
+            return
+        }
+        if handleHorizontalSelectionAdjustmentShortcut(event) {
+            BlockInputSelectionDebug.emit("text key consumed horizontal")
+            return
+        }
+        super.keyDown(with: event)
+    }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.isArrowKey {
+            BlockInputSelectionDebug.emit(
+                "text equivalent key=\(event.debugKeyName) modifiers=\(event.debugModifierNames) range=\(selectedRange())"
+            )
+        }
         if event.blockInputIsSelectAllShortcut,
            let blockItem {
             blockItem.requestSelectAll()
@@ -11,6 +112,18 @@ final class BlockInputTextView: NSTextView {
         }
         if let undoShortcut = event.blockInputUndoShortcut,
            blockItem?.requestUndoShortcut(undoShortcut) == true {
+            return true
+        }
+        if handleDocumentBoundaryShortcut(event) {
+            BlockInputSelectionDebug.emit("text equivalent consumed document boundary")
+            return true
+        }
+        if handleSelectionExpansionShortcut(event) {
+            BlockInputSelectionDebug.emit("text equivalent consumed")
+            return true
+        }
+        if handleHorizontalSelectionAdjustmentShortcut(event) {
+            BlockInputSelectionDebug.emit("text equivalent consumed horizontal")
             return true
         }
         // Copy needs a direct key-equivalent path; paste stays on NSText so insertion uses AppKit's normal edit pipeline.
@@ -55,10 +168,30 @@ final class BlockInputTextView: NSTextView {
     }
 
     override func doCommand(by selector: Selector) {
-        if handleBlockCommand(selector) || handleBoundaryCommand(selector) {
+        BlockInputSelectionDebug.emit("text command selector=\(selector) range=\(selectedRange())")
+        if handleBlockCommand(selector) ||
+            handleDocumentBoundaryCommand(selector) ||
+            handleSelectionExpansionCommand(selector) ||
+            handleHorizontalSelectionAdjustmentCommand(selector) ||
+            handleBoundaryCommand(selector) {
+            BlockInputSelectionDebug.emit("text command consumed selector=\(selector)")
             return
         }
         super.doCommand(by: selector)
+    }
+
+    override func moveToBeginningOfDocument(_ sender: Any?) {
+        if requestDocumentBoundaryFromOwningBlock(.upward) {
+            return
+        }
+        super.moveToBeginningOfDocument(sender)
+    }
+
+    override func moveToEndOfDocument(_ sender: Any?) {
+        if requestDocumentBoundaryFromOwningBlock(.downward) {
+            return
+        }
+        super.moveToEndOfDocument(sender)
     }
 
     private func handleBlockCommand(_ selector: Selector) -> Bool {
@@ -88,7 +221,7 @@ final class BlockInputTextView: NSTextView {
         case #selector(insertBacktab(_:)):
             return blockItem?.requestOutdent() == true
         case #selector(cancelOperation(_:)):
-            return true
+            return blockItem?.requestCancelSelection() == true
         default:
             return false
         }
@@ -97,12 +230,96 @@ final class BlockInputTextView: NSTextView {
     private func handleBoundaryCommand(_ selector: Selector) -> Bool {
         switch selector {
         case #selector(moveUp(_:)):
-            return blockItem?.requestMoveVertically(.upward) == true
+            return blockItem?.requestCollapseSelection(.upward) == true
+                || blockItem?.requestMoveVertically(.upward) == true
         case #selector(moveDown(_:)):
-            return blockItem?.requestMoveVertically(.downward) == true
+            return blockItem?.requestCollapseSelection(.downward) == true
+                || blockItem?.requestMoveVertically(.downward) == true
         default:
             return false
         }
+    }
+
+    private func handleSelectionExpansionCommand(_ selector: Selector) -> Bool {
+        let direction: BlockInputVerticalMovementDirection
+        switch selector {
+        case #selector(moveUpAndModifySelection(_:)):
+            direction = .upward
+        case #selector(moveDownAndModifySelection(_:)):
+            direction = .downward
+        default:
+            return false
+        }
+        _ = blockItem?.requestExpandSelection(direction)
+        return true
+    }
+
+    private func handleDocumentBoundaryCommand(_ selector: Selector) -> Bool {
+        switch selector {
+        case #selector(moveToBeginningOfDocument(_:)):
+            return requestDocumentBoundaryFromOwningBlock(.upward)
+        case #selector(moveToEndOfDocument(_:)):
+            return requestDocumentBoundaryFromOwningBlock(.downward)
+        default:
+            return false
+        }
+    }
+
+    private func handleDocumentBoundaryShortcut(_ event: NSEvent) -> Bool {
+        guard let direction = event.blockInputDocumentBoundaryDirection else {
+            return false
+        }
+        return requestDocumentBoundaryFromOwningBlock(direction)
+    }
+
+    private func handleSelectionExpansionShortcut(_ event: NSEvent) -> Bool {
+        if let direction = event.blockInputSelectionExpansionDirection {
+            _ = requestSelectionExpansionFromOwningBlock(direction)
+            return true
+        }
+        return false
+    }
+
+    func requestSelectionExpansionFromOwningBlock(_ direction: BlockInputVerticalMovementDirection) -> Bool {
+        let result = blockItem?.requestExpandSelection(direction) == true
+        BlockInputSelectionDebug.emit(
+            "text request expand direction=\(direction.debugName) range=\(selectedRange()) result=\(result)"
+        )
+        return result
+    }
+
+    func requestActiveBlockSelectionExpansionFromOwningBlock(_ direction: BlockInputVerticalMovementDirection) -> Bool {
+        let result = blockItem?.requestExpandActiveBlockSelection(direction) == true
+        BlockInputSelectionDebug.emit(
+            "text request expand active blocks direction=\(direction.debugName) range=\(selectedRange()) result=\(result)"
+        )
+        return result
+    }
+
+    func requestDocumentBoundaryFromOwningBlock(_ direction: BlockInputVerticalMovementDirection) -> Bool {
+        let result = blockItem?.requestDocumentBoundary(direction) == true
+        BlockInputSelectionDebug.emit(
+            "text request document boundary direction=\(direction.debugName) range=\(selectedRange()) result=\(result)"
+        )
+        return result
+    }
+
+    func requestCancelSelectionFromOwningBlock() -> Bool {
+        blockItem?.requestCancelSelection() == true
+    }
+
+    func requestMouseDownCancelSelectionFromOwningBlock() -> Bool {
+        blockItem?.requestMouseDownCancelSelection() == true
+    }
+
+    func rememberBlockSelectionDragRange(_ range: NSRange) {
+        blockSelectionDragSelectedRange = range
+    }
+
+    func collapsedBlockSelectionDragNativeRange() -> NSRange {
+        let textLength = (string as NSString).length
+        let offset = min(max(blockSelectionDragAnchorOffset ?? selectedRange().location, 0), textLength)
+        return NSRange(location: offset, length: 0)
     }
 
     private func copySelectedPlainText() -> Bool {

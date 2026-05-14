@@ -100,19 +100,11 @@ final class BlockInputTextEditingShortcutTests: XCTestCase {
         XCTAssertEqual(pasteboard.string(forType: .string), BlockInputDocument(blocks: [first, second]).markdown)
     }
 
-    func testCopyActionReadsBlockSelectionFromConfiguredStore() throws {
-        let firstID = BlockInputBlockID(rawValue: "first")
-        let secondID = BlockInputBlockID(rawValue: "second")
-        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
-            BlockInputBlock(id: firstID, text: "Stale first"),
-            BlockInputBlock(id: secondID, text: "Stale second")
-        ]))
-        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(documentStore: store))
-        store.replaceDocument(BlockInputDocument(blocks: [
-            BlockInputBlock(id: firstID, text: "Fresh first"),
-            BlockInputBlock(id: secondID, text: "Fresh second")
-        ]))
-        mounted.view.applySelection(.blocks([firstID, secondID]), notify: false)
+    func testCommandCCopiesValidBlockSelectionInDocumentOrder() throws {
+        let first = BlockInputBlock(id: "first", text: "First")
+        let second = BlockInputBlock(id: "second", text: "Second")
+        let mounted = makeMountedBlockInputView(blocks: [first, second])
+        mounted.view.applySelection(.blocks([second.id, first.id]), notify: false)
         mounted.window.makeFirstResponder(mounted.view)
         let pasteboard = NSPasteboard.general
         let previousString = pasteboard.string(forType: .string)
@@ -124,9 +116,56 @@ final class BlockInputTextEditingShortcutTests: XCTestCase {
             }
         }
 
-        mounted.view.blockInputCopy(nil)
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandCEvent()))
 
-        XCTAssertEqual(pasteboard.string(forType: .string), "Fresh first\n\nFresh second")
+        XCTAssertEqual(pasteboard.string(forType: .string), BlockInputDocument(blocks: [first, second]).markdown)
+    }
+
+    func testCommandCCopiesMixedSelectionAsMarkdownWithoutWholeEndpointText() throws {
+        let first = BlockInputBlock(id: "first", text: "First")
+        let second = BlockInputBlock(id: "second", text: "Second")
+        let mounted = makeMountedBlockInputView(blocks: [first, second])
+        mounted.view.applySelection(.mixed(BlockInputMixedSelection(
+            blockIDs: [second.id],
+            leadingTextRange: BlockInputTextRange(blockID: first.id, range: NSRange(location: 2, length: 3))
+        )), notify: false)
+        mounted.window.makeFirstResponder(mounted.view)
+        let pasteboard = NSPasteboard.general
+        let previousString = pasteboard.string(forType: .string)
+        pasteboard.clearContents()
+        defer {
+            pasteboard.clearContents()
+            if let previousString {
+                pasteboard.setString(previousString, forType: .string)
+            }
+        }
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandCEvent()))
+
+        XCTAssertEqual(pasteboard.string(forType: .string), "rst\n\nSecond")
+    }
+
+    func testCommandCCopiesMixedPartialListEndpointWithoutMarkerWhenRangeStartsInsideBlock() throws {
+        let checklist = BlockInputBlock(id: "check", kind: .checklistItem(isChecked: false), text: "Checklist data")
+        let mounted = makeMountedBlockInputView(blocks: [checklist])
+        mounted.view.applySelection(.mixed(BlockInputMixedSelection(
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: checklist.id, range: NSRange(location: 10, length: 4))
+        )), notify: false)
+        mounted.window.makeFirstResponder(mounted.view)
+        let pasteboard = NSPasteboard.general
+        let previousString = pasteboard.string(forType: .string)
+        pasteboard.clearContents()
+        defer {
+            pasteboard.clearContents()
+            if let previousString {
+                pasteboard.setString(previousString, forType: .string)
+            }
+        }
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandCEvent()))
+
+        XCTAssertEqual(pasteboard.string(forType: .string), "data")
     }
 
     func testPasteActionPastesIntoTextSelectionWhenEditorViewIsFirstResponder() throws {
@@ -180,6 +219,61 @@ final class BlockInputTextEditingShortcutTests: XCTestCase {
         XCTAssertEqual(pasteboard.string(forType: .string), "First")
         XCTAssertEqual(mounted.view.document.blocks.map(\.id), [secondID])
         XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: secondID, utf16Offset: 0)))
+    }
+
+    func testCutActionDeletesMixedSelectionAfterCopyingMarkdown() throws {
+        let first = BlockInputBlock(id: "first", text: "First")
+        let second = BlockInputBlock(id: "second", text: "Second")
+        let mounted = makeMountedBlockInputView(blocks: [first, second])
+        mounted.view.applySelection(.mixed(BlockInputMixedSelection(
+            blockIDs: [second.id],
+            leadingTextRange: BlockInputTextRange(blockID: first.id, range: NSRange(location: 2, length: 3))
+        )), notify: false)
+        mounted.window.makeFirstResponder(mounted.view)
+        let pasteboard = NSPasteboard.general
+        let previousString = pasteboard.string(forType: .string)
+        pasteboard.clearContents()
+        defer {
+            pasteboard.clearContents()
+            if let previousString {
+                pasteboard.setString(previousString, forType: .string)
+            }
+        }
+
+        mounted.view.blockInputCut(nil)
+
+        XCTAssertEqual(pasteboard.string(forType: .string), "rst\n\nSecond")
+        XCTAssertEqual(mounted.view.document.blocks.map(\.id), [first.id])
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Fi")
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: first.id, utf16Offset: 2)))
+    }
+
+    func testCutActionJoinsMixedSelectionPartialEdgeRemainders() throws {
+        let first = BlockInputBlock(id: "first", text: "First")
+        let second = BlockInputBlock(id: "second", text: "Second")
+        let mounted = makeMountedBlockInputView(blocks: [first, second])
+        mounted.view.applySelection(.mixed(BlockInputMixedSelection(
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: first.id, range: NSRange(location: 2, length: 3)),
+            trailingTextRange: BlockInputTextRange(blockID: second.id, range: NSRange(location: 0, length: 3))
+        )), notify: false)
+        mounted.window.makeFirstResponder(mounted.view)
+        let pasteboard = NSPasteboard.general
+        let previousString = pasteboard.string(forType: .string)
+        pasteboard.clearContents()
+        defer {
+            pasteboard.clearContents()
+            if let previousString {
+                pasteboard.setString(previousString, forType: .string)
+            }
+        }
+
+        mounted.view.blockInputCut(nil)
+
+        XCTAssertEqual(pasteboard.string(forType: .string), "rst\n\nSec")
+        XCTAssertEqual(mounted.view.document.blocks.map(\.id), [first.id])
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Fiond")
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: first.id, utf16Offset: 2)))
     }
 
     func testCopyResponderActionCopiesSelectedTextFromTextFocus() throws {

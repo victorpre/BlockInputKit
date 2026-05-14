@@ -330,6 +330,22 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     }
 
     @MainActor
+    func testTextBlockSelectionUsesVisibleRowChrome() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", text: "Plain"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+
+        item.setBlockSelection(true)
+
+        XCTAssertFalse(item.testingSelectionBackgroundView.isHidden)
+        XCTAssertNotEqual(item.testingSelectionBackgroundView.layer?.backgroundColor, NSColor.clear.cgColor)
+        XCTAssertEqual(item.view.layer?.borderWidth, CGFloat(0))
+        XCTAssertEqual(item.view.layer?.backgroundColor, NSColor.clear.cgColor)
+    }
+
+    @MainActor
     func testHorizontalRuleViewIsHiddenForTextBlocks() throws {
         let view = BlockInputView()
         let item = BlockInputBlockItem.configuredForTesting(
@@ -424,4 +440,5 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
 
         XCTAssertGreaterThan(checkbox.frame.minX, initialMinX)
     }
+
 }

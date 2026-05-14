@@ -21,7 +21,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let quoteBarWidth: CGFloat = 6
     static let minimumQuoteBarHeight: CGFloat = 32
     static let quoteBarVerticalInset: CGFloat = 2
-    private static let quoteTextLeading: CGFloat = 9
+    static let quoteTextLeading: CGFloat = 9
 
     let handleView = BlockInputDragHandleView()
     let kindLabel = BlockInputMarkerView()
@@ -29,6 +29,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     let quoteBarView = NSView()
     let scrollView = NSScrollView()
     let horizontalRuleView = BlockInputHorizontalRuleView()
+    let selectionBackgroundView = BlockInputSelectionBackgroundView()
     let textView = BlockInputTextView()
     private var trackingArea: NSTrackingArea?
     private(set) weak var delegate: BlockInputBlockItemDelegate?
@@ -38,6 +39,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     // Programmatic reuse/configuration can move NSTextView selection; do not
     // report that as user selection, especially on large store-backed docs.
     private var isConfiguringBlock = false
+    var blockSelectionChrome: BlockInputBlockSelectionChrome = .none
+    var temporarySelectionHighlightRange: NSRange?
+    var isTrackingBlockSelectionDrag = false
+    var isDraggingBlockSelection = false
     var handleWidthConstraint: NSLayoutConstraint?
     var kindLabelLeadingConstraint: NSLayoutConstraint?
     var kindLabelWidthConstraint: NSLayoutConstraint?
@@ -92,6 +97,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     override func viewDidLayout() {
         super.viewDidLayout()
         updateTextViewDocumentFrame()
+        updateSelectionChromeFrame()
         updateHoverTrackingArea()
         updateMarkerLineYOffsets()
         updateQuoteBarVerticalExtent()
@@ -111,7 +117,24 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             super.mouseDown(with: event)
             return
         }
+        beginBlockSelectionDrag()
         requestSelectHorizontalRule()
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard isHorizontalRule,
+              updateBlockSelectionDrag(with: event) else {
+            super.mouseDragged(with: event)
+            return
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard isHorizontalRule else {
+            super.mouseUp(with: event)
+            return
+        }
+        finishBlockSelectionDrag()
     }
 
     func configure(
@@ -168,6 +191,34 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     func setSelectedRange(_ range: NSRange) {
         textView.setSelectedRange(range)
         updateTypingAttributesForCurrentSelection()
+    }
+
+    func collapseNativeSelectionIfNeeded(at offset: Int? = nil) {
+        guard !isHorizontalRule,
+              textView.selectedRange().length > 0 || offset != nil else {
+            return
+        }
+        let wasConfiguringBlock = isConfiguringBlock
+        isConfiguringBlock = true
+        let textLength = (textView.string as NSString).length
+        let location = min(max(offset ?? textView.selectedRange().location, 0), textLength)
+        textView.setSelectedRange(NSRange(location: location, length: 0))
+        updateTypingAttributesForCurrentSelection()
+        isConfiguringBlock = wasConfiguringBlock
+    }
+
+    func setSelectionHighlightRange(_ range: NSRange) {
+        let wasConfiguringBlock = isConfiguringBlock
+        isConfiguringBlock = true
+        guard applyTemporarySelectionHighlight(range) else {
+            applySelectionChrome(.none)
+            isConfiguringBlock = wasConfiguringBlock
+            return
+        }
+        applySelectionChrome(.partial)
+        collapseNativeSelectionIfNeeded(at: range.location)
+        suppressNativeSelectionDisplayForPartialChrome()
+        isConfiguringBlock = wasConfiguringBlock
     }
 
     func textDidBeginEditing(_ notification: Notification) {
@@ -227,6 +278,47 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate?.blockItem(self, didChangeSelectionIn: blockID)
     }
 
+    func textView(
+        _ textView: NSTextView,
+        willChangeSelectionFromCharacterRange oldSelectedCharRange: NSRange,
+        toCharacterRange newSelectedCharRange: NSRange
+    ) -> NSRange {
+        guard !isConfiguringBlock,
+              isTrackingBlockSelectionDrag,
+              let event = currentBlockSelectionDragEvent() else {
+            return newSelectedCharRange
+        }
+        let blockTextView = textView as? BlockInputTextView
+        blockTextView?.rememberBlockSelectionDragRange(newSelectedCharRange)
+        guard updateBlockSelectionDrag(with: event, selectedRange: newSelectedCharRange) else {
+            return newSelectedCharRange
+        }
+        return blockTextView?.collapsedBlockSelectionDragNativeRange() ?? oldSelectedCharRange
+    }
+
+    private func currentBlockSelectionDragEvent() -> NSEvent? {
+        if let event = NSApp.currentEvent,
+           event.type == .leftMouseDragged {
+            return event
+        }
+        guard NSEvent.pressedMouseButtons & 1 == 1,
+              let window = view.window else {
+            return nil
+        }
+        let windowLocation = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+        return NSEvent.mouseEvent(
+            with: .leftMouseDragged,
+            location: windowLocation,
+            modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 0
+        )
+    }
+
     func requestReturn() -> Bool {
         guard let blockID else {
             return true
@@ -270,10 +362,12 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     func setBlockSelection(_ isSelected: Bool) {
-        view.layer?.backgroundColor = isSelected
-            ? NSColor.selectedContentBackgroundColor.withAlphaComponent(0.18).cgColor
-            : NSColor.clear.cgColor
+        clearTemporarySelectionHighlight()
+        applySelectionChrome(isSelected ? .whole : .none)
         horizontalRuleView.isSelected = isHorizontalRule && isSelected
+        if isSelected {
+            collapseNativeSelectionIfNeeded()
+        }
     }
 
     @objc func requestToggleChecklist() {
@@ -309,6 +403,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         guard let pasteboardItem = draggingPasteboardItem() else {
             return
         }
+        if let blockID {
+            delegate?.blockItemDidBeginReordering(self, blockID: blockID)
+        }
         let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
         draggingItem.setDraggingFrame(
             handleView.convert(view.bounds, from: view),
@@ -330,118 +427,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.trackingArea = trackingArea
     }
 
-    private func configureBlockKindChrome(block: BlockInputBlock) {
-        let kind = block.kind
-        let isHorizontalRule = kind == .horizontalRule
-        let contentIndent = Self.contentIndent(for: block)
-        let perLineContentIndent = Self.perLineContentIndent(for: block)
-        let verticalMetrics = Self.verticalMetrics(for: block)
-        textView.textContainerInset = verticalMetrics.textContainerInset
-        textView.isEditable = !isHorizontalRule
-        applyTextAttributes(for: block)
-        scrollView.isHidden = isHorizontalRule
-        scrollViewTopConstraint?.constant = 0
-        scrollViewBottomConstraint?.constant = 0
-        handleTopConstraint?.constant = Self.dragHandleTopConstant(for: block.kind, metrics: verticalMetrics)
-        kindLabelTopConstraint?.constant = 0
-        checklistButtonTopConstraint?.constant = verticalMetrics.checklistButtonTopConstant(
-            font: Self.font(for: block.kind),
-            checkboxHeight: Self.checklistButtonHeight
-        )
-        kindLabelLeadingConstraint?.constant = kindLabelLeadingConstant(for: block, contentIndent: contentIndent)
-        kindLabelWidthConstraint?.constant = kindLabelWidthConstant(for: block, perLineContentIndent: perLineContentIndent)
-        scrollViewLeadingConstraint?.constant = textLeadingConstant(
-            for: kind,
-            perLineContentIndent: perLineContentIndent
-        )
-        horizontalRuleLeadingConstraint?.constant = Self.defaultTextLeading + 4
-        quoteBarView.isHidden = kind != .quote || isHorizontalRule
-        quoteBarView.alphaValue = quoteBarView.isHidden ? 0 : 1
-        horizontalRuleView.setVisible(isHorizontalRule)
-        applyKindLabelAttributes(for: block)
-        updateQuoteBarVerticalExtent()
-        switch kind {
-        case let .checklistItem(isChecked):
-            checklistButton.isHidden = false
-            checklistButton.isEnabled = true
-            checklistButton.state = isChecked ? .on : .off
-            checklistButtonLeadingConstraint?.constant = Self.checklistButtonLeadingConstant(
-                indentationLevel: block.indentationLevel(forLine: 0),
-                rowContentIndent: contentIndent
-            )
-        default:
-            checklistButton.isHidden = true
-            checklistButton.isEnabled = false
-            checklistButton.state = .off
-            checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
-        }
-    }
-
-    private func kindLabelLeadingConstant(for block: BlockInputBlock, contentIndent: CGFloat) -> CGFloat {
-        switch block.kind {
-        case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
-            return Self.markerAlignmentLeading + contentIndent
-        case .paragraph, .heading, .code, .horizontalRule:
-            return contentIndent
-        }
-    }
-
-    private func kindLabelWidthConstant(
-        for block: BlockInputBlock,
-        perLineContentIndent: CGFloat
-    ) -> CGFloat {
-        if block.kind == .quote {
-            return 0
-        }
-        return Self.markerGutterWidth(for: block) + perLineContentIndent
-    }
-
-    private func textLeadingConstant(
-        for kind: BlockInputBlockKind,
-        perLineContentIndent: CGFloat
-    ) -> CGFloat {
-        if kind == .quote {
-            return Self.quoteTextLeading
-        }
-        if kind.supportsIndentation {
-            return Self.listTextLeading - perLineContentIndent
-        }
-        return Self.defaultTextLeading
-    }
-
-    private static func checklistButtonLeadingConstant(
-        indentationLevel: Int,
-        rowContentIndent: CGFloat
-    ) -> CGFloat {
-        checklistButtonBaseLeading + contentIndent(forIndentationLevel: indentationLevel) - rowContentIndent
-    }
-
-    private static func markerGutterWidth(for block: BlockInputBlock) -> CGFloat {
-        guard block.kind.supportsIndentation else {
-            return markerGutterWidth
-        }
-        let markerLines = markerLines(for: block)
-        let markerTexts = markerLines.isEmpty ? [prefix(for: block.kind, indentationLevel: block.indentationLevel)] : markerLines.map(\.text)
-        let widestMarker = markerTexts.reduce(CGFloat.zero) { widest, marker in
-            guard !marker.isEmpty else {
-                return widest
-            }
-            let width = (marker as NSString).size(withAttributes: [.font: font(for: block.kind)]).width
-            return max(widest, width)
-        }
-        return max(markerGutterWidth, widestMarker + minimumMarkerTextGap)
-    }
-
-    private func draggingPreviewImage() -> NSImage {
-        let image = NSImage(size: view.bounds.size)
-        guard let representation = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
-            return image
-        }
-        view.cacheDisplay(in: view.bounds, to: representation)
-        image.addRepresentation(representation)
-        return image
-    }
-
 }
 
 extension BlockInputBlockItem {
@@ -451,11 +436,13 @@ extension BlockInputBlockItem {
         delegate = nil
         selectionBeforeTextChange = nil
         isHorizontalRule = false
-        view.layer?.backgroundColor = NSColor.clear.cgColor
+        setBlockSelection(false)
         handleView.blockItem = nil
         horizontalRuleView.blockItem = nil
         horizontalRuleView.resetForReuse()
+        textView.cancelBlockSelectionDrag()
         textView.blockItem = nil
+        finishBlockSelectionDrag()
         textView.string = ""
         textView.isEditable = true
         textView.textContainerInset = Self.standardTextContainerInset

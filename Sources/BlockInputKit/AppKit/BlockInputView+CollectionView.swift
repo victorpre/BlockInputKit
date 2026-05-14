@@ -75,6 +75,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         guard let block = block(at: indexPath.item) else {
             return nil
         }
+        _ = cancelMultiBlockSelectionForReorderStart()
         let pasteboardItem = NSPasteboardItem()
         pasteboardItem.setString(block.id.rawValue, forType: .blockInputBlockID)
         return pasteboardItem

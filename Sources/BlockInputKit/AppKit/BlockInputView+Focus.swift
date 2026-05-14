@@ -27,11 +27,20 @@ extension BlockInputView {
             candidateID = range.blockID
         case let .blocks(ids):
             // Store-backed documents can change under an existing multi-block selection.
-            // Keep commands anchored to the first selected block that still exists.
+            // Keep commands anchored to the last interaction point when possible.
+            if let lastFocusedBlockID,
+               ids.contains(lastFocusedBlockID),
+               index(of: lastFocusedBlockID) != nil {
+                return lastFocusedBlockID
+            }
             if let validBlockID = ids.first(where: { index(of: $0) != nil }) {
                 return validBlockID
             }
             candidateID = nil
+        case let .mixed(selection):
+            candidateID = selection.leadingTextRange?.blockID
+                ?? selection.trailingTextRange?.blockID
+                ?? selection.blockIDs.first
         case nil:
             candidateID = lastFocusedBlockID
         }
@@ -138,6 +147,7 @@ extension BlockInputView {
         if !isBecomingFirstResponder, window?.firstResponder !== self {
             window?.makeFirstResponder(self)
         }
+        updateVisibleBlockSelectionHighlights()
     }
 
     func restoreVisibleSelection() {
@@ -148,9 +158,34 @@ extension BlockInputView {
             restoreVisibleTextSelection(textRange)
         case let .blocks(blockIDs):
             restoreVisibleBlockSelection(blockIDs)
+        case let .mixed(selection):
+            restoreVisibleBlockSelection(selectedBlockIDs(in: selection))
         case nil:
             break
         }
+    }
+
+    func moveCaretToDocumentBoundary(_ direction: BlockInputVerticalMovementDirection) -> Bool {
+        refreshDocumentFromStore()
+        let targetIndex = direction == .upward ? 0 : blockCount - 1
+        guard let block = block(at: targetIndex) else {
+            return false
+        }
+        if block.kind == .horizontalRule {
+            applySelection(.blocks([block.id]), notify: true)
+            scrollBlockToVisible(at: targetIndex, direction: direction)
+            window?.makeFirstResponder(self)
+            publishFocusChange(true)
+            return true
+        }
+        focus(blockID: block.id, utf16Offset: direction == .upward ? 0 : block.utf16Length)
+        return true
+    }
+
+    private func scrollBlockToVisible(at index: Int, direction: BlockInputVerticalMovementDirection) {
+        let scrollPosition: NSCollectionView.ScrollPosition = direction == .upward ? .top : .bottom
+        collectionView.scrollToItems(at: [IndexPath(item: index, section: 0)], scrollPosition: scrollPosition)
+        collectionView.layoutSubtreeIfNeeded()
     }
 
     func restoreMountedSelection() {
@@ -171,6 +206,11 @@ extension BlockInputView {
             if !blockIDs.isEmpty, !isBecomingFirstResponder, window?.firstResponder !== self {
                 window?.makeFirstResponder(self)
             }
+        case let .mixed(selection):
+            if !selectedBlockIDs(in: selection).isEmpty, !isBecomingFirstResponder, window?.firstResponder !== self {
+                window?.makeFirstResponder(self)
+            }
+            updateVisibleBlockSelectionHighlights()
         case nil:
             break
         }
@@ -236,23 +276,38 @@ extension BlockInputView {
     }
 
     func applySelection(_ selection: BlockInputSelection?, notify: Bool) {
+        BlockInputSelectionDebug.emit("apply selection=\(String(describing: selection)) notify=\(notify)")
         self.selection = selection
+        horizontalSelectionExpansion = nil
         preferredNavigationX = nil
         switch selection {
         case let .cursor(cursor):
             lastFocusedBlockID = cursor.blockID
             pendingFocus = cursor
             selectedHorizontalRuleIndex = nil
+            lastNativeTextSelectionExpansion = nil
+            blockSelectionExpansion = nil
         case let .text(range):
             lastFocusedBlockID = range.blockID
             pendingFocus = nil
             selectedHorizontalRuleIndex = nil
+            blockSelectionExpansion = nil
         case let .blocks(blockIDs):
             lastFocusedBlockID = blockIDs.first
             pendingFocus = nil
+            lastNativeTextSelectionExpansion = nil
+        case let .mixed(mixedSelection):
+            lastFocusedBlockID = mixedSelection.leadingTextRange?.blockID
+                ?? mixedSelection.trailingTextRange?.blockID
+                ?? mixedSelection.blockIDs.first
+            pendingFocus = nil
+            selectedHorizontalRuleIndex = nil
+            lastNativeTextSelectionExpansion = nil
         case nil:
             pendingFocus = nil
             selectedHorizontalRuleIndex = nil
+            lastNativeTextSelectionExpansion = nil
+            blockSelectionExpansion = nil
         }
         if notify {
             onSelectionChange?(selection)
@@ -261,17 +316,14 @@ extension BlockInputView {
     }
 
     func isBlockSelected(_ blockID: BlockInputBlockID) -> Bool {
-        guard case let .blocks(blockIDs) = selection else {
+        guard let blockIDs = selection?.wholeSelectedBlockIDs else {
             return false
         }
         return blockIDs.contains(blockID)
     }
 
     var selectedBlockCount: Int {
-        guard case let .blocks(blockIDs) = selection else {
-            return 0
-        }
-        return blockIDs.count
+        selection?.wholeSelectedBlockIDs.count ?? 0
     }
 
     private func updateVisibleBlockSelectionHighlights() {
@@ -281,6 +333,39 @@ extension BlockInputView {
                 continue
             }
             item.setBlockSelection(isBlockSelected(blockID))
+            if let range = selection?.partialTextRange(for: blockID) {
+                item.setSelectionHighlightRange(range.range)
+            } else if let range = selection?.textRange(for: blockID) {
+                item.setFocusedTextSelectionHighlightRange(range.range)
+            } else if shouldCollapseNativeTextSelection(in: blockID) {
+                // Editor-level selections use custom row chrome. Collapse any leftover AppKit range so an inactive
+                // gray `NSTextView` selection cannot drift over the blue multi-selection background.
+                item.collapseNativeSelectionIfNeeded()
+            }
+        }
+    }
+
+    private func shouldCollapseNativeTextSelection(in blockID: BlockInputBlockID) -> Bool {
+        switch selection {
+        case .blocks, .mixed, nil:
+            return true
+        case let .cursor(cursor):
+            return cursor.blockID != blockID
+        case let .text(textRange):
+            return textRange.blockID != blockID
+        }
+    }
+
+    private func selectedBlockIDs(in selection: BlockInputMixedSelection) -> [BlockInputBlockID] {
+        var blockIDs = selection.blockIDs
+        if let blockID = selection.leadingTextRange?.blockID, !blockIDs.contains(blockID) {
+            blockIDs.append(blockID)
+        }
+        if let blockID = selection.trailingTextRange?.blockID, !blockIDs.contains(blockID) {
+            blockIDs.append(blockID)
+        }
+        return blockIDs.sorted { lhs, rhs in
+            (index(of: lhs) ?? Int.max) < (index(of: rhs) ?? Int.max)
         }
     }
 
@@ -288,5 +373,38 @@ extension BlockInputView {
         for item in collectionView.visibleItems().compactMap({ $0 as? BlockInputBlockItem }) {
             item.setBlockSelection(item === selectedItem)
         }
+    }
+}
+
+extension BlockInputSelection {
+    var wholeSelectedBlockIDs: [BlockInputBlockID] {
+        switch self {
+        case let .blocks(blockIDs):
+            return blockIDs
+        case let .mixed(selection):
+            return selection.blockIDs
+        case .cursor, .text:
+            return []
+        }
+    }
+
+    func partialTextRange(for blockID: BlockInputBlockID) -> BlockInputTextRange? {
+        guard case let .mixed(selection) = self else {
+            return nil
+        }
+        if selection.leadingTextRange?.blockID == blockID {
+            return selection.leadingTextRange
+        }
+        if selection.trailingTextRange?.blockID == blockID {
+            return selection.trailingTextRange
+        }
+        return nil
+    }
+
+    func textRange(for blockID: BlockInputBlockID) -> BlockInputTextRange? {
+        guard case let .text(textRange) = self, textRange.blockID == blockID else {
+            return nil
+        }
+        return textRange
     }
 }

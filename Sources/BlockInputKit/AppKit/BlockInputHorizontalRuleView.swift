@@ -30,7 +30,19 @@ final class BlockInputHorizontalRuleView: NSView {
         guard !isHidden else {
             return
         }
+        blockItem?.beginBlockSelectionDrag()
         blockItem?.requestSelectHorizontalRule()
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard !isHidden else {
+            return
+        }
+        _ = blockItem?.updateBlockSelectionDrag(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        blockItem?.finishBlockSelectionDrag()
     }
 
     func resetForReuse() {

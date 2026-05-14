@@ -36,6 +36,17 @@ extension BlockInputView {
             return !blockIDs.isEmpty
                 && Set(blockIDs).count == blockIDs.count
                 && blockIDs.allSatisfy { index(of: $0) != nil }
+        case let .mixed(selection):
+            let partialRanges = [selection.leadingTextRange, selection.trailingTextRange].compactMap { $0 }
+            let allIDs = selection.blockIDs + partialRanges.map(\.blockID)
+            let isStructurallyValid = !allIDs.isEmpty
+                && Set(allIDs).count == allIDs.count
+                && selection.blockIDs.allSatisfy { index(of: $0) != nil }
+                && partialRanges.allSatisfy { $0.range.length > 0 && containsValidTextRange($0) }
+            guard isStructurallyValid else {
+                return false
+            }
+            return containsCanonicalMixedSelectionOrder(selection)
         }
     }
 
@@ -54,6 +65,24 @@ extension BlockInputView {
         }
         return textRange.range.location <= block.utf16Length
             && textRange.range.length <= block.utf16Length - textRange.range.location
+    }
+
+    private func containsCanonicalMixedSelectionOrder(_ selection: BlockInputMixedSelection) -> Bool {
+        let wholeIndexes = selection.blockIDs.compactMap { index(of: $0) }.sorted()
+        let leadingIndex = selection.leadingTextRange.flatMap { index(of: $0.blockID) }
+        let trailingIndex = selection.trailingTextRange.flatMap { index(of: $0.blockID) }
+        if let leadingIndex, let trailingIndex, leadingIndex >= trailingIndex {
+            return false
+        }
+        let firstSelectionIndex = leadingIndex ?? wholeIndexes.first ?? trailingIndex
+        let lastSelectionIndex = trailingIndex ?? wholeIndexes.last ?? leadingIndex
+        guard let firstSelectionIndex, let lastSelectionIndex else {
+            return false
+        }
+        let expectedWholeIndexes = (firstSelectionIndex...lastSelectionIndex).filter {
+            $0 != leadingIndex && $0 != trailingIndex
+        }
+        return wholeIndexes == expectedWholeIndexes
     }
 }
 

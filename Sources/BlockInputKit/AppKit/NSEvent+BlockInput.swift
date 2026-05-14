@@ -32,4 +32,126 @@ extension NSEvent {
         return modifierFlags.contains(.shift) ? .redo : .undo
     }
 
+    var blockInputSelectionExpansionDirection: BlockInputVerticalMovementDirection? {
+        let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers.contains(.shift),
+              !modifiers.contains(.command),
+              !modifiers.contains(.option),
+              !modifiers.contains(.control) else {
+            return nil
+        }
+        if keyCode == 126 || charactersIgnoringModifiers == "\u{F700}" {
+            return .upward
+        }
+        if keyCode == 125 || charactersIgnoringModifiers == "\u{F701}" {
+            return .downward
+        }
+        return nil
+    }
+
+    var horizontalSelectionAdjustmentDirection: BlockInputHorizontalMovementDirection? {
+        let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers.contains(.shift),
+              !modifiers.contains(.command),
+              !modifiers.contains(.option),
+              !modifiers.contains(.control) else {
+            return nil
+        }
+        if keyCode == 123 || charactersIgnoringModifiers == "\u{F702}" {
+            return .leftward
+        }
+        if keyCode == 124 || charactersIgnoringModifiers == "\u{F703}" {
+            return .rightward
+        }
+        return nil
+    }
+
+    var blockInputDocumentBoundaryDirection: BlockInputVerticalMovementDirection? {
+        let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers.contains(.command),
+              !modifiers.contains(.shift),
+              !modifiers.contains(.option),
+              !modifiers.contains(.control) else {
+            return nil
+        }
+        return verticalMovementDirection
+    }
+
+    var plainVerticalMovementDirection: BlockInputVerticalMovementDirection? {
+        let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard !modifiers.contains(.command),
+              !modifiers.contains(.shift),
+              !modifiers.contains(.option),
+              !modifiers.contains(.control) else {
+            return nil
+        }
+        return verticalMovementDirection
+    }
+
+    var verticalMovementDirection: BlockInputVerticalMovementDirection? {
+        if keyCode == 126 || charactersIgnoringModifiers == "\u{F700}" {
+            return .upward
+        }
+        if keyCode == 125 || charactersIgnoringModifiers == "\u{F701}" {
+            return .downward
+        }
+        return nil
+    }
+
+    var isBackspaceOrDelete: Bool {
+        keyCode == 51
+            || keyCode == 117
+            || charactersIgnoringModifiers == "\u{7F}"
+            || charactersIgnoringModifiers == "\u{F728}"
+    }
+
+    var isCancelOperation: Bool {
+        keyCode == 53 || charactersIgnoringModifiers == "\u{1B}"
+    }
+
+    var isArrowKey: Bool {
+        keyCode == 125
+            || keyCode == 126
+            || keyCode == 123
+            || keyCode == 124
+            || charactersIgnoringModifiers == "\u{F700}"
+            || charactersIgnoringModifiers == "\u{F701}"
+            || charactersIgnoringModifiers == "\u{F702}"
+            || charactersIgnoringModifiers == "\u{F703}"
+    }
+
+    var debugKeyName: String {
+        if keyCode == 123 || charactersIgnoringModifiers == "\u{F702}" {
+            return "Left"
+        }
+        if keyCode == 124 || charactersIgnoringModifiers == "\u{F703}" {
+            return "Right"
+        }
+        if keyCode == 126 || charactersIgnoringModifiers == "\u{F700}" {
+            return "Up"
+        }
+        if keyCode == 125 || charactersIgnoringModifiers == "\u{F701}" {
+            return "Down"
+        }
+        return "keyCode=\(keyCode)"
+    }
+
+    var debugModifierNames: String {
+        let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+        var names: [String] = []
+        if modifiers.contains(.command) {
+            names.append("cmd")
+        }
+        if modifiers.contains(.shift) {
+            names.append("shift")
+        }
+        if modifiers.contains(.option) {
+            names.append("opt")
+        }
+        if modifiers.contains(.control) {
+            names.append("ctrl")
+        }
+        return names.isEmpty ? "none" : names.joined(separator: "+")
+    }
+
 }

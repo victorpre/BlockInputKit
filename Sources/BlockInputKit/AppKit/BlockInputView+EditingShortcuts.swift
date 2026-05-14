@@ -14,7 +14,7 @@ extension BlockInputView {
         if case .text = selection {
             return performTextViewEditAction(#selector(NSText.cut(_:)))
         }
-        guard case .blocks = selection,
+        guard selection?.wholeSelectedBlockIDs.isEmpty == false || isMixedSelection,
               copyActiveSelection() else {
             return false
         }
@@ -25,7 +25,7 @@ extension BlockInputView {
         switch selection {
         case .cursor, .text:
             return performTextViewEditAction(#selector(NSText.paste(_:)))
-        case .blocks, nil:
+        case .blocks, .mixed, nil:
             return false
         }
     }
@@ -42,7 +42,7 @@ extension BlockInputView {
                 return false
             }
             item.focusText(inUTF16Range: textRange.range)
-        case .blocks, nil:
+        case .blocks, .mixed, nil:
             return false
         }
         guard let textView = window?.firstResponder as? BlockInputTextView else {
@@ -60,7 +60,13 @@ extension BlockInputView {
             }
             return (block.text as NSString).substring(with: block.text.clampedRange(textRange.range))
         case let .blocks(blockIDs):
-            let copiedBlocks = blockIDs.compactMap { block(withID: $0) }
+            let copiedBlocks = blocksForMarkdownCopy(blockIDs: blockIDs)
+            guard !copiedBlocks.isEmpty else {
+                return nil
+            }
+            return BlockInputDocument(blocks: copiedBlocks).markdown
+        case let .mixed(mixedSelection):
+            let copiedBlocks = blocksForMixedMarkdownCopy(mixedSelection)
             guard !copiedBlocks.isEmpty else {
                 return nil
             }
@@ -68,6 +74,75 @@ extension BlockInputView {
         case .cursor, nil:
             return nil
         }
+    }
+
+    private var isMixedSelection: Bool {
+        if case .mixed = selection {
+            return true
+        }
+        return false
+    }
+
+    private func blocksForMarkdownCopy(blockIDs: [BlockInputBlockID]) -> [BlockInputBlock] {
+        let indexedBlocks = blockIDs.compactMap { blockID -> (index: Int, block: BlockInputBlock)? in
+            guard let index = index(of: blockID),
+                  let block = block(at: index) else {
+                return nil
+            }
+            return (index, block)
+        }
+        return indexedBlocks
+            .sorted { $0.index < $1.index }
+            .map(\.block)
+    }
+
+    private func blocksForMixedMarkdownCopy(_ selection: BlockInputMixedSelection) -> [BlockInputBlock] {
+        let edgeBlockIDs = [
+            selection.leadingTextRange?.blockID,
+            selection.trailingTextRange?.blockID
+        ].compactMap { $0 }
+        let blockIDs = selection.blockIDs + edgeBlockIDs
+        return blockIDs.compactMap { blockID -> (index: Int, block: BlockInputBlock)? in
+            guard let index = index(of: blockID), var block = block(at: index) else {
+                return nil
+            }
+            if let textRange = selection.leadingTextRange, textRange.blockID == blockID {
+                block.applyPartialMarkdownCopyRange(textRange.range)
+            }
+            if let textRange = selection.trailingTextRange, textRange.blockID == blockID {
+                block.applyPartialMarkdownCopyRange(textRange.range)
+            }
+            return (index, block)
+        }
+        .sorted { $0.index < $1.index }
+        .map(\.block)
+    }
+}
+
+private extension BlockInputBlock {
+    mutating func applyPartialMarkdownCopyRange(_ range: NSRange) {
+        let originalTextLength = utf16Length
+        let clampedRange = text.clampedRange(range)
+        text = (text as NSString).substring(with: clampedRange)
+        stripMarkdownChromeIfPartialCopyNeedsPlainText(clampedRange, originalTextLength: originalTextLength)
+    }
+
+    mutating func stripMarkdownChromeIfPartialCopyNeedsPlainText(_ range: NSRange, originalTextLength: Int) {
+        let coversWholeBlock = range.location <= 0 && NSMaxRange(range) >= originalTextLength
+        guard !coversWholeBlock,
+              range.location > 0 || hasInvisibleMarkdownFence else {
+            return
+        }
+        kind = .paragraph
+        indentationLevel = 0
+        lineIndentationLevels = []
+    }
+
+    var hasInvisibleMarkdownFence: Bool {
+        if case .code = kind {
+            return true
+        }
+        return false
     }
 }
 

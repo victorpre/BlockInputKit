@@ -1,16 +1,50 @@
 import AppKit
 import XCTest
+@testable import BlockInputKit
 
 func mouseDownEvent(windowNumber: Int) throws -> NSEvent {
+    try mouseEvent(type: .leftMouseDown, windowNumber: windowNumber)
+}
+
+func mouseDownEvent(
+    location: NSPoint,
+    windowNumber: Int,
+    modifierFlags: NSEvent.ModifierFlags = [],
+    clickCount: Int = 1
+) throws -> NSEvent {
+    try mouseEvent(
+        type: .leftMouseDown,
+        location: location,
+        windowNumber: windowNumber,
+        modifierFlags: modifierFlags,
+        clickCount: clickCount
+    )
+}
+
+func mouseDraggedEvent(location: NSPoint, windowNumber: Int) throws -> NSEvent {
+    try mouseEvent(type: .leftMouseDragged, location: location, windowNumber: windowNumber)
+}
+
+func mouseUpEvent(location: NSPoint, windowNumber: Int) throws -> NSEvent {
+    try mouseEvent(type: .leftMouseUp, location: location, windowNumber: windowNumber)
+}
+
+private func mouseEvent(
+    type: NSEvent.EventType,
+    location: NSPoint = .zero,
+    windowNumber: Int,
+    modifierFlags: NSEvent.ModifierFlags = [],
+    clickCount: Int = 1
+) throws -> NSEvent {
     try XCTUnwrap(NSEvent.mouseEvent(
-        with: .leftMouseDown,
-        location: .zero,
-        modifierFlags: [],
+        with: type,
+        location: location,
+        modifierFlags: modifierFlags,
         timestamp: 0,
         windowNumber: windowNumber,
         context: nil,
         eventNumber: 0,
-        clickCount: 1,
+        clickCount: clickCount,
         pressure: 1
     ))
 }
@@ -35,12 +69,26 @@ func keyEquivalentEvent(
     characters: String,
     modifierFlags: NSEvent.ModifierFlags
 ) throws -> NSEvent {
+    try keyEquivalentEvent(
+        keyCode: keyCode,
+        characters: characters,
+        modifierFlags: modifierFlags,
+        windowNumber: 0
+    )
+}
+
+func keyEquivalentEvent(
+    keyCode: UInt16,
+    characters: String,
+    modifierFlags: NSEvent.ModifierFlags,
+    windowNumber: Int
+) throws -> NSEvent {
     try XCTUnwrap(NSEvent.keyEvent(
         with: .keyDown,
         location: .zero,
         modifierFlags: modifierFlags,
         timestamp: 0,
-        windowNumber: 0,
+        windowNumber: windowNumber,
         context: nil,
         characters: characters,
         charactersIgnoringModifiers: characters.lowercased(),
@@ -55,6 +103,75 @@ func commandAEvent() throws -> NSEvent {
 
 func commandCEvent() throws -> NSEvent {
     try keyEquivalentEvent(keyCode: 8, characters: "c", modifierFlags: .command)
+}
+
+func commandUpEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 126, characters: "\u{F700}", modifierFlags: .command)
+}
+
+func commandShiftUpEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 126, characters: "\u{F700}", modifierFlags: [.command, .shift])
+}
+
+func commandDownEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 125, characters: "\u{F701}", modifierFlags: .command)
+}
+
+func commandShiftDownEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 125, characters: "\u{F701}", modifierFlags: [.command, .shift])
+}
+
+func shiftUpEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 126, characters: "\u{F700}", modifierFlags: .shift)
+}
+
+func shiftDownEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 125, characters: "\u{F701}", modifierFlags: .shift)
+}
+
+func shiftLeftEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 123, characters: "\u{F702}", modifierFlags: .shift)
+}
+
+func shiftRightEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 124, characters: "\u{F703}", modifierFlags: .shift)
+}
+
+func plainUpEvent() throws -> NSEvent {
+    try keyDownEvent(keyCode: 126, characters: "\u{F700}")
+}
+
+func plainDownEvent() throws -> NSEvent {
+    try keyDownEvent(keyCode: 125, characters: "\u{F701}")
+}
+
+func shiftNumericPadUpEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 126, characters: "\u{F700}", modifierFlags: [.shift, .numericPad])
+}
+
+func shiftNumericPadDownEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 125, characters: "\u{F701}", modifierFlags: [.shift, .numericPad])
+}
+
+func escapeEvent() throws -> NSEvent {
+    try keyDownEvent(keyCode: 53, characters: "\u{1B}")
+}
+
+@MainActor
+func windowLocation(forUTF16Offset offset: Int, in textView: BlockInputTextView) throws -> NSPoint {
+    let textContainerX = try XCTUnwrap(textView.blockItem?.textContainerX(forUTF16Offset: offset))
+    let textContainerOrigin = textView.textContainerOrigin
+    if let window = textView.window {
+        let caretRect = textView.firstRect(forCharacterRange: NSRange(location: offset, length: 0), actualRange: nil)
+        if caretRect != .zero, !caretRect.isNull, !caretRect.isInfinite {
+            let windowPoint = window.convertPoint(fromScreen: caretRect.origin)
+            return NSPoint(x: windowPoint.x, y: windowPoint.y + 4)
+        }
+    }
+    return textView.convert(
+        NSPoint(x: textContainerOrigin.x + textContainerX, y: textContainerOrigin.y + 8),
+        to: nil
+    )
 }
 
 func commandZEvent() throws -> NSEvent {

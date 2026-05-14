@@ -1,9 +1,16 @@
+import AppKit
 import CoreGraphics
 import Foundation
 
 enum BlockInputVerticalMovementDirection: Equatable {
     case upward
     case downward
+}
+
+/// Logical Shift+Left/Right direction after AppKit key events are normalized.
+enum BlockInputHorizontalMovementDirection: Equatable {
+    case leftward
+    case rightward
 }
 
 @MainActor
@@ -30,6 +37,7 @@ protocol BlockInputBlockItemDelegate: AnyObject {
     ) -> Bool
     func blockItemDidRequestSelectHorizontalRule(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
+    func blockItemDidBeginReordering(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestIndent(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
@@ -46,4 +54,40 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         didRequestVerticalMovement direction: BlockInputVerticalMovementDirection,
         preferredTextContainerX: CGFloat?
     ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didDragSelectBlocksWith event: NSEvent,
+        selectedRange: NSRange?
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestExpandSelection direction: BlockInputVerticalMovementDirection,
+        selectedRange: NSRange,
+        preferredTextContainerX: CGFloat?
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestExpandActiveBlockSelection direction: BlockInputVerticalMovementDirection
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestHorizontalSelectionAdjustment direction: BlockInputHorizontalMovementDirection,
+        selectedRange: NSRange
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestCollapseSelection direction: BlockInputVerticalMovementDirection
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestDocumentBoundary direction: BlockInputVerticalMovementDirection
+    ) -> Bool
+    func blockItemDidRequestCancelSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
+    func blockItemDidRequestMouseDownCancelSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
 }

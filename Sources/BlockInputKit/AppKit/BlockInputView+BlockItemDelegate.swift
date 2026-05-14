@@ -128,15 +128,49 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID) {
+        guard !item.isDraggingBlockSelection,
+              window?.firstResponder !== self else {
+            return
+        }
+        if case .blocks = selection,
+           NSApp.currentEvent?.type != .leftMouseDown,
+           NSApp.currentEvent?.type != .leftMouseDragged {
+            return
+        }
         guard let block = block(withID: blockID),
               block.kind != .horizontalRule else {
             return
         }
         let range = item.currentSelectedRange
+        let nativeExpansionDirection = nativeTextSelectionExpansionDirection(
+            blockID: blockID,
+            selectedRange: range,
+            blockText: block.text
+        )
+        if let direction = nativeExpansionDirection,
+           shouldPromoteRepeatedNativeTextSelection(
+            blockID: blockID,
+            selectedRange: range,
+            direction: direction,
+            blockText: block.text
+           ),
+           promoteNativeSelectionExpansionIfNeeded(from: blockID, selectedRange: range, direction: direction) {
+            return
+        }
         if range.length == 0 {
             applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: range.location)), notify: true)
         } else {
             applySelection(.text(BlockInputTextRange(blockID: blockID, range: range)), notify: true)
+            if let direction = nativeExpansionDirection,
+               range.isSelectionExpansionBoundary(in: block.text, direction: direction) {
+                lastNativeTextSelectionExpansion = BlockInputNativeTextSelectionExpansion(
+                    blockID: blockID,
+                    range: range,
+                    direction: direction
+                )
+            } else {
+                lastNativeTextSelectionExpansion = nil
+            }
         }
     }
 
@@ -263,6 +297,10 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         _ = toggleChecklistItem(blockID: blockID)
     }
 
+    func blockItemDidBeginReordering(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+        _ = cancelMultiBlockSelectionForReorderStart()
+    }
+
     func blockItemDidRequestSelectHorizontalRule(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
         refreshDocumentFromStore()
         guard block(withID: blockID)?.kind == .horizontalRule else {
@@ -270,6 +308,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         }
         selectedHorizontalRuleIndex = collectionView.indexPath(for: item)?.item
         hideDropIndicator()
+        blockSelectionExpansion = nil
         applySelection(.blocks([blockID]), notify: true)
         selectOnlyVisibleBlockItem(item)
         window?.makeFirstResponder(self)
@@ -339,6 +378,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         let resolvedPreferredTextContainerX = preferredNavigationX ?? preferredTextContainerX
         if targetBlock.kind == .horizontalRule {
             selectedHorizontalRuleIndex = targetIndex
+            blockSelectionExpansion = nil
             applySelection(.blocks([targetBlock.id]), notify: true)
             if let targetItem = visibleItem(for: targetBlock.id, refreshConfiguration: false) {
                 selectOnlyVisibleBlockItem(targetItem)
@@ -399,7 +439,6 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             delegate: self
         )
     }
-
 }
 
 private struct PlainTextChangeContext {

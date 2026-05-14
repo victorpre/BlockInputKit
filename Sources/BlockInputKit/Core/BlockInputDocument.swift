@@ -126,6 +126,48 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         return nil
     }
 
+    /// Deletes a selection that spans whole blocks and partial text edges, returning the unified-text cursor start.
+    @discardableResult
+    public mutating func deleteMixedSelection(_ selection: BlockInputMixedSelection) -> BlockInputCursor? {
+        let partialRanges = [selection.leadingTextRange, selection.trailingTextRange].compactMap { $0 }
+        guard !selection.blockIDs.isEmpty || !partialRanges.isEmpty else {
+            return nil
+        }
+
+        let selectedIDs = Set(selection.blockIDs + partialRanges.map(\.blockID))
+        guard let firstSelectedIndex = blocks.indices.first(where: { selectedIDs.contains(blocks[$0].id) }) else {
+            return nil
+        }
+        if let joinedCursor = deleteMixedSelectionByJoiningPartialEdges(selection) {
+            return joinedCursor
+        }
+        let preferredCursor = mixedSelectionStartCursor(selection, firstSelectedIndex: firstSelectedIndex)
+
+        let groupedRanges = Dictionary(grouping: partialRanges, by: \.blockID)
+        for (blockID, ranges) in groupedRanges {
+            let sortedRanges = ranges.map(\.range).sorted { lhs, rhs in
+                lhs.location > rhs.location
+            }
+            for range in sortedRanges {
+                replaceText(in: blockID, range: range, replacement: "")
+            }
+        }
+
+        let fallbackSelection = selection.blockIDs.isEmpty ? nil : deleteBlocks(blockIDs: selection.blockIDs)
+        if let preferredCursor,
+           block(withID: preferredCursor.blockID) != nil {
+            return preferredCursor
+        }
+        if case let .cursor(cursor) = fallbackSelection {
+            return cursor
+        }
+        if blocks.indices.contains(firstSelectedIndex) {
+            let block = blocks[firstSelectedIndex]
+            return BlockInputCursor(blockID: block.id, utf16Offset: 0)
+        }
+        return blocks.last.map { BlockInputCursor(blockID: $0.id, utf16Offset: $0.utf16Length) }
+    }
+
     /// Applies Backspace/Delete key semantics for an empty block.
     @discardableResult
     public mutating func deleteEmptyBlockForBackspaceOrDelete(blockID: BlockInputBlockID) -> BlockInputSelection? {
@@ -290,6 +332,67 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
             return .blocks(allBlockIDs)
         }
         return .text(fullRange)
+    }
+}
+
+private extension BlockInputDocument {
+    mutating func deleteMixedSelectionByJoiningPartialEdges(_ selection: BlockInputMixedSelection) -> BlockInputCursor? {
+        guard let leadingTextRange = selection.leadingTextRange,
+              let trailingTextRange = selection.trailingTextRange,
+              leadingTextRange.blockID != trailingTextRange.blockID,
+              let leadingIndex = index(of: leadingTextRange.blockID),
+              let trailingIndex = index(of: trailingTextRange.blockID),
+              leadingIndex < trailingIndex else {
+            return nil
+        }
+        let leadingBlock = blocks[leadingIndex]
+        let trailingBlock = blocks[trailingIndex]
+        let leadingRange = leadingBlock.text.clampedUTF16Range(leadingTextRange.range)
+        let trailingRange = trailingBlock.text.clampedUTF16Range(trailingTextRange.range)
+        let leadingText = leadingBlock.text as NSString
+        let trailingText = trailingBlock.text as NSString
+        var mergedBlock = leadingBlock
+        mergedBlock.text = leadingText.substring(to: leadingRange.location)
+            + trailingText.substring(from: NSMaxRange(trailingRange))
+        blocks[leadingIndex] = mergedBlock
+
+        let deletedIDs = Set(selection.blockIDs + [trailingTextRange.blockID])
+        for index in blocks.indices.reversed() where index != leadingIndex && deletedIDs.contains(blocks[index].id) {
+            blocks.remove(at: index)
+        }
+        return BlockInputCursor(blockID: leadingTextRange.blockID, utf16Offset: leadingRange.location)
+    }
+
+    func mixedSelectionStartCursor(
+        _ selection: BlockInputMixedSelection,
+        firstSelectedIndex: Int
+    ) -> BlockInputCursor? {
+        let partialRanges = [selection.leadingTextRange, selection.trailingTextRange].compactMap { $0 }
+        let indexedPartialRanges = partialRanges.compactMap { textRange -> (index: Int, range: BlockInputTextRange)? in
+            guard let index = index(of: textRange.blockID) else {
+                return nil
+            }
+            return (index, textRange)
+        }
+        if let firstPartial = indexedPartialRanges
+            .filter({ $0.index == firstSelectedIndex })
+            .sorted(by: { $0.range.range.location < $1.range.range.location })
+            .first {
+            return BlockInputCursor(
+                blockID: firstPartial.range.blockID,
+                utf16Offset: firstPartial.range.range.location
+            )
+        }
+        if let nextPartial = indexedPartialRanges
+            .filter({ $0.index > firstSelectedIndex })
+            .sorted(by: { $0.index < $1.index })
+            .first {
+            return BlockInputCursor(
+                blockID: nextPartial.range.blockID,
+                utf16Offset: nextPartial.range.range.location
+            )
+        }
+        return nil
     }
 }
 

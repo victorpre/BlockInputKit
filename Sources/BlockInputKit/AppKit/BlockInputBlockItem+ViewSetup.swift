@@ -5,6 +5,7 @@ extension BlockInputBlockItem {
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.clear.cgColor
 
+        setupSelectionBackgroundView()
         setupHandleView()
         setupKindLabel()
         setupChecklistButton()
@@ -13,6 +14,10 @@ extension BlockInputBlockItem {
         setupQuoteBarView()
         addArrangedSubviews()
         activateLayoutConstraints()
+    }
+
+    private func setupSelectionBackgroundView() {
+        selectionBackgroundView.isHidden = true
     }
 
     private func setupHandleView() {
@@ -49,6 +54,8 @@ extension BlockInputBlockItem {
         textView.textContainerInset = Self.standardTextContainerInset
         textView.backgroundColor = .clear
         textView.drawsBackground = false
+        textView.isSelectable = true
+        textView.selectedTextAttributes = BlockInputBlockSelectionChrome.nativeSelectedTextAttributes
         textView.isRichText = true
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.allowsUndo = false
@@ -68,6 +75,8 @@ extension BlockInputBlockItem {
     }
 
     private func addArrangedSubviews() {
+        selectionBackgroundView.translatesAutoresizingMaskIntoConstraints = true
+        view.addSubview(selectionBackgroundView)
         for subview in [handleView, kindLabel, checklistButton, quoteBarView, scrollView, horizontalRuleView] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
