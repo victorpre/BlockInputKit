@@ -23,6 +23,22 @@ final class BlockInputMarkdownTests: XCTestCase {
         XCTAssertEqual(parsed.blocks.map(\.indentationLevel), document.blocks.map(\.indentationLevel))
     }
 
+    func testMarkdownPreservesCodeFenceLanguageInfoString() {
+        let parsed = BlockInputDocument(markdown: """
+        ``` swift package
+        let value = 1
+        ```
+        """)
+
+        XCTAssertEqual(parsed.blocks.map(\.kind), [.code(language: "swift package")])
+        XCTAssertEqual(parsed.blocks.map(\.text), ["let value = 1"])
+        XCTAssertEqual(parsed.markdown, """
+        ```swift package
+        let value = 1
+        ```
+        """)
+    }
+
     func testMarkdownRoundTripKeepsAdjacentParagraphBlocksSeparate() {
         let document = BlockInputDocument(blocks: [
             BlockInputBlock(id: "first", kind: .paragraph, text: "First"),

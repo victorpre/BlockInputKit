@@ -12,6 +12,13 @@ public extension BlockInputDocument {
             return nil
         }
         let currentBlock = blocks[index]
+        if let codeBlock = currentBlock.codeFenceBlockForReturn(
+            utf16Offset: utf16Offset,
+            selectedUTF16Length: selectedUTF16Length
+        ) {
+            blocks[index] = codeBlock
+            return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
+        }
         if currentBlock.isEmpty, currentBlock.kind.exitsToParagraphOnEmptyReturn {
             if currentBlock.kind.supportsIndentation,
                outdentEmptyListBlock(at: index) {
@@ -51,6 +58,21 @@ public extension BlockInputDocument {
             return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: insertionOffset + 1))
         }
         return insertBlock(BlockInputBlock(), at: index + 1)
+    }
+}
+
+extension BlockInputBlock {
+    func codeFenceBlockForReturn(
+        utf16Offset: Int?,
+        selectedUTF16Length: Int
+    ) -> BlockInputBlock? {
+        guard kind == .paragraph,
+              selectedUTF16Length == 0,
+              (utf16Offset ?? utf16Length) == utf16Length,
+              let opening = BlockInputCodeParsing.codeFenceOpening(in: text) else {
+            return nil
+        }
+        return BlockInputBlock(id: id, kind: .code(language: opening.language))
     }
 }
 

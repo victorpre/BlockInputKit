@@ -58,6 +58,17 @@ extension BlockInputView {
               cachedBlockMatches(block, at: index) else {
             return nil
         }
+        if let replacement = block.codeFenceBlockForReturn(
+            utf16Offset: returnSelection?.offset,
+            selectedUTF16Length: returnSelection?.length ?? 0
+        ) {
+            return performGranularReturnBlockReplacement(
+                actionName: "Format Block",
+                beforeBlock: block,
+                afterBlock: replacement,
+                index: index
+            )
+        }
         if let replacement = replacementBlockForGranularReturn(from: block, at: index, selection: returnSelection) {
             return performGranularReturnBlockReplacement(
                 actionName: returnActionName(for: block, selection: returnSelection),
@@ -342,6 +353,12 @@ extension BlockInputView {
         }
         if block.isEmpty && block.kind.exitsToParagraphOnEmptyReturn {
             return "Unformat Block"
+        }
+        if block.codeFenceBlockForReturn(
+            utf16Offset: selection?.offset,
+            selectedUTF16Length: selection?.length ?? 0
+        ) != nil {
+            return "Format Block"
         }
         guard !block.isEmpty && block.kind.acceptsInlineReturn else {
             return "Insert Block"

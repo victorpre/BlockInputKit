@@ -25,6 +25,61 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
     }
 
+    func testReturnCommandConvertsCodeFenceThroughDelegatePath() throws {
+        let blockID = BlockInputBlockID(rawValue: "code")
+        let undoController = BlockInputUndoController()
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "``` swift")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            undoController: undoController
+        ))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 9, length: 0))
+        let paragraphBlock = store.document.blocks[0]
+        _ = view.itemHeightCache.height(for: paragraphBlock, at: 0, textWidth: 320) {
+            44
+        }
+        store.resetCounts()
+
+        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .code(language: "swift"))
+        ])
+        XCTAssertEqual(store.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .code(language: "swift"))
+        ])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+        let remeasuredParagraphHeight = view.itemHeightCache.height(for: paragraphBlock, at: 0, textWidth: 320) {
+            88
+        }
+        XCTAssertEqual(remeasuredParagraphHeight, 88)
+
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Format Block")
+        XCTAssertEqual(store.document.blocks, [
+            BlockInputBlock(id: blockID, text: "``` swift")
+        ])
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(redo?.actionName, "Format Block")
+        XCTAssertEqual(store.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .code(language: "swift"))
+        ])
+    }
+
     func testReturnCommandContinuesListThroughDelegatePath() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let undoController = BlockInputUndoController()

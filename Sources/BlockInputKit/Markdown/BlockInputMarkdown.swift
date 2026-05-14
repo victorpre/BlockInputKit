@@ -54,12 +54,10 @@ enum BlockInputMarkdownImporter {
     }
 
     private static func codeFenceLanguage(in line: String) -> String?? {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard trimmed.hasPrefix("```") else {
+        guard let opening = BlockInputCodeParsing.codeFenceOpening(in: line) else {
             return nil
         }
-        let language = String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespaces)
-        return language.isEmpty ? .some(nil) : .some(language)
+        return .some(opening.language)
     }
 
     private static func parseCodeBlock(

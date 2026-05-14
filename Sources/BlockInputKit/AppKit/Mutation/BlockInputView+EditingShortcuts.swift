@@ -132,6 +132,11 @@ extension BlockInputBlock {
            NSMaxRange(clampedRange) == utf16Length {
             return BlockInputDocument(blocks: [self]).markdown
         }
+        if case .code = kind,
+           clampedRange.location == 0,
+           NSMaxRange(clampedRange) == utf16Length {
+            return BlockInputDocument(blocks: [self]).markdown
+        }
         return (text as NSString).substring(with: clampedRange)
     }
 
