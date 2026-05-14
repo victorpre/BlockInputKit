@@ -8,13 +8,15 @@ extension BlockInputBlockItem {
         let fullRange = NSRange(location: 0, length: textStorage.length)
         let inlineFont = Self.inlineCodeFont(for: Self.font(for: block.kind))
         let delimiterFont = Self.inlineCodeDelimiterFont(for: Self.font(for: block.kind))
+        let backgroundColor = Self.inlineCodeBackgroundColor
         for inlineCodeRange in BlockInputCodeParsing.inlineCodeRanges(in: textStorage.string) {
             let contentRange = NSIntersectionRange(inlineCodeRange.contentRange, fullRange)
             if contentRange.length > 0 {
                 textStorage.addAttributes(
                     [
                         .font: inlineFont,
-                        .foregroundColor: NSColor.labelColor
+                        .foregroundColor: NSColor.labelColor,
+                        .backgroundColor: backgroundColor
                     ],
                     range: contentRange
                 )
@@ -27,7 +29,8 @@ extension BlockInputBlockItem {
                 textStorage.addAttributes(
                     [
                         .font: delimiterFont,
-                        .foregroundColor: NSColor.clear
+                        .foregroundColor: NSColor.clear,
+                        .backgroundColor: backgroundColor
                     ],
                     range: clampedDelimiterRange
                 )
@@ -53,6 +56,10 @@ extension BlockInputBlockItem {
 
     static func inlineCodeFont(for font: NSFont) -> NSFont {
         .monospacedSystemFont(ofSize: font.pointSize * 0.94, weight: .regular)
+    }
+
+    static var inlineCodeBackgroundColor: NSColor {
+        NSColor.quaternaryLabelColor
     }
 
     private static func inlineCodeDelimiterFont(for font: NSFont) -> NSFont {

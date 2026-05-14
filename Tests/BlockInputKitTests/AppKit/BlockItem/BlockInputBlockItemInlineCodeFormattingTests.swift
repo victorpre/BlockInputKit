@@ -26,6 +26,12 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
 
             XCTAssertTrue(codeFont.fontDescriptor.symbolicTraits.contains(.monoSpace), "Expected inline code font for \(kind).")
             XCTAssertFalse(baseFont.fontDescriptor.symbolicTraits.contains(.monoSpace), "Expected base text font for \(kind).")
+            XCTAssertEqual(
+                textStorage.attribute(.backgroundColor, at: 5, effectiveRange: nil) as? NSColor,
+                BlockInputBlockItem.inlineCodeBackgroundColor,
+                "Expected inline code background for \(kind)."
+            )
+            XCTAssertNil(textStorage.attribute(.backgroundColor, at: 0, effectiveRange: nil))
         }
     }
 
@@ -43,6 +49,11 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 4, effectiveRange: nil) as? NSColor, .clear)
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 15, effectiveRange: nil) as? NSColor, .clear)
         XCTAssertNotEqual(textStorage.attribute(.foregroundColor, at: 5, effectiveRange: nil) as? NSColor, .clear)
+        XCTAssertEqual(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil) as? NSColor, BlockInputBlockItem.inlineCodeBackgroundColor)
+        XCTAssertEqual(
+            textStorage.attribute(.backgroundColor, at: 15, effectiveRange: nil) as? NSColor,
+            BlockInputBlockItem.inlineCodeBackgroundColor
+        )
     }
 
     @MainActor
@@ -55,6 +66,7 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
 
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 4, effectiveRange: nil) as? NSColor, .labelColor)
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil))
         XCTAssertFalse(try XCTUnwrap(textStorage.attribute(.font, at: 5, effectiveRange: nil) as? NSFont)
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
     }
@@ -74,6 +86,11 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .clear)
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 14, effectiveRange: nil) as? NSColor, .clear)
+        XCTAssertEqual(textStorage.attribute(.backgroundColor, at: 1, effectiveRange: nil) as? NSColor, BlockInputBlockItem.inlineCodeBackgroundColor)
+        XCTAssertEqual(
+            textStorage.attribute(.backgroundColor, at: 11, effectiveRange: nil) as? NSColor,
+            BlockInputBlockItem.inlineCodeBackgroundColor
+        )
     }
 
     @MainActor
@@ -86,6 +103,7 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
 
         XCTAssertNotEqual(textStorage.attribute(.foregroundColor, at: 12, effectiveRange: nil) as? NSColor, .clear)
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 12, effectiveRange: nil))
         XCTAssertTrue(try XCTUnwrap(textStorage.attribute(.font, at: 13, effectiveRange: nil) as? NSFont)
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
     }
@@ -107,6 +125,7 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
 
         let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 4, effectiveRange: nil) as? NSColor, .labelColor)
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil))
         XCTAssertFalse(try XCTUnwrap(textStorage.attribute(.font, at: 4, effectiveRange: nil) as? NSFont)
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
     }
@@ -123,10 +142,12 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         item.setSelectedRange(NSRange(location: 7, length: 0))
         XCTAssertTrue(try XCTUnwrap(textView.typingAttributes[.font] as? NSFont)
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
+        XCTAssertEqual(textView.typingAttributes[.backgroundColor] as? NSColor, BlockInputBlockItem.inlineCodeBackgroundColor)
 
         item.setSelectedRange(NSRange(location: 18, length: 0))
         XCTAssertFalse(try XCTUnwrap(textView.typingAttributes[.font] as? NSFont)
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
         XCTAssertNil(textView.typingAttributes[.foregroundColor] as? NSColor)
+        XCTAssertNil(textView.typingAttributes[.backgroundColor] as? NSColor)
     }
 }

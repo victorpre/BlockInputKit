@@ -221,6 +221,6 @@ private extension BlockInputDocument {
         BlockInputBlock(id: "check-open", kind: .checklistItem(isChecked: false), text: "Checklist data round-trips through Markdown"),
         BlockInputBlock(id: "check-done", kind: .checklistItem(isChecked: true), text: "Checked state renders without Markdown text"),
         BlockInputBlock(id: "rule", kind: .horizontalRule),
-        BlockInputBlock(id: "tail", kind: .paragraph, text: "Try mention query: @av")
+        BlockInputBlock(id: "tail", kind: .paragraph, text: "Try inline code: `@av`")
     ])
 }
