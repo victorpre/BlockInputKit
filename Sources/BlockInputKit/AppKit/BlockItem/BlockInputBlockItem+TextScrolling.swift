@@ -1,7 +1,6 @@
 import AppKit
 
 extension BlockInputBlockItem {
-    static let codeScrollViewportInset: CGFloat = 6
     static var codeHorizontalScrollerReserve: CGFloat {
         floor(NSScroller.scrollerWidth(for: .regular, scrollerStyle: .overlay) / 2)
     }

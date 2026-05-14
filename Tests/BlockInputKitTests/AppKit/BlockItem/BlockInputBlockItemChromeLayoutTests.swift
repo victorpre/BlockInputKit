@@ -146,26 +146,23 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
             block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Plain"),
             delegate: view
         )
-        let paragraphScrollView = try XCTUnwrap(paragraphItem.testingTextScrollView)
+        let paragraphTextMinX = try textContentMinX(in: paragraphItem)
         let codeItem = configuredItem(
             block: BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1\nprint(value)"),
             delegate: view
         )
         let codeSurface = codeItem.testingCodeBackgroundView
         let codeScrollView = try XCTUnwrap(codeItem.testingTextScrollView)
+        let codeTextMinX = try textContentMinX(in: codeItem)
 
         XCTAssertFalse(codeSurface.isHidden)
         XCTAssertEqual(
             codeSurface.frame.minX,
-            paragraphScrollView.frame.minX - BlockInputBlockItem.codeScrollViewportInset,
+            paragraphTextMinX,
             accuracy: 0.5
         )
-        XCTAssertEqual(
-            codeSurface.frame.maxX,
-            codeScrollView.frame.maxX + BlockInputBlockItem.codeScrollViewportInset,
-            accuracy: 0.5
-        )
-        XCTAssertEqual(codeScrollView.frame.minX, paragraphScrollView.frame.minX, accuracy: 0.5)
+        XCTAssertEqual(codeTextMinX - codeSurface.frame.minX, BlockInputBlockItem.codeTextHorizontalPadding, accuracy: 0.5)
+        XCTAssertGreaterThanOrEqual(codeSurface.frame.maxX, codeScrollView.frame.maxX)
         XCTAssertEqual(codeSurface.layer?.cornerRadius, 6)
         XCTAssertEqual(codeSurface.layer?.borderWidth, 1)
         XCTAssertNotNil(codeSurface.layer?.backgroundColor)

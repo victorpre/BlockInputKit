@@ -334,7 +334,7 @@ extension BlockInputBlockItem {
     private func standardTextSelectionLeadingX() -> CGFloat {
         handleView.frame.maxX
             + Self.defaultTextLeading
-            + textView.textContainerInset.width
+            + Self.standardTextContainerInset.width
     }
 
     private func textGlyphTrailingX() -> CGFloat {

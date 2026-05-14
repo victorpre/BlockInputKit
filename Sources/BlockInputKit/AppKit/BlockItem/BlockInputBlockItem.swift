@@ -24,6 +24,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let minimumQuoteBarHeight: CGFloat = 32
     static let quoteBarVerticalInset: CGFloat = 2
     static let quoteTextLeading: CGFloat = 9
+    static let codeTextHorizontalPadding: CGFloat = 6
 
     let handleView = BlockInputDragHandleView()
     let kindLabel = BlockInputMarkerView()

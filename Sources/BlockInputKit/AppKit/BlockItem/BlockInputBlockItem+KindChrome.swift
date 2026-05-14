@@ -7,7 +7,7 @@ extension BlockInputBlockItem {
         let contentIndent = Self.contentIndent(for: block)
         let perLineContentIndent = Self.perLineContentIndent(for: block)
         let verticalMetrics = Self.verticalMetrics(for: block)
-        textView.textContainerInset = verticalMetrics.textContainerInset
+        textView.textContainerInset = textContainerInset(for: kind, metrics: verticalMetrics)
         textView.isEditable = !isHorizontalRule
         textView.isSelectable = !isHorizontalRule
         configureTextScrolling(for: block)
@@ -84,6 +84,19 @@ extension BlockInputBlockItem {
             return Self.listTextLeading - perLineContentIndent
         }
         return Self.defaultTextLeading
+    }
+
+    func textContainerInset(
+        for kind: BlockInputBlockKind,
+        metrics: BlockInputBlockItemVerticalMetrics
+    ) -> NSSize {
+        guard case .code = kind else {
+            return metrics.textContainerInset
+        }
+        return NSSize(
+            width: metrics.textContainerInset.width + Self.codeTextHorizontalPadding,
+            height: metrics.textContainerInset.height
+        )
     }
 
     static func checklistButtonLeadingConstant(

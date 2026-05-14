@@ -170,10 +170,25 @@ final class BlockInputCodeBlockScrollRoutingTests: XCTestCase {
         scrollView.reflectScrolledClipView(scrollView.contentView)
         item.view.layoutSubtreeIfNeeded()
 
-        let viewport = item.visibleTextViewportInItemCoordinates
+        let textView = try XCTUnwrap(item.testingTextView)
+        let textContentMinX = textView.convert(
+            NSPoint(
+                x: scrollView.contentView.bounds.origin.x + textView.textContainerOrigin.x,
+                y: textView.textContainerOrigin.y
+            ),
+            to: item.view
+        ).x
+        let visibleTextMaxX = min(max(scrollView.contentView.bounds.maxX, 0), textView.frame.width)
+        let textContentMaxX = visibleTextMaxX
+            + scrollView.frame.minX
+            - scrollView.contentView.bounds.origin.x
         XCTAssertGreaterThanOrEqual(
-            viewport.minX - item.testingCodeBackgroundView.frame.minX,
-            BlockInputBlockItem.codeScrollViewportInset - 1
+            textContentMinX - item.testingCodeBackgroundView.frame.minX,
+            -1
+        )
+        XCTAssertLessThanOrEqual(
+            textContentMaxX,
+            item.testingCodeBackgroundView.frame.maxX + 1
         )
     }
 
