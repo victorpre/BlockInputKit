@@ -65,6 +65,18 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     }
 
     @MainActor
+    func testTextUsesDynamicLabelForegroundColor() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", text: "Plain"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .labelColor)
+    }
+
+    @MainActor
     func testQuoteUsesLeadingRuleInsteadOfMarkdownMarker() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "quote", kind: .quote, text: "Quoted"),

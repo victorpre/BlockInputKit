@@ -299,8 +299,11 @@ extension BlockInputBlockItem {
         }
         textStorage.beginEditing()
         textStorage.addAttribute(.font, value: font, range: fullRange)
+        textStorage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
+        textStorage.removeAttribute(.kern, range: fullRange)
         textStorage.removeAttribute(.paragraphStyle, range: fullRange)
         applyLineIndentationAttributes(for: block, textStorage: textStorage)
+        applyInlineCodeAttributes(for: block, textStorage: textStorage)
         textStorage.endEditing()
         textView.layoutManager?.invalidateLayout(forCharacterRange: fullRange, actualCharacterRange: nil)
         textView.needsDisplay = true
@@ -312,7 +315,19 @@ extension BlockInputBlockItem {
             return
         }
         var attributes = textView.typingAttributes
-        attributes[.font] = Self.font(for: block.kind)
+        let font = Self.font(for: block.kind)
+        attributes[.font] = font
+        attributes.removeValue(forKey: .foregroundColor)
+        attributes.removeValue(forKey: .kern)
+        let textLength = (textView.string as NSString).length
+        let selectedLocation = min(textView.selectedRange().location, max(textLength - 1, 0))
+        let insertionRange = NSRange(location: selectedLocation, length: max(textView.selectedRange().length, 1))
+        if inlineCodeContentRanges(for: block).contains(where: { range in
+            return NSIntersectionRange(range, insertionRange).length > 0
+        }) {
+            attributes[.font] = Self.inlineCodeFont(for: font)
+            attributes[.foregroundColor] = NSColor.labelColor
+        }
         if block.kind.supportsIndentation, !block.lineIndentationLevels.isEmpty {
             let lineIndex = block.lineIndex(containingUTF16Offset: textView.selectedRange().location)
             let paragraphStyle = Self.paragraphStyle(
