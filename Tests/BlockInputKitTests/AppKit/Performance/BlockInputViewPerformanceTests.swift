@@ -222,7 +222,7 @@ final class BlockInputViewPerformanceTests: XCTestCase {
 
     func testStoreBackedIndentInvalidatesLayoutWhenWrappingHeightChanges() throws {
         let blockID = BlockInputBlockID(rawValue: "second")
-        let text = "This is a long list item that should wrap after indentation reduces the available text width."
+        let text = "This is a long list item that should wrap after indentation reduces the available text width more more"
         let block = BlockInputBlock(id: blockID, kind: .bulletedListItem, text: text)
         let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
             BlockInputBlock(id: "first", text: "First"),

@@ -21,6 +21,8 @@ final class BlockInputTextView: NSTextView {
     // Native modified-click and multi-click gestures can re-enter mouseDragged/mouseUp during AppKit tracking. Keep that
     // separate from the custom plain-drag state so native selection restoration cannot be consumed as a block drag.
     var isUsingNativeMouseSelection = false
+    private var isForwardingVerticalScrollSequence = false
+    private var verticalScrollSequenceToken = UUID()
 
     override func mouseDown(with event: NSEvent) {
         _ = requestMouseDownCancelSelectionFromOwningBlock()
@@ -76,6 +78,36 @@ final class BlockInputTextView: NSTextView {
             return
         }
         super.mouseUp(with: event)
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        if shouldBreakVerticalSequenceForHorizontalScroll(event),
+           forwardHorizontalScroll(event) {
+            isForwardingVerticalScrollSequence = false
+            verticalScrollSequenceToken = UUID()
+            return
+        }
+        if isForwardingVerticalScrollSequence,
+           let verticalAncestorScrollView {
+            verticalAncestorScrollView.scrollWheel(with: event)
+            schedulePhaseLessVerticalScrollSequenceResetIfNeeded(for: event)
+            updateVerticalScrollSequenceState(after: event)
+            return
+        }
+        if shouldForwardHorizontalScroll(event),
+           forwardHorizontalScroll(event) {
+            return
+        }
+        if shouldForwardVerticalScroll(event),
+           let verticalAncestorScrollView {
+            isForwardingVerticalScrollSequence = true
+            schedulePhaseLessVerticalScrollSequenceResetIfNeeded(for: event)
+            verticalAncestorScrollView.scrollWheel(with: event)
+            updateVerticalScrollSequenceState(after: event)
+            return
+        }
+        updateVerticalScrollSequenceState(after: event)
+        super.scrollWheel(with: event)
     }
 
     override func keyDown(with event: NSEvent) {
@@ -340,6 +372,75 @@ final class BlockInputTextView: NSTextView {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(copiedText, forType: .string)
         return true
+    }
+
+    private func shouldForwardVerticalScroll(_ event: NSEvent) -> Bool {
+        guard !event.modifierFlags.contains(.shift) else {
+            return false
+        }
+        let deltaY = abs(verticalScrollDelta(for: event))
+        return deltaY > 0 && deltaY >= abs(horizontalRawScrollDelta(for: event))
+    }
+
+    private func shouldForwardHorizontalScroll(_ event: NSEvent) -> Bool {
+        abs(horizontalRawScrollDelta(for: event)) > abs(verticalScrollDelta(for: event)) ||
+            shouldBreakVerticalSequenceForHorizontalScroll(event)
+    }
+
+    private func forwardHorizontalScroll(_ event: NSEvent) -> Bool {
+        guard let horizontalScrollView = enclosingScrollView,
+              horizontalScrollView.hasHorizontalScroller else {
+            return false
+        }
+        horizontalScrollView.scrollWheel(with: event)
+        return true
+    }
+
+    private func shouldBreakVerticalSequenceForHorizontalScroll(_ event: NSEvent) -> Bool {
+        event.modifierFlags.contains(.shift) &&
+            (abs(verticalScrollDelta(for: event)) > 0 || abs(horizontalRawScrollDelta(for: event)) > 0)
+    }
+
+    private func horizontalRawScrollDelta(for event: NSEvent) -> CGFloat {
+        event.scrollingDeltaX != 0 ? event.scrollingDeltaX : event.deltaX
+    }
+
+    private func verticalScrollDelta(for event: NSEvent) -> CGFloat {
+        event.scrollingDeltaY != 0 ? event.scrollingDeltaY : event.deltaY
+    }
+
+    private func updateVerticalScrollSequenceState(after event: NSEvent) {
+        if event.phase.contains(.ended) || event.phase.contains(.cancelled) ||
+            event.momentumPhase.contains(.ended) || event.momentumPhase.contains(.cancelled) {
+            isForwardingVerticalScrollSequence = false
+            verticalScrollSequenceToken = UUID()
+        }
+    }
+
+    private func schedulePhaseLessVerticalScrollSequenceResetIfNeeded(for event: NSEvent) {
+        guard event.phase == [], event.momentumPhase == [] else {
+            return
+        }
+        let token = UUID()
+        verticalScrollSequenceToken = token
+        DispatchQueue.main.async { [weak self] in
+            guard self?.verticalScrollSequenceToken == token else {
+                return
+            }
+            self?.isForwardingVerticalScrollSequence = false
+        }
+    }
+
+    private var verticalAncestorScrollView: NSScrollView? {
+        var candidate = superview
+        while let view = candidate {
+            if let scrollView = view as? NSScrollView,
+               scrollView.hasVerticalScroller {
+                return scrollView
+            }
+            candidate = view.superview
+        }
+        return nil
     }
 }
 

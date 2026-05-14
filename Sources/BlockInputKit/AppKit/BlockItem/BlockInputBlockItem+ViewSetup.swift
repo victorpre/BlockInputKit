@@ -67,6 +67,7 @@ extension BlockInputBlockItem {
         textView.selectedTextAttributes = BlockInputBlockSelectionChrome.nativeSelectedTextAttributes
         textView.isRichText = true
         textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.allowsUndo = false
         textView.font = .preferredFont(forTextStyle: .body)
         textView.delegate = self

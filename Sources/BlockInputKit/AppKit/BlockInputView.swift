@@ -16,7 +16,7 @@ public final class BlockInputView: NSView {
     /// Color used for the drag insertion indicator line.
     public internal(set) var dropIndicatorColor = NSColor.controlAccentColor
 
-    private let scrollView = NSScrollView()
+    private let scrollView = BlockInputDocumentScrollView()
     let collectionView = BlockInputCollectionView()
     let dropIndicatorView = NSView()
     private let layout = BlockInputCollectionViewFlowLayout()
@@ -445,6 +445,7 @@ public final class BlockInputView: NSView {
         collectionView.addSubview(dropIndicatorView, positioned: .above, relativeTo: nil)
 
         scrollView.borderType = .noBorder
+        scrollView.hasHorizontalScroller = false
         scrollView.hasVerticalScroller = true
         scrollView.drawsBackground = true
         scrollView.backgroundColor = .textBackgroundColor

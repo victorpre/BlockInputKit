@@ -29,7 +29,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     let kindLabel = BlockInputMarkerView()
     let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     let quoteBarView = NSView()
-    let scrollView = NSScrollView()
+    let scrollView = BlockInputBlockItemScrollView()
     let codeBackgroundView = NSView()
     let horizontalRuleView = BlockInputHorizontalRuleView()
     let selectionBackgroundView = BlockInputSelectionBackgroundView()
@@ -158,6 +158,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         selectionBeforeTextChange = nil
         isHorizontalRule = block.kind == .horizontalRule
         handleView.blockItem = self
+        scrollView.blockItem = self
         horizontalRuleView.blockItem = self
         horizontalRuleView.accentColor = accentColor
         textView.blockItem = self
@@ -185,17 +186,20 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             location: min(max(offset, 0), (textView.string as NSString).length),
             length: 0
         ))
+        textView.scrollRangeToVisible(textView.selectedRange())
         updateTypingAttributesForCurrentSelection()
     }
 
     func focusText(inUTF16Range range: NSRange) {
         view.window?.makeFirstResponder(textView)
         textView.setSelectedRange(range)
+        textView.scrollRangeToVisible(range)
         updateTypingAttributesForCurrentSelection()
     }
 
     func setSelectedRange(_ range: NSRange) {
         textView.setSelectedRange(range)
+        textView.scrollRangeToVisible(range)
         updateTypingAttributesForCurrentSelection()
     }
 
@@ -444,6 +448,7 @@ extension BlockInputBlockItem {
         isHorizontalRule = false
         setBlockSelection(false)
         handleView.blockItem = nil
+        scrollView.blockItem = nil
         horizontalRuleView.blockItem = nil
         horizontalRuleView.resetForReuse()
         renderedCodeColorScheme = nil
@@ -453,6 +458,7 @@ extension BlockInputBlockItem {
         textView.string = ""
         textView.isEditable = true
         textView.textContainerInset = Self.standardTextContainerInset
+        configureWrappingTextScrolling()
         scrollView.isHidden = false
         codeBackgroundView.isHidden = true
         codeBackgroundView.alphaValue = 0

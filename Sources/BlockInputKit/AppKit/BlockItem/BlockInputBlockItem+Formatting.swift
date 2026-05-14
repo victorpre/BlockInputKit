@@ -9,6 +9,20 @@ extension BlockInputBlockItem {
         )
         let font = font(for: block.kind)
         let metrics = verticalMetrics(for: block)
+        if case .code = block.kind {
+            let codeWidth = max(unwrappedTextWidth(for: text, font: font), availableTextWidth)
+            let horizontalScrollerReserve = codeWidth > availableTextWidth
+                ? codeHorizontalScrollerReserve
+                : 0
+            return max(
+                metrics.minimumHeight,
+                textKitHeight(for: text, width: codeWidth, font: font)
+                    + metrics.topContentInset
+                    + metrics.bottomContentInset
+                    + horizontalScrollerReserve
+                    + 2
+            )
+        }
         if isShortSingleLine(text, likelyFitting: availableTextWidth, font: font) {
             return max(
                 metrics.minimumHeight,
@@ -60,6 +74,15 @@ extension BlockInputBlockItem {
         layoutManager.ensureLayout(for: textContainer)
         let usedRect = layoutManager.usedRect(for: textContainer)
         return ceil(max(usedRect.maxY, singleLineTextHeight(font: font)))
+    }
+
+    private static func unwrappedTextWidth(for text: String, font: NSFont) -> CGFloat {
+        text.components(separatedBy: .newlines)
+            .map { line in
+                let measuredLine = line.isEmpty ? " " : line
+                return ceil((measuredLine as NSString).size(withAttributes: [.font: font]).width)
+            }
+            .max() ?? 120
     }
 
     static func verticalMetrics(for block: BlockInputBlock) -> BlockInputBlockItemVerticalMetrics {
@@ -429,29 +452,6 @@ extension BlockInputBlockItem {
         let bottomInset = max(Self.quoteBarVerticalInset, quoteBarMinY - view.bounds.minY)
         quoteBarTopConstraint?.constant = topInset
         quoteBarBottomConstraint?.constant = -bottomInset
-    }
-
-    func updateTextViewDocumentFrame() {
-        let contentBounds = scrollView.contentView.bounds
-        guard contentBounds.width > 0, contentBounds.height > 0 else {
-            return
-        }
-        let fittingHeight = textView.layoutManager.flatMap { layoutManager -> CGFloat? in
-            guard let textContainer = textView.textContainer else {
-                return nil
-            }
-            layoutManager.ensureLayout(for: textContainer)
-            return ceil(layoutManager.usedRect(for: textContainer).maxY + textView.textContainerInset.height * 2)
-        } ?? contentBounds.height
-        let targetSize = NSSize(
-            width: contentBounds.width,
-            height: max(contentBounds.height, fittingHeight)
-        )
-        if abs(textView.frame.width - targetSize.width) > 0.5 ||
-            abs(textView.frame.height - targetSize.height) > 0.5 {
-            textView.frame = NSRect(origin: .zero, size: targetSize)
-        }
-        scrollView.contentView.scroll(to: .zero)
     }
 
     private func markerAlignmentRect(

@@ -10,6 +10,7 @@ extension BlockInputBlockItem {
         textView.textContainerInset = verticalMetrics.textContainerInset
         textView.isEditable = !isHorizontalRule
         textView.isSelectable = !isHorizontalRule
+        configureTextScrolling(for: block)
         applyTextAttributes(for: block)
         scrollView.isHidden = isHorizontalRule
         configureCodeBackground(for: block)

@@ -47,12 +47,11 @@ extension BlockInputBlockItem {
             return
         }
         let verticalInset: CGFloat = 2
-        let leadingInset: CGFloat = 0
-        let trailingInset: CGFloat = 0
+        let horizontalInset = Self.codeScrollViewportInset
         codeBackgroundView.frame = NSRect(
-            x: scrollView.frame.minX - leadingInset,
+            x: scrollView.frame.minX - horizontalInset,
             y: max(0, scrollView.frame.minY + verticalInset),
-            width: max(0, scrollView.frame.width + leadingInset + trailingInset),
+            width: max(0, scrollView.frame.width + horizontalInset * 2),
             height: max(0, scrollView.frame.height - verticalInset * 2)
         ).integral
     }

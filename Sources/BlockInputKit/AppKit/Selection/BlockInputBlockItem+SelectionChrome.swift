@@ -211,12 +211,17 @@ extension BlockInputBlockItem {
             width: max(line.lineRect.width, 1),
             height: max(line.lineRect.height, 1)
         ), to: view)
-        return NSRect(
+        let frame = NSRect(
             x: minX,
             y: max(0, lineViewRect.minY),
             width: max(maxX - minX, 1),
             height: max(lineViewRect.height, 1)
         )
+        guard case .code = renderedBlock?.kind else {
+            return frame
+        }
+        let clippedFrame = frame.intersection(visibleTextViewportInItemCoordinates)
+        return clippedFrame.isNull || clippedFrame.isEmpty ? nil : clippedFrame
     }
 
     private func singleLinePartialBackgroundFrame(for bounds: NSRect) -> NSRect {

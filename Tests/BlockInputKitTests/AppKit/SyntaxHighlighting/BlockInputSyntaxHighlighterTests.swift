@@ -57,6 +57,19 @@ final class BlockInputSyntaxHighlighterTests: XCTestCase {
         XCTAssertNotEqual(keywordColor, baseColor)
     }
 
+    func testSmartQuotedSwiftStringKeepsStringColor() throws {
+        let source = "println(\u{201C}test\u{201D})"
+        let highlighted = BlockInputSyntaxHighlighter.highlighted(
+            source,
+            language: "swift",
+            colorScheme: .light
+        )
+
+        let stringColor = try XCTUnwrap(color(at: ("println(" as NSString).length, in: highlighted))
+        let baseColor = try XCTUnwrap(color(at: 0, in: highlighted))
+        XCTAssertNotEqual(stringColor, baseColor)
+    }
+
     func testLargeInputFallsBackToPlainCode() {
         let source = String(repeating: "let value = 42\n", count: 20_000)
         XCTAssertGreaterThan((source as NSString).length, BlockInputSyntaxHighlighter.maximumHighlightedUTF16Length)

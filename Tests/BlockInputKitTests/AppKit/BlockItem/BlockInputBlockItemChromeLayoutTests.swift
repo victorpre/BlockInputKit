@@ -155,7 +155,16 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
         let codeScrollView = try XCTUnwrap(codeItem.testingTextScrollView)
 
         XCTAssertFalse(codeSurface.isHidden)
-        XCTAssertEqual(codeSurface.frame.minX, paragraphScrollView.frame.minX, accuracy: 0.5)
+        XCTAssertEqual(
+            codeSurface.frame.minX,
+            paragraphScrollView.frame.minX - BlockInputBlockItem.codeScrollViewportInset,
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            codeSurface.frame.maxX,
+            codeScrollView.frame.maxX + BlockInputBlockItem.codeScrollViewportInset,
+            accuracy: 0.5
+        )
         XCTAssertEqual(codeScrollView.frame.minX, paragraphScrollView.frame.minX, accuracy: 0.5)
         XCTAssertEqual(codeSurface.layer?.cornerRadius, 6)
         XCTAssertEqual(codeSurface.layer?.borderWidth, 1)

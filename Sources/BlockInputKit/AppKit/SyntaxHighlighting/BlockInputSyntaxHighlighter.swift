@@ -206,11 +206,17 @@ private extension BlockInputSyntaxHighlighter {
 }
 
 private extension BlockInputSyntaxHighlighter {
+    static let asciiDoubleString = #""([^"\\]|\\.)*""#
+    static let asciiSingleString = #"'([^'\\]|\\.)*'"#
+    static let smartDoubleString = smartQuotedString(open: "\u{201C}", close: "\u{201D}")
+    static let smartSingleString = smartQuotedString(open: "\u{2018}", close: "\u{2019}")
     static let stringDoubleSingle = [
-        #""([^"\\]|\\.)*""#,
-        #"'([^'\\]|\\.)*'"#
+        asciiDoubleString,
+        smartDoubleString,
+        asciiSingleString,
+        smartSingleString
     ]
-    static let stringDoubleOnly = [#""([^"\\]|\\.)*""#]
+    static let stringDoubleOnly = [asciiDoubleString, smartDoubleString]
     static let cLikeComments = [#"//.*$"#, #"/\*[\s\S]*?\*/"#]
     static let cLikeStrings = stringDoubleSingle + [#"'([^'\\]|\\.)'"#]
 
@@ -456,6 +462,12 @@ private extension BlockInputSyntaxHighlighter {
             ],
             symbolPatterns: [#"[<>/=]"#]
         )
+    }
+
+    static func smartQuotedString(open: String, close: String) -> String {
+        NSRegularExpression.escapedPattern(for: open)
+            + #"[\s\S]*?"#
+            + NSRegularExpression.escapedPattern(for: close)
     }
 }
 

@@ -53,7 +53,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     }
 
     @MainActor
-    func testTextViewDisablesAutomaticDashSubstitution() throws {
+    func testTextViewDisablesAutomaticDashAndQuoteSubstitution() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "paragraph", text: ""),
             allowsReordering: true,
@@ -62,6 +62,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
 
         let textView = try XCTUnwrap(item.testingTextView)
         XCTAssertFalse(textView.isAutomaticDashSubstitutionEnabled)
+        XCTAssertFalse(textView.isAutomaticQuoteSubstitutionEnabled)
     }
 
     @MainActor
