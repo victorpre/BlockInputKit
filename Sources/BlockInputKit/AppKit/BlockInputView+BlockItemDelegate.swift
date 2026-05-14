@@ -124,7 +124,14 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         )
         let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: textWidth)
         let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: textWidth)
+        let isStaleCodeBlockHeight: Bool
+        if case .code = afterBlock.kind {
+            isStaleCodeBlockHeight = abs(item.view.frame.height - afterHeight) > 0.5
+        } else {
+            isStaleCodeBlockHeight = false
+        }
         return abs(beforeHeight - afterHeight) > 0.5
+            || isStaleCodeBlockHeight
     }
 
     func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID) {

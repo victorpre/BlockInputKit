@@ -183,9 +183,13 @@ extension BlockInputView {
     }
 
     @discardableResult
-    func reconfigureVisibleReplacement(_ block: BlockInputBlock, at index: Int) -> Bool {
+    func reconfigureVisibleReplacement(
+        _ block: BlockInputBlock,
+        at index: Int,
+        requiresDeferredLayout: Bool = true
+    ) -> Bool {
         let indexPath = IndexPath(item: index, section: 0)
-        guard shouldDeferGranularCountLayout,
+        guard !requiresDeferredLayout || shouldDeferGranularCountLayout,
               let item = collectionView.item(at: indexPath) as? BlockInputBlockItem else {
             return false
         }
@@ -356,7 +360,7 @@ extension BlockInputView {
         _ = replaceCachedBlock(block, at: index)
         applySelection(validUndoSelection(selection), notify: true)
         itemHeightCache.invalidate(blockID: block.id)
-        if reconfigureVisibleReplacement(block, at: index) {
+        if reconfigureVisibleReplacement(block, at: index, requiresDeferredLayout: false) {
             publishDocumentChange()
             return true
         }
