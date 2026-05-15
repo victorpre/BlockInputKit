@@ -37,6 +37,11 @@ public enum BlockInputBlockKind: Equatable, Codable, Sendable {
     case numberedListItem(start: Int)
     /// Checklist item with checked state stored in the block kind.
     case checklistItem(isChecked: Bool)
+    /// Unsupported block-level Markdown source that should round-trip verbatim.
+    ///
+    /// The block's `text` stores the original Markdown source for this block.
+    /// Raw Markdown blocks are editable as source text and exported unchanged.
+    case rawMarkdown
 }
 
 /// Structured document unit edited by its own AppKit text input.
@@ -49,8 +54,9 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
             normalizeForKind()
         }
     }
-    /// Plain text content owned by editable block kinds.
+    /// Text content owned by editable block kinds.
     ///
+    /// For ``BlockInputBlockKind/rawMarkdown``, this stores the original Markdown source.
     /// Non-text blocks such as horizontal rules normalize this value to an empty string.
     public var text: String {
         didSet {
@@ -296,11 +302,11 @@ extension BlockInputBlock {
         guard selectedUTF16Length == 0 else {
             return false
         }
-        return emptyInlineLineRemovalRangeForReturn(utf16Offset: utf16Offset) != nil
+        return kind.exitsInlineBlockOnEmptyReturn && emptyInlineLineRemovalRangeForReturn(utf16Offset: utf16Offset) != nil
     }
 
     func emptyInlineLineRemovalRangeForReturn(utf16Offset: Int) -> NSRange? {
-        guard kind.acceptsInlineReturn, !isEmpty else {
+        guard kind.exitsInlineBlockOnEmptyReturn, !isEmpty else {
             return nil
         }
         let textStorage = text as NSString
@@ -340,14 +346,14 @@ extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .quote:
+        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
             return false
         }
     }
 
     var canUnwrapToParagraph: Bool {
         switch self {
-        case .paragraph, .code:
+        case .paragraph, .code, .rawMarkdown:
             return false
         case .heading, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
@@ -358,16 +364,25 @@ extension BlockInputBlockKind {
         switch self {
         case .heading, .code, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .horizontalRule:
+        case .paragraph, .horizontalRule, .rawMarkdown:
             return false
         }
     }
 
     var acceptsInlineReturn: Bool {
         switch self {
-        case .code, .quote:
+        case .code, .quote, .rawMarkdown:
             return true
         case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem:
+            return false
+        }
+    }
+
+    var exitsInlineBlockOnEmptyReturn: Bool {
+        switch self {
+        case .code, .quote:
+            return true
+        case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem, .rawMarkdown:
             return false
         }
     }
@@ -376,7 +391,7 @@ extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .quote:
+        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
             return false
         }
     }

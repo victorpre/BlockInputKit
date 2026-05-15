@@ -113,7 +113,7 @@ private extension BlockInputDocument {
             return .numberedListItem(start: start + 1)
         case .checklistItem:
             return .checklistItem(isChecked: false)
-        case .paragraph, .heading, .code, .horizontalRule, .quote:
+        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
             return kind
         }
     }

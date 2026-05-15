@@ -93,14 +93,14 @@ extension BlockInputBlockItem {
             return .checklist
         case .paragraph, .quote:
             return .textBlock
-        case .heading, .code, .horizontalRule:
+        case .heading, .code, .horizontalRule, .rawMarkdown:
             return .standard
         }
     }
 
     static func prefix(for kind: BlockInputBlockKind, indentationLevel: Int) -> String {
         switch kind {
-        case .paragraph, .heading, .code, .horizontalRule, .quote:
+        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
             return ""
         case .bulletedListItem:
             return unorderedListMarker(indentationLevel: indentationLevel)
@@ -117,7 +117,7 @@ extension BlockInputBlockItem {
             let clampedLevel = min(max(level, 1), 6)
             let sizes: [CGFloat] = [26, 23, 20, 18, 16, 15]
             return .systemFont(ofSize: sizes[clampedLevel - 1], weight: .semibold)
-        case .code:
+        case .code, .rawMarkdown:
             return .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         case .paragraph, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return .preferredFont(forTextStyle: .body)
@@ -482,7 +482,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .quote, .bulletedListItem, .numberedListItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .checklistItem:
+        case .paragraph, .heading, .code, .horizontalRule, .checklistItem, .rawMarkdown:
             return false
         }
     }

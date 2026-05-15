@@ -26,6 +26,31 @@ final class BlockInputTextCommandTabTests: XCTestCase {
     }
 
     @MainActor
+    func testTabCommandsDoNotIndentRawMarkdownThroughDelegatePath() throws {
+        let blockID = BlockInputBlockID(rawValue: "raw")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .rawMarkdown, text: "| A |\n| - |")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
+        textView.doCommand(by: #selector(NSResponder.insertBacktab(_:)))
+
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .rawMarkdown, text: "| A |\n| - |")
+        ])
+        XCTAssertEqual(textView.string, "| A |\n| - |")
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 0, length: 0))
+    }
+
+    @MainActor
     func testDefaultConfigurationUndoAndRedoAppliesTabIndent() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(

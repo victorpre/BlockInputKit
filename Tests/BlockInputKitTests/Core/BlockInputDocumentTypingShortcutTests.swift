@@ -21,6 +21,21 @@ final class BlockInputDocumentTypingShortcutTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6)))
     }
 
+    func testTypingShortcutIgnoresRawMarkdownBlocks() {
+        let blockID = BlockInputBlockID(rawValue: "raw")
+        let document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .rawMarkdown, text: "")
+        ])
+
+        let shortcut = document.typingShortcut(
+            for: blockID,
+            proposedText: "- [ ] Todo",
+            proposedUTF16Offset: 10
+        )
+
+        XCTAssertNil(shortcut)
+    }
+
     func testTypingShortcutTurnsParagraphMarkerIntoChecklistItem() {
         let blockID = BlockInputBlockID(rawValue: "check")
         var document = BlockInputDocument(blocks: [

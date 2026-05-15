@@ -55,7 +55,7 @@ extension BlockInputBlockItem {
         switch block.kind {
         case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return Self.markerAlignmentLeading + contentIndent
-        case .paragraph, .heading, .code, .horizontalRule:
+        case .paragraph, .heading, .code, .horizontalRule, .rawMarkdown:
             return contentIndent
         }
     }
@@ -141,7 +141,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule:
+        case .paragraph, .heading, .code, .horizontalRule, .rawMarkdown:
             return false
         }
     }

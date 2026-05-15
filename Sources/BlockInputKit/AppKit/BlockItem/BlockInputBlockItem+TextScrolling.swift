@@ -9,7 +9,7 @@ extension BlockInputBlockItem {
         switch block.kind {
         case .code:
             configureCodeTextScrolling()
-        case .paragraph, .heading, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+        case .paragraph, .heading, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem, .rawMarkdown:
             configureWrappingTextScrolling()
         }
     }

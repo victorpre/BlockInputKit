@@ -87,6 +87,7 @@ The demo app includes:
 
 - `BlockInputDocument` is the structured document model and Markdown source of truth.
 - `BlockInputBlock` models a stable block ID, kind, text, and indentation level.
+- `BlockInputBlockKind.rawMarkdown` preserves unsupported block-level Markdown verbatim in `BlockInputBlock.text`.
 - `BlockInputView` is the primary AppKit editor surface.
 - `BlockInputEditor` wraps `BlockInputView` for SwiftUI hosts and can bridge focus with `Binding<Bool>`.
 - `BlockInputDocumentStore` lets hosts provide indexed block reads plus granular block mutations.
@@ -115,6 +116,8 @@ The demo app includes:
 - Drag insertion and selected horizontal-rule colors default to the system accent color and can be customized with `dropIndicatorColor`.
 - Clicking a horizontal rule selects the rule; Backspace/Delete removes the selected rule block.
 - Markdown import/export supports paragraph, heading, horizontal rule, code, quote, bulleted list, numbered list, and checklist blocks.
+- Unsupported block-level Markdown such as front matter, tables, raw HTML blocks, setext headings, and footnote definitions imports as editable `rawMarkdown` blocks and exports the raw block text verbatim.
+- Rendered `rawMarkdown` blocks use editable wrapping monospaced source text without code-block chrome, Markdown typing shortcuts, or list indentation behavior.
 - File URL insertion helpers and built-in file drops create Markdown link blocks.
 
 ## Performance Expectations

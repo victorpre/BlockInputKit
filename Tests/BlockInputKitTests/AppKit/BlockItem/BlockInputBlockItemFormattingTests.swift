@@ -9,6 +9,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .code(language: nil), indentationLevel: 1), "")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .horizontalRule, indentationLevel: 0), "")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .quote, indentationLevel: 2), "")
+        XCTAssertEqual(BlockInputBlockItem.prefix(for: .rawMarkdown, indentationLevel: 0), "")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 0), "•")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 1), "◦")
         XCTAssertEqual(BlockInputBlockItem.prefix(for: .bulletedListItem, indentationLevel: 2), "▪")

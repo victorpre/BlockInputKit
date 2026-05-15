@@ -70,6 +70,20 @@ final class BlockInputDocumentReturnTests: XCTestCase {
         XCTAssertEqual(document.blocks[0].text, "``` swift")
     }
 
+    func testReturnInRawMarkdownEmptyLineInsertsLineEndingWithoutExitingBlock() {
+        let blockID = BlockInputBlockID(rawValue: "raw")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .rawMarkdown, text: "Before\n\nAfter")
+        ])
+
+        let selection = document.handleReturn(in: blockID, utf16Offset: 7)
+
+        XCTAssertEqual(document.blocks.count, 1)
+        XCTAssertEqual(document.blocks[0].kind, .rawMarkdown)
+        XCTAssertEqual(document.blocks[0].text, "Before\n\n\nAfter")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 8)))
+    }
+
     func testReturnInListItemContinuesListKindAndIndentation() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         var document = BlockInputDocument(blocks: [

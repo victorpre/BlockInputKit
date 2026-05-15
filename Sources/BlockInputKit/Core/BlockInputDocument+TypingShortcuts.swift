@@ -261,7 +261,7 @@ extension BlockInputBlockKind {
             return "\(start)."
         case .checklistItem(let isChecked):
             return isChecked ? "- [x]" : "- [ ]"
-        case .paragraph, .code:
+        case .paragraph, .code, .rawMarkdown:
             return nil
         }
     }

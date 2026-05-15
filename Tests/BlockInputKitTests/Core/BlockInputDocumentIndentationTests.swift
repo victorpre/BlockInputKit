@@ -163,4 +163,20 @@ final class BlockInputDocumentIndentationTests: XCTestCase {
         XCTAssertNil(selection)
         XCTAssertEqual(document.blocks[0].indentationLevel, 0)
     }
+
+    func testIndentAndOutdentIgnoreRawMarkdownBlocks() {
+        let blockID = BlockInputBlockID(rawValue: "raw")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .rawMarkdown, text: "| A |\n| - |")
+        ])
+
+        let indentSelection = document.indentBlock(blockID: blockID, activeUTF16Offset: 0)
+        let outdentSelection = document.outdentBlock(blockID: blockID, activeUTF16Offset: 0)
+
+        XCTAssertNil(indentSelection)
+        XCTAssertNil(outdentSelection)
+        XCTAssertEqual(document.blocks[0].kind, .rawMarkdown)
+        XCTAssertEqual(document.blocks[0].indentationLevel, 0)
+        XCTAssertEqual(document.blocks[0].lineIndentationLevels, [])
+    }
 }

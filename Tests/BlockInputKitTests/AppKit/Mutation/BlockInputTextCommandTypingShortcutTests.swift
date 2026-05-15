@@ -99,6 +99,29 @@ final class BlockInputTextCommandTypingShortcutTests: XCTestCase {
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
+    func testTypingShortcutIgnoresRawMarkdownThroughDelegatePath() throws {
+        let blockID = BlockInputBlockID(rawValue: "raw")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .rawMarkdown, text: "")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.string = "- [ ] Todo"
+        textView.setSelectedRange(NSRange(location: 10, length: 0))
+
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        XCTAssertEqual(view.document.blocks[0].kind, .rawMarkdown)
+        XCTAssertEqual(view.document.blocks[0].text, "- [ ] Todo")
+        XCTAssertEqual(textView.string, "- [ ] Todo")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 10)))
+    }
+
     func testTypingShortcutUpgradesBulletIntoChecklistThroughDelegatePath() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let view = BlockInputView()

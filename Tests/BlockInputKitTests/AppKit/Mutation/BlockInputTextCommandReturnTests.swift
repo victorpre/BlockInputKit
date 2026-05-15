@@ -80,6 +80,26 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
         ])
     }
 
+    func testReturnCommandInRawMarkdownEmptyLineStaysInlineThroughDelegatePath() throws {
+        let blockID = BlockInputBlockID(rawValue: "raw")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .rawMarkdown, text: "Before\n\nAfter")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 7, length: 0))
+
+        XCTAssertFalse(view.blockItemDidRequestReturn(item, blockID: blockID))
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .rawMarkdown, text: "Before\n\nAfter")
+        ])
+    }
+
     func testReturnCommandContinuesListThroughDelegatePath() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let undoController = BlockInputUndoController()

@@ -7,50 +7,48 @@ enum BlockInputMarkdownImporter {
         var index = 0
 
         while index < lines.count {
-            let line = lines[index]
-            if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            guard let parsed = parseNextBlock(lines: lines, startIndex: index) else {
                 index += 1
                 continue
             }
-
-            if let language = codeFenceLanguage(in: line) {
-                let parsed = parseCodeBlock(lines: lines, startIndex: index, language: language)
-                blocks.append(parsed.block)
-                index = parsed.nextIndex
-                continue
-            }
-
-            if line.trimmingCharacters(in: .whitespaces) == "---" {
-                blocks.append(BlockInputBlock(kind: .horizontalRule))
-                index += 1
-                continue
-            }
-
-            if let heading = parseHeading(line) {
-                blocks.append(heading)
-                index += 1
-                continue
-            }
-
-            if line.hasPrefix(">") {
-                let parsed = parseQuote(lines: lines, startIndex: index)
-                blocks.append(parsed.block)
-                index = parsed.nextIndex
-                continue
-            }
-
-            if let parsed = parseListLine(lines[index]) {
-                blocks.append(parsed)
-                index += 1
-                continue
-            }
-
-            let parsed = parseParagraph(lines: lines, startIndex: index)
             blocks.append(parsed.block)
             index = parsed.nextIndex
         }
 
         return BlockInputDocument(blocks: blocks)
+    }
+
+    private static func parseNextBlock(
+        lines: [String],
+        startIndex: Int
+    ) -> (block: BlockInputBlock, nextIndex: Int)? {
+        let line = lines[startIndex]
+        guard !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        if let language = codeFenceLanguage(in: line) {
+            return parseCodeBlock(lines: lines, startIndex: startIndex, language: language)
+        }
+        if isFrontMatterOpening(line, index: startIndex),
+           let parsed = parseFrontMatter(lines: lines, startIndex: startIndex) {
+            return parsed
+        }
+        if let parsed = parseUnsupportedBlock(lines: lines, startIndex: startIndex) {
+            return parsed
+        }
+        if line.trimmingCharacters(in: .whitespaces) == "---" {
+            return (BlockInputBlock(kind: .horizontalRule), startIndex + 1)
+        }
+        if let heading = parseHeading(line) {
+            return (heading, startIndex + 1)
+        }
+        if line.hasPrefix(">") {
+            return parseQuote(lines: lines, startIndex: startIndex)
+        }
+        if let parsed = parseListLine(lines[startIndex]) {
+            return (parsed, startIndex + 1)
+        }
+        return parseParagraph(lines: lines, startIndex: startIndex)
     }
 
     private static func codeFenceLanguage(in line: String) -> String?? {
@@ -87,13 +85,103 @@ enum BlockInputMarkdownImporter {
         return (BlockInputBlock(kind: .quote, text: content.joined(separator: "\n")), index)
     }
 
+    private static func parseUnsupportedBlock(
+        lines: [String],
+        startIndex: Int
+    ) -> (block: BlockInputBlock, nextIndex: Int)? {
+        if isSetextHeading(lines: lines, startIndex: startIndex) {
+            return rawBlock(lines: lines, range: startIndex..<(startIndex + 2))
+        }
+        if isTable(lines: lines, startIndex: startIndex) {
+            return parseRawRun(lines: lines, startIndex: startIndex, while: isTableContentLine)
+        }
+        if isFootnoteDefinition(lines[startIndex]) {
+            return parseFootnoteDefinition(lines: lines, startIndex: startIndex)
+        }
+        if isHTMLBlockOpening(lines[startIndex]) {
+            return parseHTMLBlock(lines: lines, startIndex: startIndex)
+        }
+        return nil
+    }
+
+    private static func parseFrontMatter(
+        lines: [String],
+        startIndex: Int
+    ) -> (block: BlockInputBlock, nextIndex: Int)? {
+        var hasBodyContent = false
+        var index = startIndex + 1
+        while index < lines.count {
+            let trimmed = lines[index].trimmingCharacters(in: .whitespaces)
+            if trimmed == "---" || trimmed == "..." {
+                guard hasBodyContent else {
+                    return nil
+                }
+                return rawBlock(lines: lines, range: startIndex..<(index + 1))
+            }
+            if !trimmed.isEmpty {
+                hasBodyContent = true
+            }
+            index += 1
+        }
+        return nil
+    }
+
+    private static func parseFootnoteDefinition(
+        lines: [String],
+        startIndex: Int
+    ) -> (block: BlockInputBlock, nextIndex: Int) {
+        var index = startIndex
+        while index < lines.count {
+            let line = lines[index]
+            if isFootnoteDefinition(line) || isIndentedFootnoteContinuationLine(line) {
+                index += 1
+                continue
+            }
+            if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let continuationIndex = nextIndentedFootnoteContinuationIndex(lines: lines, startIndex: index) {
+                index = continuationIndex
+                continue
+            }
+            break
+        }
+        return rawBlock(lines: lines, range: startIndex..<index)
+    }
+
+    private static func parseRawRun(
+        lines: [String],
+        startIndex: Int,
+        while shouldContinue: (String) -> Bool
+    ) -> (block: BlockInputBlock, nextIndex: Int) {
+        var index = startIndex
+        while index < lines.count, shouldContinue(lines[index]) {
+            index += 1
+        }
+        return rawBlock(lines: lines, range: startIndex..<index)
+    }
+
+    static func rawBlock(
+        lines: [String],
+        range: Range<Int>
+    ) -> (block: BlockInputBlock, nextIndex: Int) {
+        var upperBound = range.upperBound
+        while upperBound < lines.count, lines[upperBound].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            upperBound += 1
+        }
+        let source = lines[range.lowerBound..<upperBound].joined(separator: "\n")
+        return (BlockInputBlock(kind: .rawMarkdown, text: source), upperBound)
+    }
+
     private static func parseParagraph(lines: [String], startIndex: Int) -> (block: BlockInputBlock, nextIndex: Int) {
         var content: [String] = []
         var index = startIndex
         while index < lines.count {
             let line = lines[index]
+            if isSetextHeading(lines: lines, startIndex: index) {
+                return rawBlock(lines: lines, range: startIndex..<(index + 2))
+            }
             if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                 codeFenceLanguage(in: line) != nil ||
+                parseUnsupportedBlock(lines: lines, startIndex: index) != nil ||
                 line.trimmingCharacters(in: .whitespaces) == "---" ||
                 parseHeading(line) != nil ||
                 line.hasPrefix(">") ||
@@ -171,6 +259,82 @@ enum BlockInputMarkdownImporter {
         let textStart = line.index(after: cursor)
         return (Int(digits) ?? 1, String(line[textStart...]))
     }
+
+    private static func isFrontMatterOpening(_ line: String, index: Int) -> Bool {
+        index == 0 && line.trimmingCharacters(in: .whitespaces) == "---"
+    }
+
+    private static func isSetextHeading(lines: [String], startIndex: Int) -> Bool {
+        guard lines.indices.contains(startIndex + 1),
+              !lines[startIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        let line = lines[startIndex]
+        let contentLine = line.trimmingCharacters(in: .whitespaces)
+        guard codeFenceLanguage(in: line) == nil,
+              contentLine != "---",
+              parseHeading(line) == nil,
+              !line.hasPrefix(">"),
+              parseListLine(line) == nil,
+              !isFootnoteDefinition(line),
+              !isHTMLBlockOpening(line) else {
+            return false
+        }
+        let underline = lines[startIndex + 1].trimmingCharacters(in: .whitespaces)
+        guard !underline.isEmpty else {
+            return false
+        }
+        return underline.allSatisfy { $0 == "=" } || underline.allSatisfy { $0 == "-" }
+    }
+
+    private static func isTable(lines: [String], startIndex: Int) -> Bool {
+        guard lines.indices.contains(startIndex + 1),
+              lines[startIndex].contains("|") else {
+            return false
+        }
+        return isTableDelimiterLine(lines[startIndex + 1])
+    }
+
+    private static func isTableDelimiterLine(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.contains("-"),
+              trimmed.contains("|") else {
+            return false
+        }
+        return trimmed.allSatisfy { character in
+            character == "|" || character == "-" || character == ":" || character.isWhitespace
+        }
+    }
+
+    private static func isTableContentLine(_ line: String) -> Bool {
+        !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && line.contains("|")
+    }
+
+    private static func isFootnoteDefinition(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        return trimmed.hasPrefix("[^") && trimmed.contains("]:")
+    }
+
+    private static func isIndentedFootnoteContinuationLine(_ line: String) -> Bool {
+        !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            (line.hasPrefix("    ") || line.hasPrefix("\t"))
+    }
+
+    private static func nextIndentedFootnoteContinuationIndex(lines: [String], startIndex: Int) -> Int? {
+        var index = startIndex + 1
+        while index < lines.count {
+            let line = lines[index]
+            if isIndentedFootnoteContinuationLine(line) {
+                return index
+            }
+            if !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return nil
+            }
+            index += 1
+        }
+        return nil
+    }
+
 }
 
 enum BlockInputMarkdownSerializer {
@@ -179,10 +343,17 @@ enum BlockInputMarkdownSerializer {
             let (index, block) = element
             if index > 0 {
                 let previousBlock = document.blocks[index - 1]
-                output += previousBlock.kind.isMarkdownListItem && block.kind.isMarkdownListItem ? "\n" : "\n\n"
+                output += separator(between: previousBlock, and: block)
             }
             output += markdownBlock(block)
         }
+    }
+
+    private static func separator(between previousBlock: BlockInputBlock, and block: BlockInputBlock) -> String {
+        if previousBlock.kind == .rawMarkdown || block.kind == .rawMarkdown {
+            return "\n"
+        }
+        return previousBlock.kind.isMarkdownListItem && block.kind.isMarkdownListItem ? "\n" : "\n\n"
     }
 
     private static func markdownBlock(_ block: BlockInputBlock) -> String {
@@ -208,6 +379,8 @@ enum BlockInputMarkdownSerializer {
             return BlockInputLineBreaks.lines(in: block.text).enumerated().map { offset, line in
                 "\(indent(for: block, lineOffset: offset))- [\(isChecked ? "x" : " ")] \(line)"
             }.joined(separator: "\n")
+        case .rawMarkdown:
+            return block.text
         }
     }
 
@@ -234,7 +407,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .quote:
+        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
             return false
         }
     }

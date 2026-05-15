@@ -207,7 +207,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .quote:
+        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
             return false
         }
     }
