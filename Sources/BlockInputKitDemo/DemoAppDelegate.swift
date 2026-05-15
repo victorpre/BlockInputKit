@@ -21,6 +21,8 @@ final class DemoAppDelegate: NSObject, NSApplicationDelegate {
         let mainMenu = NSMenu()
         let appMenuItem = NSMenuItem()
         mainMenu.addItem(appMenuItem)
+        let fileMenuItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
+        mainMenu.addItem(fileMenuItem)
         let editMenuItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
         mainMenu.addItem(editMenuItem)
 
@@ -35,6 +37,13 @@ final class DemoAppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(quitItem)
         appMenuItem.submenu = appMenu
 
+        let fileMenu = NSMenu(title: "File")
+        let openItem = NSMenuItem(title: "Open...", action: #selector(openDocument(_:)), keyEquivalent: "o")
+        openItem.keyEquivalentModifierMask = .command
+        openItem.target = self
+        fileMenu.addItem(openItem)
+        fileMenuItem.submenu = fileMenu
+
         let editMenu = NSMenu(title: "Edit")
         editMenu.addItem(NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z"))
         let redoItem = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
@@ -48,6 +57,10 @@ final class DemoAppDelegate: NSObject, NSApplicationDelegate {
         editMenu.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
         editMenuItem.submenu = editMenu
         NSApp.mainMenu = mainMenu
+    }
+
+    @objc private func openDocument(_ sender: Any?) {
+        windowController?.openDocument(sender)
     }
 
     private func activateDemoApp() {

@@ -3,9 +3,9 @@ import BlockInputKit
 
 @MainActor
 final class DemoWindowController: NSWindowController {
-    private let notes = DemoNote.all
+    var sidebarItems = DemoNote.all.map { DemoSidebarItem(id: .builtIn($0.id)) }
     private let splitViewController = NSSplitViewController()
-    private let sidebarTableView = NSTableView()
+    let sidebarTableView = NSTableView()
     private let noteTitleLabel = NSTextField(labelWithString: "")
     private let reorderCheckbox = NSButton(checkboxWithTitle: "Reordering", target: nil, action: nil)
     private let modeControl = NSSegmentedControl(
@@ -17,17 +17,18 @@ final class DemoWindowController: NSWindowController {
     private let contentContainer = NSView()
     private let editorView = BlockInputView()
     private let rawScrollView = NSScrollView()
-    private let rawTextView = NSTextView()
+    let rawTextView = NSTextView()
+    private let loadingProgress = NSProgressIndicator()
     private let loadingLabel = NSTextField(labelWithString: "")
 
-    private var sessions: [DemoNoteID: DemoNoteSession] = [:]
+    var sessions: [DemoSidebarItemID: DemoNoteSession] = [:]
     private var warmTasks: [DemoNoteID: Task<Void, Never>] = [:]
-    private var currentNoteID: DemoNoteID = .mixed
-    private var editorMode: DemoEditorMode = .rendered
+    var currentItemID: DemoSidebarItemID = .builtIn(.mixed)
+    var editorMode: DemoEditorMode = .rendered
     private var allowsReordering = true
-    private var rawTextNoteID: DemoNoteID?
-    private var editorConfiguredNoteID: DemoNoteID?
-    private var isApplyingRawText = false
+    var rawTextItemID: DemoSidebarItemID?
+    private var editorConfiguredItemID: DemoSidebarItemID?
+    var isApplyingRawText = false
 
     init() {
         let window = NSWindow(
@@ -40,7 +41,7 @@ final class DemoWindowController: NSWindowController {
         window.center()
         super.init(window: window)
 
-        sessions[.mixed] = DemoNoteSession(note: DemoNote(id: .mixed), document: DemoNoteID.mixed.makeDocument())
+        sessions[.builtIn(.mixed)] = DemoNoteSession(note: DemoNote(id: .mixed), document: DemoNoteID.mixed.makeDocument())
         configureSidebar()
         configureRawTextView()
         configureControls()
@@ -63,8 +64,8 @@ final class DemoWindowController: NSWindowController {
         fatalError("init(coder:) is not supported")
     }
 
-    private var currentSession: DemoNoteSession? {
-        sessions[currentNoteID]
+    var currentSession: DemoNoteSession? {
+        sessions[currentItemID]
     }
 
     private func configureSidebar() {
@@ -117,10 +118,14 @@ final class DemoWindowController: NSWindowController {
     }
 
     private func configureContentContainer() {
-        [editorView, rawScrollView, loadingLabel].forEach {
+        [editorView, rawScrollView, loadingProgress, loadingLabel].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             contentContainer.addSubview($0)
         }
+        loadingProgress.style = .spinning
+        loadingProgress.controlSize = .regular
+        loadingProgress.isIndeterminate = true
+        loadingProgress.isDisplayedWhenStopped = false
         loadingLabel.alignment = .center
         loadingLabel.font = .systemFont(ofSize: 13, weight: .medium)
         loadingLabel.textColor = .secondaryLabelColor
@@ -137,7 +142,10 @@ final class DemoWindowController: NSWindowController {
             rawScrollView.bottomAnchor.constraint(equalTo: contentContainer.bottomAnchor),
 
             loadingLabel.centerXAnchor.constraint(equalTo: contentContainer.centerXAnchor),
-            loadingLabel.centerYAnchor.constraint(equalTo: contentContainer.centerYAnchor)
+            loadingLabel.centerYAnchor.constraint(equalTo: contentContainer.centerYAnchor, constant: 22),
+
+            loadingProgress.centerXAnchor.constraint(equalTo: contentContainer.centerXAnchor),
+            loadingProgress.bottomAnchor.constraint(equalTo: loadingLabel.topAnchor, constant: -10)
         ])
         contentContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
         contentContainer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
@@ -198,13 +206,14 @@ final class DemoWindowController: NSWindowController {
     }
 
     private func warmRemainingNotesAfterLaunch() {
-        for note in notes where sessions[note.id] == nil {
+        for note in DemoNote.all where sessions[.builtIn(note.id)] == nil {
             startWarmTask(for: note.id)
         }
     }
 
     private func startWarmTask(for noteID: DemoNoteID) {
-        guard sessions[noteID] == nil,
+        let itemID = DemoSidebarItemID.builtIn(noteID)
+        guard sessions[itemID] == nil,
               warmTasks[noteID] == nil else {
             return
         }
@@ -221,27 +230,40 @@ final class DemoWindowController: NSWindowController {
 
     private func installWarmedSession(_ warmState: DemoNoteWarmState) {
         warmTasks[warmState.id] = nil
-        guard sessions[warmState.id] == nil else {
+        let itemID = DemoSidebarItemID.builtIn(warmState.id)
+        guard sessions[itemID] == nil else {
             return
         }
         let session = DemoNoteSession(note: DemoNote(id: warmState.id), warmState: warmState)
-        sessions[warmState.id] = session
-        if currentNoteID == warmState.id {
+        sessions[itemID] = session
+        if currentItemID == itemID {
             applySelectedNote(preloadBothViews: false)
         }
     }
 
-    private func applySelectedNote(preloadBothViews: Bool) {
-        noteTitleLabel.stringValue = currentNoteID.title
+    func applySelectedNote(preloadBothViews: Bool) {
+        noteTitleLabel.stringValue = currentItemID.title
         guard let session = currentSession else {
-            showLoadingState(for: currentNoteID)
-            startWarmTask(for: currentNoteID)
+            showLoadingState(title: currentItemID.title)
+            if case .builtIn(let noteID) = currentItemID {
+                startWarmTask(for: noteID)
+            }
             return
         }
 
-        loadingLabel.stringValue = ""
+        switch session.loadingState {
+        case .idle:
+            loadingLabel.stringValue = ""
+        case .loading:
+            showLoadingState(title: session.title)
+            return
+        case .failed(let message):
+            showErrorState(message)
+            return
+        }
+
         prepareRenderedView(for: session, preload: preloadBothViews)
-        if preloadBothViews || editorMode == .raw || rawTextNoteID == currentNoteID {
+        if preloadBothViews || editorMode == .raw || rawTextItemID == currentItemID {
             applyRawMarkdown(session.rawMarkdown, to: session)
         }
         if editorMode == .raw {
@@ -250,14 +272,19 @@ final class DemoWindowController: NSWindowController {
         updateVisibleContent(isLoading: false)
     }
 
-    private func showLoadingState(for noteID: DemoNoteID) {
-        loadingLabel.stringValue = "Loading \(noteID.title)..."
+    private func showLoadingState(title: String) {
+        loadingLabel.stringValue = "Loading \(title)..."
         updateVisibleContent(isLoading: true)
+    }
+
+    private func showErrorState(_ message: String) {
+        loadingLabel.stringValue = message
+        updateVisibleContent(isLoading: true, showsProgress: false)
     }
 
     private func prepareRenderedView(for session: DemoNoteSession, preload: Bool = false) {
         let hasPendingRawParse = session.pendingRawParseTask != nil
-        if preload || editorConfiguredNoteID != session.note.id || session.renderedViewNeedsReload || hasPendingRawParse {
+        if preload || editorConfiguredItemID != session.id || session.renderedViewNeedsReload || hasPendingRawParse {
             configureEditor(for: session, markRenderedViewFresh: !hasPendingRawParse)
         }
         if hasPendingRawParse {
@@ -267,7 +294,7 @@ final class DemoWindowController: NSWindowController {
 
     private func prepareRawView(for session: DemoNoteSession) {
         let needsRefresh = session.rawViewNeedsReload
-        if rawTextNoteID != session.note.id || needsRefresh {
+        if rawTextItemID != session.id || needsRefresh {
             applyRawMarkdown(session.rawMarkdown, to: session, markRawViewFresh: !needsRefresh)
         }
         if needsRefresh {
@@ -275,34 +302,40 @@ final class DemoWindowController: NSWindowController {
         }
     }
 
-    private func updateVisibleContent(isLoading: Bool) {
+    private func updateVisibleContent(isLoading: Bool, showsProgress: Bool = true) {
         loadingLabel.isHidden = !isLoading
+        loadingProgress.isHidden = !isLoading || !showsProgress
+        if isLoading && showsProgress {
+            loadingProgress.startAnimation(nil)
+        } else {
+            loadingProgress.stopAnimation(nil)
+        }
         editorView.isHidden = isLoading || editorMode != .rendered
         rawScrollView.isHidden = isLoading || editorMode != .raw
         modeControl.selectedSegment = editorMode.segment
         reorderCheckbox.state = allowsReordering ? .on : .off
     }
 
-    private func configureEditor(for session: DemoNoteSession, markRenderedViewFresh: Bool = true) {
+    func configureEditor(for session: DemoNoteSession, markRenderedViewFresh: Bool = true) {
         editorView.configure(BlockInputConfiguration(
             documentStore: session.store,
             allowsBlockReordering: allowsReordering,
             undoController: session.undoController,
-            onDocumentMutation: { [weak self, noteID = session.note.id] change in
-                self?.handleRenderedMutation(change, noteID: noteID)
+            onDocumentMutation: { [weak self, itemID = session.id] change in
+                self?.handleRenderedMutation(change, itemID: itemID)
             },
-            onDocumentChange: { [weak self, noteID = session.note.id] document in
-                self?.handleRenderedDocumentChange(document, noteID: noteID)
+            onDocumentChange: { [weak self, itemID = session.id] document in
+                self?.handleRenderedDocumentChange(document, itemID: itemID)
             }
         ))
-        editorConfiguredNoteID = session.note.id
+        editorConfiguredItemID = session.id
         if markRenderedViewFresh {
             session.renderedViewNeedsReload = false
         }
     }
 
-    private func handleRenderedMutation(_: BlockInputDocumentChange, noteID: DemoNoteID) {
-        guard let session = sessions[noteID] else {
+    private func handleRenderedMutation(_: BlockInputDocumentChange, itemID: DemoSidebarItemID) {
+        guard let session = sessions[itemID] else {
             return
         }
         session.documentRevision += 1
@@ -311,44 +344,44 @@ final class DemoWindowController: NSWindowController {
         session.pendingMarkdownTask = nil
     }
 
-    private func handleRenderedDocumentChange(_ document: BlockInputDocument, noteID: DemoNoteID) {
-        guard let session = sessions[noteID] else {
+    private func handleRenderedDocumentChange(_ document: BlockInputDocument, itemID: DemoSidebarItemID) {
+        guard let session = sessions[itemID] else {
             return
         }
         let revision = session.documentRevision
         session.pendingMarkdownTask?.cancel()
-        session.pendingMarkdownTask = Task { [weak self, document, noteID, revision] in
+        session.pendingMarkdownTask = Task { [weak self, document, itemID, revision] in
             let markdown = await Task.detached(priority: .utility) {
                 document.markdown
             }.value
-            self?.applyRenderedMarkdown(markdown, noteID: noteID, revision: revision)
+            self?.applyRenderedMarkdown(markdown, itemID: itemID, revision: revision)
         }
     }
 
-    private func applyRenderedMarkdown(_ markdown: String, noteID: DemoNoteID, revision: Int) {
-        guard let session = sessions[noteID],
+    private func applyRenderedMarkdown(_ markdown: String, itemID: DemoSidebarItemID, revision: Int) {
+        guard let session = sessions[itemID],
               session.documentRevision == revision else {
             return
         }
         session.rawMarkdown = markdown
-        session.rawViewNeedsReload = rawTextNoteID != noteID || rawTextView.string != markdown
+        session.rawViewNeedsReload = rawTextItemID != itemID || rawTextView.string != markdown
         session.pendingMarkdownTask = nil
-        if currentNoteID == noteID,
+        if currentItemID == itemID,
            editorMode == .raw {
             applyRawMarkdown(markdown, to: session)
         }
     }
 
     private func refreshRawMarkdownFromStore(for session: DemoNoteSession) {
-        let noteID = session.note.id
+        let itemID = session.id
         let revision = session.documentRevision
         let store = session.store
         session.pendingMarkdownTask?.cancel()
-        session.pendingMarkdownTask = Task { [weak self, noteID, revision, store] in
+        session.pendingMarkdownTask = Task { [weak self, itemID, revision, store] in
             let markdown = await Task.detached(priority: .utility) {
                 store.backgroundDocumentSnapshot().markdown
             }.value
-            self?.applyRenderedMarkdown(markdown, noteID: noteID, revision: revision)
+            self?.applyRenderedMarkdown(markdown, itemID: itemID, revision: revision)
         }
     }
 
@@ -356,66 +389,10 @@ final class DemoWindowController: NSWindowController {
         isApplyingRawText = true
         rawTextView.string = markdown
         isApplyingRawText = false
-        rawTextNoteID = session.note.id
+        rawTextItemID = session.id
         session.rawMarkdown = markdown
         if markRawViewFresh {
             session.rawViewNeedsReload = false
-        }
-    }
-
-    private func handleRawTextDidChange() {
-        guard !isApplyingRawText,
-              let session = currentSession,
-              rawTextNoteID == session.note.id else {
-            return
-        }
-        session.rawMarkdown = rawTextView.string
-        session.rawViewNeedsReload = false
-        session.renderedViewNeedsReload = true
-        session.documentRevision += 1
-        session.pendingMarkdownTask?.cancel()
-        session.pendingMarkdownTask = nil
-        scheduleRawParse(for: session, delay: 0.35)
-    }
-
-    private func scheduleRawParse(for session: DemoNoteSession, delay: TimeInterval) {
-        let markdown = session.rawMarkdown
-        let noteID = session.note.id
-        session.rawParseGeneration += 1
-        let generation = session.rawParseGeneration
-        session.pendingRawParseTask?.cancel()
-        session.pendingRawParseTask = Task { [weak self, markdown, noteID, generation] in
-            let nanoseconds = UInt64(max(0, delay) * 1_000_000_000)
-            if nanoseconds > 0 {
-                do {
-                    try await Task.sleep(nanoseconds: nanoseconds)
-                } catch {
-                    return
-                }
-            }
-            guard !Task.isCancelled else {
-                return
-            }
-            let document = await Task.detached(priority: .userInitiated) {
-                BlockInputDocument(markdown: markdown)
-            }.value
-            self?.applyRawDocument(document, noteID: noteID, generation: generation)
-        }
-    }
-
-    private func applyRawDocument(_ document: BlockInputDocument, noteID: DemoNoteID, generation: Int) {
-        guard let session = sessions[noteID],
-              session.rawParseGeneration == generation else {
-            return
-        }
-        session.pendingRawParseTask = nil
-        session.store.replaceDocument(document)
-        session.undoController = BlockInputUndoController()
-        session.renderedViewNeedsReload = true
-        if currentNoteID == noteID {
-            if editorMode == .rendered {
-                configureEditor(for: session)
-            }
         }
     }
 
@@ -426,7 +403,17 @@ final class DemoWindowController: NSWindowController {
         }
         editorMode = mode
         guard let session = currentSession else {
-            showLoadingState(for: currentNoteID)
+            showLoadingState(title: currentItemID.title)
+            return
+        }
+        switch session.loadingState {
+        case .idle:
+            break
+        case .loading:
+            showLoadingState(title: session.title)
+            return
+        case .failed(let message):
+            showErrorState(message)
             return
         }
         switch mode {
@@ -440,58 +427,10 @@ final class DemoWindowController: NSWindowController {
 
     @objc private func toggleReordering() {
         allowsReordering = reorderCheckbox.state == .on
-        guard let session = currentSession else {
+        guard let session = currentSession,
+              case .idle = session.loadingState else {
             return
         }
         configureEditor(for: session)
-    }
-}
-
-extension DemoWindowController: NSTableViewDataSource, NSTableViewDelegate {
-    func numberOfRows(in tableView: NSTableView) -> Int {
-        notes.count
-    }
-
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard notes.indices.contains(row) else {
-            return nil
-        }
-        let cell = tableView.makeView(withIdentifier: sidebarCellIdentifier, owner: self) as? NSTableCellView ?? makeSidebarCell()
-        cell.textField?.stringValue = notes[row].title
-        return cell
-    }
-
-    func tableViewSelectionDidChange(_ notification: Notification) {
-        let row = sidebarTableView.selectedRow
-        guard notes.indices.contains(row) else {
-            return
-        }
-        currentNoteID = notes[row].id
-        applySelectedNote(preloadBothViews: false)
-    }
-
-    private func makeSidebarCell() -> NSTableCellView {
-        let cell = NSTableCellView()
-        cell.identifier = sidebarCellIdentifier
-        let textField = NSTextField(labelWithString: "")
-        textField.translatesAutoresizingMaskIntoConstraints = false
-        textField.lineBreakMode = .byTruncatingTail
-        cell.addSubview(textField)
-        cell.textField = textField
-        NSLayoutConstraint.activate([
-            textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 10),
-            textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
-            textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
-        ])
-        return cell
-    }
-}
-
-extension DemoWindowController: NSTextViewDelegate {
-    func textDidChange(_ notification: Notification) {
-        guard notification.object as? NSTextView === rawTextView else {
-            return
-        }
-        handleRawTextDidChange()
     }
 }

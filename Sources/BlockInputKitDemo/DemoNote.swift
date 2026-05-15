@@ -34,6 +34,34 @@ struct DemoNote: Sendable {
     static let all = DemoNoteID.allCases.map(DemoNote.init)
 }
 
+enum DemoSidebarItemID: Hashable, Sendable {
+    case builtIn(DemoNoteID)
+    case file(URL)
+
+    var title: String {
+        switch self {
+        case .builtIn(let noteID):
+            noteID.title
+        case .file(let url):
+            url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
+        }
+    }
+}
+
+struct DemoSidebarItem: Sendable {
+    var id: DemoSidebarItemID
+
+    var title: String {
+        id.title
+    }
+}
+
+enum DemoNoteLoadingState {
+    case idle
+    case loading
+    case failed(String)
+}
+
 struct DemoNoteWarmState: Sendable {
     var id: DemoNoteID
     var store: BlockInputMemoryDocumentStore
@@ -50,27 +78,40 @@ struct DemoNoteWarmState: Sendable {
 }
 
 final class DemoNoteSession {
-    let note: DemoNote
+    let id: DemoSidebarItemID
+    let title: String
     var store: BlockInputMemoryDocumentStore
     var undoController = BlockInputUndoController()
     var rawMarkdown: String
+    var loadingState: DemoNoteLoadingState = .idle
     var rawViewNeedsReload = false
     var renderedViewNeedsReload = false
     var documentRevision = 0
     var rawParseGeneration = 0
     var pendingRawParseTask: Task<Void, Never>?
     var pendingMarkdownTask: Task<Void, Never>?
+    var pendingLoadTask: Task<Void, Never>?
 
     init(note: DemoNote, document: BlockInputDocument) {
-        self.note = note
+        id = .builtIn(note.id)
+        title = note.title
         store = BlockInputMemoryDocumentStore(document: document)
         rawMarkdown = document.markdown
     }
 
     init(note: DemoNote, warmState: DemoNoteWarmState) {
-        self.note = note
+        id = .builtIn(note.id)
+        title = note.title
         store = warmState.store
         rawMarkdown = warmState.rawMarkdown
+    }
+
+    init(fileURL: URL) {
+        id = .file(fileURL)
+        title = fileURL.lastPathComponent.isEmpty ? fileURL.path : fileURL.lastPathComponent
+        store = BlockInputMemoryDocumentStore(document: BlockInputDocument())
+        rawMarkdown = ""
+        loadingState = .loading
     }
 
     deinit {
@@ -82,5 +123,7 @@ final class DemoNoteSession {
         pendingRawParseTask = nil
         pendingMarkdownTask?.cancel()
         pendingMarkdownTask = nil
+        pendingLoadTask?.cancel()
+        pendingLoadTask = nil
     }
 }
