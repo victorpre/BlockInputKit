@@ -7,6 +7,7 @@ final class DemoWindowController: NSWindowController {
     private let splitViewController = NSSplitViewController()
     let sidebarTableView = NSTableView()
     private let noteTitleLabel = NSTextField(labelWithString: "")
+    let saveStatusLabel = NSTextField(labelWithString: "")
     private let reorderCheckbox = NSButton(checkboxWithTitle: "Reordering", target: nil, action: nil)
     private let modeControl = NSSegmentedControl(
         labels: DemoEditorMode.allCases.map(\.title),
@@ -107,6 +108,11 @@ final class DemoWindowController: NSWindowController {
         noteTitleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
         noteTitleLabel.lineBreakMode = .byTruncatingTail
 
+        saveStatusLabel.font = .systemFont(ofSize: 12)
+        saveStatusLabel.textColor = .secondaryLabelColor
+        saveStatusLabel.lineBreakMode = .byTruncatingTail
+        saveStatusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
         reorderCheckbox.state = allowsReordering ? .on : .off
         reorderCheckbox.target = self
         reorderCheckbox.action = #selector(toggleReordering)
@@ -191,7 +197,7 @@ final class DemoWindowController: NSWindowController {
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let strip = NSStackView(views: [noteTitleLabel, spacer, reorderCheckbox, modeControl])
+        let strip = NSStackView(views: [noteTitleLabel, saveStatusLabel, spacer, reorderCheckbox, modeControl])
         strip.orientation = .horizontal
         strip.alignment = .centerY
         strip.spacing = 12
@@ -254,10 +260,13 @@ final class DemoWindowController: NSWindowController {
         switch session.loadingState {
         case .idle:
             loadingLabel.stringValue = ""
+            updateSaveStatus(for: session)
         case .loading:
+            saveStatusLabel.stringValue = ""
             showLoadingState(title: session.title)
             return
         case .failed(let message):
+            saveStatusLabel.stringValue = ""
             showErrorState(message)
             return
         }
@@ -339,6 +348,7 @@ final class DemoWindowController: NSWindowController {
             return
         }
         session.documentRevision += 1
+        markSessionDirty(session, rawEdit: false)
         session.rawViewNeedsReload = true
         session.pendingMarkdownTask?.cancel()
         session.pendingMarkdownTask = nil

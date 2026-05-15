@@ -42,6 +42,15 @@ final class DemoAppDelegate: NSObject, NSApplicationDelegate {
         openItem.keyEquivalentModifierMask = .command
         openItem.target = self
         fileMenu.addItem(openItem)
+        fileMenu.addItem(.separator())
+        let saveItem = NSMenuItem(title: "Save", action: #selector(saveDocument(_:)), keyEquivalent: "s")
+        saveItem.keyEquivalentModifierMask = .command
+        saveItem.target = self
+        fileMenu.addItem(saveItem)
+        let saveAsItem = NSMenuItem(title: "Save As...", action: #selector(saveDocumentAs(_:)), keyEquivalent: "S")
+        saveAsItem.keyEquivalentModifierMask = [.command, .shift]
+        saveAsItem.target = self
+        fileMenu.addItem(saveAsItem)
         fileMenuItem.submenu = fileMenu
 
         let editMenu = NSMenu(title: "Edit")
@@ -61,6 +70,14 @@ final class DemoAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openDocument(_ sender: Any?) {
         windowController?.openDocument(sender)
+    }
+
+    @objc private func saveDocument(_ sender: Any?) {
+        windowController?.saveDocument(sender)
+    }
+
+    @objc private func saveDocumentAs(_ sender: Any?) {
+        windowController?.saveDocumentAs(sender)
     }
 
     private func activateDemoApp() {

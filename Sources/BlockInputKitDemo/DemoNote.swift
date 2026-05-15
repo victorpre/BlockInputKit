@@ -56,9 +56,15 @@ struct DemoSidebarItem: Sendable {
     }
 }
 
-enum DemoNoteLoadingState {
+enum DemoNoteLoadingState: Equatable {
     case idle
     case loading
+    case failed(String)
+}
+
+enum DemoNoteSaveState {
+    case idle
+    case saving
     case failed(String)
 }
 
@@ -78,19 +84,33 @@ struct DemoNoteWarmState: Sendable {
 }
 
 final class DemoNoteSession {
-    let id: DemoSidebarItemID
-    let title: String
+    var id: DemoSidebarItemID
+    var title: String
     var store: BlockInputMemoryDocumentStore
     var undoController = BlockInputUndoController()
     var rawMarkdown: String
     var loadingState: DemoNoteLoadingState = .idle
+    var saveState: DemoNoteSaveState = .idle
+    var isDirty = false
     var rawViewNeedsReload = false
     var renderedViewNeedsReload = false
     var documentRevision = 0
     var rawParseGeneration = 0
+    var saveGeneration = 0
+    var saveQueuedAfterActive = false
+    var saveQueuedRawWrite = false
     var pendingRawParseTask: Task<Void, Never>?
     var pendingMarkdownTask: Task<Void, Never>?
     var pendingLoadTask: Task<Void, Never>?
+    var pendingAutosaveTask: Task<Void, Never>?
+    var activeSaveTask: Task<Void, Never>?
+
+    var fileURL: URL? {
+        if case .file(let url) = id {
+            return url
+        }
+        return nil
+    }
 
     init(note: DemoNote, document: BlockInputDocument) {
         id = .builtIn(note.id)
@@ -125,5 +145,9 @@ final class DemoNoteSession {
         pendingMarkdownTask = nil
         pendingLoadTask?.cancel()
         pendingLoadTask = nil
+        pendingAutosaveTask?.cancel()
+        pendingAutosaveTask = nil
+        activeSaveTask?.cancel()
+        activeSaveTask = nil
     }
 }

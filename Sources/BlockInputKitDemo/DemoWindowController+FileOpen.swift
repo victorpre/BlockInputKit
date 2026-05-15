@@ -95,7 +95,7 @@ extension DemoWindowController {
         }
     }
 
-    private func selectSidebarItem(_ itemID: DemoSidebarItemID) {
+    func selectSidebarItem(_ itemID: DemoSidebarItemID) {
         guard let row = sidebarItems.firstIndex(where: { $0.id == itemID }) else {
             return
         }

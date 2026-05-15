@@ -19,6 +19,7 @@ extension DemoWindowController: NSTextViewDelegate {
         session.rawViewNeedsReload = false
         session.renderedViewNeedsReload = true
         session.documentRevision += 1
+        markSessionDirty(session, rawEdit: true)
         session.pendingMarkdownTask?.cancel()
         session.pendingMarkdownTask = nil
         scheduleRawParse(for: session, delay: 0.35)
