@@ -77,14 +77,11 @@ Run the local demo:
 
 The demo app includes:
 
-- A primary `BlockInputView` editor surface.
-- Mixed paragraph, heading, divider, code, quote, list, numbered list, and toggleable checklist data.
-- A 100,000-block load path for exercising large-document behavior.
-- Markdown import/export, Markdown insertion, and file-link insertion from buttons or drops.
-- Text and structural undo/redo buttons.
-- Hover reorder handles and a runtime reordering toggle.
-- Host-provided mention and slash-command completion samples, including accepted-suggestion insertion.
-- A SwiftUI `BlockInputEditor` preview with focus-binding controls embedded beside the AppKit editor.
+- A native sidebar with `Mixed` and `100K` notes.
+- A main editor area that can switch between editable raw Markdown and rendered structured blocks.
+- A runtime reordering toggle for rendered blocks.
+- Mixed paragraph, heading, divider, code, quote, list, numbered list, and checklist data.
+- A 100,000-block note for exercising large-document behavior.
 
 ## Architecture
 

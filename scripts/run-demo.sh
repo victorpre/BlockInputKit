@@ -7,6 +7,7 @@ cd "$repo_root"
 demo_process_pattern='(^|/)BlockInputKitDemo([[:space:]]|$)'
 demo_binary="$repo_root/.build/xcode/Build/Products/Debug/BlockInputKitDemo"
 demo_log="${TMPDIR:-/tmp}/blockinputkit-demo.log"
+demo_launch_label="com.blockinputkit.demo"
 
 run_and_format() {
   if command -v xcsift >/dev/null 2>&1; then
@@ -16,10 +17,19 @@ run_and_format() {
   fi
 }
 
+remove_demo_launch_jobs() {
+  local labels
+  labels=$(launchctl print "gui/$(id -u)" 2>/dev/null | awk '/com\.blockinputkit\.demo/ { print $3 }' || true)
+  for label in $labels; do
+    launchctl remove "$label" >/dev/null 2>&1 || true
+  done
+}
+
 stop_existing_demo() {
   local pids
   pids=$(pgrep -f "$demo_process_pattern" || true)
   if [ -z "$pids" ]; then
+    remove_demo_launch_jobs
     return
   fi
 
@@ -29,6 +39,7 @@ stop_existing_demo() {
   for _ in {1..20}; do
     pids=$(pgrep -f "$demo_process_pattern" || true)
     if [ -z "$pids" ]; then
+      remove_demo_launch_jobs
       return
     fi
     sleep 0.1
@@ -36,6 +47,7 @@ stop_existing_demo() {
 
   echo "Force stopping existing BlockInputKitDemo process(es): ${pids//$'\n'/ }"
   kill -9 $pids 2>/dev/null || true
+  remove_demo_launch_jobs
 }
 
 stop_existing_demo
@@ -46,5 +58,16 @@ run_and_format xcodebuild \
   -derivedDataPath .build/xcode \
   build
 
-nohup "$demo_binary" "$@" >"$demo_log" 2>&1 &
-echo "Started BlockInputKitDemo (pid $!). Log: $demo_log"
+launchctl submit -l "$demo_launch_label" -o "$demo_log" -e "$demo_log" -- "$demo_binary" "$@"
+sleep 0.5
+
+pids=$(pgrep -f "$demo_process_pattern" || true)
+if [ -z "$pids" ]; then
+  echo "Failed to start BlockInputKitDemo"
+  if [ -s "$demo_log" ]; then
+    tail -40 "$demo_log"
+  fi
+  exit 1
+fi
+
+echo "Started BlockInputKitDemo (pid(s): ${pids//$'\n'/ }). Log: $demo_log"

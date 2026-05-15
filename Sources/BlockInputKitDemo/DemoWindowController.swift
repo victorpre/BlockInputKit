@@ -1,24 +1,33 @@
 import AppKit
 import BlockInputKit
-import SwiftUI
 
 @MainActor
 final class DemoWindowController: NSWindowController {
-    private let editorView = BlockInputView()
-    private let completionProvider = DemoCompletionProvider()
-    private let statusLabel = NSTextField(labelWithString: "")
-    private let selectionLabel = NSTextField(labelWithString: "")
-    private let completionQueryField = NSTextField(string: "")
-    private let completionResultsLabel = NSTextField(wrappingLabelWithString: "")
-    private let selectionDebugLabel = NSTextField(wrappingLabelWithString: "Selection debug: no events")
-    private let markdownTextView = NSTextView()
+    private let notes = DemoNote.all
+    private let splitViewController = NSSplitViewController()
+    private let sidebarTableView = NSTableView()
+    private let noteTitleLabel = NSTextField(labelWithString: "")
     private let reorderCheckbox = NSButton(checkboxWithTitle: "Reordering", target: nil, action: nil)
+    private let modeControl = NSSegmentedControl(
+        labels: DemoEditorMode.allCases.map(\.title),
+        trackingMode: .selectOne,
+        target: nil,
+        action: nil
+    )
+    private let contentContainer = NSView()
+    private let editorView = BlockInputView()
+    private let rawScrollView = NSScrollView()
+    private let rawTextView = NSTextView()
+    private let loadingLabel = NSTextField(labelWithString: "")
 
-    private var store = BlockInputMemoryDocumentStore(document: DemoData.mixedDocument())
-    private var undoController = BlockInputUndoController()
-    private var latestCompletionSuggestions: [BlockInputCompletionSuggestion] = []
-    nonisolated(unsafe) private var selectionDebugObserver: NSObjectProtocol?
-    private let isSelectionDebugEnabled = UserDefaults.standard.bool(forKey: selectionDebugEnabledKey)
+    private var sessions: [DemoNoteID: DemoNoteSession] = [:]
+    private var warmTasks: [DemoNoteID: Task<Void, Never>] = [:]
+    private var currentNoteID: DemoNoteID = .mixed
+    private var editorMode: DemoEditorMode = .rendered
+    private var allowsReordering = true
+    private var rawTextNoteID: DemoNoteID?
+    private var editorConfiguredNoteID: DemoNoteID?
+    private var isApplyingRawText = false
 
     init() {
         let window = NSWindow(
@@ -30,18 +39,23 @@ final class DemoWindowController: NSWindowController {
         window.title = "BlockInputKit Demo"
         window.center()
         super.init(window: window)
-        if isSelectionDebugEnabled {
-            installSelectionDebugObserver()
-        }
-        window.contentView = makeContentView()
-        configureEditor()
-        updateStatus(for: store.document)
+
+        sessions[.mixed] = DemoNoteSession(note: DemoNote(id: .mixed), document: DemoNoteID.mixed.makeDocument())
+        configureSidebar()
+        configureRawTextView()
+        configureControls()
+        configureContentContainer()
+        installSplitView()
+        window.contentViewController = splitViewController
+        window.minSize = NSSize(width: 860, height: 560)
+        window.setContentSize(NSSize(width: 1120, height: 760))
+        sidebarTableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        applySelectedNote(preloadBothViews: true)
+        warmRemainingNotesAfterLaunch()
     }
 
     deinit {
-        if let selectionDebugObserver {
-            NotificationCenter.default.removeObserver(selectionDebugObserver)
-        }
+        warmTasks.values.forEach { $0.cancel() }
     }
 
     @available(*, unavailable)
@@ -49,126 +63,132 @@ final class DemoWindowController: NSWindowController {
         fatalError("init(coder:) is not supported")
     }
 
-    private func makeContentView() -> NSView {
-        let rootStack = NSStackView()
-        rootStack.orientation = .vertical
-        rootStack.spacing = 8
-        rootStack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
-
-        let bodyStack = NSStackView()
-        bodyStack.orientation = .horizontal
-        bodyStack.spacing = 12
-
-        editorView.translatesAutoresizingMaskIntoConstraints = false
-        editorView.widthAnchor.constraint(greaterThanOrEqualToConstant: 620).isActive = true
-
-        let sidePanel = makeSidePanel()
-        sidePanel.widthAnchor.constraint(equalToConstant: 360).isActive = true
-
-        bodyStack.addArrangedSubview(editorView)
-        bodyStack.addArrangedSubview(sidePanel)
-
-        rootStack.addArrangedSubview(makeToolbar())
-        rootStack.addArrangedSubview(bodyStack)
-        rootStack.addArrangedSubview(makeStatusBar())
-        return rootStack
+    private var currentSession: DemoNoteSession? {
+        sessions[currentNoteID]
     }
 
-    private func makeToolbar() -> NSView {
-        reorderCheckbox.state = .on
+    private func configureSidebar() {
+        let column = NSTableColumn(identifier: sidebarColumnIdentifier)
+        column.resizingMask = .autoresizingMask
+        sidebarTableView.addTableColumn(column)
+        sidebarTableView.headerView = nil
+        sidebarTableView.style = .sourceList
+        sidebarTableView.rowHeight = 28
+        sidebarTableView.intercellSpacing = NSSize(width: 0, height: 4)
+        sidebarTableView.dataSource = self
+        sidebarTableView.delegate = self
+        sidebarTableView.allowsEmptySelection = false
+    }
+
+    private func configureRawTextView() {
+        rawTextView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        rawTextView.isRichText = false
+        rawTextView.isAutomaticQuoteSubstitutionEnabled = false
+        rawTextView.isAutomaticDashSubstitutionEnabled = false
+        rawTextView.isAutomaticTextReplacementEnabled = false
+        rawTextView.isVerticallyResizable = true
+        rawTextView.isHorizontallyResizable = false
+        rawTextView.autoresizingMask = [.width]
+        rawTextView.minSize = NSSize(width: 0, height: 0)
+        rawTextView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        rawTextView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        rawTextView.textContainer?.widthTracksTextView = true
+        rawTextView.delegate = self
+
+        rawScrollView.borderType = .noBorder
+        rawScrollView.hasVerticalScroller = true
+        rawScrollView.hasHorizontalScroller = false
+        rawScrollView.autohidesScrollers = true
+        rawScrollView.documentView = rawTextView
+    }
+
+    private func configureControls() {
+        noteTitleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        noteTitleLabel.lineBreakMode = .byTruncatingTail
+
+        reorderCheckbox.state = allowsReordering ? .on : .off
         reorderCheckbox.target = self
         reorderCheckbox.action = #selector(toggleReordering)
 
-        let toolbar: NSStackView = NSStackView(views: [
-            makeButton("Mixed", action: #selector(loadMixedDocument)),
-            makeButton("100k", action: #selector(loadLargeDocument)),
-            makeButton("Import", action: #selector(importMarkdown)),
-            makeButton("Insert Markdown", action: #selector(insertMarkdown)),
-            makeButton("Insert File", action: #selector(insertFileLink)),
-            makeButton("Export", action: #selector(exportMarkdown)),
-            makeSeparator(),
-            makeButton("Undo Text", action: #selector(undoText)),
-            makeButton("Redo Text", action: #selector(redoText)),
-            makeButton("Undo Structure", action: #selector(undoStructure)),
-            makeButton("Redo Structure", action: #selector(redoStructure)),
-            makeSeparator(),
-            makeButton("Toggle Check", action: #selector(toggleChecklist)),
-            makeButton("Focus First", action: #selector(focusFirstBlock)),
-            reorderCheckbox
+        modeControl.segmentStyle = .rounded
+        modeControl.selectedSegment = editorMode.segment
+        modeControl.target = self
+        modeControl.action = #selector(changeEditorMode)
+    }
+
+    private func configureContentContainer() {
+        [editorView, rawScrollView, loadingLabel].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+            contentContainer.addSubview($0)
+        }
+        loadingLabel.alignment = .center
+        loadingLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        loadingLabel.textColor = .secondaryLabelColor
+
+        NSLayoutConstraint.activate([
+            editorView.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
+            editorView.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor),
+            editorView.topAnchor.constraint(equalTo: contentContainer.topAnchor),
+            editorView.bottomAnchor.constraint(equalTo: contentContainer.bottomAnchor),
+
+            rawScrollView.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
+            rawScrollView.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor),
+            rawScrollView.topAnchor.constraint(equalTo: contentContainer.topAnchor),
+            rawScrollView.bottomAnchor.constraint(equalTo: contentContainer.bottomAnchor),
+
+            loadingLabel.centerXAnchor.constraint(equalTo: contentContainer.centerXAnchor),
+            loadingLabel.centerYAnchor.constraint(equalTo: contentContainer.centerYAnchor)
         ])
-        toolbar.orientation = .horizontal
-        toolbar.spacing = 8
-        toolbar.alignment = .centerY
-        return toolbar
+        contentContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
+        contentContainer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        contentContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 460).isActive = true
     }
 
-    private func makeSidePanel() -> NSView {
-        let sideStack = NSStackView()
-        sideStack.orientation = .vertical
-        sideStack.spacing = 10
+    private func installSplitView() {
+        let sidebarScrollView = NSScrollView()
+        sidebarScrollView.borderType = .noBorder
+        sidebarScrollView.drawsBackground = false
+        sidebarScrollView.hasVerticalScroller = true
+        sidebarScrollView.documentView = sidebarTableView
 
-        completionQueryField.placeholderString = "Completion query"
-        completionResultsLabel.maximumNumberOfLines = 8
+        let sidebarViewController = NSViewController()
+        sidebarViewController.view = sidebarScrollView
+        let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebarViewController)
+        sidebarItem.minimumThickness = 176
+        sidebarItem.maximumThickness = 260
+        sidebarItem.canCollapse = false
 
-        let completionButtons = NSStackView(views: [
-            makeButton("Mentions", action: #selector(showMentionCompletions)),
-            makeButton("Slash", action: #selector(showSlashCompletions)),
-            makeButton("Insert First", action: #selector(insertFirstCompletion))
-        ])
-        completionButtons.orientation = .horizontal
-        completionButtons.spacing = 8
+        let contentViewController = NSViewController()
+        contentViewController.view = makeMainContentView()
+        contentViewController.preferredContentSize = NSSize(width: 920, height: 760)
+        let contentItem = NSSplitViewItem(viewController: contentViewController)
+        contentItem.minimumThickness = 560
 
-        markdownTextView.string = DemoData.markdownSample
-        markdownTextView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        markdownTextView.isRichText = false
-        let markdownScrollView = NSScrollView()
-        markdownScrollView.borderType = .bezelBorder
-        markdownScrollView.hasVerticalScroller = true
-        markdownScrollView.documentView = markdownTextView
-        markdownScrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 220).isActive = true
-
-        let swiftUIPreview = NSHostingView(rootView: DemoSwiftUIPreview())
-        swiftUIPreview.heightAnchor.constraint(equalToConstant: 180).isActive = true
-
-        sideStack.addArrangedSubview(sectionLabel("Completion Provider"))
-        sideStack.addArrangedSubview(completionQueryField)
-        sideStack.addArrangedSubview(completionButtons)
-        sideStack.addArrangedSubview(completionResultsLabel)
-        sideStack.addArrangedSubview(sectionLabel("Markdown Import / Export"))
-        sideStack.addArrangedSubview(markdownScrollView)
-        sideStack.addArrangedSubview(sectionLabel("SwiftUI Wrapper"))
-        sideStack.addArrangedSubview(swiftUIPreview)
-        return sideStack
+        splitViewController.addSplitViewItem(sidebarItem)
+        splitViewController.addSplitViewItem(contentItem)
     }
 
-    private func makeStatusBar() -> NSView {
-        let statusStack = NSStackView(views: [statusLabel, selectionLabel])
-        statusStack.orientation = .horizontal
-        statusStack.spacing = 16
-        statusStack.distribution = .fillEqually
+    private func makeMainContentView() -> NSView {
+        let rootStack = NSStackView()
+        rootStack.orientation = .vertical
+        rootStack.spacing = 0
 
-        selectionDebugLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        selectionDebugLabel.textColor = .secondaryLabelColor
-        selectionDebugLabel.maximumNumberOfLines = 2
-        selectionDebugLabel.lineBreakMode = .byTruncatingMiddle
-
-        let views: [NSView] = isSelectionDebugEnabled ? [statusStack, selectionDebugLabel] : [statusStack]
-        let stack = NSStackView(views: views)
-        stack.orientation = .vertical
-        stack.spacing = 4
-        return stack
+        rootStack.addArrangedSubview(makeControlStrip())
+        rootStack.addArrangedSubview(makeSeparator())
+        rootStack.addArrangedSubview(contentContainer)
+        return rootStack
     }
 
-    private func makeButton(_ title: String, action: Selector) -> NSButton {
-        let button = NSButton(title: title, target: self, action: action)
-        button.bezelStyle = .rounded
-        return button
-    }
+    private func makeControlStrip() -> NSView {
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-    private func sectionLabel(_ title: String) -> NSTextField {
-        let label = NSTextField(labelWithString: title)
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
-        return label
+        let strip = NSStackView(views: [noteTitleLabel, spacer, reorderCheckbox, modeControl])
+        strip.orientation = .horizontal
+        strip.alignment = .centerY
+        strip.spacing = 12
+        strip.edgeInsets = NSEdgeInsets(top: 10, left: 14, bottom: 10, right: 14)
+        return strip
     }
 
     private func makeSeparator() -> NSBox {
@@ -177,169 +197,301 @@ final class DemoWindowController: NSWindowController {
         return box
     }
 
-    private func installSelectionDebugObserver() {
-        selectionDebugObserver = NotificationCenter.default.addObserver(
-            forName: selectionDebugNotificationName,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            guard let message = notification.userInfo?["message"] as? String else {
-                return
-            }
-            Task { @MainActor in
-                self?.selectionDebugLabel.stringValue = "Selection debug: \(message)"
-            }
+    private func warmRemainingNotesAfterLaunch() {
+        for note in notes where sessions[note.id] == nil {
+            startWarmTask(for: note.id)
         }
     }
 
-    private func configureEditor() {
-        editorView.configure(BlockInputConfiguration(
-            documentStore: store,
-            allowsBlockReordering: reorderCheckbox.state == .on,
-            undoController: undoController,
-            completionProvider: completionProvider,
-            onDocumentMutation: { [weak self] _ in
-                self?.updateStatusForCurrentStore()
-            },
-            onSelectionChange: { [weak self] selection in
-                self?.updateSelection(selection)
-            }
-        ))
-    }
-
-    private func replaceDocument(_ document: BlockInputDocument, status: String) {
-        store = BlockInputMemoryDocumentStore(document: document)
-        undoController = BlockInputUndoController()
-        latestCompletionSuggestions = []
-        completionResultsLabel.stringValue = ""
-        configureEditor()
-        updateStatus(for: document, prefix: status)
-    }
-
-    private func updateStatus(for document: BlockInputDocument, prefix: String? = nil) {
-        updateStatus(blockCount: document.blocks.count, prefix: prefix)
-    }
-
-    private func updateStatusForCurrentStore(prefix: String? = nil) {
-        updateStatus(blockCount: store.blockCount, prefix: prefix)
-    }
-
-    private func updateStatus(blockCount: Int, prefix: String? = nil) {
-        let base = "\(blockCount) blocks"
-        statusLabel.stringValue = [prefix, base].compactMap { $0 }.joined(separator: " - ")
-    }
-
-    private func updateSelection(_ selection: BlockInputSelection?) {
-        switch selection {
-        case .cursor(let cursor):
-            selectionLabel.stringValue = "Cursor: \(cursor.blockID.rawValue) @ \(cursor.utf16Offset)"
-        case .text(let range):
-            selectionLabel.stringValue = "Text: \(range.blockID.rawValue) \(range.range)"
-        case .blocks(let blockIDs):
-            selectionLabel.stringValue = "Blocks: \(blockIDs.count)"
-        case .mixed(let selection):
-            let partialCount = [selection.leadingTextRange, selection.trailingTextRange].compactMap { $0 }.count
-            selectionLabel.stringValue = "Mixed: \(selection.blockIDs.count + partialCount) blocks"
-        case nil:
-            selectionLabel.stringValue = "No selection"
-        }
-    }
-
-    @objc private func loadMixedDocument() {
-        replaceDocument(DemoData.mixedDocument(), status: "Loaded mixed document")
-    }
-
-    @objc private func loadLargeDocument() {
-        replaceDocument(DemoData.largeDocument(), status: "Loaded 100k document")
-    }
-
-    @objc private func importMarkdown() {
-        replaceDocument(BlockInputDocument(markdown: markdownTextView.string), status: "Imported Markdown")
-    }
-
-    @objc private func insertMarkdown() {
-        let selection = editorView.insertMarkdown(markdownTextView.string)
-        updateStatus(for: editorView.document, prefix: selection == nil ? "Markdown insert ignored" : "Inserted Markdown")
-    }
-
-    @objc private func insertFileLink() {
-        let selection = editorView.insertFileURLs([URL(fileURLWithPath: #filePath)])
-        updateStatus(for: editorView.document, prefix: selection == nil ? "File insert ignored" : "Inserted file link")
-    }
-
-    @objc private func exportMarkdown() {
-        markdownTextView.string = editorView.document.markdown
-        updateStatus(for: editorView.document, prefix: "Exported Markdown")
-    }
-
-    @objc private func undoText() {
-        let result = editorView.undoTextEditInActiveBlock()
-        updateStatus(for: editorView.document, prefix: result?.actionName ?? "No text undo")
-    }
-
-    @objc private func redoText() {
-        let result = editorView.redoTextEditInActiveBlock()
-        updateStatus(for: editorView.document, prefix: result?.actionName ?? "No text redo")
-    }
-
-    @objc private func undoStructure() {
-        let result = editorView.undoStructuralEdit()
-        updateStatus(for: editorView.document, prefix: result?.actionName ?? "No structural undo")
-    }
-
-    @objc private func redoStructure() {
-        let result = editorView.redoStructuralEdit()
-        updateStatus(for: editorView.document, prefix: result?.actionName ?? "No structural redo")
-    }
-
-    @objc private func toggleChecklist() {
-        let selection = editorView.toggleChecklistItem()
-        updateStatus(for: editorView.document, prefix: selection == nil ? "No checklist item selected" : "Toggled checklist")
-    }
-
-    @objc private func focusFirstBlock() {
-        guard let firstBlock = editorView.document.blocks.first else {
+    private func startWarmTask(for noteID: DemoNoteID) {
+        guard sessions[noteID] == nil,
+              warmTasks[noteID] == nil else {
             return
         }
-        editorView.focus(blockID: firstBlock.id, utf16Offset: 0)
+        warmTasks[noteID] = Task { [weak self] in
+            let warmState = await Task.detached(priority: .utility) {
+                DemoNoteWarmState.make(for: noteID)
+            }.value
+            guard !Task.isCancelled else {
+                return
+            }
+            self?.installWarmedSession(warmState)
+        }
+    }
+
+    private func installWarmedSession(_ warmState: DemoNoteWarmState) {
+        warmTasks[warmState.id] = nil
+        guard sessions[warmState.id] == nil else {
+            return
+        }
+        let session = DemoNoteSession(note: DemoNote(id: warmState.id), warmState: warmState)
+        sessions[warmState.id] = session
+        if currentNoteID == warmState.id {
+            applySelectedNote(preloadBothViews: false)
+        }
+    }
+
+    private func applySelectedNote(preloadBothViews: Bool) {
+        noteTitleLabel.stringValue = currentNoteID.title
+        guard let session = currentSession else {
+            showLoadingState(for: currentNoteID)
+            startWarmTask(for: currentNoteID)
+            return
+        }
+
+        loadingLabel.stringValue = ""
+        prepareRenderedView(for: session, preload: preloadBothViews)
+        if preloadBothViews || editorMode == .raw || rawTextNoteID == currentNoteID {
+            applyRawMarkdown(session.rawMarkdown, to: session)
+        }
+        if editorMode == .raw {
+            prepareRawView(for: session)
+        }
+        updateVisibleContent(isLoading: false)
+    }
+
+    private func showLoadingState(for noteID: DemoNoteID) {
+        loadingLabel.stringValue = "Loading \(noteID.title)..."
+        updateVisibleContent(isLoading: true)
+    }
+
+    private func prepareRenderedView(for session: DemoNoteSession, preload: Bool = false) {
+        let hasPendingRawParse = session.pendingRawParseTask != nil
+        if preload || editorConfiguredNoteID != session.note.id || session.renderedViewNeedsReload || hasPendingRawParse {
+            configureEditor(for: session, markRenderedViewFresh: !hasPendingRawParse)
+        }
+        if hasPendingRawParse {
+            scheduleRawParse(for: session, delay: 0)
+        }
+    }
+
+    private func prepareRawView(for session: DemoNoteSession) {
+        let needsRefresh = session.rawViewNeedsReload
+        if rawTextNoteID != session.note.id || needsRefresh {
+            applyRawMarkdown(session.rawMarkdown, to: session, markRawViewFresh: !needsRefresh)
+        }
+        if needsRefresh {
+            refreshRawMarkdownFromStore(for: session)
+        }
+    }
+
+    private func updateVisibleContent(isLoading: Bool) {
+        loadingLabel.isHidden = !isLoading
+        editorView.isHidden = isLoading || editorMode != .rendered
+        rawScrollView.isHidden = isLoading || editorMode != .raw
+        modeControl.selectedSegment = editorMode.segment
+        reorderCheckbox.state = allowsReordering ? .on : .off
+    }
+
+    private func configureEditor(for session: DemoNoteSession, markRenderedViewFresh: Bool = true) {
+        editorView.configure(BlockInputConfiguration(
+            documentStore: session.store,
+            allowsBlockReordering: allowsReordering,
+            undoController: session.undoController,
+            onDocumentMutation: { [weak self, noteID = session.note.id] change in
+                self?.handleRenderedMutation(change, noteID: noteID)
+            },
+            onDocumentChange: { [weak self, noteID = session.note.id] document in
+                self?.handleRenderedDocumentChange(document, noteID: noteID)
+            }
+        ))
+        editorConfiguredNoteID = session.note.id
+        if markRenderedViewFresh {
+            session.renderedViewNeedsReload = false
+        }
+    }
+
+    private func handleRenderedMutation(_: BlockInputDocumentChange, noteID: DemoNoteID) {
+        guard let session = sessions[noteID] else {
+            return
+        }
+        session.documentRevision += 1
+        session.rawViewNeedsReload = true
+        session.pendingMarkdownTask?.cancel()
+        session.pendingMarkdownTask = nil
+    }
+
+    private func handleRenderedDocumentChange(_ document: BlockInputDocument, noteID: DemoNoteID) {
+        guard let session = sessions[noteID] else {
+            return
+        }
+        let revision = session.documentRevision
+        session.pendingMarkdownTask?.cancel()
+        session.pendingMarkdownTask = Task { [weak self, document, noteID, revision] in
+            let markdown = await Task.detached(priority: .utility) {
+                document.markdown
+            }.value
+            self?.applyRenderedMarkdown(markdown, noteID: noteID, revision: revision)
+        }
+    }
+
+    private func applyRenderedMarkdown(_ markdown: String, noteID: DemoNoteID, revision: Int) {
+        guard let session = sessions[noteID],
+              session.documentRevision == revision else {
+            return
+        }
+        session.rawMarkdown = markdown
+        session.rawViewNeedsReload = rawTextNoteID != noteID || rawTextView.string != markdown
+        session.pendingMarkdownTask = nil
+        if currentNoteID == noteID,
+           editorMode == .raw {
+            applyRawMarkdown(markdown, to: session)
+        }
+    }
+
+    private func refreshRawMarkdownFromStore(for session: DemoNoteSession) {
+        let noteID = session.note.id
+        let revision = session.documentRevision
+        let store = session.store
+        session.pendingMarkdownTask?.cancel()
+        session.pendingMarkdownTask = Task { [weak self, noteID, revision, store] in
+            let markdown = await Task.detached(priority: .utility) {
+                store.backgroundDocumentSnapshot().markdown
+            }.value
+            self?.applyRenderedMarkdown(markdown, noteID: noteID, revision: revision)
+        }
+    }
+
+    private func applyRawMarkdown(_ markdown: String, to session: DemoNoteSession, markRawViewFresh: Bool = true) {
+        isApplyingRawText = true
+        rawTextView.string = markdown
+        isApplyingRawText = false
+        rawTextNoteID = session.note.id
+        session.rawMarkdown = markdown
+        if markRawViewFresh {
+            session.rawViewNeedsReload = false
+        }
+    }
+
+    private func handleRawTextDidChange() {
+        guard !isApplyingRawText,
+              let session = currentSession,
+              rawTextNoteID == session.note.id else {
+            return
+        }
+        session.rawMarkdown = rawTextView.string
+        session.rawViewNeedsReload = false
+        session.renderedViewNeedsReload = true
+        session.documentRevision += 1
+        session.pendingMarkdownTask?.cancel()
+        session.pendingMarkdownTask = nil
+        scheduleRawParse(for: session, delay: 0.35)
+    }
+
+    private func scheduleRawParse(for session: DemoNoteSession, delay: TimeInterval) {
+        let markdown = session.rawMarkdown
+        let noteID = session.note.id
+        session.rawParseGeneration += 1
+        let generation = session.rawParseGeneration
+        session.pendingRawParseTask?.cancel()
+        session.pendingRawParseTask = Task { [weak self, markdown, noteID, generation] in
+            let nanoseconds = UInt64(max(0, delay) * 1_000_000_000)
+            if nanoseconds > 0 {
+                do {
+                    try await Task.sleep(nanoseconds: nanoseconds)
+                } catch {
+                    return
+                }
+            }
+            guard !Task.isCancelled else {
+                return
+            }
+            let document = await Task.detached(priority: .userInitiated) {
+                BlockInputDocument(markdown: markdown)
+            }.value
+            self?.applyRawDocument(document, noteID: noteID, generation: generation)
+        }
+    }
+
+    private func applyRawDocument(_ document: BlockInputDocument, noteID: DemoNoteID, generation: Int) {
+        guard let session = sessions[noteID],
+              session.rawParseGeneration == generation else {
+            return
+        }
+        session.pendingRawParseTask = nil
+        session.store.replaceDocument(document)
+        session.undoController = BlockInputUndoController()
+        session.renderedViewNeedsReload = true
+        if currentNoteID == noteID {
+            if editorMode == .rendered {
+                configureEditor(for: session)
+            }
+        }
+    }
+
+    @objc private func changeEditorMode() {
+        guard let mode = DemoEditorMode(segment: modeControl.selectedSegment),
+              mode != editorMode else {
+            return
+        }
+        editorMode = mode
+        guard let session = currentSession else {
+            showLoadingState(for: currentNoteID)
+            return
+        }
+        switch mode {
+        case .raw:
+            prepareRawView(for: session)
+        case .rendered:
+            prepareRenderedView(for: session)
+        }
+        updateVisibleContent(isLoading: false)
     }
 
     @objc private func toggleReordering() {
-        configureEditor()
-        updateStatus(for: editorView.document, prefix: reorderCheckbox.state == .on ? "Reordering enabled" : "Reordering disabled")
-    }
-
-    @objc private func showMentionCompletions() {
-        showCompletions(trigger: .mention)
-    }
-
-    @objc private func showSlashCompletions() {
-        showCompletions(trigger: .slashCommand)
-    }
-
-    private func showCompletions(trigger: BlockInputCompletionTrigger) {
-        let query = completionQueryField.stringValue
-        Task { [weak self] in
-            guard let self else {
-                return
-            }
-            let suggestions = await editorView.completionSuggestions(trigger: trigger, query: query)
-            latestCompletionSuggestions = suggestions
-            completionResultsLabel.stringValue = suggestions.isEmpty
-                ? "No suggestions"
-                : suggestions.map { "\($0.title) -> \($0.insertionText)" }.joined(separator: "\n")
-        }
-    }
-
-    @objc private func insertFirstCompletion() {
-        guard let suggestion = latestCompletionSuggestions.first else {
-            updateStatus(for: editorView.document, prefix: "No completion selected")
+        allowsReordering = reorderCheckbox.state == .on
+        guard let session = currentSession else {
             return
         }
-        let selection = editorView.acceptCompletionSuggestion(suggestion)
-        updateStatus(for: editorView.document, prefix: selection == nil ? "Completion ignored" : "Inserted completion")
+        configureEditor(for: session)
     }
 }
 
-private let selectionDebugEnabledKey = "BlockInputKitSelectionDebugEnabled"
-private let selectionDebugNotificationName = Notification.Name("BlockInputKitSelectionDebugEvent")
+extension DemoWindowController: NSTableViewDataSource, NSTableViewDelegate {
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        notes.count
+    }
+
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        guard notes.indices.contains(row) else {
+            return nil
+        }
+        let cell = tableView.makeView(withIdentifier: sidebarCellIdentifier, owner: self) as? NSTableCellView ?? makeSidebarCell()
+        cell.textField?.stringValue = notes[row].title
+        return cell
+    }
+
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        let row = sidebarTableView.selectedRow
+        guard notes.indices.contains(row) else {
+            return
+        }
+        currentNoteID = notes[row].id
+        applySelectedNote(preloadBothViews: false)
+    }
+
+    private func makeSidebarCell() -> NSTableCellView {
+        let cell = NSTableCellView()
+        cell.identifier = sidebarCellIdentifier
+        let textField = NSTextField(labelWithString: "")
+        textField.translatesAutoresizingMaskIntoConstraints = false
+        textField.lineBreakMode = .byTruncatingTail
+        cell.addSubview(textField)
+        cell.textField = textField
+        NSLayoutConstraint.activate([
+            textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 10),
+            textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+            textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+        ])
+        return cell
+    }
+}
+
+extension DemoWindowController: NSTextViewDelegate {
+    func textDidChange(_ notification: Notification) {
+        guard notification.object as? NSTextView === rawTextView else {
+            return
+        }
+        handleRawTextDidChange()
+    }
+}

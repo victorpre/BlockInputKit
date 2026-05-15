@@ -2,28 +2,6 @@ import BlockInputKit
 import Foundation
 
 enum DemoData {
-    static let markdownSample = """
-    BlockInputKit Markdown import
-
-    ## Heading blocks
-
-    > Quotes become quote blocks.
-
-    - Bulleted list item
-      - Nested bullet
-
-    1. Numbered item
-
-    - [ ] Checklist item
-    - [x] Completed checklist item
-
-    ---
-
-    ```swift
-    let editor = BlockInputView()
-    ```
-    """
-
     static func mixedDocument() -> BlockInputDocument {
         BlockInputDocument(blocks: [
             BlockInputBlock(kind: .heading(level: 1), text: "BlockInputKit demo"),
@@ -32,17 +10,8 @@ enum DemoData {
             BlockInputBlock(kind: .horizontalRule),
             BlockInputBlock(kind: .code(language: "swift"), text: "let editor = BlockInputView()\neditor.focusEditor()"),
             BlockInputBlock(kind: .bulletedListItem, text: "Hover rows to reveal reorder handles"),
-            BlockInputBlock(kind: .numberedListItem(start: 1), text: "Toggle reordering from the toolbar"),
-            BlockInputBlock(kind: .checklistItem(isChecked: false), text: "Checklist data round-trips through Markdown"),
-            BlockInputBlock(kind: .paragraph, text: "Try mention query: @av"),
-            BlockInputBlock(kind: .paragraph, text: "Try slash query: /code")
-        ])
-    }
-
-    static func swiftUIDocument() -> BlockInputDocument {
-        BlockInputDocument(blocks: [
-            BlockInputBlock(kind: .heading(level: 2), text: "SwiftUI wrapper preview"),
-            BlockInputBlock(kind: .quote, text: "This side panel embeds BlockInputEditor.")
+            BlockInputBlock(kind: .numberedListItem(start: 1), text: "Switch between raw Markdown and rendered blocks"),
+            BlockInputBlock(kind: .checklistItem(isChecked: false), text: "Checklist data round-trips through Markdown")
         ])
     }
 
