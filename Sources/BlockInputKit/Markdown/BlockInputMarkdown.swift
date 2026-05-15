@@ -51,7 +51,7 @@ enum BlockInputMarkdownImporter {
         return parseParagraph(lines: lines, startIndex: startIndex)
     }
 
-    private static func codeFenceLanguage(in line: String) -> String?? {
+    static func codeFenceLanguage(in line: String) -> String?? {
         guard let opening = BlockInputCodeParsing.codeFenceOpening(in: line) else {
             return nil
         }
@@ -194,7 +194,7 @@ enum BlockInputMarkdownImporter {
         return (BlockInputBlock(kind: .paragraph, text: content.joined(separator: "\n")), index)
     }
 
-    private static func parseHeading(_ line: String) -> BlockInputBlock? {
+    static func parseHeading(_ line: String) -> BlockInputBlock? {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         let level = trimmed.prefix { $0 == "#" }.count
         guard (1...6).contains(level),
@@ -204,7 +204,7 @@ enum BlockInputMarkdownImporter {
         return BlockInputBlock(kind: .heading(level: level), text: String(trimmed.dropFirst(level + 1)))
     }
 
-    private static func parseListLine(_ line: String) -> BlockInputBlock? {
+    static func parseListLine(_ line: String) -> BlockInputBlock? {
         let leadingSpaceCount = line.prefix { $0 == " " }.count
         let indentationLevel = leadingSpaceCount / 2
         let trimmed = String(line.dropFirst(leadingSpaceCount))
@@ -295,7 +295,7 @@ enum BlockInputMarkdownImporter {
         return isTableDelimiterLine(lines[startIndex + 1])
     }
 
-    private static func isTableDelimiterLine(_ line: String) -> Bool {
+    static func isTableDelimiterLine(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard trimmed.contains("-"),
               trimmed.contains("|") else {
@@ -306,16 +306,16 @@ enum BlockInputMarkdownImporter {
         }
     }
 
-    private static func isTableContentLine(_ line: String) -> Bool {
+    static func isTableContentLine(_ line: String) -> Bool {
         !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && line.contains("|")
     }
 
-    private static func isFootnoteDefinition(_ line: String) -> Bool {
+    static func isFootnoteDefinition(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         return trimmed.hasPrefix("[^") && trimmed.contains("]:")
     }
 
-    private static func isIndentedFootnoteContinuationLine(_ line: String) -> Bool {
+    static func isIndentedFootnoteContinuationLine(_ line: String) -> Bool {
         !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             (line.hasPrefix("    ") || line.hasPrefix("\t"))
     }

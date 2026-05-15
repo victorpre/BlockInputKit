@@ -136,11 +136,11 @@ extension BlockInputMarkdownImporter {
         return rawBlock(lines: lines, range: startIndex..<index)
     }
 
-    private static func isDelimitedRawHTMLTagName(_ tagName: String) -> Bool {
+    static func isDelimitedRawHTMLTagName(_ tagName: String) -> Bool {
         ["pre", "script", "style", "textarea"].contains(tagName.lowercased())
     }
 
-    private static func isSelfContainedHTMLTag(_ opening: String, tagName: String) -> Bool {
+    static func isSelfContainedHTMLTag(_ opening: String, tagName: String) -> Bool {
         if opening.hasSuffix("/>") {
             return true
         }
@@ -150,7 +150,7 @@ extension BlockInputMarkdownImporter {
         ].contains(tagName.lowercased())
     }
 
-    private static func htmlBlockOpeningTagName(in line: String) -> String? {
+    static func htmlBlockOpeningTagName(in line: String) -> String? {
         guard let tagName = htmlOpeningTagName(in: line) else {
             return nil
         }
@@ -160,7 +160,7 @@ extension BlockInputMarkdownImporter {
         return nil
     }
 
-    private static func isBlockHTMLTagName(_ tagName: String) -> Bool {
+    static func isBlockHTMLTagName(_ tagName: String) -> Bool {
         [
             "address", "article", "aside", "base", "basefont", "blockquote", "body",
             "caption", "center", "col", "colgroup", "dd", "details", "dialog",
@@ -174,7 +174,7 @@ extension BlockInputMarkdownImporter {
         ].contains(tagName.lowercased())
     }
 
-    private static func containsHTMLClosingTag(_ line: String, tagName: String) -> Bool {
+    static func containsHTMLClosingTag(_ line: String, tagName: String) -> Bool {
         let lowercasedLine = line.lowercased()
         let needle = "</\(tagName.lowercased())"
         var searchStart = lowercasedLine.startIndex
@@ -190,7 +190,7 @@ extension BlockInputMarkdownImporter {
         return false
     }
 
-    private static func htmlOpeningTagName(in line: String) -> String? {
+    static func htmlOpeningTagName(in line: String) -> String? {
         var cursor = line.startIndex
         guard cursor < line.endIndex, line[cursor] == "<" else {
             return nil

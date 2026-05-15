@@ -67,6 +67,42 @@ struct EditorScreen: View {
 }
 ```
 
+## Markdown Streaming
+
+Use the async Markdown APIs when reading or writing files. File reads are UTF-8 line-by-line, and streaming writes emit chunks in block order without first converting the document to one full Markdown string. Streaming deserialization buffers only the current block and any lookahead needed to match snapshot import behavior; unsupported block-level constructs are retained as `rawMarkdown` blocks rather than discarded.
+
+```swift
+let url = URL(filePath: "/tmp/note.md")
+let document = try await BlockInputDocument.readingMarkdown(from: url)
+try await document.writeMarkdown(to: url)
+
+let parsed = await BlockInputDocument.parsingMarkdown("# Heading")
+let markdown = await parsed.markdownSnapshot()
+```
+
+Custom storage can implement the streaming protocols directly:
+
+```swift
+struct DatabaseLineReader: BlockInputMarkdownLineReader {
+    mutating func readMarkdownLine() async throws -> String? {
+        // Return the next logical line without its trailing line ending, or nil at EOF.
+        nil
+    }
+}
+
+struct ChunkWriter: BlockInputMarkdownWriter {
+    mutating func writeMarkdown(_ chunk: String) async throws {
+        // Persist this chunk immediately; do not buffer the whole document.
+    }
+}
+
+var reader = DatabaseLineReader()
+let streamed = try await BlockInputDocument.readMarkdown(from: &reader)
+
+var writer = ChunkWriter()
+try await streamed.writeMarkdown(to: &writer)
+```
+
 ## Demo
 
 Run the local demo:
@@ -118,6 +154,7 @@ The demo app includes:
 - Markdown import/export supports paragraph, heading, horizontal rule, code, quote, bulleted list, numbered list, and checklist blocks.
 - Unsupported block-level Markdown such as front matter, tables, raw HTML blocks, setext headings, and footnote definitions imports as editable `rawMarkdown` blocks and exports the raw block text verbatim.
 - Rendered `rawMarkdown` blocks use editable wrapping monospaced source text without code-block chrome, Markdown typing shortcuts, or list indentation behavior.
+- `BlockInputMarkdownLineReader` and `BlockInputMarkdownWriter` support sequential Markdown import/export for files and custom storage.
 - File URL insertion helpers and built-in file drops create Markdown link blocks.
 
 ## Performance Expectations
