@@ -1,6 +1,4 @@
-import AppKit
-
-enum DemoEditorMode: Int, CaseIterable {
+enum DemoEditorMode: Int, CaseIterable, Hashable {
     case raw
     case rendered
 
@@ -12,15 +10,4 @@ enum DemoEditorMode: Int, CaseIterable {
             "Rendered"
         }
     }
-
-    var segment: Int {
-        rawValue
-    }
-
-    init?(segment: Int) {
-        self.init(rawValue: segment)
-    }
 }
-
-let sidebarColumnIdentifier = NSUserInterfaceItemIdentifier("DemoNoteColumn")
-let sidebarCellIdentifier = NSUserInterfaceItemIdentifier("DemoNoteCell")

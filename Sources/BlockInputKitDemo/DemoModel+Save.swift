@@ -1,82 +1,78 @@
-import AppKit
 import BlockInputKit
-import UniformTypeIdentifiers
+import Foundation
 
-extension DemoWindowController {
-    @objc func saveDocument(_ sender: Any?) {
+extension DemoModel {
+    func saveSelectedDocument() {
         guard let session = currentSession,
-              case .idle = session.loadingState else {
-            return
-        }
-        guard session.fileURL != nil else {
-            saveDocumentAs(sender)
+              session.loadingState == .idle,
+              session.fileURL != nil else {
             return
         }
         requestSave(for: session, rawEdit: false, immediate: true)
     }
 
-    @objc func saveDocumentAs(_ sender: Any?) {
-        guard let session = currentSession,
-              case .idle = session.loadingState else {
+    func saveCurrentSessionAs(_ url: URL) {
+        guard let session = currentSession else {
             return
         }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [
-            UTType(filenameExtension: "md"),
-            UTType(filenameExtension: "markdown")
-        ].compactMap { $0 }
-        panel.nameFieldStringValue = defaultSaveName(for: session)
-        let completion: (NSApplication.ModalResponse) -> Void = { [weak self] response in
-            guard response == .OK,
-                  let url = panel.url else {
-                return
-            }
-            Task { @MainActor in
-                self?.saveCurrentSessionAs(url)
-            }
-        }
-        if let window {
-            panel.beginSheetModal(for: window, completionHandler: completion)
+        let hadPendingRawParse = session.pendingRawParseTask != nil
+        let fileURL = standardizedFileURL(for: url)
+        let targetSession: DemoNoteSession
+        if session.fileURL == nil {
+            targetSession = copySession(session, to: fileURL)
+            installFileBackedSession(targetSession)
+            select(targetSession.id)
         } else {
-            completion(panel.runModal())
+            targetSession = session
+            retargetFileSession(session, to: fileURL)
+        }
+        targetSession.isDirty = true
+        targetSession.saveGeneration += 1
+        if hadPendingRawParse {
+            scheduleRawParse(for: targetSession, delay: 0)
+        }
+        requestSave(for: targetSession, rawEdit: false, immediate: true)
+        objectWillChange.send()
+    }
+
+    func defaultSaveName(for session: DemoNoteSession) -> String {
+        if let fileURL = session.fileURL {
+            return fileURL.lastPathComponent
+        }
+        return "\(session.title).md"
+    }
+
+    func saveStatusText(for session: DemoNoteSession) -> String {
+        switch session.saveState {
+        case .idle:
+            if session.fileURL == nil {
+                return ""
+            }
+            return session.isDirty ? "Edited" : "Saved"
+        case .saving:
+            return "Saving..."
+        case .failed(let message):
+            return message
         }
     }
 
-    func markSessionDirty(_ session: DemoNoteSession, rawEdit: Bool) {
+    @discardableResult
+    func markSessionDirty(_ session: DemoNoteSession, rawEdit: Bool) -> Bool {
+        let previousStatus = saveStatusText(for: session)
         guard session.loadingState == .idle else {
-            return
+            return false
         }
         session.isDirty = true
         session.saveGeneration += 1
         session.saveQueuedRawWrite = rawEdit
         session.saveState = .idle
-        if currentItemID == session.id {
-            updateSaveStatus(for: session)
+        if session.fileURL != nil {
+            scheduleAutosave(for: session, rawEdit: rawEdit)
         }
-        guard session.fileURL != nil else {
-            return
-        }
-        scheduleAutosave(for: session, rawEdit: rawEdit)
+        return saveStatusText(for: session) != previousStatus
     }
 
-    func updateSaveStatus(for session: DemoNoteSession) {
-        switch session.saveState {
-        case .idle:
-            if session.fileURL == nil {
-                saveStatusLabel.stringValue = ""
-            } else if session.isDirty {
-                saveStatusLabel.stringValue = "Edited"
-            } else {
-                saveStatusLabel.stringValue = "Saved"
-            }
-        case .saving:
-            saveStatusLabel.stringValue = "Saving..."
-        case .failed(let message):
-            saveStatusLabel.stringValue = message
-        }
-    }
-
-    private func scheduleAutosave(for session: DemoNoteSession, rawEdit: Bool) {
+    func scheduleAutosave(for session: DemoNoteSession, rawEdit: Bool) {
         session.pendingAutosaveTask?.cancel()
         let itemID = session.id
         let generation = session.saveGeneration
@@ -93,7 +89,7 @@ extension DemoWindowController {
         }
     }
 
-    private func startAutosave(itemID: DemoSidebarItemID, generation: Int, rawEdit: Bool) {
+    func startAutosave(itemID: DemoSidebarItemID, generation: Int, rawEdit: Bool) {
         guard let session = sessions[itemID],
               session.saveGeneration == generation,
               session.isDirty else {
@@ -102,7 +98,7 @@ extension DemoWindowController {
         requestSave(for: session, rawEdit: rawEdit, immediate: false)
     }
 
-    private func requestSave(for session: DemoNoteSession, rawEdit: Bool, immediate: Bool) {
+    func requestSave(for session: DemoNoteSession, rawEdit: Bool, immediate: Bool) {
         guard let url = session.fileURL else {
             return
         }
@@ -114,21 +110,20 @@ extension DemoWindowController {
         guard session.activeSaveTask == nil else {
             session.saveQueuedAfterActive = true
             session.saveQueuedRawWrite = shouldWriteRaw
+            objectWillChange.send()
             return
         }
         startSave(for: session, to: url, generation: session.saveGeneration, rawEdit: shouldWriteRaw)
     }
 
-    private func startSave(for session: DemoNoteSession, to url: URL, generation: Int, rawEdit: Bool) {
+    func startSave(for session: DemoNoteSession, to url: URL, generation: Int, rawEdit: Bool) {
         let itemID = session.id
         let rawMarkdown = session.rawMarkdown
         let document = session.store.backgroundDocumentSnapshot()
         session.saveState = .saving
         session.saveQueuedAfterActive = false
         session.saveQueuedRawWrite = false
-        if currentItemID == itemID {
-            updateSaveStatus(for: session)
-        }
+        objectWillChange.send()
         session.activeSaveTask = Task { [weak self, itemID, url, generation, rawEdit, rawMarkdown, document] in
             do {
                 if rawEdit {
@@ -149,7 +144,7 @@ extension DemoWindowController {
         }
     }
 
-    private func completeSave(itemID: DemoSidebarItemID, generation: Int, rawEdit: Bool, result: Result<Void, Error>) {
+    func completeSave(itemID: DemoSidebarItemID, generation: Int, rawEdit: Bool, result: Result<Void, Error>) {
         guard let session = sessions[itemID] else {
             return
         }
@@ -180,46 +175,21 @@ extension DemoWindowController {
             requestSave(for: session, rawEdit: false, immediate: true)
             return
         }
-        if currentItemID == itemID {
-            updateSaveStatus(for: session)
-        }
+        objectWillChange.send()
     }
 
-    private func saveCurrentSessionAs(_ url: URL) {
-        guard let session = currentSession else {
-            return
+    func installFileBackedSession(_ session: DemoNoteSession) {
+        if let existing = sessions[session.id],
+           existing !== session {
+            existing.cancelPendingWork()
         }
-        let hadPendingRawParse = session.pendingRawParseTask != nil
-        let fileURL = standardizedSaveURL(for: url)
-        let targetSession: DemoNoteSession
-        if session.fileURL == nil {
-            targetSession = copySession(session, to: fileURL)
-            installFileBackedSession(targetSession)
-            selectSidebarItem(targetSession.id)
-        } else {
-            targetSession = session
-            retargetFileSession(session, to: fileURL)
-        }
-        targetSession.isDirty = true
-        targetSession.saveGeneration += 1
-        if hadPendingRawParse {
-            scheduleRawParse(for: targetSession, delay: 0)
-        }
-        requestSave(for: targetSession, rawEdit: false, immediate: true)
-        updateSaveStatus(for: targetSession)
-    }
-
-    private func installFileBackedSession(_ session: DemoNoteSession) {
         sessions[session.id] = session
-        if let row = sidebarItems.firstIndex(where: { $0.id == session.id }) {
-            sidebarTableView.reloadData(forRowIndexes: IndexSet(integer: row), columnIndexes: IndexSet(integer: 0))
-            return
+        if !sidebarItems.contains(where: { $0.id == session.id }) {
+            sidebarItems.append(DemoSidebarItem(id: session.id))
         }
-        sidebarItems.append(DemoSidebarItem(id: session.id))
-        sidebarTableView.insertRows(at: IndexSet(integer: sidebarItems.count - 1), withAnimation: .effectFade)
     }
 
-    private func retargetFileSession(_ session: DemoNoteSession, to url: URL) {
+    func retargetFileSession(_ session: DemoNoteSession, to url: URL) {
         let oldID = session.id
         let newID = DemoSidebarItemID.file(url)
         guard oldID != newID else {
@@ -238,30 +208,22 @@ extension DemoWindowController {
         session.id = newID
         session.title = newID.title
         sessions[newID] = session
-        if rawTextItemID == oldID {
-            rawTextItemID = newID
-        }
-        currentItemID = newID
+        selectedItemID = newID
         let oldRow = sidebarItems.firstIndex(where: { $0.id == oldID })
         let existingRow = sidebarItems.firstIndex(where: { $0.id == newID })
         if let existingRow,
            existingRow != oldRow {
             if let oldRow {
                 sidebarItems.remove(at: oldRow)
-                sidebarTableView.removeRows(at: IndexSet(integer: oldRow), withAnimation: .effectFade)
             }
-            sidebarTableView.reloadData()
         } else if let oldRow {
             sidebarItems[oldRow].id = newID
-            sidebarTableView.reloadData(forRowIndexes: IndexSet(integer: oldRow), columnIndexes: IndexSet(integer: 0))
         } else {
             installFileBackedSession(session)
         }
-        configureEditor(for: session)
-        selectSidebarItem(newID)
     }
 
-    private func copySession(_ session: DemoNoteSession, to url: URL) -> DemoNoteSession {
+    func copySession(_ session: DemoNoteSession, to url: URL) -> DemoNoteSession {
         let document = session.store.backgroundDocumentSnapshot()
         let copy = DemoNoteSession(fileURL: url)
         copy.loadingState = .idle
@@ -272,19 +234,7 @@ extension DemoWindowController {
         copy.rawParseGeneration = session.rawParseGeneration
         copy.saveQueuedRawWrite = session.saveQueuedRawWrite
         copy.rawViewNeedsReload = true
-        copy.renderedViewNeedsReload = true
         return copy
-    }
-
-    private func defaultSaveName(for session: DemoNoteSession) -> String {
-        if let fileURL = session.fileURL {
-            return fileURL.lastPathComponent
-        }
-        return "\(session.title).md"
-    }
-
-    private func standardizedSaveURL(for url: URL) -> URL {
-        URL(fileURLWithPath: url.path).standardizedFileURL
     }
 
     private static func writeRawMarkdown(_ markdown: String, to url: URL) async throws {

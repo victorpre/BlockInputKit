@@ -56,6 +56,29 @@ struct DemoSidebarItem: Sendable {
     }
 }
 
+enum DemoSidebarSection {
+    case notes
+    case files
+
+    var title: String {
+        switch self {
+        case .notes:
+            "Notes"
+        case .files:
+            "Files"
+        }
+    }
+
+    func contains(_ item: DemoSidebarItem) -> Bool {
+        switch (self, item.id) {
+        case (.notes, .builtIn), (.files, .file):
+            true
+        case (.notes, .file), (.files, .builtIn):
+            false
+        }
+    }
+}
+
 enum DemoNoteLoadingState: Equatable {
     case idle
     case loading
@@ -93,7 +116,6 @@ final class DemoNoteSession {
     var saveState: DemoNoteSaveState = .idle
     var isDirty = false
     var rawViewNeedsReload = false
-    var renderedViewNeedsReload = false
     var documentRevision = 0
     var rawParseGeneration = 0
     var saveGeneration = 0
