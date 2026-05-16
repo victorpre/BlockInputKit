@@ -208,10 +208,7 @@ extension BlockInputView {
 
     func resizeVisibleItem(_ item: BlockInputBlockItem, for block: BlockInputBlock) {
         let itemWidth = item.view.bounds.width > 0 ? item.view.bounds.width : collectionView.bounds.width
-        let textWidth = max(
-            itemWidth - BlockInputBlockItem.horizontalChromeWidth(allowsReordering: allowsBlockReordering),
-            120
-        )
+        let textWidth = BlockInputBlockItem.measuredTextWidth(for: itemWidth, allowsReordering: allowsBlockReordering)
         let height = BlockInputBlockItem.height(for: block, textWidth: textWidth)
         guard abs(item.view.frame.height - height) > 0.5 else {
             return

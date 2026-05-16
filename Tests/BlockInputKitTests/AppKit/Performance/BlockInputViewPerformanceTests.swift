@@ -240,7 +240,7 @@ final class BlockInputViewPerformanceTests: XCTestCase {
             delegate: view
         )
         let itemWidth: CGFloat = 260
-        let textWidth = itemWidth - BlockInputBlockItem.horizontalChromeWidth(allowsReordering: true)
+        let textWidth = BlockInputBlockItem.measuredTextWidth(for: itemWidth, allowsReordering: true)
         let startingHeight = BlockInputBlockItem.height(for: block, textWidth: textWidth)
         item.view.frame = NSRect(x: 0, y: 0, width: itemWidth, height: startingHeight)
         let textView = try XCTUnwrap(item.testingTextView)

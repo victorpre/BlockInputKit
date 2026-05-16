@@ -118,10 +118,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         afterBlock: BlockInputBlock
     ) -> Bool {
         let itemWidth = item.view.bounds.width > 0 ? item.view.bounds.width : collectionView.bounds.width
-        let textWidth = max(
-            itemWidth - BlockInputBlockItem.horizontalChromeWidth(allowsReordering: allowsBlockReordering),
-            120
-        )
+        let textWidth = BlockInputBlockItem.measuredTextWidth(for: itemWidth, allowsReordering: allowsBlockReordering)
         let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: textWidth)
         let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: textWidth)
         let isStaleCodeBlockHeight: Bool

@@ -9,12 +9,12 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let handleWidth: CGFloat = 24
     static let handleLeading: CGFloat = 4
     static let handleTrailingGap: CGFloat = 4
+    static let defaultTextLeading: CGFloat = 4
     static let horizontalChromeWidthWithHandle: CGFloat = handleLeading + handleWidth + handleTrailingGap
-    static let horizontalChromeWidthWithoutHandle: CGFloat = handleLeading + handleTrailingGap
+    static let horizontalChromeWidthWithoutHandle: CGFloat = 8
     static let markerGutterWidth: CGFloat = 24
     static let markerChromeWidth: CGFloat = 18
     static let minimumMarkerTextGap: CGFloat = 4
-    static let defaultTextLeading: CGFloat = 4
     // Mirrors the NSTextView inset plus line-fragment padding so external chrome starts at the plain-text glyph column.
     static let textContainerContentLeading: CGFloat = 9
     static let markerAlignmentLeading: CGFloat = defaultTextLeading + textContainerContentLeading
@@ -25,6 +25,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let quoteBarVerticalInset: CGFloat = 2
     static let quoteTextLeading: CGFloat = 9
     static let codeTextHorizontalPadding: CGFloat = 6
+    static let horizontalRuleInnerInset: CGFloat = defaultTextLeading + 4
 
     let handleView = BlockInputDragHandleView()
     let kindLabel = BlockInputMarkerView()
@@ -48,11 +49,14 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var isTrackingBlockSelectionDrag = false
     var isDraggingBlockSelection = false
     var renderedCodeColorScheme: BlockInputSyntaxColorScheme?
+    var allowsReordering = true
+    var handleLeadingConstraint: NSLayoutConstraint?
     var handleWidthConstraint: NSLayoutConstraint?
     var kindLabelLeadingConstraint: NSLayoutConstraint?
     var kindLabelWidthConstraint: NSLayoutConstraint?
     var checklistButtonLeadingConstraint: NSLayoutConstraint?
     var scrollViewLeadingConstraint: NSLayoutConstraint?
+    var scrollViewTrailingConstraint: NSLayoutConstraint?
     var scrollViewTopConstraint: NSLayoutConstraint?
     var scrollViewBottomConstraint: NSLayoutConstraint?
     var handleTopConstraint: NSLayoutConstraint?
@@ -62,6 +66,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var quoteBarTopConstraint: NSLayoutConstraint?
     var quoteBarBottomConstraint: NSLayoutConstraint?
     var horizontalRuleLeadingConstraint: NSLayoutConstraint?
+    var horizontalRuleTrailingConstraint: NSLayoutConstraint?
     private var isHorizontalRule = false
 
     enum TextLinePosition {
@@ -156,6 +161,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         blockID = block.id
         renderedBlock = block
         self.delegate = delegate
+        self.allowsReordering = allowsReordering
         selectionBeforeTextChange = nil
         isHorizontalRule = block.kind == .horizontalRule
         handleView.blockItem = self
@@ -173,7 +179,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         handleView.isHidden = !allowsReordering
         handleView.alphaValue = 0
         handleView.toolTip = allowsReordering ? "Drag to reorder block" : nil
+        handleLeadingConstraint?.constant = allowsReordering ? Self.handleLeading : 0
         handleWidthConstraint?.constant = allowsReordering ? Self.handleWidth : 0
+        scrollViewTrailingConstraint?.constant = -Self.horizontalContentTrailingInset(allowsReordering: allowsReordering)
+        horizontalRuleTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: allowsReordering)
     }
 
     func updateTextDependentChrome(for block: BlockInputBlock) {
@@ -442,6 +451,13 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
 extension BlockInputBlockItem {
     func clearConfiguration() {
+        clearBlockReferencesForReuse()
+        resetTextForReuse()
+        resetLayoutForReuse()
+        resetChromeForReuse()
+    }
+
+    private func clearBlockReferencesForReuse() {
         blockID = nil
         renderedBlock = nil
         delegate = nil
@@ -456,41 +472,5 @@ extension BlockInputBlockItem {
         textView.cancelBlockSelectionDrag()
         textView.blockItem = nil
         finishBlockSelectionDrag()
-        textView.string = ""
-        textView.isEditable = true
-        textView.textContainerInset = Self.standardTextContainerInset
-        configureWrappingTextScrolling()
-        scrollView.isHidden = false
-        codeBackgroundView.isHidden = true
-        codeBackgroundView.alphaValue = 0
-        scrollViewLeadingConstraint?.constant = Self.defaultTextLeading
-        scrollViewTopConstraint?.constant = 0
-        scrollViewBottomConstraint?.constant = 0
-        handleTopConstraint?.constant = Self.dragHandleTopConstant(for: .paragraph, metrics: .standard)
-        kindLabelTopConstraint?.constant = 0
-        checklistButtonTopConstraint?.constant = BlockInputBlockItemVerticalMetrics.standard.checklistButtonTopConstant(
-            font: Self.font(for: .paragraph),
-            checkboxHeight: Self.checklistButtonHeight
-        )
-        quoteBarLeadingConstraint?.constant = Self.chromeFrameAlignmentOffset
-        quoteBarTopConstraint?.constant = Self.quoteBarVerticalInset
-        quoteBarBottomConstraint?.constant = -Self.quoteBarVerticalInset
-        horizontalRuleLeadingConstraint?.constant = Self.defaultTextLeading + 4
-        quoteBarView.isHidden = true
-        quoteBarView.alphaValue = 0
-        textView.setSelectedRange(NSRange(location: 0, length: 0))
-        textView.font = Self.font(for: .paragraph)
-        kindLabel.setMarkerLines([])
-        kindLabelLeadingConstraint?.constant = 0
-        kindLabelWidthConstraint?.constant = 0
-        checklistButton.state = .off
-        checklistButton.isHidden = true
-        checklistButton.isEnabled = false
-        checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
-        handleView.isEnabled = false
-        handleView.isHidden = true
-        handleView.alphaValue = 0
-        handleView.toolTip = nil
-        handleWidthConstraint?.constant = 0
     }
 }

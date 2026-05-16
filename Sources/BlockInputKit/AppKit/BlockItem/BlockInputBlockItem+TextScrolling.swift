@@ -53,7 +53,13 @@ extension BlockInputBlockItem {
     }
 
     var visibleTextViewportInItemCoordinates: NSRect {
-        scrollView.contentView.convert(scrollView.contentView.bounds, to: view)
+        let viewport = scrollView.contentView.convert(scrollView.contentView.bounds, to: view)
+        guard case .code = renderedBlock?.kind,
+              !codeBackgroundView.isHidden else {
+            return viewport
+        }
+        let clippedViewport = viewport.intersection(codeBackgroundView.frame)
+        return clippedViewport.isNull ? viewport : clippedViewport
     }
 
     func updateTextViewDocumentFrame() {

@@ -109,6 +109,8 @@ extension BlockInputBlockItem {
             constant: Self.checklistButtonBaseLeading
         )
         self.checklistButtonLeadingConstraint = checklistButtonLeadingConstraint
+        let handleLeadingConstraint = handleView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Self.handleLeading)
+        self.handleLeadingConstraint = handleLeadingConstraint
         let handleWidthConstraint = handleView.widthAnchor.constraint(equalToConstant: Self.handleWidth)
         self.handleWidthConstraint = handleWidthConstraint
         let handleTopConstraint = handleView.topAnchor.constraint(
@@ -132,7 +134,7 @@ extension BlockInputBlockItem {
         )
         self.checklistButtonTopConstraint = checklistButtonTopConstraint
         return [
-            handleView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Self.handleLeading),
+            handleLeadingConstraint,
             handleTopConstraint,
             handleWidthConstraint,
             kindLabelLeadingConstraint,
@@ -158,9 +160,13 @@ extension BlockInputBlockItem {
         self.scrollViewBottomConstraint = scrollViewBottomConstraint
         let horizontalRuleLeadingConstraint = horizontalRuleView.leadingAnchor.constraint(
             equalTo: scrollView.leadingAnchor,
-            constant: Self.defaultTextLeading + 4
+            constant: Self.horizontalRuleInnerInset
         )
         self.horizontalRuleLeadingConstraint = horizontalRuleLeadingConstraint
+        let scrollViewTrailingConstraint = makeScrollViewTrailingConstraint()
+        self.scrollViewTrailingConstraint = scrollViewTrailingConstraint
+        let horizontalRuleTrailingConstraint = makeHorizontalRuleTrailingConstraint()
+        self.horizontalRuleTrailingConstraint = horizontalRuleTrailingConstraint
         let quoteBarLeadingConstraint = quoteBarView.leadingAnchor.constraint(
             equalTo: kindLabel.leadingAnchor,
             constant: Self.chromeFrameAlignmentOffset
@@ -182,13 +188,27 @@ extension BlockInputBlockItem {
             quoteBarBottomConstraint,
             quoteBarView.widthAnchor.constraint(equalToConstant: Self.quoteBarWidth),
             scrollViewLeadingConstraint,
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            scrollViewTrailingConstraint,
             scrollViewTopConstraint,
             scrollViewBottomConstraint,
             horizontalRuleLeadingConstraint,
-            horizontalRuleView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -4),
+            horizontalRuleTrailingConstraint,
             horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             horizontalRuleView.heightAnchor.constraint(equalToConstant: 9)
         ]
+    }
+
+    private func makeScrollViewTrailingConstraint() -> NSLayoutConstraint {
+        scrollView.trailingAnchor.constraint(
+            equalTo: view.trailingAnchor,
+            constant: -Self.horizontalContentTrailingInset(allowsReordering: true)
+        )
+    }
+
+    private func makeHorizontalRuleTrailingConstraint() -> NSLayoutConstraint {
+        horizontalRuleView.trailingAnchor.constraint(
+            equalTo: scrollView.trailingAnchor,
+            constant: -Self.horizontalRuleTrailingInset(allowsReordering: true)
+        )
     }
 }

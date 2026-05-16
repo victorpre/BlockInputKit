@@ -28,7 +28,7 @@ extension BlockInputBlockItem {
             for: kind,
             perLineContentIndent: perLineContentIndent
         )
-        horizontalRuleLeadingConstraint?.constant = Self.defaultTextLeading + 4
+        horizontalRuleLeadingConstraint?.constant = Self.horizontalRuleInnerInset
         quoteBarView.isHidden = kind != .quote || isHorizontalRule
         quoteBarView.alphaValue = quoteBarView.isHidden ? 0 : 1
         horizontalRuleView.setVisible(isHorizontalRule)
@@ -54,7 +54,7 @@ extension BlockInputBlockItem {
     func kindLabelLeadingConstant(for block: BlockInputBlock, contentIndent: CGFloat) -> CGFloat {
         switch block.kind {
         case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
-            return Self.markerAlignmentLeading + contentIndent
+            return markerAlignmentLeading() + contentIndent
         case .paragraph, .heading, .code, .horizontalRule, .rawMarkdown:
             return contentIndent
         }
@@ -83,7 +83,14 @@ extension BlockInputBlockItem {
         if kind.supportsIndentation {
             return Self.listTextLeading - perLineContentIndent
         }
-        return Self.defaultTextLeading
+        return allowsReordering ? Self.defaultTextLeading : Self.horizontalChromeWidthWithoutHandle
+    }
+
+    private func markerAlignmentLeading() -> CGFloat {
+        if allowsReordering {
+            return Self.markerAlignmentLeading
+        }
+        return Self.horizontalChromeWidthWithoutHandle + Self.textContainerContentLeading
     }
 
     func textContainerInset(

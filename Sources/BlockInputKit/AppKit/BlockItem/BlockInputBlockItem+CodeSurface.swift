@@ -47,9 +47,8 @@ extension BlockInputBlockItem {
             return
         }
         let verticalInset: CGFloat = 2
-        let trailingPadding: CGFloat = 6
-        let lineFragmentPadding = textView.textContainer?.lineFragmentPadding ?? 0
-        let minX = scrollView.frame.minX + Self.standardTextContainerInset.width + lineFragmentPadding
+        let trailingPadding = Self.codeBackgroundTrailingInset(allowsReordering: allowsReordering)
+        let minX = Self.codeBackgroundLeadingInset(allowsReordering: allowsReordering)
         let maxX = max(minX, view.bounds.maxX - trailingPadding)
         codeBackgroundView.frame = NSRect(
             x: minX,

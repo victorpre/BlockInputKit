@@ -22,6 +22,48 @@ final class BlockInputViewTests: XCTestCase {
         XCTAssertEqual(layout?.minimumLineSpacing, 0)
     }
 
+    func testMountedEditorKeepsTrailingInsetsStableWhenReorderingIsDisabled() throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1")
+            ]),
+            allowsBlockReordering: false
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let scrollView = try XCTUnwrap(item.testingTextScrollView)
+        let codeSurface = item.testingCodeBackgroundView
+
+        XCTAssertEqual(scrollView.frame.minX, item.view.bounds.maxX - scrollView.frame.maxX, accuracy: 0.5)
+        XCTAssertEqual(
+            scrollView.frame.width,
+            BlockInputBlockItem.measuredTextWidth(for: item.view.bounds.width, allowsReordering: false),
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            item.view.bounds.maxX - codeSurface.frame.maxX,
+            BlockInputBlockItem.codeBackgroundTrailingInset(allowsReordering: false),
+            accuracy: 0.5
+        )
+    }
+
+    func testMountedEditorPreservesReorderLaneWhenReorderingIsEnabled() throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "paragraph", text: "First")
+            ]),
+            allowsBlockReordering: true
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let scrollView = try XCTUnwrap(item.testingTextScrollView)
+        let handleView = try XCTUnwrap(item.testingHandleView)
+
+        XCTAssertEqual(scrollView.frame.minX, BlockInputBlockItem.horizontalChromeWidth(allowsReordering: true), accuracy: 0.5)
+        XCTAssertEqual(scrollView.frame.minX, item.view.bounds.maxX - scrollView.frame.maxX, accuracy: 0.5)
+        XCTAssertEqual(handleView.frame.minX, BlockInputBlockItem.handleLeading, accuracy: 0.5)
+        XCTAssertEqual(handleView.frame.width, BlockInputBlockItem.handleWidth, accuracy: 0.5)
+        XCTAssertFalse(handleView.isHidden)
+    }
+
     func testInsertBlockBelowCurrentBlockPublishesDocumentChange() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let view = BlockInputView()

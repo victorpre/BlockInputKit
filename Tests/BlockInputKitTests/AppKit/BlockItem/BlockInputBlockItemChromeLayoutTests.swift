@@ -38,6 +38,14 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
         )
         let paragraphScrollView = try XCTUnwrap(paragraphItem.testingTextScrollView)
         XCTAssertEqual(paragraphScrollView.frame.minX, BlockInputBlockItem.horizontalChromeWidth(allowsReordering: true), accuracy: 0.5)
+        let expectedTrailingX = paragraphItem.view.bounds.maxX - BlockInputBlockItem.horizontalContentTrailingInset(
+            allowsReordering: true
+        )
+        XCTAssertEqual(paragraphScrollView.frame.maxX, expectedTrailingX, accuracy: 0.5)
+        XCTAssertEqual(paragraphScrollView.frame.minX, paragraphItem.view.bounds.maxX - paragraphScrollView.frame.maxX, accuracy: 0.5)
+        let handleView = try XCTUnwrap(paragraphItem.testingHandleView)
+        XCTAssertEqual(handleView.frame.minX, BlockInputBlockItem.handleLeading, accuracy: 0.5)
+        XCTAssertEqual(handleView.frame.width, BlockInputBlockItem.handleWidth, accuracy: 0.5)
         XCTAssertEqual(try XCTUnwrap(paragraphItem.testingMarkerView).frame.width, 0, accuracy: 0.5)
 
         let noMarkerBlocks = [
@@ -47,12 +55,17 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
         ]
         for block in noMarkerBlocks {
             let item = configuredItem(block: block, delegate: view)
-            XCTAssertEqual(try XCTUnwrap(item.testingMarkerView).frame.width, 0, accuracy: 0.5, "Unexpected marker lane for \(block.kind).")
+            XCTAssertEqual(
+                try XCTUnwrap(item.testingMarkerView).frame.width,
+                0,
+                accuracy: 0.5,
+                "Unexpected marker lane for \(block.kind)."
+            )
         }
     }
 
     @MainActor
-    func testPlainRowsWithoutReorderingReserveOnlyHandleMarginSpace() throws {
+    func testPlainRowsWithoutReorderingUseSymmetricInsetsWithoutHandleLane() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Plain"),
             allowsReordering: false,
@@ -62,8 +75,93 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
         item.view.layoutSubtreeIfNeeded()
 
         let scrollView = try XCTUnwrap(item.testingTextScrollView)
-        XCTAssertEqual(scrollView.frame.minX, BlockInputBlockItem.horizontalChromeWidth(allowsReordering: false), accuracy: 0.5)
+        XCTAssertEqual(
+            scrollView.frame.minX,
+            BlockInputBlockItem.horizontalChromeWidth(allowsReordering: false),
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            item.view.bounds.maxX - scrollView.frame.maxX,
+            BlockInputBlockItem.horizontalContentTrailingInset(allowsReordering: false),
+            accuracy: 0.5
+        )
+        XCTAssertEqual(scrollView.frame.minX, item.view.bounds.maxX - scrollView.frame.maxX, accuracy: 0.5)
+        let handleView = try XCTUnwrap(item.testingHandleView)
+        XCTAssertEqual(handleView.frame.minX, 0, accuracy: 0.5)
+        XCTAssertEqual(handleView.frame.width, 0, accuracy: 0.5)
         XCTAssertEqual(try XCTUnwrap(item.testingMarkerView).frame.width, 0, accuracy: 0.5)
+    }
+
+    @MainActor
+    func testCodeAndHorizontalRuleChromeKeepNormalTrailingInsetsWithoutReordering() throws {
+        let codeItem = configuredItem(
+            block: BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1"),
+            allowsReordering: false,
+            delegate: BlockInputView()
+        )
+        let codeSurface = codeItem.testingCodeBackgroundView
+        XCTAssertFalse(codeSurface.isHidden)
+        XCTAssertEqual(
+            codeSurface.frame.minX,
+            BlockInputBlockItem.codeBackgroundLeadingInset(allowsReordering: false),
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            codeItem.view.bounds.maxX - codeSurface.frame.maxX,
+            BlockInputBlockItem.codeBackgroundTrailingInset(allowsReordering: false),
+            accuracy: 0.5
+        )
+        XCTAssertEqual(codeSurface.frame.minX, codeItem.view.bounds.maxX - codeSurface.frame.maxX, accuracy: 0.5)
+
+        let ruleItem = configuredItem(
+            block: BlockInputBlock(id: "rule", kind: .horizontalRule),
+            allowsReordering: false,
+            delegate: BlockInputView()
+        )
+        let ruleView = try XCTUnwrap(ruleItem.testingHorizontalRuleView)
+        XCTAssertEqual(
+            ruleItem.view.bounds.maxX - ruleView.frame.maxX,
+            BlockInputBlockItem.horizontalContentTrailingInset(allowsReordering: false)
+                + BlockInputBlockItem.horizontalRuleTrailingInset(allowsReordering: false),
+            accuracy: 0.5
+        )
+        XCTAssertEqual(ruleView.frame.minX, ruleItem.view.bounds.maxX - ruleView.frame.maxX, accuracy: 0.5)
+    }
+
+    @MainActor
+    func testCodeAndHorizontalRuleChromeStayBalancedWithReorderingEnabled() throws {
+        let codeItem = configuredItem(
+            block: BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let codeSurface = codeItem.testingCodeBackgroundView
+        XCTAssertFalse(codeSurface.isHidden)
+        XCTAssertEqual(
+            codeSurface.frame.minX,
+            BlockInputBlockItem.codeBackgroundLeadingInset(allowsReordering: true),
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            codeItem.view.bounds.maxX - codeSurface.frame.maxX,
+            BlockInputBlockItem.codeBackgroundTrailingInset(allowsReordering: true),
+            accuracy: 0.5
+        )
+        XCTAssertEqual(codeSurface.frame.minX, codeItem.view.bounds.maxX - codeSurface.frame.maxX, accuracy: 0.5)
+
+        let ruleItem = configuredItem(
+            block: BlockInputBlock(id: "rule", kind: .horizontalRule),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let ruleView = try XCTUnwrap(ruleItem.testingHorizontalRuleView)
+        XCTAssertEqual(
+            ruleItem.view.bounds.maxX - ruleView.frame.maxX,
+            BlockInputBlockItem.horizontalContentTrailingInset(allowsReordering: true)
+                + BlockInputBlockItem.horizontalRuleTrailingInset(allowsReordering: true),
+            accuracy: 0.5
+        )
+        XCTAssertEqual(ruleView.frame.minX, ruleItem.view.bounds.maxX - ruleView.frame.maxX, accuracy: 0.5)
     }
 
     @MainActor
@@ -162,7 +260,8 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
             accuracy: 0.5
         )
         XCTAssertEqual(codeTextMinX - codeSurface.frame.minX, BlockInputBlockItem.codeTextHorizontalPadding, accuracy: 0.5)
-        XCTAssertGreaterThanOrEqual(codeSurface.frame.maxX, codeScrollView.frame.maxX)
+        XCTAssertEqual(codeSurface.frame.minX - codeScrollView.frame.minX, BlockInputBlockItem.textContainerContentLeading, accuracy: 0.5)
+        XCTAssertEqual(codeScrollView.frame.maxX - codeSurface.frame.maxX, BlockInputBlockItem.textContainerContentLeading, accuracy: 0.5)
         XCTAssertEqual(codeSurface.layer?.cornerRadius, 6)
         XCTAssertEqual(codeSurface.layer?.borderWidth, 1)
         XCTAssertNotNil(codeSurface.layer?.backgroundColor)
@@ -280,12 +379,13 @@ private extension BlockInputBlockItemChromeLayoutTests {
     @MainActor
     func configuredItem(
         block: BlockInputBlock,
+        allowsReordering: Bool = true,
         isSelected: Bool = false,
         delegate: BlockInputView
     ) -> BlockInputBlockItem {
         let item = BlockInputBlockItem.configuredForTesting(
             block: block,
-            allowsReordering: true,
+            allowsReordering: allowsReordering,
             isSelected: isSelected,
             delegate: delegate
         )
