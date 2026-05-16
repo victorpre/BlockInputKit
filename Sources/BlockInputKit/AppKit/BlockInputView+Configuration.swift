@@ -15,6 +15,7 @@ extension BlockInputView {
         document = configuredDocument
         isDocumentCacheSynchronized = true
         allowsBlockReordering = configuration.allowsBlockReordering
+        editorHorizontalInset = configuration.editorHorizontalInset
         dropIndicatorColor = configuration.dropIndicatorColor
         if let configuredUndoController = configuration.undoController {
             undoController = configuredUndoController

@@ -118,9 +118,20 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         afterBlock: BlockInputBlock
     ) -> Bool {
         let itemWidth = item.view.bounds.width > 0 ? item.view.bounds.width : collectionView.bounds.width
-        let textWidth = BlockInputBlockItem.measuredTextWidth(for: itemWidth, allowsReordering: allowsBlockReordering)
-        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: textWidth)
-        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: textWidth)
+        let beforeTextWidth = BlockInputBlockItem.measuredTextWidth(
+            for: itemWidth,
+            block: beforeBlock,
+            allowsReordering: allowsBlockReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
+        let afterTextWidth = BlockInputBlockItem.measuredTextWidth(
+            for: itemWidth,
+            block: afterBlock,
+            allowsReordering: allowsBlockReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
+        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: beforeTextWidth)
+        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: afterTextWidth)
         let isStaleCodeBlockHeight: Bool
         if case .code = afterBlock.kind {
             isStaleCodeBlockHeight = abs(item.view.frame.height - afterHeight) > 0.5
@@ -438,6 +449,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         item.configure(
             block: block,
             allowsReordering: allowsBlockReordering,
+            editorHorizontalInset: editorHorizontalInset,
             accentColor: dropIndicatorColor,
             isSelected: isBlockSelected(block.id),
             delegate: self

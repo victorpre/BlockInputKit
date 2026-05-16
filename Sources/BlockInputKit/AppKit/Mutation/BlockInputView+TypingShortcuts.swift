@@ -84,7 +84,6 @@ extension BlockInputView {
             selectionBefore: selectionBefore,
             selectionAfter: afterSelection
         )
-        itemHeightCache.invalidate(blockID: blockBeforeEdit.id)
         if !reconfigureVisibleReplacement(afterBlock, at: index),
            !shouldDeferGranularCountLayout {
             collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
@@ -134,7 +133,6 @@ extension BlockInputView {
             selectionBefore: selectionBefore,
             selectionAfter: afterSelection
         ))
-        itemHeightCache.invalidate(blockID: blockBeforeEdit.id)
         if shouldDeferGranularCountLayout {
             _ = reconfigureVisibleReplacement(afterBlock, at: index)
             insertVisibleBlock(at: insertionIndex)
@@ -178,7 +176,6 @@ extension BlockInputView {
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         )
-        itemHeightCache.invalidate(blockID: blockID)
         if !reconfigureVisibleReplacement(afterBlock, at: index),
            !shouldDeferGranularCountLayout {
             collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])

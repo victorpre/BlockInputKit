@@ -398,7 +398,7 @@ final class BlockInputViewReorderingTests: XCTestCase {
 
         XCTAssertTrue(handleView.isEnabled)
         XCTAssertFalse(handleView.isHidden)
-        XCTAssertEqual(handleWidthConstraint.constant, 24)
+        XCTAssertEqual(handleWidthConstraint.constant, BlockInputBlockItem.handleWidth)
         XCTAssertEqual(handleView.alphaValue, 0)
         XCTAssertEqual(handleView.toolTip, "Drag to reorder block")
         XCTAssertEqual(handleView.accessibilityLabel(), "Drag to reorder block")

@@ -89,10 +89,6 @@ extension BlockInputView {
         targetIndex: Int,
         changedBlocks: [BlockInputBlock]
     ) {
-        itemHeightCache.invalidateFrom(min(sourceIndex, targetIndex))
-        for block in changedBlocks {
-            itemHeightCache.invalidate(blockID: block.id)
-        }
         guard shouldDeferGranularCountLayout else {
             reloadDataKeepingFocus()
             return
@@ -124,6 +120,7 @@ extension BlockInputView {
             blockItem.configure(
                 block: block,
                 allowsReordering: allowsBlockReordering,
+                editorHorizontalInset: editorHorizontalInset,
                 accentColor: dropIndicatorColor,
                 isSelected: isBlockSelected(block.id),
                 delegate: self

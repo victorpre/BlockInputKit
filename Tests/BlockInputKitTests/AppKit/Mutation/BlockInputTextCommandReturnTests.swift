@@ -43,10 +43,6 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
         )
         let textView = try XCTUnwrap(item.testingTextView)
         textView.setSelectedRange(NSRange(location: 9, length: 0))
-        let paragraphBlock = store.document.blocks[0]
-        _ = view.itemHeightCache.height(for: paragraphBlock, at: 0, textWidth: 320) {
-            44
-        }
         store.resetCounts()
 
         textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
@@ -60,10 +56,6 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
         XCTAssertEqual(store.replaceDocumentCount, 0)
         XCTAssertEqual(store.replaceBlockIDs, [blockID])
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
-        let remeasuredParagraphHeight = view.itemHeightCache.height(for: paragraphBlock, at: 0, textWidth: 320) {
-            88
-        }
-        XCTAssertEqual(remeasuredParagraphHeight, 88)
 
         let undo = view.undoStructuralEdit()
 

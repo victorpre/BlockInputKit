@@ -36,7 +36,11 @@ final class BlockInputViewTests: XCTestCase {
         XCTAssertEqual(scrollView.frame.minX, item.view.bounds.maxX - scrollView.frame.maxX, accuracy: 0.5)
         XCTAssertEqual(
             scrollView.frame.width,
-            BlockInputBlockItem.measuredTextWidth(for: item.view.bounds.width, allowsReordering: false),
+            BlockInputBlockItem.textScrollViewWidth(
+                for: item.view.bounds.width,
+                block: mounted.view.document.blocks[0],
+                allowsReordering: false
+            ),
             accuracy: 0.5
         )
         XCTAssertEqual(

@@ -222,14 +222,15 @@ final class BlockInputViewPerformanceTests: XCTestCase {
 
     func testStoreBackedIndentInvalidatesLayoutWhenWrappingHeightChanges() throws {
         let blockID = BlockInputBlockID(rawValue: "second")
-        let text = "This is a long list item that should wrap after indentation reduces the available text width more more"
+        let text = Array(repeating: "wrapped content", count: 6).joined(separator: " ")
         let block = BlockInputBlock(id: blockID, kind: .bulletedListItem, text: text)
         let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
             BlockInputBlock(id: "first", text: "First"),
             block,
             BlockInputBlock(id: "third", text: "Third")
         ]))
-        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 260, height: 480))
+        let itemWidth: CGFloat = 220
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: itemWidth, height: 480))
         let layout = TrackingCollectionViewFlowLayout()
         view.collectionView.collectionViewLayout = layout
         view.configure(BlockInputConfiguration(documentStore: store))
@@ -239,8 +240,11 @@ final class BlockInputViewPerformanceTests: XCTestCase {
             allowsReordering: true,
             delegate: view
         )
-        let itemWidth: CGFloat = 260
-        let textWidth = BlockInputBlockItem.measuredTextWidth(for: itemWidth, allowsReordering: true)
+        let textWidth = BlockInputBlockItem.measuredTextWidth(
+            for: itemWidth,
+            block: block,
+            allowsReordering: true
+        )
         let startingHeight = BlockInputBlockItem.height(for: block, textWidth: textWidth)
         item.view.frame = NSRect(x: 0, y: 0, width: itemWidth, height: startingHeight)
         let textView = try XCTUnwrap(item.testingTextView)
@@ -249,7 +253,12 @@ final class BlockInputViewPerformanceTests: XCTestCase {
         textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
 
         let updatedBlock = try XCTUnwrap(store.block(withID: blockID))
-        let expectedHeight = BlockInputBlockItem.height(for: updatedBlock, textWidth: textWidth)
+        let updatedTextWidth = BlockInputBlockItem.measuredTextWidth(
+            for: itemWidth,
+            block: updatedBlock,
+            allowsReordering: true
+        )
+        let expectedHeight = BlockInputBlockItem.height(for: updatedBlock, textWidth: updatedTextWidth)
         XCTAssertGreaterThan(expectedHeight, startingHeight)
         XCTAssertEqual(item.view.frame.height, expectedHeight, accuracy: 0.5)
         XCTAssertTrue(layout.didInvalidateDelegateMetrics)

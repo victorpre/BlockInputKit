@@ -83,14 +83,9 @@ struct DemoShellView: View {
     }
 
     private func renderedEditor(for session: DemoNoteSession) -> some View {
-        GeometryReader { proxy in
-            if proxy.size.width > 1,
-               proxy.size.height > 1 {
-                BlockInputEditor(configuration: model.editorConfiguration(for: session))
-                    .id(session.id)
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-            }
-        }
+        BlockInputEditor(configuration: model.editorConfiguration(for: session))
+            .id(session.id)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func controlStrip(for session: DemoNoteSession) -> some View {
@@ -118,7 +113,8 @@ struct DemoShellView: View {
             .pickerStyle(.segmented)
             .frame(width: 220)
         }
-        .padding(.horizontal, 14)
+        .padding(.leading, 20)
+        .padding(.trailing, 14)
         .padding(.vertical, 10)
     }
 

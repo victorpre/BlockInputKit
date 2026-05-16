@@ -80,6 +80,7 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
             BlockInputBlockItem.horizontalChromeWidth(allowsReordering: false),
             accuracy: 0.5
         )
+        XCTAssertEqual(try textContentMinX(in: item), BlockInputConfiguration.defaultEditorHorizontalInset, accuracy: 0.5)
         XCTAssertEqual(
             item.view.bounds.maxX - scrollView.frame.maxX,
             BlockInputBlockItem.horizontalContentTrailingInset(allowsReordering: false),

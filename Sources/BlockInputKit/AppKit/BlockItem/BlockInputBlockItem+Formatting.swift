@@ -3,10 +3,7 @@ import AppKit
 extension BlockInputBlockItem {
     static func height(for block: BlockInputBlock, textWidth: CGFloat) -> CGFloat {
         let text = block.text.isEmpty ? " " : block.text
-        let availableTextWidth = max(
-            textWidth - measuredContentIndent(for: block),
-            120
-        )
+        let availableTextWidth = max(textWidth - perLineContentIndent(for: block), 120)
         let font = font(for: block.kind)
         let metrics = verticalMetrics(for: block)
         if case .code = block.kind {

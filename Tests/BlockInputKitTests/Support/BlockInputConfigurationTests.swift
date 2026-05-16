@@ -29,6 +29,7 @@ final class BlockInputConfigurationTests: XCTestCase {
 
         XCTAssertTrue(configuration.documentStore is BlockInputMemoryDocumentStore)
         XCTAssertEqual(configuration.document.blocks.map(\.id), [blockID])
+        XCTAssertEqual(configuration.editorHorizontalInset, BlockInputConfiguration.defaultEditorHorizontalInset)
     }
 
     @MainActor
@@ -42,6 +43,7 @@ final class BlockInputConfigurationTests: XCTestCase {
 
         view.configure(BlockInputConfiguration(
             allowsBlockReordering: false,
+            editorHorizontalInset: 28,
             dropIndicatorColor: .systemPink,
             undoController: undoController,
             completionProvider: provider,
@@ -52,6 +54,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         ))
 
         XCTAssertFalse(view.allowsBlockReordering)
+        XCTAssertEqual(view.editorHorizontalInset, 28)
         XCTAssertEqual(view.dropIndicatorColor, .systemPink)
         XCTAssertTrue(view.undoController === undoController)
         XCTAssertTrue(view.completionProvider === provider)

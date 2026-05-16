@@ -83,14 +83,23 @@ extension BlockInputBlockItem {
         if kind.supportsIndentation {
             return Self.listTextLeading - perLineContentIndent
         }
-        return allowsReordering ? Self.defaultTextLeading : Self.horizontalChromeWidthWithoutHandle
+        return Self.textScrollViewEdgeInset(
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        ) - Self.handleTrailingX(
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
     }
 
     private func markerAlignmentLeading() -> CGFloat {
-        if allowsReordering {
-            return Self.markerAlignmentLeading
-        }
-        return Self.horizontalChromeWidthWithoutHandle + Self.textContainerContentLeading
+        Self.visualContentInset(
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        ) - Self.handleTrailingX(
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
     }
 
     func textContainerInset(

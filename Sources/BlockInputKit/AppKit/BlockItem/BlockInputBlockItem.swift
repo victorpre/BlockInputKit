@@ -6,17 +6,18 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let chromeFrameAlignmentOffset: CGFloat = 0
     static let checklistButtonBaseLeading: CGFloat = chromeFrameAlignmentOffset
 
-    static let handleWidth: CGFloat = 24
-    static let handleLeading: CGFloat = 4
-    static let handleTrailingGap: CGFloat = 4
+    static let handleWidth: CGFloat = 20
+    static let handleLeading: CGFloat = 0
+    static let handleTrailingGap: CGFloat = 0
     static let defaultTextLeading: CGFloat = 4
     static let horizontalChromeWidthWithHandle: CGFloat = handleLeading + handleWidth + handleTrailingGap
-    static let horizontalChromeWidthWithoutHandle: CGFloat = 8
     static let markerGutterWidth: CGFloat = 24
     static let markerChromeWidth: CGFloat = 18
     static let minimumMarkerTextGap: CGFloat = 4
     // Mirrors the NSTextView inset plus line-fragment padding so external chrome starts at the plain-text glyph column.
     static let textContainerContentLeading: CGFloat = 9
+    // Mirrors NSTextContainer's default line-fragment padding for offscreen width measurement.
+    static let textContainerLineFragmentPadding: CGFloat = 5
     static let markerAlignmentLeading: CGFloat = defaultTextLeading + textContainerContentLeading
     static let listTextLeading: CGFloat = -textContainerContentLeading
     static let quoteBarIdentifier = NSUserInterfaceItemIdentifier("BlockInputQuoteBarView")
@@ -48,8 +49,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var temporarySelectionHighlightRange: NSRange?
     var isTrackingBlockSelectionDrag = false
     var isDraggingBlockSelection = false
+    var isUpdatingBlockSelectionDrag = false
     var renderedCodeColorScheme: BlockInputSyntaxColorScheme?
     var allowsReordering = true
+    var editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
     var handleLeadingConstraint: NSLayoutConstraint?
     var handleWidthConstraint: NSLayoutConstraint?
     var kindLabelLeadingConstraint: NSLayoutConstraint?
@@ -84,10 +87,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
     var representedBlockID: BlockInputBlockID? {
         blockID
-    }
-
-    static func horizontalChromeWidth(allowsReordering: Bool) -> CGFloat {
-        allowsReordering ? horizontalChromeWidthWithHandle : horizontalChromeWidthWithoutHandle
     }
 
     override func loadView() {
@@ -152,6 +151,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     func configure(
         block: BlockInputBlock,
         allowsReordering: Bool,
+        editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         accentColor: NSColor = .controlAccentColor,
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
@@ -162,6 +162,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         renderedBlock = block
         self.delegate = delegate
         self.allowsReordering = allowsReordering
+        self.editorHorizontalInset = editorHorizontalInset
         selectionBeforeTextChange = nil
         isHorizontalRule = block.kind == .horizontalRule
         handleView.blockItem = self
@@ -179,9 +180,15 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         handleView.isHidden = !allowsReordering
         handleView.alphaValue = 0
         handleView.toolTip = allowsReordering ? "Drag to reorder block" : nil
-        handleLeadingConstraint?.constant = allowsReordering ? Self.handleLeading : 0
+        handleLeadingConstraint?.constant = Self.handleLeadingInset(
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
         handleWidthConstraint?.constant = allowsReordering ? Self.handleWidth : 0
-        scrollViewTrailingConstraint?.constant = -Self.horizontalContentTrailingInset(allowsReordering: allowsReordering)
+        scrollViewTrailingConstraint?.constant = -Self.horizontalContentTrailingInset(
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
         horizontalRuleTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: allowsReordering)
     }
 
@@ -304,6 +311,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         toCharacterRange newSelectedCharRange: NSRange
     ) -> NSRange {
         guard !isConfiguringBlock,
+              !isUpdatingBlockSelectionDrag,
               isTrackingBlockSelectionDrag,
               let event = currentBlockSelectionDragEvent() else {
             return newSelectedCharRange
@@ -314,29 +322,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             return newSelectedCharRange
         }
         return blockTextView?.collapsedBlockSelectionDragNativeRange() ?? oldSelectedCharRange
-    }
-
-    private func currentBlockSelectionDragEvent() -> NSEvent? {
-        if let event = NSApp.currentEvent,
-           event.type == .leftMouseDragged {
-            return event
-        }
-        guard NSEvent.pressedMouseButtons & 1 == 1,
-              let window = view.window else {
-            return nil
-        }
-        let windowLocation = window.convertPoint(fromScreen: NSEvent.mouseLocation)
-        return NSEvent.mouseEvent(
-            with: .leftMouseDragged,
-            location: windowLocation,
-            modifierFlags: [],
-            timestamp: ProcessInfo.processInfo.systemUptime,
-            windowNumber: window.windowNumber,
-            context: nil,
-            eventNumber: 0,
-            clickCount: 1,
-            pressure: 0
-        )
     }
 
     func requestReturn() -> Bool {
@@ -382,6 +367,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     func setBlockSelection(_ isSelected: Bool) {
+        let wasConfiguringBlock = isConfiguringBlock
+        isConfiguringBlock = true
+        defer { isConfiguringBlock = wasConfiguringBlock }
+
         clearTemporarySelectionHighlight()
         applySelectionChrome(isSelected ? .whole : .none)
         horizontalRuleView.isSelected = isHorizontalRule && isSelected

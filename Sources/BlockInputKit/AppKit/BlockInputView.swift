@@ -13,6 +13,11 @@ public final class BlockInputView: NSView {
     public internal(set) var selection: BlockInputSelection?
     /// Whether drag reordering is enabled for block items.
     public internal(set) var allowsBlockReordering = true
+    /// Visual horizontal inset used for block content.
+    ///
+    /// When reordering is enabled, the drag handle is centered inside this inset when possible
+    /// and the gutter grows only when the inset is too small for the handle lane.
+    public internal(set) var editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
     /// Color used for the drag insertion indicator line.
     public internal(set) var dropIndicatorColor = NSColor.controlAccentColor
 
@@ -37,7 +42,6 @@ public final class BlockInputView: NSView {
     var lastFocusedBlockID: BlockInputBlockID?
     var selectedHorizontalRuleIndex: Int?
     var preferredNavigationX: CGFloat?
-    let itemHeightCache = BlockInputItemHeightCache()
     // Invalidates deferred selection restoration when a later reload should not restore focus.
     var focusRestoreGeneration = 0
     // Avoid re-entering NSWindow first-responder assignment while AppKit is already promoting this view.

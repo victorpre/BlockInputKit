@@ -89,7 +89,7 @@ extension BlockInputBlockItem {
         view.addSubview(codeBackgroundView)
         selectionBackgroundView.translatesAutoresizingMaskIntoConstraints = true
         view.addSubview(selectionBackgroundView)
-        for subview in [handleView, kindLabel, checklistButton, quoteBarView, scrollView, horizontalRuleView] {
+        for subview in [kindLabel, checklistButton, quoteBarView, scrollView, horizontalRuleView, handleView] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }

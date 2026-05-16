@@ -112,11 +112,6 @@ extension BlockInputView {
         editedItem: BlockInputBlockItem? = nil,
         block: BlockInputBlock? = nil
     ) {
-        if let block {
-            itemHeightCache.invalidate(blockID: block.id)
-        } else {
-            itemHeightCache.invalidate(at: index)
-        }
         if let flowLayout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout {
             let context = NSCollectionViewFlowLayoutInvalidationContext()
             context.invalidateFlowLayoutDelegateMetrics = true
@@ -132,7 +127,6 @@ extension BlockInputView {
     }
 
     func deleteVisibleBlock(at index: Int, deletedBlockIDs: [BlockInputBlockID] = []) {
-        itemHeightCache.deleteItems(at: index, count: 1, deletedBlockIDs: deletedBlockIDs)
         let indexPath = IndexPath(item: index, section: 0)
         if shouldDeferGranularCountLayout {
             reconfigureMountedBlocksAfterGranularCountChange(startingAt: index)
@@ -159,6 +153,7 @@ extension BlockInputView {
             blockItem.configure(
                 block: block,
                 allowsReordering: allowsBlockReordering,
+                editorHorizontalInset: editorHorizontalInset,
                 accentColor: dropIndicatorColor,
                 isSelected: isBlockSelected(block.id),
                 delegate: self
@@ -196,6 +191,7 @@ extension BlockInputView {
         item.configure(
             block: block,
             allowsReordering: allowsBlockReordering,
+            editorHorizontalInset: editorHorizontalInset,
             accentColor: dropIndicatorColor,
             isSelected: isBlockSelected(block.id),
             delegate: self
@@ -208,7 +204,12 @@ extension BlockInputView {
 
     func resizeVisibleItem(_ item: BlockInputBlockItem, for block: BlockInputBlock) {
         let itemWidth = item.view.bounds.width > 0 ? item.view.bounds.width : collectionView.bounds.width
-        let textWidth = BlockInputBlockItem.measuredTextWidth(for: itemWidth, allowsReordering: allowsBlockReordering)
+        let textWidth = BlockInputBlockItem.measuredTextWidth(
+            for: itemWidth,
+            block: block,
+            allowsReordering: allowsBlockReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
         let height = BlockInputBlockItem.height(for: block, textWidth: textWidth)
         guard abs(item.view.frame.height - height) > 0.5 else {
             return
@@ -356,7 +357,6 @@ extension BlockInputView {
         syncDocumentStore(.replaceBlock(block))
         _ = replaceCachedBlock(block, at: index)
         applySelection(validUndoSelection(selection), notify: true)
-        itemHeightCache.invalidate(blockID: block.id)
         if reconfigureVisibleReplacement(block, at: index, requiresDeferredLayout: false) {
             publishDocumentChange()
             return true
@@ -394,7 +394,6 @@ extension BlockInputView {
             markDocumentCacheUnsynchronized()
         }
         applySelection(validUndoSelection(selection), notify: true)
-        itemHeightCache.invalidate(blockID: replacement.id)
         if !reconfigureVisibleReplacement(replacement, at: replacementIndex) {
             collectionView.reloadItems(at: [IndexPath(item: replacementIndex, section: 0)])
             collectionView.layoutSubtreeIfNeeded()
@@ -425,7 +424,6 @@ extension BlockInputView {
             markDocumentCacheUnsynchronized()
         }
         applySelection(validUndoSelection(selection), notify: true)
-        itemHeightCache.invalidate(blockID: replacement.id)
         if !reconfigureVisibleReplacement(replacement, at: replacementIndex) {
             collectionView.reloadItems(at: [IndexPath(item: replacementIndex, section: 0)])
             collectionView.layoutSubtreeIfNeeded()

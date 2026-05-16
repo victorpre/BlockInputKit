@@ -116,6 +116,7 @@ extension BlockInputView {
             item.configure(
                 block: block,
                 allowsReordering: allowsBlockReordering,
+                editorHorizontalInset: editorHorizontalInset,
                 accentColor: dropIndicatorColor,
                 isSelected: isBlockSelected(block.id),
                 delegate: self
@@ -228,6 +229,7 @@ extension BlockInputView {
         item.configure(
             block: block,
             allowsReordering: allowsBlockReordering,
+            editorHorizontalInset: editorHorizontalInset,
             accentColor: dropIndicatorColor,
             isSelected: isBlockSelected(block.id),
             delegate: self
@@ -237,7 +239,6 @@ extension BlockInputView {
 
     func reloadDataKeepingFocus() {
         focusRestoreGeneration += 1
-        itemHeightCache.invalidateAll()
         let generation = focusRestoreGeneration
         collectionView.reloadData()
         collectionView.collectionViewLayout?.invalidateLayout()
@@ -257,7 +258,6 @@ extension BlockInputView {
 
     func reloadDataWithoutRestoringFocus() {
         focusRestoreGeneration += 1
-        itemHeightCache.invalidateAll()
         collectionView.reloadData()
         collectionView.collectionViewLayout?.invalidateLayout()
         collectionView.layoutSubtreeIfNeeded()

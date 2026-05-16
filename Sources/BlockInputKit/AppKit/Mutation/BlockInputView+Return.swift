@@ -293,11 +293,6 @@ extension BlockInputView {
     }
 
     private func reloadVisibleBlock(at index: Int) {
-        if let block = block(at: index) {
-            itemHeightCache.invalidate(blockID: block.id)
-        } else {
-            itemHeightCache.invalidate(at: index)
-        }
         let indexPath = IndexPath(item: index, section: 0)
         if shouldDeferGranularCountLayout,
            let block = block(at: index),
@@ -322,7 +317,6 @@ extension BlockInputView {
     }
 
     func insertVisibleBlock(at index: Int) {
-        itemHeightCache.insertItems(at: index, count: 1)
         let indexPath = IndexPath(item: index, section: 0)
         if shouldDeferGranularCountLayout {
             reconfigureMountedBlocksAfterGranularCountChange(startingAt: index)

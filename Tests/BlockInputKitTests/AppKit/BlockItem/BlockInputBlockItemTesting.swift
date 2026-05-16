@@ -5,6 +5,7 @@ extension BlockInputBlockItem {
     static func configuredForTesting(
         block: BlockInputBlock,
         allowsReordering: Bool,
+        editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) -> BlockInputBlockItem {
@@ -14,6 +15,7 @@ extension BlockInputBlockItem {
         item.configure(
             block: block,
             allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset,
             accentColor: .controlAccentColor,
             isSelected: isSelected,
             delegate: delegate

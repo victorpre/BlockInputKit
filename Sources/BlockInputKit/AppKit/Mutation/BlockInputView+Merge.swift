@@ -39,7 +39,6 @@ public extension BlockInputView {
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         ))
-        itemHeightCache.invalidate(blockID: previousBlock.id)
         reloadDataKeepingFocus()
         publishDocumentChange()
         return afterSelection

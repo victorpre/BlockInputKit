@@ -36,6 +36,7 @@ let editor = BlockInputView()
 editor.configure(BlockInputConfiguration(
     documentStore: store,
     allowsBlockReordering: true,
+    editorHorizontalInset: 20,
     dropIndicatorColor: .systemTeal,
     undoController: undoController,
     onDocumentMutation: { change in
@@ -149,6 +150,8 @@ The demo app includes:
 - Markdown typing shortcuts convert leading quote, list, checklist, numbered-list, heading, and `---` markers into block kinds.
 - Backspace/Delete at the front of formatted blocks unwraps them into paragraph text with the Markdown marker visible.
 - Drag reordering is enabled by default and can be disabled with `allowsBlockReordering`.
+- Block content uses a 20-point horizontal inset by default; customize it with `editorHorizontalInset`.
+  When reordering is enabled, the reorder handle is centered inside that inset when possible and the gutter grows only if the handle lane needs more room.
 - Drag insertion and selected horizontal-rule colors default to the system accent color and can be customized with `dropIndicatorColor`.
 - Clicking a horizontal rule selects the rule; Backspace/Delete removes the selected rule block.
 - Markdown import/export supports paragraph, heading, horizontal rule, code, quote, bulleted list, numbered list, and checklist blocks.

@@ -4,13 +4,18 @@ extension BlockInputBlockItem {
     func beginBlockSelectionDrag() {
         isTrackingBlockSelectionDrag = true
         isDraggingBlockSelection = false
+        isUpdatingBlockSelectionDrag = false
     }
 
     func updateBlockSelectionDrag(with event: NSEvent, selectedRange: NSRange? = nil) -> Bool {
         guard let blockID,
-              isTrackingBlockSelectionDrag else {
+              isTrackingBlockSelectionDrag,
+              !isUpdatingBlockSelectionDrag else {
             return false
         }
+        isUpdatingBlockSelectionDrag = true
+        defer { isUpdatingBlockSelectionDrag = false }
+
         let wasDraggingBlockSelection = isDraggingBlockSelection
         if delegate?.blockItem(
             self,
@@ -37,6 +42,30 @@ extension BlockInputBlockItem {
     func finishBlockSelectionDrag() {
         isTrackingBlockSelectionDrag = false
         isDraggingBlockSelection = false
+        isUpdatingBlockSelectionDrag = false
+    }
+
+    func currentBlockSelectionDragEvent() -> NSEvent? {
+        if let event = NSApp.currentEvent,
+           event.type == .leftMouseDragged {
+            return event
+        }
+        guard NSEvent.pressedMouseButtons & 1 == 1,
+              let window = view.window else {
+            return nil
+        }
+        let windowLocation = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+        return NSEvent.mouseEvent(
+            with: .leftMouseDragged,
+            location: windowLocation,
+            modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 0
+        )
     }
 
     func requestExpandSelection(_ direction: BlockInputVerticalMovementDirection) -> Bool {

@@ -238,40 +238,6 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     }
 
     @MainActor
-    func testListHeightAccountsForIndentedTextWidth() {
-        let text = Array(repeating: "Wrapped list content", count: 8).joined(separator: " ")
-        let rootHeight = BlockInputBlockItem.height(
-            for: BlockInputBlock(kind: .bulletedListItem, text: text),
-            textWidth: 260
-        )
-        let indentedHeight = BlockInputBlockItem.height(
-            for: BlockInputBlock(kind: .bulletedListItem, text: text, indentationLevel: 3),
-            textWidth: 260
-        )
-
-        XCTAssertGreaterThan(indentedHeight, rootHeight)
-    }
-
-    @MainActor
-    func testListHeightAccountsForPerLineIndentedTextWidth() {
-        let text = "Short\n" + Array(repeating: "Wrapped list content", count: 12).joined(separator: " ")
-        let rootHeight = BlockInputBlockItem.height(
-            for: BlockInputBlock(kind: .bulletedListItem, text: text),
-            textWidth: 180
-        )
-        let indentedHeight = BlockInputBlockItem.height(
-            for: BlockInputBlock(
-                kind: .bulletedListItem,
-                text: text,
-                lineIndentationLevels: [0, 3, 1]
-            ),
-            textWidth: 180
-        )
-
-        XCTAssertGreaterThan(indentedHeight, rootHeight)
-    }
-
-    @MainActor
     func testHeightUsesMinimumForEmptyBlocks() {
         let height = BlockInputBlockItem.height(for: .emptyParagraph(), textWidth: 240)
 

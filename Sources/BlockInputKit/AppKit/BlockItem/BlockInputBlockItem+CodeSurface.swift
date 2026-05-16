@@ -47,8 +47,14 @@ extension BlockInputBlockItem {
             return
         }
         let verticalInset: CGFloat = 2
-        let trailingPadding = Self.codeBackgroundTrailingInset(allowsReordering: allowsReordering)
-        let minX = Self.codeBackgroundLeadingInset(allowsReordering: allowsReordering)
+        let trailingPadding = Self.codeBackgroundTrailingInset(
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
+        let minX = Self.codeBackgroundLeadingInset(
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
         let maxX = max(minX, view.bounds.maxX - trailingPadding)
         codeBackgroundView.frame = NSRect(
             x: minX,

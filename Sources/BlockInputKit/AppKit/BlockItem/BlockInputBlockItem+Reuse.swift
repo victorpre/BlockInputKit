@@ -12,6 +12,7 @@ extension BlockInputBlockItem {
 
     func resetLayoutForReuse() {
         allowsReordering = true
+        editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
         scrollView.isHidden = false
         codeBackgroundView.isHidden = true
         codeBackgroundView.alphaValue = 0
