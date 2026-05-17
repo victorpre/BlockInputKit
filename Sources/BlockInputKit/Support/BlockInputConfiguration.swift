@@ -41,9 +41,12 @@ public struct BlockInputConfiguration {
     public var onFocusChange: ((Bool) -> Void)?
     var usesDefaultDocumentStore: Bool
 
-    /// Current document snapshot from `documentStore`.
+    /// Current loaded document snapshot from `documentStore`.
+    ///
+    /// Progressive stores expose only loaded blocks here; callers that need a complete save snapshot should call
+    /// `BlockInputDocumentStore.completeDocumentSnapshot(limit:)`.
     public var document: BlockInputDocument {
-        documentStore.document
+        BlockInputDocument(blocks: (0..<documentStore.loadedBlockCount).compactMap { documentStore.block(at: $0) })
     }
 
     /// Creates configuration. When `documentStore` is supplied, it is the source of truth and `document` is ignored.

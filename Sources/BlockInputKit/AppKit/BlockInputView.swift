@@ -26,6 +26,10 @@ public final class BlockInputView: NSView {
     let dropIndicatorView = NSView()
     private let layout = BlockInputCollectionViewFlowLayout()
     var documentStore: (any BlockInputDocumentStore)?
+    var documentStoreObservation: BlockInputDocumentStoreObservation?
+    var progressiveLoadTask: Task<Void, Never>?
+    var progressiveLoadBatchLimit = 5_000
+    var progressiveStoreError: String?
     var fallbackUndoController = BlockInputUndoController()
     var undoController: BlockInputUndoController?
     var completionProvider: (any BlockInputCompletionProvider)?
@@ -64,25 +68,13 @@ public final class BlockInputView: NSView {
     }
 
     deinit {
+        progressiveLoadTask?.cancel()
+        documentStoreObservation?.cancel()
         if let selectionExpansionKeyMonitor { NSEvent.removeMonitor(selectionExpansionKeyMonitor) }
     }
 
     public override var acceptsFirstResponder: Bool {
         true
-    }
-
-    /// Focuses the editor like a single text field, preserving valid current selections.
-    public func focusEditor() {
-        refreshDocumentFromStore()
-        if let selection, containsValidSelection(selection) {
-            restoreVisibleSelection()
-            if isEditorFirstResponder {
-                publishFocusChange(true)
-            }
-            return
-        }
-        let cursor = pendingFocus ?? cursorForRestoredFocus()
-        focus(blockID: cursor.blockID, utf16Offset: cursor.utf16Offset)
     }
 
     public override func becomeFirstResponder() -> Bool {
@@ -436,6 +428,10 @@ public final class BlockInputView: NSView {
             BlockInputBlockItem.self,
             forItemWithIdentifier: BlockInputBlockItem.reuseIdentifier
         )
+        collectionView.register(
+            BlockInputLoadingItem.self,
+            forItemWithIdentifier: BlockInputLoadingItem.reuseIdentifier
+        )
         collectionView.registerForDraggedTypes([.blockInputBlockID, .fileURL])
         collectionView.setDraggingSourceOperationMask(.move, forLocal: true)
         installSelectionExpansionKeyMonitor()
@@ -465,4 +461,20 @@ public final class BlockInputView: NSView {
         ])
     }
 
+}
+
+extension BlockInputView {
+    /// Focuses the editor like a single text field, preserving valid current selections.
+    public func focusEditor() {
+        refreshDocumentFromStore()
+        if let selection, containsValidSelection(selection) {
+            restoreVisibleSelection()
+            if isEditorFirstResponder {
+                publishFocusChange(true)
+            }
+            return
+        }
+        let cursor = pendingFocus ?? cursorForRestoredFocus()
+        focus(blockID: cursor.blockID, utf16Offset: cursor.utf16Offset)
+    }
 }

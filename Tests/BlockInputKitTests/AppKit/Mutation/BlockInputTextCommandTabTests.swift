@@ -286,7 +286,7 @@ final class BlockInputTextCommandTabTests: XCTestCase {
 
         textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
 
-        XCTAssertEqual(store.documentReadCount, 1)
+        XCTAssertEqual(store.documentReadCount, 0)
         XCTAssertEqual(store.replaceDocumentCount, 0)
         XCTAssertEqual(store.replacedBlockIDs, [targetID])
         XCTAssertEqual(store.block(withID: targetID)?.indentationLevel, 1)

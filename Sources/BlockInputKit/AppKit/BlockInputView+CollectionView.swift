@@ -9,13 +9,22 @@ extension BlockInputView: NSCollectionViewDataSource {
         _ collectionView: NSCollectionView,
         numberOfItemsInSection section: Int
     ) -> Int {
-        blockCount
+        blockCount + (showsProgressiveLoadingRow ? 1 : 0)
     }
 
     public func collectionView(
         _ collectionView: NSCollectionView,
         itemForRepresentedObjectAt indexPath: IndexPath
     ) -> NSCollectionViewItem {
+        if isProgressiveLoadingIndex(indexPath.item) {
+            let item = collectionView.makeItem(
+                withIdentifier: BlockInputLoadingItem.reuseIdentifier,
+                for: indexPath
+            )
+            (item as? BlockInputLoadingItem)?.configure(error: progressiveStoreError)
+            requestNextProgressiveBatchIfNeeded()
+            return item
+        }
         let item = collectionView.makeItem(
             withIdentifier: BlockInputBlockItem.reuseIdentifier,
             for: indexPath
@@ -47,8 +56,12 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
     ) -> NSSize {
         let sectionInset = (collectionViewLayout as? NSCollectionViewFlowLayout)?.sectionInset
             ?? NSEdgeInsetsZero
-        let horizontalInsets = sectionInset.left + sectionInset.right
-        let availableWidth = max(collectionView.bounds.width - horizontalInsets, 1)
+        let scrollViewInsets = collectionView.enclosingScrollView?.contentInsets ?? NSEdgeInsetsZero
+        let horizontalInsets = sectionInset.left + sectionInset.right + scrollViewInsets.left + scrollViewInsets.right
+        let availableWidth = max(collectionView.bounds.width - horizontalInsets, 0)
+        if isProgressiveLoadingIndex(indexPath.item) {
+            return NSSize(width: availableWidth, height: 56)
+        }
         guard let block = block(at: indexPath.item) else {
             return NSSize(width: availableWidth, height: 32)
         }
@@ -60,6 +73,130 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
         )
         let height = BlockInputBlockItem.height(for: block, textWidth: textWidth)
         return NSSize(width: availableWidth, height: height)
+    }
+}
+
+extension BlockInputView {
+    var showsProgressiveLoadingRow: Bool {
+        guard let documentStore else {
+            return false
+        }
+        return !documentStore.isComplete || progressiveStoreError != nil
+    }
+
+    func isProgressiveLoadingIndex(_ index: Int) -> Bool {
+        showsProgressiveLoadingRow && index == blockCount
+    }
+
+    func requestNextProgressiveBatchIfNeeded() {
+        guard progressiveLoadTask == nil,
+              progressiveStoreError == nil,
+              let documentStore,
+              !documentStore.isComplete,
+              !documentStore.isLoading else {
+            return
+        }
+        let batchLimit = progressiveLoadBatchLimit
+        let loadedCountBeforeRequest = documentStore.loadedBlockCount
+        progressiveLoadTask = Task { @MainActor [weak self, documentStore] in
+            do {
+                try await documentStore.loadNextBlockBatch(limit: batchLimit)
+            } catch is CancellationError {
+            } catch {
+                guard let self,
+                      self.isCurrentDocumentStore(documentStore as AnyObject) else {
+                    return
+                }
+                self.progressiveStoreError = error.localizedDescription
+                self.collectionView.reloadData()
+            }
+            guard let self,
+                  self.isCurrentDocumentStore(documentStore as AnyObject) else {
+                return
+            }
+            self.progressiveLoadTask = nil
+            if documentStore.loadedBlockCount > loadedCountBeforeRequest,
+               self.isProgressiveLoadingRowVisible() {
+                self.requestNextProgressiveBatchIfNeeded()
+            }
+        }
+    }
+
+    func isCurrentDocumentStore(_ store: AnyObject) -> Bool {
+        guard let documentStore else {
+            return false
+        }
+        return (documentStore as AnyObject) === store
+    }
+
+    func isProgressiveLoadingRowVisible() -> Bool {
+        guard showsProgressiveLoadingRow else {
+            return false
+        }
+        return collectionView.item(at: IndexPath(item: blockCount, section: 0)) != nil
+    }
+
+    func handleDocumentStoreChange(_ change: BlockInputDocumentStoreChange) {
+        switch change {
+        case .loadingStateChanged:
+            break
+        case .appendedBlocks(let batch):
+            progressiveStoreError = nil
+            updateDocumentCacheAfterProgressiveBatch(batch)
+            appendProgressiveBatch(batch)
+            if batch.isComplete,
+               pendingDocumentSnapshotWorkItem != nil {
+                scheduleDeferredDocumentSnapshot()
+            }
+        case .replacedDocument:
+            progressiveStoreError = nil
+            refreshDocumentFromStore()
+            reloadDataKeepingFocus()
+            if documentStore?.isComplete == true,
+               pendingDocumentSnapshotWorkItem != nil {
+                scheduleDeferredDocumentSnapshot()
+            }
+        case .failed(let error):
+            progressiveStoreError = error
+            collectionView.reloadData()
+        }
+    }
+
+    func updateDocumentCacheAfterProgressiveBatch(_ batch: BlockInputDocumentStoreBatch) {
+        guard isDocumentCacheSynchronized else {
+            return
+        }
+        let updatedCount = document.blocks.count + batch.blocks.count
+        guard document.blocks.count == batch.startIndex,
+              updatedCount <= largeDocumentCacheMutationLimit else {
+            markDocumentCacheUnsynchronized()
+            return
+        }
+        document.blocks.append(contentsOf: batch.blocks)
+    }
+
+    func appendProgressiveBatch(_ batch: BlockInputDocumentStoreBatch) {
+        let previousLoadingIndex = batch.startIndex
+        let insertedCount = batch.blocks.count
+        guard insertedCount > 0 else {
+            collectionView.reloadData()
+            return
+        }
+        collectionView.performBatchUpdates {
+            if previousLoadingIndex < collectionView.numberOfItems(inSection: 0) {
+                collectionView.deleteItems(at: [IndexPath(item: previousLoadingIndex, section: 0)])
+            }
+            let inserted = (0..<insertedCount).map { IndexPath(item: batch.startIndex + $0, section: 0) }
+            collectionView.insertItems(at: Set(inserted))
+            if !batch.isComplete {
+                collectionView.insertItems(at: [IndexPath(item: batch.startIndex + insertedCount, section: 0)])
+            }
+        } completionHandler: { [weak self] _ in
+            guard let self else {
+                return
+            }
+            self.restoreMountedSelection()
+        }
     }
 }
 

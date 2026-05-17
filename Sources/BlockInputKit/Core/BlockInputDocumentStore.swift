@@ -7,10 +7,14 @@ import Foundation
 /// read methods cheap and override the granular mutation methods to avoid full
 /// document replacement on common editor operations.
 public protocol BlockInputDocumentStore: AnyObject {
-    /// Current document snapshot.
-    var document: BlockInputDocument { get }
-    /// Number of blocks available to the editor.
-    var blockCount: Int { get }
+    /// Number of blocks currently loaded and available to the editor.
+    var loadedBlockCount: Int { get }
+    /// Total block count when it is known without finishing the load.
+    var totalBlockCount: Int? { get }
+    /// Whether every block has been loaded.
+    var isComplete: Bool { get }
+    /// Whether the store is currently loading another block batch.
+    var isLoading: Bool { get }
 
     /// Returns the block at an ordered index.
     func block(at index: Int) -> BlockInputBlock?
@@ -18,58 +22,150 @@ public protocol BlockInputDocumentStore: AnyObject {
     func block(withID id: BlockInputBlockID) -> BlockInputBlock?
     /// Returns the ordered index for a stable block ID.
     func index(of id: BlockInputBlockID) -> Int?
+    /// Registers a store observer. Release or cancel the returned token to stop observing changes.
+    func observeChanges(_ observer: @escaping @MainActor (BlockInputDocumentStoreChange) -> Void) -> BlockInputDocumentStoreObservation
+    /// Loads the next available block batch. `limit` is a target count of complete parsed blocks, not source lines.
+    @MainActor
+    func loadNextBlockBatch(limit: Int) async throws
+    /// Loads all remaining blocks into the editor-visible loaded prefix in batches.
+    @MainActor
+    func loadAllRemainingBlocks(limit: Int) async throws
+    /// Returns a complete document snapshot for save/export.
+    ///
+    /// Progressive stores may materialize this without publishing append changes
+    /// or expanding `loadedBlockCount`; the default implementation loads all
+    /// remaining blocks into the visible prefix first.
+    @MainActor
+    func completeDocumentSnapshot(limit: Int) async throws -> BlockInputDocument
     /// Replaces the full document after broad structural mutations.
     func replaceDocument(_ document: BlockInputDocument)
     /// Replaces one block after a text or formatting mutation.
     ///
-    /// The default implementation calls `replaceDocument(_:)` only when the
-    /// block exists and changes the current document.
+    /// The default implementation calls `replaceDocument(_:)` only for complete
+    /// stores when the block exists and changes the current document.
     func replaceBlock(_ block: BlockInputBlock)
     /// Inserts blocks at an ordered index.
     ///
-    /// The default implementation calls `replaceDocument(_:)` only when the
-    /// insertion changes the current document.
+    /// The default implementation calls `replaceDocument(_:)` only for complete
+    /// stores when the insertion changes the current document.
     func insertBlocks(_ blocks: [BlockInputBlock], at index: Int)
     /// Deletes blocks by stable ID.
     ///
-    /// The default implementation calls `replaceDocument(_:)` only when at
-    /// least one block is removed.
+    /// The default implementation calls `replaceDocument(_:)` only for complete
+    /// stores when at least one block is removed.
     func deleteBlocks(withIDs ids: [BlockInputBlockID])
     /// Moves one block to a final ordered index.
     ///
-    /// The default implementation calls `replaceDocument(_:)` only when the
-    /// block exists and its index changes.
+    /// The default implementation calls `replaceDocument(_:)` only for complete
+    /// stores when the block exists and its index changes.
     func moveBlock(withID id: BlockInputBlockID, to index: Int)
 }
 
-/// Optional store capability for producing full snapshots away from the main actor.
-public protocol BlockInputBackgroundSnapshotStore: BlockInputDocumentStore, Sendable {
-    /// Returns a consistent full-document snapshot from a background thread.
-    func backgroundDocumentSnapshot() -> BlockInputDocument
+/// Append or loading state change emitted by a document store.
+public enum BlockInputDocumentStoreChange: Sendable {
+    /// Store loading state changed.
+    case loadingStateChanged(isLoading: Bool)
+    /// Blocks were appended at a tail range.
+    case appendedBlocks(BlockInputDocumentStoreBatch)
+    /// The full store document was replaced.
+    case replacedDocument
+    /// Loading failed.
+    case failed(String)
+}
+
+/// Errors thrown by document-store progressive loading helpers.
+public enum BlockInputDocumentStoreError: Error, Equatable, Sendable {
+    /// A store reported that loading was incomplete but a batch load made no observable progress.
+    case progressiveLoadMadeNoProgress
+}
+
+/// Tail append metadata for progressive stores.
+public struct BlockInputDocumentStoreBatch: Equatable, Sendable {
+    /// Ordered index where the batch starts.
+    public var startIndex: Int
+    /// Complete parsed blocks appended to the store.
+    public var blocks: [BlockInputBlock]
+    /// Whether the store is complete after this batch.
+    public var isComplete: Bool
+
+    /// Creates tail append metadata.
+    public init(startIndex: Int, blocks: [BlockInputBlock], isComplete: Bool) {
+        self.startIndex = startIndex
+        self.blocks = blocks
+        self.isComplete = isComplete
+    }
+}
+
+/// Cancellable store observation token.
+public final class BlockInputDocumentStoreObservation: @unchecked Sendable {
+    private let cancellation: @Sendable () -> Void
+    private var isCancelled = false
+    private let lock = NSLock()
+
+    /// Creates an observation token that runs `cancellation` once when cancelled or deallocated.
+    public init(_ cancellation: @escaping @Sendable () -> Void = {}) {
+        self.cancellation = cancellation
+    }
+
+    deinit {
+        cancel()
+    }
+
+    /// Cancels the observation. Repeated calls are ignored.
+    public func cancel() {
+        lock.lock()
+        let shouldCancel = !isCancelled
+        isCancelled = true
+        lock.unlock()
+        if shouldCancel {
+            cancellation()
+        }
+    }
 }
 
 public extension BlockInputDocumentStore {
-    var blockCount: Int {
-        document.blocks.count
+    var totalBlockCount: Int? {
+        isComplete ? loadedBlockCount : nil
     }
 
-    func block(at index: Int) -> BlockInputBlock? {
-        guard document.blocks.indices.contains(index) else {
-            return nil
+    var isComplete: Bool {
+        true
+    }
+
+    var isLoading: Bool {
+        false
+    }
+
+    func observeChanges(_ observer: @escaping @MainActor (BlockInputDocumentStoreChange) -> Void) -> BlockInputDocumentStoreObservation {
+        BlockInputDocumentStoreObservation()
+    }
+
+    @MainActor
+    func loadNextBlockBatch(limit: Int) async throws {}
+
+    @MainActor
+    func loadAllRemainingBlocks(limit: Int) async throws {
+        while !isComplete {
+            try Task.checkCancellation()
+            let beforeCount = loadedBlockCount
+            try await loadNextBlockBatch(limit: limit)
+            guard isComplete || loadedBlockCount > beforeCount else {
+                throw BlockInputDocumentStoreError.progressiveLoadMadeNoProgress
+            }
         }
-        return document.blocks[index]
     }
 
-    func block(withID id: BlockInputBlockID) -> BlockInputBlock? {
-        document.block(withID: id)
-    }
-
-    func index(of id: BlockInputBlockID) -> Int? {
-        document.index(of: id)
+    @MainActor
+    func completeDocumentSnapshot(limit: Int) async throws -> BlockInputDocument {
+        try await loadAllRemainingBlocks(limit: limit)
+        return BlockInputDocument(blocks: (0..<loadedBlockCount).compactMap { block(at: $0) })
     }
 
     func replaceBlock(_ block: BlockInputBlock) {
-        var updatedDocument = document
+        guard isComplete else {
+            return
+        }
+        var updatedDocument = BlockInputDocument(blocks: (0..<loadedBlockCount).compactMap { self.block(at: $0) })
         guard let index = updatedDocument.index(of: block.id) else {
             return
         }
@@ -81,7 +177,10 @@ public extension BlockInputDocumentStore {
     }
 
     func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
-        var updatedDocument = document
+        guard isComplete else {
+            return
+        }
+        var updatedDocument = BlockInputDocument(blocks: (0..<loadedBlockCount).compactMap { self.block(at: $0) })
         guard updatedDocument.insertBlocks(blocks, at: index) != nil else {
             return
         }
@@ -89,10 +188,13 @@ public extension BlockInputDocumentStore {
     }
 
     func deleteBlocks(withIDs ids: [BlockInputBlockID]) {
+        guard isComplete else {
+            return
+        }
         guard !ids.isEmpty else {
             return
         }
-        var updatedDocument = document
+        var updatedDocument = BlockInputDocument(blocks: (0..<loadedBlockCount).compactMap { self.block(at: $0) })
         let beforeDocument = updatedDocument
         let deletedIDs = Set(ids)
         updatedDocument.blocks.removeAll { deletedIDs.contains($0.id) }
@@ -103,7 +205,10 @@ public extension BlockInputDocumentStore {
     }
 
     func moveBlock(withID id: BlockInputBlockID, to index: Int) {
-        var updatedDocument = document
+        guard isComplete else {
+            return
+        }
+        var updatedDocument = BlockInputDocument(blocks: (0..<loadedBlockCount).compactMap { self.block(at: $0) })
         guard updatedDocument.moveBlock(blockID: id, to: index) != nil else {
             return
         }
@@ -112,7 +217,7 @@ public extension BlockInputDocumentStore {
 }
 
 /// In-memory store for simple editors and tests.
-public final class BlockInputMemoryDocumentStore: BlockInputBackgroundSnapshotStore, @unchecked Sendable {
+public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unchecked Sendable {
     /// Current document snapshot.
     public var document: BlockInputDocument {
         lock.lock()
@@ -120,10 +225,16 @@ public final class BlockInputMemoryDocumentStore: BlockInputBackgroundSnapshotSt
         return storedDocument
     }
 
-    public var blockCount: Int {
+    /// Number of blocks available to the editor.
+    public var loadedBlockCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return storedDocument.blocks.count
+    }
+
+    /// Total block count.
+    public var totalBlockCount: Int? {
+        loadedBlockCount
     }
 
     private var storedDocument: BlockInputDocument
@@ -133,15 +244,15 @@ public final class BlockInputMemoryDocumentStore: BlockInputBackgroundSnapshotSt
     // a later lookup asks for one, keeping 100k-demo mutations responsive.
     private var indexesNeedRebuild = false
 
+    /// Creates a memory-backed store for a complete document.
     public init(document: BlockInputDocument = BlockInputDocument()) {
         storedDocument = document
         indexesByID = Self.indexesByID(for: document)
     }
 
-    public func backgroundDocumentSnapshot() -> BlockInputDocument {
-        lock.lock()
-        defer { lock.unlock() }
-        return storedDocument.detachedStorage()
+    @MainActor
+    public func completeDocumentSnapshot(limit: Int) async throws -> BlockInputDocument {
+        document.detachedStorage()
     }
 
     public func block(at index: Int) -> BlockInputBlock? {

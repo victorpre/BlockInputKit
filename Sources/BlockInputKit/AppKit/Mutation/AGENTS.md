@@ -2,7 +2,9 @@
 
 - Keep document-store synchronization granular when a single block replacement, insertion, deletion, or move accurately describes the mutation; fall back to full document replacement for multi-step structural edits.
 - Keep large-document structural undo/redo on granular store operations when the undo payload describes a single block replacement, insertion, deletion, or move.
-- Publish large-document edit notifications through `onDocumentMutation` for hot paths; keep full `onDocumentChange` snapshots deferred/coalesced so Return, Delete, Undo, and Redo do not read `documentStore.document` synchronously.
+- Publish large-document edit notifications through `onDocumentMutation` for hot paths; keep full `onDocumentChange` snapshots deferred/coalesced so Return, Delete, Undo, and Redo do not materialize full snapshots synchronously.
+- For progressive stores, full snapshot callbacks should use `completeDocumentSnapshot(limit:)` without forcing editor row population; hot edit paths should stay on loaded-block reads and granular mutations.
+- Do not replace an incomplete progressive store with a loaded-prefix document; use granular mutations or wait until the store is complete.
 
 ## Editing Operations
 

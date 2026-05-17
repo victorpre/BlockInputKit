@@ -1,6 +1,40 @@
 import AppKit
 
 extension BlockInputView {
+    func syncDocumentStore(_ action: StoreSyncAction) {
+        guard let documentStore else {
+            return
+        }
+        guard canSynchronizeDocumentStore(action) else {
+            return
+        }
+        switch action {
+        case .replaceDocument:
+            documentStore.replaceDocument(document)
+        case let .replaceBlock(block):
+            documentStore.replaceBlock(block)
+        case let .insertBlocks(blocks, insertionIndex):
+            documentStore.insertBlocks(blocks, at: insertionIndex)
+        case let .deleteBlocks(blockIDs):
+            documentStore.deleteBlocks(withIDs: blockIDs)
+        case let .moveBlock(blockID, targetIndex):
+            documentStore.moveBlock(withID: blockID, to: targetIndex)
+        case let .moveBlockAndReplaceChangedBlocks(blockID, targetIndex, changedBlocks):
+            if let memoryStore = documentStore as? BlockInputMemoryDocumentStore {
+                memoryStore.moveBlockWithoutNormalizing(withID: blockID, to: targetIndex)
+            } else {
+                documentStore.moveBlock(withID: blockID, to: targetIndex)
+            }
+            publishDocumentMutation(.moveBlock(blockID, index: targetIndex))
+            for block in changedBlocks {
+                documentStore.replaceBlock(block)
+                publishDocumentMutation(.replaceBlock(block))
+            }
+            return
+        }
+        publishDocumentMutation(action.documentChange(document: document))
+    }
+
     func changedBlocksByID(
         before beforeDocument: BlockInputDocument,
         after afterDocument: BlockInputDocument
@@ -32,6 +66,14 @@ extension BlockInputView.StoreSyncAction {
 }
 
 extension BlockInputView {
+    func canSynchronizeDocumentStore(_ action: StoreSyncAction) -> Bool {
+        guard case .replaceDocument = action,
+              let documentStore else {
+            return true
+        }
+        return documentStore.isComplete
+    }
+
     func defaultStoreSyncAction(for result: BlockInputUndoResult) -> StoreSyncAction {
         if result.replacedBlock != nil,
            result.insertedBlocks != nil || result.deletedBlockIDs != nil {

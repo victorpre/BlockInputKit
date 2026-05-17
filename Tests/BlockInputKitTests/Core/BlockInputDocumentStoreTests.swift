@@ -11,7 +11,7 @@ final class BlockInputDocumentStoreTests: XCTestCase {
             BlockInputBlock(id: secondID, text: "Second")
         ]))
 
-        XCTAssertEqual(store.blockCount, 2)
+        XCTAssertEqual(store.loadedBlockCount, 2)
         XCTAssertEqual(store.block(at: 1)?.id, secondID)
         XCTAssertEqual(store.block(withID: firstID)?.text, "First")
         XCTAssertEqual(store.index(of: secondID), 1)
@@ -201,6 +201,7 @@ final class BlockInputDocumentStoreTests: XCTestCase {
         XCTAssertEqual(fallbackStore.document.blocks.map(\.id), [firstID])
         XCTAssertEqual(fallbackStore.replaceDocumentCount, 0)
     }
+
 }
 
 private final class FallbackDocumentStore: BlockInputDocumentStore {
@@ -211,8 +212,27 @@ private final class FallbackDocumentStore: BlockInputDocumentStore {
         self.document = document
     }
 
+    var loadedBlockCount: Int {
+        document.blocks.count
+    }
+
     func replaceDocument(_ document: BlockInputDocument) {
         replaceDocumentCount += 1
         self.document = document
+    }
+
+    func block(at index: Int) -> BlockInputBlock? {
+        guard document.blocks.indices.contains(index) else {
+            return nil
+        }
+        return document.blocks[index]
+    }
+
+    func block(withID id: BlockInputBlockID) -> BlockInputBlock? {
+        document.block(withID: id)
+    }
+
+    func index(of id: BlockInputBlockID) -> Int? {
+        document.index(of: id)
     }
 }

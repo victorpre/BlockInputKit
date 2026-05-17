@@ -1,11 +1,11 @@
 import Foundation
 @testable import BlockInputKit
 
-final class BackgroundSnapshotCountingStore: BlockInputBackgroundSnapshotStore, @unchecked Sendable {
+final class CompleteSnapshotCountingStore: BlockInputDocumentStore, @unchecked Sendable {
     private var storedDocument: BlockInputDocument
     private let lock = NSLock()
     private(set) var documentReadCount = 0
-    private(set) var backgroundSnapshotCount = 0
+    private(set) var completeSnapshotCount = 0
 
     var document: BlockInputDocument {
         lock.lock()
@@ -14,7 +14,7 @@ final class BackgroundSnapshotCountingStore: BlockInputBackgroundSnapshotStore, 
         return storedDocument
     }
 
-    var blockCount: Int {
+    var loadedBlockCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return storedDocument.blocks.count
@@ -28,14 +28,19 @@ final class BackgroundSnapshotCountingStore: BlockInputBackgroundSnapshotStore, 
         lock.lock()
         defer { lock.unlock() }
         documentReadCount = 0
-        backgroundSnapshotCount = 0
+        completeSnapshotCount = 0
     }
 
-    func backgroundDocumentSnapshot() -> BlockInputDocument {
+    func countedCompleteDocumentSnapshot() -> BlockInputDocument {
         lock.lock()
         defer { lock.unlock() }
-        backgroundSnapshotCount += 1
+        completeSnapshotCount += 1
         return BlockInputDocument(blocks: storedDocument.blocks.map { $0 })
+    }
+
+    @MainActor
+    func completeDocumentSnapshot(limit: Int) async throws -> BlockInputDocument {
+        countedCompleteDocumentSnapshot()
     }
 
     func block(at index: Int) -> BlockInputBlock? {

@@ -3,7 +3,7 @@ import Foundation
 
 final class CountingDocumentStore: BlockInputDocumentStore {
     private(set) var document: BlockInputDocument
-    private(set) var blockCountReadCount = 0
+    private(set) var loadedBlockCountReadCount = 0
     private(set) var blockAtReadIndexes: [Int] = []
     private(set) var indexReadIDs: [BlockInputBlockID] = []
     private(set) var replaceDocumentCount = 0
@@ -12,8 +12,8 @@ final class CountingDocumentStore: BlockInputDocumentStore {
     private(set) var deletedBlockIDs: [[BlockInputBlockID]] = []
     private(set) var movedBlocks: [(id: BlockInputBlockID, index: Int)] = []
 
-    var blockCount: Int {
-        blockCountReadCount += 1
+    var loadedBlockCount: Int {
+        loadedBlockCountReadCount += 1
         return document.blocks.count
     }
 
@@ -22,7 +22,7 @@ final class CountingDocumentStore: BlockInputDocumentStore {
     }
 
     func resetCounts() {
-        blockCountReadCount = 0
+        loadedBlockCountReadCount = 0
         blockAtReadIndexes = []
         indexReadIDs = []
         replaceDocumentCount = 0
@@ -38,6 +38,10 @@ final class CountingDocumentStore: BlockInputDocumentStore {
             return nil
         }
         return document.blocks[index]
+    }
+
+    func block(withID id: BlockInputBlockID) -> BlockInputBlock? {
+        document.block(withID: id)
     }
 
     func index(of id: BlockInputBlockID) -> Int? {

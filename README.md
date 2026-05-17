@@ -127,7 +127,7 @@ The demo app includes:
 - `BlockInputBlockKind.rawMarkdown` preserves unsupported block-level Markdown verbatim in `BlockInputBlock.text`.
 - `BlockInputView` is the primary AppKit editor surface.
 - `BlockInputEditor` wraps `BlockInputView` for SwiftUI hosts and can bridge focus with `Binding<Bool>`.
-- `BlockInputDocumentStore` lets hosts provide indexed block reads plus granular block mutations.
+- `BlockInputDocumentStore` lets hosts provide indexed block reads, progressive loading, complete snapshots, and granular block mutations.
 - `BlockInputCompletionProvider` keeps mention and slash-command suggestions host-owned.
 - `BlockInputUndoController` separates per-block text undo from structural undo.
 
@@ -162,7 +162,7 @@ The demo app includes:
 
 ## Performance Expectations
 
-BlockInputKit is designed for large documents. The AppKit surface uses `NSCollectionView` so visible items are reused instead of mounting every block view at once. `BlockInputDocumentStore` supports indexed block reads for rendering; large host stores should make `block(at:)`, `block(withID:)`, and `index(of:)` cheap. Common editor edits publish granular store mutations for block replacement, insertion, deletion, and movement through `onDocumentMutation`; use that callback for immediate host syncing in large documents. `onDocumentChange` publishes full document snapshots, and large store-backed editors defer and coalesce those snapshots so hot edit paths do not synchronously materialize every block. Broad structural undo/redo can still publish a full document replacement. The demo includes a 100,000-block loading path to keep large-document behavior visible during development.
+BlockInputKit is designed for large documents. The AppKit surface uses `NSCollectionView` so visible items are reused instead of mounting every block view at once. `BlockInputDocumentStore` supports indexed block reads for rendering; large host stores should make `block(at:)`, `block(withID:)`, and `index(of:)` cheap. Progressive stores can expose a loaded prefix through `loadedBlockCount`, append more editor-visible blocks with `loadNextBlockBatch(limit:)`, and provide a save-ready document through `completeDocumentSnapshot(limit:)` without forcing every remaining row into the collection view. Common editor edits publish granular store mutations for block replacement, insertion, deletion, and movement through `onDocumentMutation`; use that callback for immediate host syncing in large documents. `onDocumentChange` publishes full document snapshots, and large store-backed editors defer and coalesce those snapshots so hot edit paths do not synchronously materialize every block. Broad structural undo/redo can still publish a full document replacement. The demo includes a 100,000-block progressive loading path to keep large-document behavior visible during development.
 
 ## Validation
 

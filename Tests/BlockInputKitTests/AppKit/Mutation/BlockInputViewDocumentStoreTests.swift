@@ -21,8 +21,67 @@ final class BlockInputViewDocumentStoreTests: XCTestCase {
         )
 
         XCTAssertEqual(itemCount, 2)
-        XCTAssertEqual(store.blockCountReadCount, 1)
+        XCTAssertEqual(store.loadedBlockCountReadCount, 1)
         XCTAssertEqual(store.blockAtReadIndexes, [0])
+    }
+
+    @MainActor
+    func testSameLargeStoreReconfigureDoesNotMaterializeLoadedBlocks() {
+        let blocks = (0...largeDocumentCacheMutationLimit).map { index in
+            BlockInputBlock(
+                id: BlockInputBlockID(rawValue: "block-\(index)"),
+                text: "Block \(index)"
+            )
+        }
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: blocks))
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        view.configure(BlockInputConfiguration(documentStore: store))
+        store.resetCounts()
+
+        view.configure(BlockInputConfiguration(documentStore: store))
+
+        XCTAssertEqual(store.blockAtReadIndexes, [])
+        XCTAssertLessThanOrEqual(store.loadedBlockCountReadCount, 1)
+        XCTAssertEqual(view.collectionView(view.collectionView, numberOfItemsInSection: 0), blocks.count)
+    }
+
+    @MainActor
+    func testCacheSynchronizationThresholdUsesCachedDocumentSizeAfterStoreInsertion() {
+        let blocks = (0..<largeDocumentCacheMutationLimit - 1).map { index in
+            BlockInputBlock(
+                id: BlockInputBlockID(rawValue: "block-\(index)"),
+                text: "Block \(index)"
+            )
+        }
+        let inserted = BlockInputBlock(id: "inserted", text: "Inserted")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: blocks))
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        view.configure(BlockInputConfiguration(documentStore: store))
+
+        view.syncDocumentStore(.insertBlocks([inserted], insertionIndex: blocks.count))
+
+        XCTAssertEqual(store.loadedBlockCount, largeDocumentCacheMutationLimit)
+        XCTAssertEqual(view.document.blocks.count, largeDocumentCacheMutationLimit - 1)
+        XCTAssertTrue(view.canSynchronizeCacheForGranularInsertion(insertedBlockCount: 1))
+    }
+
+    @MainActor
+    func testCacheSynchronizationThresholdUsesCachedDocumentSizeAfterStoreDeletion() {
+        let blocks = (0...largeDocumentCacheMutationLimit).map { index in
+            BlockInputBlock(
+                id: BlockInputBlockID(rawValue: "block-\(index)"),
+                text: "Block \(index)"
+            )
+        }
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: blocks))
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        view.configure(BlockInputConfiguration(documentStore: store))
+
+        view.syncDocumentStore(.deleteBlocks([blocks[largeDocumentCacheMutationLimit].id]))
+
+        XCTAssertEqual(store.loadedBlockCount, largeDocumentCacheMutationLimit)
+        XCTAssertEqual(view.document.blocks.count, largeDocumentCacheMutationLimit + 1)
+        XCTAssertTrue(view.canSynchronizeCacheForGranularDeletion(deletedBlockCount: 1))
     }
 
     @MainActor
@@ -41,6 +100,23 @@ final class BlockInputViewDocumentStoreTests: XCTestCase {
 
         XCTAssertLessThanOrEqual(size.width, view.collectionView.bounds.width)
         XCTAssertGreaterThan(size.width, 0)
+    }
+
+    @MainActor
+    func testCollectionItemWidthCanBeZeroDuringEarlyLayout() {
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 0, height: 120))
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(text: "First")
+        ])))
+        view.collectionView.frame = NSRect(x: 0, y: 0, width: 0, height: 120)
+
+        let size = view.collectionView(
+            view.collectionView,
+            layout: view.collectionView.collectionViewLayout ?? NSCollectionViewFlowLayout(),
+            sizeForItemAt: IndexPath(item: 0, section: 0)
+        )
+
+        XCTAssertEqual(size.width, 0)
     }
 
     @MainActor

@@ -83,7 +83,7 @@ final class BlockInputViewPerformanceTests: XCTestCase {
         textView.setSelectedRange(NSRange(location: 13, length: 0))
         item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
 
-        XCTAssertEqual(store.documentReadCount, 1)
+        XCTAssertEqual(store.documentReadCount, 0)
         XCTAssertEqual(store.replacedBlockIDs, [blockID])
         XCTAssertEqual(publishedDocument?.blocks.map(\.id), [insertedID, blockID])
         XCTAssertEqual(publishedDocument?.block(withID: blockID)?.text, "Editable text")

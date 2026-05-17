@@ -2,7 +2,10 @@ import AppKit
 
 extension BlockInputView {
     var shouldDeferDocumentChangeSnapshot: Bool {
-        documentStore != nil && blockCount > largeDocumentCacheMutationLimit
+        guard let documentStore else {
+            return false
+        }
+        return !documentStore.isComplete || blockCount > largeDocumentCacheMutationLimit
     }
 
     func publishDocumentMutation(_ change: BlockInputDocumentChange) {
@@ -34,21 +37,34 @@ extension BlockInputView {
               onDocumentChange != nil else {
             return
         }
-        if let backgroundStore = documentStore as? any BlockInputBackgroundSnapshotStore {
-            DispatchQueue.global(qos: .utility).async { [backgroundStore] in
-                let snapshot = backgroundStore.backgroundDocumentSnapshot()
-                DispatchQueue.main.async { [weak self] in
-                    Task { @MainActor [weak self] in
+        if let documentStore {
+            let snapshotLoadBatchLimit = progressiveLoadBatchLimit
+            Task { [weak self, documentStore] in
+                let snapshot: BlockInputDocument
+                do {
+                    snapshot = try await documentStore.completeDocumentSnapshot(limit: snapshotLoadBatchLimit)
+                } catch {
+                    await MainActor.run { [weak self] in
                         guard let self,
                               generation == self.documentSnapshotGeneration else {
                             return
                         }
-                        self.onDocumentChange?(snapshot)
+                        self.pendingDocumentSnapshotWorkItem = nil
                     }
+                    return
+                }
+                await MainActor.run { [weak self] in
+                    guard let self,
+                          generation == self.documentSnapshotGeneration else {
+                        return
+                    }
+                    self.pendingDocumentSnapshotWorkItem = nil
+                    self.onDocumentChange?(snapshot)
                 }
             }
             return
         }
-        onDocumentChange?((documentStore?.document ?? document).detachedStorage())
+        pendingDocumentSnapshotWorkItem = nil
+        onDocumentChange?(document.detachedStorage())
     }
 }

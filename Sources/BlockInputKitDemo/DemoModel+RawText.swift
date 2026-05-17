@@ -73,8 +73,14 @@ extension DemoModel {
         let store = session.store
         session.pendingMarkdownTask?.cancel()
         session.pendingMarkdownTask = Task { [weak self, itemID, revision, store] in
+            let document: BlockInputDocument
+            do {
+                document = try await store.completeDocumentSnapshot(limit: DemoData.progressiveLoadBatchLimit)
+            } catch {
+                return
+            }
             let markdown = await Task.detached(priority: .utility) {
-                store.backgroundDocumentSnapshot().markdown
+                document.markdown
             }.value
             self?.applyRenderedMarkdown(markdown, itemID: itemID, revision: revision)
         }

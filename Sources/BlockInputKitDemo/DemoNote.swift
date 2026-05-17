@@ -91,25 +91,38 @@ enum DemoNoteSaveState {
     case failed(String)
 }
 
-struct DemoNoteWarmState: Sendable {
+struct DemoNoteWarmState: @unchecked Sendable {
     var id: DemoNoteID
-    var store: BlockInputMemoryDocumentStore
+    var store: any BlockInputDocumentStore
     var rawMarkdown: String
 
     static func make(for id: DemoNoteID) -> DemoNoteWarmState {
-        let document = id.makeDocument()
-        return DemoNoteWarmState(
-            id: id,
-            store: BlockInputMemoryDocumentStore(document: document),
-            rawMarkdown: document.markdown
-        )
+        switch id {
+        case .mixed:
+            let document = id.makeDocument()
+            return DemoNoteWarmState(
+                id: id,
+                store: BlockInputMemoryDocumentStore(document: document),
+                rawMarkdown: document.markdown
+            )
+        case .large:
+            return DemoNoteWarmState(
+                id: id,
+                store: DemoGeneratedDocumentStore(
+                    count: DemoData.largeDocumentBlockCount,
+                    initialLimit: 1_000,
+                    blockProvider: DemoData.largeBlock(at:)
+                ),
+                rawMarkdown: ""
+            )
+        }
     }
 }
 
 final class DemoNoteSession {
     var id: DemoSidebarItemID
     var title: String
-    var store: BlockInputMemoryDocumentStore
+    var store: any BlockInputDocumentStore
     var undoController = BlockInputUndoController()
     var rawMarkdown: String
     var loadingState: DemoNoteLoadingState = .idle
@@ -137,8 +150,19 @@ final class DemoNoteSession {
     init(note: DemoNote, document: BlockInputDocument) {
         id = .builtIn(note.id)
         title = note.title
-        store = BlockInputMemoryDocumentStore(document: document)
-        rawMarkdown = document.markdown
+        switch note.id {
+        case .mixed:
+            store = BlockInputMemoryDocumentStore(document: document)
+            rawMarkdown = document.markdown
+        case .large:
+            store = DemoGeneratedDocumentStore(
+                count: DemoData.largeDocumentBlockCount,
+                initialLimit: 1_000,
+                blockProvider: DemoData.largeBlock(at:)
+            )
+            rawMarkdown = ""
+            rawViewNeedsReload = true
+        }
     }
 
     init(note: DemoNote, warmState: DemoNoteWarmState) {
@@ -146,6 +170,9 @@ final class DemoNoteSession {
         title = note.title
         store = warmState.store
         rawMarkdown = warmState.rawMarkdown
+        if note.id == .large {
+            rawViewNeedsReload = true
+        }
     }
 
     init(fileURL: URL) {

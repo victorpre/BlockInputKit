@@ -29,40 +29,11 @@ extension BlockInputView {
         scheduleDeferredDocumentSnapshot()
     }
 
-    func syncDocumentStore(_ action: StoreSyncAction) {
-        guard let documentStore else {
-            return
-        }
-        switch action {
-        case .replaceDocument:
-            documentStore.replaceDocument(document)
-        case let .replaceBlock(block):
-            documentStore.replaceBlock(block)
-        case let .insertBlocks(blocks, insertionIndex):
-            documentStore.insertBlocks(blocks, at: insertionIndex)
-        case let .deleteBlocks(blockIDs):
-            documentStore.deleteBlocks(withIDs: blockIDs)
-        case let .moveBlock(blockID, targetIndex):
-            documentStore.moveBlock(withID: blockID, to: targetIndex)
-        case let .moveBlockAndReplaceChangedBlocks(blockID, targetIndex, changedBlocks):
-            if let memoryStore = documentStore as? BlockInputMemoryDocumentStore {
-                memoryStore.moveBlockWithoutNormalizing(withID: blockID, to: targetIndex)
-            } else {
-                documentStore.moveBlock(withID: blockID, to: targetIndex)
-            }
-            publishDocumentMutation(.moveBlock(blockID, index: targetIndex))
-            for block in changedBlocks {
-                documentStore.replaceBlock(block)
-                publishDocumentMutation(.replaceBlock(block))
-            }
-            return
-        }
-        publishDocumentMutation(action.documentChange(document: document))
-    }
-
     func refreshDocumentFromStore() {
         if let documentStore {
-            document = documentStore.document.detachedStorage()
+            document = BlockInputDocument(
+                blocks: (0..<documentStore.loadedBlockCount).compactMap { documentStore.block(at: $0) }
+            ).detachedStorage()
             isDocumentCacheSynchronized = true
         }
     }
@@ -70,6 +41,9 @@ extension BlockInputView {
     func canSynchronizeCacheForGranularInsertion(insertedBlockCount: Int) -> Bool {
         guard documentStore != nil else {
             return true
+        }
+        guard isDocumentCacheSynchronized else {
+            return false
         }
         // Above this size, duplicating the store mutation with a local array
         // insert is visible in the 100k demo's repeated list-item Return path.
@@ -79,6 +53,9 @@ extension BlockInputView {
     func canSynchronizeCacheForGranularDeletion(deletedBlockCount: Int) -> Bool {
         guard documentStore != nil else {
             return true
+        }
+        guard isDocumentCacheSynchronized else {
+            return false
         }
         return document.blocks.count - deletedBlockCount <= largeDocumentCacheMutationLimit
     }
@@ -273,7 +250,12 @@ extension BlockInputView {
             applySelection(afterSelection, notify: beforeSelection != afterSelection)
             return nil
         }
-        syncDocumentStore(storeSyncAction(beforeDocument, document, afterSelection))
+        let action = storeSyncAction(beforeDocument, document, afterSelection)
+        guard canSynchronizeDocumentStore(action) else {
+            document = beforeDocument
+            return nil
+        }
+        syncDocumentStore(action)
         applySelection(afterSelection, notify: true)
         undoController?.registerStructuralEdit(
             actionName: actionName,

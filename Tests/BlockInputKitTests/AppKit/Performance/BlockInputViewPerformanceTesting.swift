@@ -15,7 +15,7 @@ final class DocumentReadCountingStore: BlockInputDocumentStore {
         return storedDocument
     }
 
-    var blockCount: Int {
+    var loadedBlockCount: Int {
         storedDocument.blocks.count
     }
 
@@ -47,6 +47,11 @@ final class DocumentReadCountingStore: BlockInputDocumentStore {
     func index(of id: BlockInputBlockID) -> Int? {
         indexLookupCount += 1
         return storedDocument.index(of: id)
+    }
+
+    @MainActor
+    func completeDocumentSnapshot(limit: Int) async throws -> BlockInputDocument {
+        document
     }
 
     func replaceDocument(_ document: BlockInputDocument) {

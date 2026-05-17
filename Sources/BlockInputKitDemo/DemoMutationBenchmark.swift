@@ -39,7 +39,7 @@ enum DemoMutationBenchmark {
         print(quoteStats.reportLine)
         print(quoteLineExitStats.reportLine)
         print(reorderStats.reportLine)
-        print("demo_100k_mutation_benchmark publishes=\(context.publishCount.value) blockCount=\(context.store.blockCount)")
+        print("demo_100k_mutation_benchmark publishes=\(context.publishCount.value) loadedBlockCount=\(context.store.loadedBlockCount)")
     }
 
     private static func makeContext() -> BenchmarkContext {
@@ -58,7 +58,7 @@ enum DemoMutationBenchmark {
             undoController: BlockInputUndoController(),
             onDocumentMutation: { _ in
                 publishCount.value += 1
-                _ = store.blockCount
+                _ = store.loadedBlockCount
             }
         ))
         view.layoutSubtreeIfNeeded()

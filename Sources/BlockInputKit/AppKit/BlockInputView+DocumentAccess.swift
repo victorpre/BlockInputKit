@@ -2,7 +2,7 @@ import Foundation
 
 extension BlockInputView {
     var blockCount: Int {
-        documentStore?.blockCount ?? document.blocks.count
+        documentStore?.loadedBlockCount ?? document.blocks.count
     }
 
     func block(at index: Int) -> BlockInputBlock? {

@@ -19,9 +19,8 @@ extension DemoModel {
         let fileURL = standardizedFileURL(for: url)
         let targetSession: DemoNoteSession
         if session.fileURL == nil {
-            targetSession = copySession(session, to: fileURL)
-            installFileBackedSession(targetSession)
-            select(targetSession.id)
+            startSaveAsCopy(for: session, to: fileURL, hadPendingRawParse: hadPendingRawParse)
+            return
         } else {
             targetSession = session
             retargetFileSession(session, to: fileURL)
@@ -32,6 +31,73 @@ extension DemoModel {
             scheduleRawParse(for: targetSession, delay: 0)
         }
         requestSave(for: targetSession, rawEdit: false, immediate: true)
+        objectWillChange.send()
+    }
+
+    func startSaveAsCopy(for session: DemoNoteSession, to fileURL: URL, hadPendingRawParse: Bool) {
+        guard session.activeSaveTask == nil else {
+            session.saveQueuedAfterActive = true
+            objectWillChange.send()
+            return
+        }
+        let sourceID = session.id
+        let store = session.store
+        session.saveState = .saving
+        objectWillChange.send()
+        session.activeSaveTask = Task { [weak self, weak session, sourceID, fileURL, hadPendingRawParse, store] in
+            do {
+                let document = try await store.completeDocumentSnapshot(limit: DemoData.progressiveLoadBatchLimit)
+                guard !Task.isCancelled else {
+                    return
+                }
+                self?.completeSaveAsCopy(
+                    sourceID: sourceID,
+                    sourceSession: session,
+                    fileURL: fileURL,
+                    document: document,
+                    hadPendingRawParse: hadPendingRawParse
+                )
+            } catch {
+                guard !Task.isCancelled else {
+                    return
+                }
+                self?.completeSaveAsCopyFailure(sourceID: sourceID, sourceSession: session, error: error)
+            }
+        }
+    }
+
+    func completeSaveAsCopy(
+        sourceID: DemoSidebarItemID,
+        sourceSession: DemoNoteSession?,
+        fileURL: URL,
+        document: BlockInputDocument,
+        hadPendingRawParse: Bool
+    ) {
+        guard let sourceSession,
+              sessions[sourceID] === sourceSession else {
+            return
+        }
+        sourceSession.activeSaveTask = nil
+        sourceSession.saveState = .idle
+        let targetSession = copySession(sourceSession, to: fileURL, document: document)
+        installFileBackedSession(targetSession)
+        select(targetSession.id)
+        targetSession.isDirty = true
+        targetSession.saveGeneration += 1
+        if hadPendingRawParse {
+            scheduleRawParse(for: targetSession, delay: 0)
+        }
+        requestSave(for: targetSession, rawEdit: false, immediate: true)
+        objectWillChange.send()
+    }
+
+    func completeSaveAsCopyFailure(sourceID: DemoSidebarItemID, sourceSession: DemoNoteSession?, error: Error) {
+        guard let sourceSession,
+              sessions[sourceID] === sourceSession else {
+            return
+        }
+        sourceSession.activeSaveTask = nil
+        sourceSession.saveState = .failed("Save failed: \(error.localizedDescription)")
         objectWillChange.send()
     }
 
@@ -119,16 +185,17 @@ extension DemoModel {
     func startSave(for session: DemoNoteSession, to url: URL, generation: Int, rawEdit: Bool) {
         let itemID = session.id
         let rawMarkdown = session.rawMarkdown
-        let document = session.store.backgroundDocumentSnapshot()
+        let store = session.store
         session.saveState = .saving
         session.saveQueuedAfterActive = false
         session.saveQueuedRawWrite = false
         objectWillChange.send()
-        session.activeSaveTask = Task { [weak self, itemID, url, generation, rawEdit, rawMarkdown, document] in
+        session.activeSaveTask = Task { [weak self, itemID, url, generation, rawEdit, rawMarkdown, store] in
             do {
                 if rawEdit {
                     try await Self.writeRawMarkdown(rawMarkdown, to: url)
                 } else {
+                    let document = try await store.completeDocumentSnapshot(limit: DemoData.progressiveLoadBatchLimit)
                     try await document.writeMarkdown(to: url)
                 }
                 guard !Task.isCancelled else {
@@ -223,8 +290,7 @@ extension DemoModel {
         }
     }
 
-    func copySession(_ session: DemoNoteSession, to url: URL) -> DemoNoteSession {
-        let document = session.store.backgroundDocumentSnapshot()
+    func copySession(_ session: DemoNoteSession, to url: URL, document: BlockInputDocument) -> DemoNoteSession {
         let copy = DemoNoteSession(fileURL: url)
         copy.loadingState = .idle
         copy.store = BlockInputMemoryDocumentStore(document: document)
