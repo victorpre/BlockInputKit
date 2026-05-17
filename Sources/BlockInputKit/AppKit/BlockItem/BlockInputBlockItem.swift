@@ -9,6 +9,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let handleWidth: CGFloat = 20
     static let handleLeading: CGFloat = 0
     static let handleTrailingGap: CGFloat = 0
+    static let handleHitOutset: CGFloat = 4
     static let defaultTextLeading: CGFloat = 4
     static let horizontalChromeWidthWithHandle: CGFloat = handleLeading + handleWidth + handleTrailingGap
     static let markerGutterWidth: CGFloat = 24
@@ -90,7 +91,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     override func loadView() {
-        view = NSView()
+        let rootView = BlockInputBlockItemRootView()
+        rootView.blockItem = self
+        view = rootView
     }
 
     override func viewDidLoad() {
@@ -112,6 +115,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         updateHoverTrackingArea()
         updateMarkerLineYOffsets()
         updateQuoteBarVerticalExtent()
+        view.window?.invalidateCursorRects(for: view)
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -180,6 +184,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         handleView.isHidden = !allowsReordering
         handleView.alphaValue = 0
         handleView.toolTip = allowsReordering ? "Drag to reorder block" : nil
+        view.window?.invalidateCursorRects(for: view)
         handleLeadingConstraint?.constant = Self.handleLeadingInset(
             allowsReordering: allowsReordering,
             editorHorizontalInset: editorHorizontalInset
@@ -444,6 +449,7 @@ extension BlockInputBlockItem {
         resetTextForReuse()
         resetLayoutForReuse()
         resetChromeForReuse()
+        view.window?.invalidateCursorRects(for: view)
     }
 
     private func clearBlockReferencesForReuse() {

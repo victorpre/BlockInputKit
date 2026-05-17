@@ -14,9 +14,18 @@ final class BlockInputDragHandleView: NSView, NSDraggingSource {
     }
 
     weak var blockItem: BlockInputBlockItem?
+    var activeCursor: NSCursor? {
+        isEnabled && !isHidden ? .openHand : nil
+    }
+    override var isHidden: Bool {
+        didSet {
+            window?.invalidateCursorRects(for: self)
+        }
+    }
     var isEnabled = true {
         didSet {
             needsDisplay = true
+            window?.invalidateCursorRects(for: self)
         }
     }
     private var mouseDownEvent: NSEvent?
@@ -37,6 +46,22 @@ final class BlockInputDragHandleView: NSView, NSDraggingSource {
 
     override var intrinsicContentSize: NSSize {
         NSSize(width: BlockInputBlockItem.handleWidth, height: BlockInputBlockItem.dragHandleHeight)
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        guard let activeCursor else {
+            return
+        }
+        addCursorRect(bounds, cursor: activeCursor)
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        guard let activeCursor else {
+            super.cursorUpdate(with: event)
+            return
+        }
+        activeCursor.set()
     }
 
     override func draw(_ dirtyRect: NSRect) {
