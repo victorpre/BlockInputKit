@@ -4,6 +4,8 @@ import AppKit
 public struct BlockInputConfiguration {
     /// Default visual horizontal inset for block content.
     public static let defaultEditorHorizontalInset: CGFloat = 20
+    /// Default visual vertical inset for the editor content.
+    public static let defaultEditorVerticalInset: CGFloat = 8
 
     /// Source of truth for the document shown by the editor.
     public var documentStore: any BlockInputDocumentStore {
@@ -18,6 +20,8 @@ public struct BlockInputConfiguration {
     /// When reordering is enabled, the drag handle is centered inside this inset when possible
     /// and the gutter grows only when the inset is too small for the handle lane.
     public var editorHorizontalInset: CGFloat
+    /// Visual vertical inset used above and below editor content.
+    public var editorVerticalInset: CGFloat
     /// Color used for editor accent affordances, including drag insertion and selected horizontal rules.
     public var dropIndicatorColor: NSColor
     /// Undo coordinator used by text and structural editor operations.
@@ -55,6 +59,7 @@ public struct BlockInputConfiguration {
         documentStore: (any BlockInputDocumentStore)? = nil,
         allowsBlockReordering: Bool = true,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
+        editorVerticalInset: CGFloat = BlockInputConfiguration.defaultEditorVerticalInset,
         dropIndicatorColor: NSColor = .controlAccentColor,
         undoController: BlockInputUndoController? = nil,
         completionProvider: (any BlockInputCompletionProvider)? = nil,
@@ -68,6 +73,7 @@ public struct BlockInputConfiguration {
         self.documentStore = documentStore ?? BlockInputMemoryDocumentStore(document: document)
         self.allowsBlockReordering = allowsBlockReordering
         self.editorHorizontalInset = editorHorizontalInset
+        self.editorVerticalInset = editorVerticalInset
         self.dropIndicatorColor = dropIndicatorColor
         self.undoController = undoController
         self.completionProvider = completionProvider

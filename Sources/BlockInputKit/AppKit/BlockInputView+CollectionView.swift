@@ -22,7 +22,7 @@ extension BlockInputView: NSCollectionViewDataSource {
                 for: indexPath
             )
             (item as? BlockInputLoadingItem)?.configure(error: progressiveStoreError)
-            requestNextProgressiveBatchIfNeeded()
+            scheduleProgressivePreloadCheck(requiresMountedPreloadWindow: false)
             return item
         }
         let item = collectionView.makeItem(
@@ -60,7 +60,7 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
         let horizontalInsets = sectionInset.left + sectionInset.right + scrollViewInsets.left + scrollViewInsets.right
         let availableWidth = max(collectionView.bounds.width - horizontalInsets, 0)
         if isProgressiveLoadingIndex(indexPath.item) {
-            return NSSize(width: availableWidth, height: 56)
+            return NSSize(width: availableWidth, height: progressiveLoadingRowHeight)
         }
         guard let block = block(at: indexPath.item) else {
             return NSSize(width: availableWidth, height: 32)
@@ -89,11 +89,7 @@ extension BlockInputView {
     }
 
     func requestNextProgressiveBatchIfNeeded() {
-        guard progressiveLoadTask == nil,
-              progressiveStoreError == nil,
-              let documentStore,
-              !documentStore.isComplete,
-              !documentStore.isLoading else {
+        guard let documentStore = documentStoreForNextProgressiveBatchRequest() else {
             return
         }
         let batchLimit = progressiveLoadBatchLimit
@@ -116,10 +112,23 @@ extension BlockInputView {
             }
             self.progressiveLoadTask = nil
             if documentStore.loadedBlockCount > loadedCountBeforeRequest,
-               self.isProgressiveLoadingRowVisible() {
-                self.requestNextProgressiveBatchIfNeeded()
+               self.isProgressiveLoadingRowVisibleOrWithinPreloadWindow() {
+                self.scheduleProgressivePreloadCheck()
             }
         }
+    }
+
+    func documentStoreForNextProgressiveBatchRequest() -> (any BlockInputDocumentStore)? {
+        // Scroll and layout events can fire repeatedly near the bottom of large documents.
+        // Keep this guard cheap so those events avoid collection geometry work while a load is blocked.
+        guard progressiveLoadTask == nil,
+              progressiveStoreError == nil,
+              let documentStore,
+              !documentStore.isComplete,
+              !documentStore.isLoading else {
+            return nil
+        }
+        return documentStore
     }
 
     func isCurrentDocumentStore(_ store: AnyObject) -> Bool {
@@ -127,13 +136,6 @@ extension BlockInputView {
             return false
         }
         return (documentStore as AnyObject) === store
-    }
-
-    func isProgressiveLoadingRowVisible() -> Bool {
-        guard showsProgressiveLoadingRow else {
-            return false
-        }
-        return collectionView.item(at: IndexPath(item: blockCount, section: 0)) != nil
     }
 
     func handleDocumentStoreChange(_ change: BlockInputDocumentStoreChange) {

@@ -24,7 +24,7 @@ public final class BlockInputView: NSView {
     private let scrollView = BlockInputDocumentScrollView()
     let collectionView = BlockInputCollectionView()
     let dropIndicatorView = NSView()
-    private let layout = BlockInputCollectionViewFlowLayout()
+    let layout = BlockInputCollectionViewFlowLayout()
     var documentStore: (any BlockInputDocumentStore)?
     var documentStoreObservation: BlockInputDocumentStoreObservation?
     var progressiveLoadTask: Task<Void, Never>?
@@ -52,6 +52,7 @@ public final class BlockInputView: NSView {
     var isBecomingFirstResponder = false
     var documentSnapshotGeneration = 0
     var pendingDocumentSnapshotWorkItem: DispatchWorkItem?
+    var pendingProgressivePreloadWorkItem: DispatchWorkItem?
     nonisolated(unsafe) var selectionExpansionKeyMonitor: Any?
     var lastNativeTextSelectionExpansion: BlockInputNativeTextSelectionExpansion?
     var blockSelectionExpansion: BlockInputBlockSelectionExpansion?
@@ -73,9 +74,7 @@ public final class BlockInputView: NSView {
         if let selectionExpansionKeyMonitor { NSEvent.removeMonitor(selectionExpansionKeyMonitor) }
     }
 
-    public override var acceptsFirstResponder: Bool {
-        true
-    }
+    public override var acceptsFirstResponder: Bool { true }
 
     public override func becomeFirstResponder() -> Bool {
         isBecomingFirstResponder = true
@@ -416,7 +415,7 @@ public final class BlockInputView: NSView {
 
         layout.minimumLineSpacing = 0
         layout.minimumInteritemSpacing = 0
-        layout.sectionInset = NSEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)
+        editorVerticalInset = BlockInputConfiguration.defaultEditorVerticalInset
 
         collectionView.collectionViewLayout = layout
         collectionView.dataSource = self
@@ -450,6 +449,9 @@ public final class BlockInputView: NSView {
         scrollView.drawsBackground = true
         scrollView.backgroundColor = .textBackgroundColor
         scrollView.documentView = collectionView
+        scrollView.onContentBoundsDidChange = { [weak self] in
+            self?.scheduleProgressivePreloadCheck()
+        }
 
         addSubview(scrollView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false

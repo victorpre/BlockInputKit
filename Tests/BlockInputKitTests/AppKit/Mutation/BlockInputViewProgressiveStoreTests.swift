@@ -29,6 +29,28 @@ final class BlockInputViewProgressiveStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testHundredThousandBlockProgressiveLoadsRemainContiguous() async throws {
+        let blocks = (0..<100_000).map { index in
+            BlockInputBlock(
+                id: BlockInputBlockID(rawValue: "block-\(index)"),
+                text: "Block \(index)"
+            )
+        }
+        let store = BlockInputProgressiveMemoryDocumentStore(blocks: blocks, initialLimit: 1_000)
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        view.configure(BlockInputConfiguration(documentStore: store))
+
+        try assertLoadedPrefixMatchesSource(blocks, store: store, view: view)
+        while !store.isComplete {
+            try await store.loadNextBlockBatch(limit: 5_000)
+            try assertLoadedPrefixMatchesSource(blocks, store: store, view: view)
+        }
+
+        XCTAssertEqual(store.loadedBlockCount, 100_000)
+        XCTAssertEqual(view.collectionView(view.collectionView, numberOfItemsInSection: 0), 100_000)
+    }
+
+    @MainActor
     func testProgressiveEmptySourceStillExposesEditableEmptyBlock() {
         let store = BlockInputProgressiveMemoryDocumentStore(blocks: [], initialLimit: 1)
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
@@ -266,6 +288,33 @@ final class BlockInputViewProgressiveStoreTests: XCTestCase {
         XCTAssertNil(selection)
         XCTAssertEqual(snapshot.blocks.map(\.id), [firstID, secondID])
         XCTAssertEqual(snapshot.blocks.map(\.text), ["", "Second"])
+    }
+
+    @MainActor
+    private func assertLoadedPrefixMatchesSource(
+        _ blocks: [BlockInputBlock],
+        store: BlockInputProgressiveMemoryDocumentStore,
+        view: BlockInputView,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let loadedCount = store.loadedBlockCount
+        let expectedItemCount = loadedCount + (store.isComplete ? 0 : 1)
+        let itemCount = view.collectionView(view.collectionView, numberOfItemsInSection: 0)
+        XCTAssertEqual(itemCount, expectedItemCount, file: file, line: line)
+        for index in 0..<loadedCount {
+            let expectedBlock = blocks[index]
+            let loadedBlock = try XCTUnwrap(store.block(at: index), "Missing store block at index \(index)", file: file, line: line)
+            let viewBlock = try XCTUnwrap(view.block(at: index), "Missing view block at index \(index)", file: file, line: line)
+            let viewIndex = view.index(of: expectedBlock.id)
+            XCTAssertEqual(loadedBlock.id, expectedBlock.id, file: file, line: line)
+            XCTAssertEqual(viewBlock.id, expectedBlock.id, file: file, line: line)
+            XCTAssertEqual(store.index(of: expectedBlock.id), index, file: file, line: line)
+            XCTAssertEqual(viewIndex, index, file: file, line: line)
+        }
+        let unloadedViewBlock = view.block(at: loadedCount)
+        XCTAssertNil(store.block(at: loadedCount), "Loaded prefix should stop at \(loadedCount)", file: file, line: line)
+        XCTAssertNil(unloadedViewBlock, "View prefix should stop at \(loadedCount)", file: file, line: line)
     }
 }
 

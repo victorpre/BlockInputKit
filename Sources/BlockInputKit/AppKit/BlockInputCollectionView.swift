@@ -5,6 +5,11 @@ final class BlockInputCollectionView: NSCollectionView {
     weak var blockInputView: BlockInputView?
     private weak var blockSelectionDragItem: BlockInputBlockItem?
 
+    override func layout() {
+        super.layout()
+        blockInputView?.scheduleProgressivePreloadCheck()
+    }
+
     override func mouseDown(with event: NSEvent) {
         blockSelectionDragItem = itemForBlockSelectionDrag(at: event.locationInWindow)
         blockSelectionDragItem?.beginBlockSelectionDrag()

@@ -26,6 +26,7 @@ extension BlockInputView {
         isDocumentCacheSynchronized = reusesLargeDocumentCache ? wasDocumentCacheSynchronized : true
         allowsBlockReordering = configuration.allowsBlockReordering
         editorHorizontalInset = configuration.editorHorizontalInset
+        editorVerticalInset = configuration.editorVerticalInset
         dropIndicatorColor = configuration.dropIndicatorColor
         configureUndoController(
             previousDocumentStore: previousDocumentStore,
@@ -95,6 +96,8 @@ extension BlockInputView {
 
 extension BlockInputView {
     func detachDocumentStoreObservation() {
+        pendingProgressivePreloadWorkItem?.cancel()
+        pendingProgressivePreloadWorkItem = nil
         progressiveLoadTask?.cancel()
         progressiveLoadTask = nil
         documentStoreObservation?.cancel()

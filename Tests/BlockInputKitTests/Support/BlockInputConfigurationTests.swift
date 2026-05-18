@@ -30,10 +30,11 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertTrue(configuration.documentStore is BlockInputMemoryDocumentStore)
         XCTAssertEqual(configuration.document.blocks.map(\.id), [blockID])
         XCTAssertEqual(configuration.editorHorizontalInset, BlockInputConfiguration.defaultEditorHorizontalInset)
+        XCTAssertEqual(configuration.editorVerticalInset, BlockInputConfiguration.defaultEditorVerticalInset)
     }
 
     @MainActor
-    func testViewAppliesConfiguredIntegrationSurfaces() {
+    func testViewAppliesConfiguredIntegrationSurfaces() throws {
         let provider = ConfigurationCompletionProvider()
         let undoController = BlockInputUndoController()
         let view = BlockInputView()
@@ -44,6 +45,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         view.configure(BlockInputConfiguration(
             allowsBlockReordering: false,
             editorHorizontalInset: 28,
+            editorVerticalInset: 14,
             dropIndicatorColor: .systemPink,
             undoController: undoController,
             completionProvider: provider,
@@ -55,6 +57,12 @@ final class BlockInputConfigurationTests: XCTestCase {
 
         XCTAssertFalse(view.allowsBlockReordering)
         XCTAssertEqual(view.editorHorizontalInset, 28)
+        XCTAssertEqual(view.editorVerticalInset, 14)
+        let sectionInset = try XCTUnwrap((view.collectionView.collectionViewLayout as? NSCollectionViewFlowLayout)?.sectionInset)
+        XCTAssertEqual(sectionInset.top, 14)
+        XCTAssertEqual(sectionInset.bottom, 14)
+        XCTAssertEqual(sectionInset.left, 0)
+        XCTAssertEqual(sectionInset.right, 0)
         XCTAssertEqual(view.dropIndicatorColor, .systemPink)
         XCTAssertTrue(view.undoController === undoController)
         XCTAssertTrue(view.completionProvider === provider)
