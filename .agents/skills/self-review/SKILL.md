@@ -30,9 +30,17 @@ Perform a repo-aware quality audit of the current BlockInputKit changes before t
 5. Confirm validation when editor, focus, keyboard, virtualization, or rendering behavior is affected.
 6. Fix low-risk issues directly. If a specific commit SHA was given to the skill, amend directly into the commit.
 7. Ask before risky or broad changes.
-8. Report findings first, ordered by severity and grounded in file/line references.
+8. After fixing anything, automatically start another pass from step 2 with fresh status and diffs.
+9. Report findings first, ordered by severity and grounded in file/line references.
 
-**WHEN DONE:** If anything was changed, loop and do another pass with fresh eyes. Continue to loop until there is nothing more to change. If nothing was changed, ask if the user wants another pass.
+## Looping Requirement
+
+Treat every fixed issue as a reason to run the skill again automatically. Continue the inspect, review, fix,
+and validate cycle until a complete fresh pass finds nothing else worth addressing, the user interrupts or
+redirects the work, or the remaining changes are risky or broad enough to require approval.
+
+Do not wait for the user to ask for "another pass" after making fixes. If the loop stops because approval is
+needed or validation cannot be completed, report the blocker and the remaining work explicitly.
 
 ## Output
 
