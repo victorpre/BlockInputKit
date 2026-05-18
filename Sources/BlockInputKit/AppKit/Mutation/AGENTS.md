@@ -14,6 +14,7 @@
 - When remapping mounted collection items after large-document insert/delete, resize each item for its new block before manually reflowing visible rows; otherwise mixed paragraph/heading runs can show uneven spacing or clipped text.
 - Keep front-of-paragraph Backspace/Delete merges granular: replace the previous block and delete the current block.
 - When indenting ordered-list blocks, normalize only the affected list run and publish replacement mutations for every block whose visible marker changes.
+- For marker-adjusting document stores, publish numbered-list marker transactions instead of marker-only block replacements on hot large-document paths.
 
 ## Shortcuts
 

@@ -24,23 +24,24 @@ extension BlockInputView {
 
         let selectionBefore = selection
         let selectionAfter = move.result.selection
-        syncDocumentStore(.moveBlockAndReplaceChangedBlocks(
-            blockID,
-            targetIndex: finalTargetIndex,
-            changedBlocks: move.afterChangedBlocks
-        ))
+        let markerTransaction = numberedListMoveMarkerTransaction(
+            sourceIndex: sourceIndex,
+            targetIndex: finalTargetIndex
+        )
+        syncLargeListMove(blockID: blockID, targetIndex: finalTargetIndex, move: move, markerTransaction: markerTransaction)
         markDocumentCacheUnsynchronized()
         applySelection(selectionAfter, notify: true)
-        undoController?.registerBlockMoveStructuralEdit(BlockInputMoveEdit(
-            actionName: "Move Block",
-            blockID: blockID,
-            beforeIndex: sourceIndex,
-            afterIndex: finalTargetIndex,
-            beforeChangedBlocks: move.beforeChangedBlocks,
-            afterChangedBlocks: move.afterChangedBlocks,
-            selectionBefore: selectionBefore,
-            selectionAfter: selectionAfter
-        ))
+        registerLargeListMoveUndo(
+            LargeListMoveUndoContext(
+                blockID: blockID,
+                sourceIndex: sourceIndex,
+                targetIndex: finalTargetIndex,
+                move: move,
+                markerTransaction: markerTransaction,
+                selectionBefore: selectionBefore,
+                selectionAfter: selectionAfter
+            )
+        )
         applyGranularMoveLayout(
             sourceIndex: sourceIndex,
             targetIndex: finalTargetIndex,
@@ -50,20 +51,86 @@ extension BlockInputView {
         return selectionAfter
     }
 
+    private func syncLargeListMove(
+        blockID: BlockInputBlockID,
+        targetIndex: Int,
+        move: BoundedListMove,
+        markerTransaction: BlockInputNumberedListMarkerTransaction?
+    ) {
+        if let markerTransaction,
+           documentStore is BlockInputMarkerAdjustingStore {
+            syncDocumentStore(.moveBlockAndApplyMarkerTransaction(
+                blockID,
+                targetIndex: targetIndex,
+                transaction: markerTransaction
+            ))
+            return
+        }
+        syncDocumentStore(.moveBlockAndReplaceChangedBlocks(
+            blockID,
+            targetIndex: targetIndex,
+            changedBlocks: move.afterChangedBlocks
+        ))
+    }
+
+    private func registerLargeListMoveUndo(_ context: LargeListMoveUndoContext) {
+        let beforeMarkerTransaction = context.markerTransaction.flatMap { _ in
+            numberedListUndoMoveMarkerTransaction(
+                blockID: context.blockID,
+                sourceIndex: context.sourceIndex,
+                targetIndex: context.targetIndex
+            )
+        }
+        undoController?.registerBlockMoveStructuralEdit(BlockInputMoveEdit(
+            actionName: "Move Block",
+            blockID: context.blockID,
+            beforeIndex: context.sourceIndex,
+            afterIndex: context.targetIndex,
+            beforeChangedBlocks: context.move.beforeChangedBlocks,
+            afterChangedBlocks: context.move.afterChangedBlocks,
+            beforeMarkerTransaction: beforeMarkerTransaction,
+            afterMarkerTransaction: context.markerTransaction,
+            selectionBefore: context.selectionBefore,
+            selectionAfter: context.selectionAfter
+        ))
+    }
+}
+
+private struct LargeListMoveUndoContext {
+    var blockID: BlockInputBlockID
+    var sourceIndex: Int
+    var targetIndex: Int
+    var move: BoundedListMove
+    var markerTransaction: BlockInputNumberedListMarkerTransaction?
+    var selectionBefore: BlockInputSelection?
+    var selectionAfter: BlockInputSelection
+}
+
+extension BlockInputView {
     func applyGranularMoveUndo(
         blockID: BlockInputBlockID,
         to targetIndex: Int,
         changedBlocks: [BlockInputBlock],
+        markerTransaction: BlockInputNumberedListMarkerTransaction? = nil,
         selection: BlockInputSelection?
     ) -> Bool {
         guard let sourceIndex = index(of: blockID) else {
             return false
         }
-        syncDocumentStore(.moveBlockAndReplaceChangedBlocks(
-            blockID,
-            targetIndex: targetIndex,
-            changedBlocks: changedBlocks
-        ))
+        if let markerTransaction,
+           documentStore is BlockInputMarkerAdjustingStore {
+            syncDocumentStore(.moveBlockAndApplyMarkerTransaction(
+                blockID,
+                targetIndex: targetIndex,
+                transaction: markerTransaction
+            ))
+        } else {
+            syncDocumentStore(.moveBlockAndReplaceChangedBlocks(
+                blockID,
+                targetIndex: targetIndex,
+                changedBlocks: changedBlocks
+            ))
+        }
         if documentStore != nil {
             markDocumentCacheUnsynchronized()
         } else {
@@ -177,6 +244,90 @@ extension BlockInputView {
             result: result,
             beforeChangedBlocks: beforeChangedBlocks,
             afterChangedBlocks: result.changedBlocks
+        )
+    }
+
+    private func numberedListMoveMarkerTransaction(
+        sourceIndex: Int,
+        targetIndex: Int
+    ) -> BlockInputNumberedListMarkerTransaction? {
+        guard sourceIndex != targetIndex,
+              let sourceBlock = block(at: sourceIndex),
+              case let .numberedListItem(sourceStart) = sourceBlock.kind,
+              sourceBlock.indentationLevel(forLine: 0) == 0 else {
+            return nil
+        }
+        let lowerBound = min(sourceIndex, targetIndex)
+        let upperBound = max(sourceIndex, targetIndex)
+        for index in lowerBound...upperBound {
+            guard let block = block(at: index),
+                  case let .numberedListItem(start) = block.kind,
+                  start == index + 1,
+                  block.indentationLevel(forLine: 0) == 0 else {
+                return nil
+            }
+        }
+        let shiftedRange: ClosedRange<Int>
+        let delta: Int
+        if sourceIndex < targetIndex {
+            shiftedRange = sourceIndex...(targetIndex - 1)
+            delta = -1
+        } else {
+            shiftedRange = (targetIndex + 1)...sourceIndex
+            delta = 1
+        }
+        return BlockInputNumberedListMarkerTransaction(
+            adjustments: [
+                BlockInputNumberedListMarkerAdjustment(
+                    startIndex: shiftedRange.lowerBound,
+                    endIndex: shiftedRange.upperBound,
+                    indentationLevel: 0,
+                    delta: delta
+                )
+            ],
+            overrides: [
+                BlockInputNumberedListMarkerOverride(
+                    blockID: sourceBlock.id,
+                    start: targetIndex + 1,
+                    previousStart: sourceStart
+                )
+            ]
+        )
+    }
+
+    private func numberedListUndoMoveMarkerTransaction(
+        blockID: BlockInputBlockID,
+        sourceIndex: Int,
+        targetIndex: Int
+    ) -> BlockInputNumberedListMarkerTransaction? {
+        guard sourceIndex != targetIndex else {
+            return nil
+        }
+        let shiftedRange: ClosedRange<Int>
+        let delta: Int
+        if sourceIndex < targetIndex {
+            shiftedRange = (sourceIndex + 1)...targetIndex
+            delta = 1
+        } else {
+            shiftedRange = targetIndex...(sourceIndex - 1)
+            delta = -1
+        }
+        return BlockInputNumberedListMarkerTransaction(
+            adjustments: [
+                BlockInputNumberedListMarkerAdjustment(
+                    startIndex: shiftedRange.lowerBound,
+                    endIndex: shiftedRange.upperBound,
+                    indentationLevel: 0,
+                    delta: delta
+                )
+            ],
+            overrides: [
+                BlockInputNumberedListMarkerOverride(
+                    blockID: blockID,
+                    start: sourceIndex + 1,
+                    previousStart: targetIndex + 1
+                )
+            ]
         )
     }
 

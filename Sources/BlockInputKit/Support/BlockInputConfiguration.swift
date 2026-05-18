@@ -31,6 +31,9 @@ public struct BlockInputConfiguration {
     /// Host completion source for mentions and slash commands.
     public var completionProvider: (any BlockInputCompletionProvider)?
     /// Called immediately with the granular store mutation applied by the editor.
+    ///
+    /// Marker-adjusting stores may receive marker-only numbered-list changes instead of a replacement for every
+    /// list item whose visible marker changed.
     public var onDocumentMutation: ((BlockInputDocumentChange) -> Void)?
     /// Called with a full document snapshot after editor mutations.
     ///

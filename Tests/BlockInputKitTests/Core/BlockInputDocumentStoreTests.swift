@@ -57,6 +57,202 @@ final class BlockInputDocumentStoreTests: XCTestCase {
         XCTAssertEqual(store.block(withID: thirdID)?.text, "Third")
     }
 
+    func testMemoryDocumentStoreAppliesNumberedListMarkerTransactions() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let separateID = BlockInputBlockID(rawValue: "separate")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, kind: .numberedListItem(start: 1), text: "First"),
+            BlockInputBlock(id: secondID, kind: .numberedListItem(start: 2), text: "Second"),
+            BlockInputBlock(id: "paragraph", text: "Paragraph"),
+            BlockInputBlock(id: separateID, kind: .numberedListItem(start: 1), text: "Separate")
+        ]))
+
+        store.applyNumberedListMarkerTransaction(BlockInputNumberedListMarkerTransaction(
+            adjustments: [
+                BlockInputNumberedListMarkerAdjustment(
+                    startIndex: 1,
+                    endIndex: nil,
+                    listRunStartIndex: 0,
+                    indentationLevel: 0,
+                    delta: 1
+                )
+            ],
+            overrides: [
+                BlockInputNumberedListMarkerOverride(blockID: firstID, start: 4, previousStart: 1)
+            ]
+        ))
+
+        XCTAssertEqual(store.block(withID: firstID)?.kind, .numberedListItem(start: 4))
+        XCTAssertEqual(store.block(withID: secondID)?.kind, .numberedListItem(start: 3))
+        XCTAssertEqual(store.block(withID: separateID)?.kind, .numberedListItem(start: 1))
+        XCTAssertEqual(store.document.blocks.map(\.kind), [
+            .numberedListItem(start: 4),
+            .numberedListItem(start: 3),
+            .paragraph,
+            .numberedListItem(start: 1)
+        ])
+    }
+
+    func testMemoryDocumentStoreStopsNestedMarkerAdjustmentAtLowerIndentationBoundary() {
+        let otherParentChildID = BlockInputBlockID(rawValue: "other-parent-child")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: "parent-one", kind: .numberedListItem(start: 1), text: "Parent one"),
+            BlockInputBlock(id: "child-one", kind: .numberedListItem(start: 1), text: "Child one", indentationLevel: 1),
+            BlockInputBlock(id: "child-two", kind: .numberedListItem(start: 2), text: "Child two", indentationLevel: 1),
+            BlockInputBlock(id: "parent-two", kind: .numberedListItem(start: 2), text: "Parent two"),
+            BlockInputBlock(id: otherParentChildID, kind: .numberedListItem(start: 1), text: "Other child", indentationLevel: 1)
+        ]))
+
+        store.applyNumberedListMarkerTransaction(BlockInputNumberedListMarkerTransaction(
+            adjustments: [
+                BlockInputNumberedListMarkerAdjustment(
+                    startIndex: 2,
+                    endIndex: nil,
+                    listRunStartIndex: 1,
+                    indentationLevel: 1,
+                    delta: 1
+                )
+            ]
+        ))
+
+        XCTAssertEqual(store.document.blocks.map(\.kind), [
+            .numberedListItem(start: 1),
+            .numberedListItem(start: 1),
+            .numberedListItem(start: 3),
+            .numberedListItem(start: 2),
+            .numberedListItem(start: 1)
+        ])
+        XCTAssertEqual(store.block(withID: otherParentChildID)?.kind, .numberedListItem(start: 1))
+    }
+
+    func testMemoryDocumentStoreReplacesAdjustedNumberedBlockWithoutDoubleApplyingMarkerTransaction() throws {
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: "first", kind: .numberedListItem(start: 1), text: "First"),
+            BlockInputBlock(id: secondID, kind: .numberedListItem(start: 2), text: "Second")
+        ]))
+        store.applyNumberedListMarkerTransaction(BlockInputNumberedListMarkerTransaction(
+            adjustments: [
+                BlockInputNumberedListMarkerAdjustment(
+                    startIndex: 1,
+                    endIndex: nil,
+                    listRunStartIndex: 0,
+                    indentationLevel: 0,
+                    delta: 1
+                )
+            ]
+        ))
+        var editedBlock = try XCTUnwrap(store.block(withID: secondID))
+        editedBlock.text = "Edited"
+
+        store.replaceBlock(editedBlock)
+
+        XCTAssertEqual(store.block(withID: secondID)?.text, "Edited")
+        XCTAssertEqual(store.block(withID: secondID)?.kind, .numberedListItem(start: 3))
+        XCTAssertEqual(store.document.block(withID: secondID)?.kind, .numberedListItem(start: 3))
+    }
+
+    func testMemoryDocumentStoreCompactsPendingMarkerTransactionsBeforeMove() {
+        let paragraphID = BlockInputBlockID(rawValue: "paragraph")
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: paragraphID, text: "Paragraph"),
+            BlockInputBlock(id: firstID, kind: .numberedListItem(start: 1), text: "First"),
+            BlockInputBlock(id: secondID, kind: .numberedListItem(start: 2), text: "Second")
+        ]))
+        store.applyNumberedListMarkerTransaction(BlockInputNumberedListMarkerTransaction(
+            adjustments: [
+                BlockInputNumberedListMarkerAdjustment(
+                    startIndex: 1,
+                    endIndex: 2,
+                    indentationLevel: 0,
+                    delta: 1
+                )
+            ]
+        ))
+
+        store.moveBlock(withID: paragraphID, to: 2)
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [firstID, secondID, paragraphID])
+        XCTAssertEqual(store.block(withID: firstID)?.kind, .numberedListItem(start: 2))
+        XCTAssertEqual(store.block(withID: secondID)?.kind, .numberedListItem(start: 3))
+    }
+
+    func testMemoryDocumentStoreDropsFiniteMarkerAdjustmentWhenCoveredBlockIsDeleted() {
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let thirdID = BlockInputBlockID(rawValue: "third")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: "first", kind: .numberedListItem(start: 1), text: "First"),
+            BlockInputBlock(id: secondID, kind: .numberedListItem(start: 2), text: "Second"),
+            BlockInputBlock(id: thirdID, kind: .numberedListItem(start: 3), text: "Third")
+        ]))
+        store.applyNumberedListMarkerTransaction(BlockInputNumberedListMarkerTransaction(
+            adjustments: [
+                BlockInputNumberedListMarkerAdjustment(
+                    startIndex: 1,
+                    endIndex: 1,
+                    indentationLevel: 0,
+                    delta: 10
+                )
+            ]
+        ))
+
+        store.deleteBlocks(withIDs: [secondID])
+
+        XCTAssertEqual(store.block(withID: thirdID)?.kind, .numberedListItem(start: 3))
+        XCTAssertEqual(store.document.blocks.map(\.kind), [
+            .numberedListItem(start: 1),
+            .numberedListItem(start: 3)
+        ])
+    }
+
+    func testMemoryDocumentStoreShiftsMarkerTransactionsForEveryDeletedDuplicateIDBlock() {
+        let sharedID = BlockInputBlockID(rawValue: "shared")
+        let fourthID = BlockInputBlockID(rawValue: "fourth")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: "first", kind: .numberedListItem(start: 1), text: "First"),
+            BlockInputBlock(id: sharedID, kind: .numberedListItem(start: 2), text: "Duplicate one"),
+            BlockInputBlock(id: sharedID, kind: .numberedListItem(start: 3), text: "Duplicate two"),
+            BlockInputBlock(id: fourthID, kind: .numberedListItem(start: 4), text: "Fourth")
+        ]))
+        store.applyNumberedListMarkerTransaction(BlockInputNumberedListMarkerTransaction(
+            adjustments: [
+                BlockInputNumberedListMarkerAdjustment(
+                    startIndex: 3,
+                    endIndex: 3,
+                    indentationLevel: 0,
+                    delta: 10
+                )
+            ]
+        ))
+
+        store.deleteBlocks(withIDs: [sharedID, "missing"])
+
+        XCTAssertEqual(store.document.blocks.map(\.id), ["first", fourthID])
+        XCTAssertEqual(store.block(withID: fourthID)?.kind, .numberedListItem(start: 14))
+    }
+
+    func testMemoryDocumentStoreRemovesDeletedMarkerOverrides() {
+        let replacedID = BlockInputBlockID(rawValue: "reused")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: replacedID, kind: .numberedListItem(start: 1), text: "Original")
+        ]))
+        store.applyNumberedListMarkerTransaction(BlockInputNumberedListMarkerTransaction(
+            overrides: [
+                BlockInputNumberedListMarkerOverride(blockID: replacedID, start: 9, previousStart: 1)
+            ]
+        ))
+
+        store.deleteBlocks(withIDs: [replacedID])
+        store.insertBlocks([
+            BlockInputBlock(id: replacedID, kind: .numberedListItem(start: 1), text: "Reused")
+        ], at: 0)
+
+        XCTAssertEqual(store.block(withID: replacedID)?.kind, .numberedListItem(start: 1))
+    }
+
     func testMemoryDocumentStoreUpdatesIndexesAfterMiddleInsertion() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let insertedID = BlockInputBlockID(rawValue: "inserted")

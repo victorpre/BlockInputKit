@@ -4,15 +4,19 @@ import XCTest
 
 @MainActor
 final class BlockInputViewReorderPerformanceTests: XCTestCase {
-    func testStoreBackedNumberedReorderAvoidsSnapshotAndUsesGranularMarkerReplacements() {
+    func testStoreBackedNumberedReorderAvoidsSnapshotAndUsesMarkerTransaction() {
         let sourceIndex = 50_000
         let sourceID = BlockInputBlockID(rawValue: "block-\(sourceIndex)")
         let shiftedID = BlockInputBlockID(rawValue: "block-\(sourceIndex + 1)")
         let store = DocumentReadCountingStore(document: numberedListDocument())
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
         let layout = ReorderTrackingFlowLayout()
+        var mutations: [BlockInputDocumentChange] = []
         view.collectionView.collectionViewLayout = layout
-        view.configure(BlockInputConfiguration(documentStore: store))
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            onDocumentMutation: { mutations.append($0) }
+        ))
         layout.reset()
         store.resetCounts()
 
@@ -23,7 +27,13 @@ final class BlockInputViewReorderPerformanceTests: XCTestCase {
         XCTAssertFalse(layout.didInvalidateEverything)
         XCTAssertEqual(store.movedBlocks.map(\.id), [sourceID])
         XCTAssertEqual(store.movedBlocks.map(\.index), [sourceIndex + 1])
-        XCTAssertEqual(store.replacedBlockIDs, [shiftedID, sourceID])
+        XCTAssertEqual(store.replacedBlockIDs, [])
+        XCTAssertEqual(store.markerTransactions.count, 1)
+        XCTAssertEqual(store.markerCompactionCount, 0)
+        XCTAssertEqual(mutations, [
+            .moveBlock(sourceID, index: sourceIndex + 1),
+            .numberedListMarkersChanged(store.markerTransactions[0])
+        ])
         XCTAssertEqual(store.block(withID: shiftedID)?.kind, .numberedListItem(start: sourceIndex + 1))
         XCTAssertEqual(store.block(withID: sourceID)?.kind, .numberedListItem(start: sourceIndex + 2))
     }
@@ -47,7 +57,8 @@ final class BlockInputViewReorderPerformanceTests: XCTestCase {
         XCTAssertEqual(store.replaceDocumentCount, 0)
         XCTAssertEqual(store.movedBlocks.map(\.id), [sourceID])
         XCTAssertEqual(store.movedBlocks.map(\.index), [sourceIndex])
-        XCTAssertEqual(store.replacedBlockIDs, [shiftedID, sourceID])
+        XCTAssertEqual(store.replacedBlockIDs, [])
+        XCTAssertEqual(store.markerTransactions.count, 1)
         XCTAssertEqual(store.block(withID: sourceID)?.kind, .numberedListItem(start: sourceIndex + 1))
         XCTAssertEqual(store.block(withID: shiftedID)?.kind, .numberedListItem(start: sourceIndex + 2))
 
@@ -58,9 +69,52 @@ final class BlockInputViewReorderPerformanceTests: XCTestCase {
         XCTAssertEqual(store.replaceDocumentCount, 0)
         XCTAssertEqual(store.movedBlocks.map(\.id), [sourceID])
         XCTAssertEqual(store.movedBlocks.map(\.index), [sourceIndex + 1])
-        XCTAssertEqual(store.replacedBlockIDs, [shiftedID, sourceID])
+        XCTAssertEqual(store.replacedBlockIDs, [])
+        XCTAssertEqual(store.markerTransactions.count, 1)
         XCTAssertEqual(store.block(withID: shiftedID)?.kind, .numberedListItem(start: sourceIndex + 1))
         XCTAssertEqual(store.block(withID: sourceID)?.kind, .numberedListItem(start: sourceIndex + 2))
+    }
+
+    func testStoreBackedNumberedReorderWithCustomStartFallsBackToChangedBlocksForUndoRedo() {
+        let sourceIndex = 50_000
+        let sourceID = BlockInputBlockID(rawValue: "block-\(sourceIndex)")
+        let shiftedID = BlockInputBlockID(rawValue: "block-\(sourceIndex + 1)")
+        let store = DocumentReadCountingStore(document: numberedListDocument(startOffset: 10))
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            undoController: BlockInputUndoController()
+        ))
+        store.resetCounts()
+
+        _ = view.moveBlock(blockID: sourceID, to: sourceIndex + 1)
+
+        XCTAssertEqual(store.documentReadCount, 0)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.markerTransactions, [])
+        XCTAssertEqual(store.replacedBlockIDs, [shiftedID, sourceID])
+        XCTAssertEqual(store.block(withID: shiftedID)?.kind, .numberedListItem(start: sourceIndex + 10))
+        XCTAssertEqual(store.block(withID: sourceID)?.kind, .numberedListItem(start: sourceIndex + 11))
+
+        store.resetCounts()
+        _ = view.undoStructuralEdit()
+
+        XCTAssertEqual(store.documentReadCount, 0)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.markerTransactions, [])
+        XCTAssertEqual(store.replacedBlockIDs, [shiftedID, sourceID])
+        XCTAssertEqual(store.block(withID: sourceID)?.kind, .numberedListItem(start: sourceIndex + 10))
+        XCTAssertEqual(store.block(withID: shiftedID)?.kind, .numberedListItem(start: sourceIndex + 11))
+
+        store.resetCounts()
+        _ = view.redoStructuralEdit()
+
+        XCTAssertEqual(store.documentReadCount, 0)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.markerTransactions, [])
+        XCTAssertEqual(store.replacedBlockIDs, [shiftedID, sourceID])
+        XCTAssertEqual(store.block(withID: shiftedID)?.kind, .numberedListItem(start: sourceIndex + 10))
+        XCTAssertEqual(store.block(withID: sourceID)?.kind, .numberedListItem(start: sourceIndex + 11))
     }
 
     func testStoreBackedNumberedReorderWithDuplicateIDsInWindowDoesNotTrap() {
@@ -99,11 +153,11 @@ final class BlockInputViewReorderPerformanceTests: XCTestCase {
         XCTAssertEqual(visibleItem.testingTextView?.string, "Block \(visibleIndex + 1)")
     }
 
-    private func numberedListDocument() -> BlockInputDocument {
+    private func numberedListDocument(startOffset: Int = 1) -> BlockInputDocument {
         BlockInputDocument(blocks: (0..<100_000).map { index in
             BlockInputBlock(
                 id: BlockInputBlockID(rawValue: "block-\(index)"),
-                kind: .numberedListItem(start: index + 1),
+                kind: .numberedListItem(start: index + startOffset),
                 text: "Block \(index)"
             )
         })

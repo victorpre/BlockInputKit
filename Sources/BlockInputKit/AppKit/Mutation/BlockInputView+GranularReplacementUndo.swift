@@ -6,6 +6,7 @@ struct ReplacementInsertionUndoContext {
     var insertedBlocks: [BlockInputBlock]
     var insertionIndex: Int
     var changedBlocks: [BlockInputBlock]
+    var markerTransaction: BlockInputNumberedListMarkerTransaction?
 }
 
 struct ReplacementDeletionUndoContext {
@@ -14,6 +15,7 @@ struct ReplacementDeletionUndoContext {
     var deletedBlockIDs: [BlockInputBlockID]
     var deletionIndex: Int
     var changedBlocks: [BlockInputBlock]
+    var markerTransaction: BlockInputNumberedListMarkerTransaction?
 }
 
 extension BlockInputView {
@@ -28,6 +30,11 @@ extension BlockInputView {
         )
         syncDocumentStore(.replaceBlock(context.replacement))
         syncDocumentStore(.insertBlocks(context.insertedBlocks, insertionIndex: resolvedInsertionIndex))
+        let canApplyMarkerTransaction = context.markerTransaction != nil && documentStore is BlockInputMarkerAdjustingStore
+        if let markerTransaction = context.markerTransaction,
+           canApplyMarkerTransaction {
+            syncDocumentStore(.numberedListMarkerTransaction(markerTransaction))
+        }
         _ = replaceCachedBlock(context.replacement, at: context.replacementIndex)
         if canSynchronizeCacheForGranularInsertion(insertedBlockCount: context.insertedBlocks.count) {
             guard document.insertBlocks(context.insertedBlocks, at: resolvedInsertionIndex) != nil else {
@@ -36,7 +43,9 @@ extension BlockInputView {
         } else {
             markDocumentCacheUnsynchronized()
         }
-        context.changedBlocks.forEach { syncDocumentStore(.replaceBlock($0)) }
+        if !canApplyMarkerTransaction {
+            context.changedBlocks.forEach { syncDocumentStore(.replaceBlock($0)) }
+        }
         for changedBlock in context.changedBlocks {
             if let changedIndex = index(of: changedBlock.id) {
                 _ = replaceCachedBlock(changedBlock, at: changedIndex)
@@ -61,7 +70,12 @@ extension BlockInputView {
         selection: BlockInputSelection?
     ) -> Bool {
         syncDocumentStore(.replaceBlock(context.replacement))
-        context.changedBlocks.forEach { syncDocumentStore(.replaceBlock($0)) }
+        if let markerTransaction = context.markerTransaction,
+           documentStore is BlockInputMarkerAdjustingStore {
+            syncDocumentStore(.numberedListMarkerTransaction(markerTransaction))
+        } else {
+            context.changedBlocks.forEach { syncDocumentStore(.replaceBlock($0)) }
+        }
         syncDocumentStore(.deleteBlocks(context.deletedBlockIDs))
         _ = replaceCachedBlock(context.replacement, at: context.replacementIndex)
         for changedBlock in context.changedBlocks {

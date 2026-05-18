@@ -5,7 +5,9 @@ import Foundation
 /// The editor sees only the loaded prefix until callers request more batches.
 /// Complete snapshots are materialized from the full source without appending
 /// hidden rows to the editor-visible prefix.
-public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentStore, @unchecked Sendable {
+public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentStore,
+    BlockInputMarkerAdjustingStore,
+    @unchecked Sendable {
     /// Number of source blocks currently visible to the editor.
     public var loadedBlockCount: Int {
         locked { loadedBlocks.count }
@@ -41,6 +43,7 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
     private var loadWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
     private let lock = NSLock()
     private var loading = false
+    private var markerTransactions: [BlockInputNumberedListMarkerTransaction] = []
 
     /// Creates a progressive store with an initial loaded prefix.
     ///
@@ -116,7 +119,10 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
     @MainActor
     public func completeDocumentSnapshot(limit: Int) async throws -> BlockInputDocument {
         locked {
-            BlockInputDocument(blocks: sourceBlocks)
+            let resolvedTransactions = markerTransactions.resolvingListRunBounds(in: sourceBlocks)
+            return BlockInputDocument(blocks: sourceBlocks.enumerated().map { index, block in
+                effectiveBlock(block, at: index, in: sourceBlocks, applying: resolvedTransactions)
+            })
         }.detachedStorage()
     }
 
@@ -126,7 +132,7 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
             guard loadedBlocks.indices.contains(index) else {
                 return nil
             }
-            return loadedBlocks[index]
+            return effectiveBlock(loadedBlocks[index], at: index, in: loadedBlocks)
         }
     }
 
@@ -138,7 +144,7 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
                   loadedBlocks[index].id == id else {
                 return nil
             }
-            return loadedBlocks[index]
+            return effectiveBlock(loadedBlocks[index], at: index, in: loadedBlocks)
         }
     }
 
@@ -154,6 +160,7 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
             sourceBlocks = document.blocks
             nextSourceIndex = document.blocks.count
             indexesByID = Self.indexesByID(for: loadedBlocks)
+            markerTransactions = []
         }
         emit(.replacedDocument)
     }
@@ -164,10 +171,11 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
             guard let index = indexesByID[block.id], loadedBlocks.indices.contains(index) else {
                 return
             }
-            loadedBlocks[index] = block
+            loadedBlocks[index] = storedBlockForReplacement(block, at: index, in: loadedBlocks)
             if let sourceIndex = sourceBlocks.firstIndex(where: { $0.id == block.id }) {
-                sourceBlocks[sourceIndex] = block
+                sourceBlocks[sourceIndex] = storedBlockForReplacement(block, at: sourceIndex, in: sourceBlocks)
             }
+            removeMarkerOverride(for: block.id)
         }
     }
 
@@ -179,6 +187,7 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
             sourceBlocks.insert(contentsOf: blocks, at: insertionIndex)
             nextSourceIndex += blocks.count
             indexesByID = Self.indexesByID(for: loadedBlocks)
+            shiftMarkerTransactionsForInsertion(at: insertionIndex, count: blocks.count)
         }
     }
 
@@ -189,17 +198,25 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
             let loadedDeleteCount = loadedBlocks.reduce(0) { count, block in
                 count + (deletedIDs.contains(block.id) ? 1 : 0)
             }
+            let sourceDeletedIndexes = sourceBlocks.indices.filter { deletedIDs.contains(sourceBlocks[$0].id) }
             loadedBlocks.removeAll { deletedIDs.contains($0.id) }
             sourceBlocks.removeAll { deletedIDs.contains($0.id) }
             nextSourceIndex = max(0, nextSourceIndex - loadedDeleteCount)
             nextSourceIndex = min(nextSourceIndex, sourceBlocks.count)
             indexesByID = Self.indexesByID(for: loadedBlocks)
+            deletedIDs.forEach { removeMarkerOverride(for: $0) }
+            for deletedIndex in sourceDeletedIndexes.reversed() {
+                shiftMarkerTransactionsForDeletion(at: deletedIndex, count: 1)
+            }
         }
     }
 
     /// Moves a loaded block in both the visible prefix and full source.
     public func moveBlock(withID id: BlockInputBlockID, to index: Int) {
         locked {
+            if !markerTransactions.isEmpty {
+                compactMarkerTransactions()
+            }
             guard let sourceIndex = indexesByID[id], loadedBlocks.indices.contains(sourceIndex) else {
                 return
             }
@@ -223,6 +240,27 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
         }
     }
 
+    public func moveBlockWithoutNormalizing(withID id: BlockInputBlockID, to index: Int) {
+        locked {
+            if !markerTransactions.isEmpty {
+                compactMarkerTransactions()
+            }
+        }
+        moveBlock(withID: id, to: index)
+    }
+
+    public func applyNumberedListMarkerTransaction(_ transaction: BlockInputNumberedListMarkerTransaction) {
+        locked {
+            guard !transaction.isEmpty else {
+                return
+            }
+            markerTransactions.append(transaction)
+            if markerTransactions.count > markerAdjustmentCompactionLimit {
+                compactMarkerTransactions()
+            }
+        }
+    }
+
     private func emit(_ change: BlockInputDocumentStoreChange) {
         let observers = locked { Array(self.observers.values) }
         Task { @MainActor in
@@ -230,7 +268,7 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
         }
     }
 
-    private func beginLoadIfPossible() -> LoadStart {
+    private func beginLoadIfPossible() -> BlockInputProgressiveMemoryLoadStart {
         locked {
             if loading {
                 return .wait
@@ -243,7 +281,7 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
         }
     }
 
-    private func finishLoad(limit: Int) -> FinishedLoad {
+    private func finishLoad(limit: Int) -> BlockInputProgressiveMemoryFinishedLoad {
         locked {
             let resolvedLimit = max(limit, 1)
             let startIndex = loadedBlocks.count
@@ -251,14 +289,17 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
             let newBlocks = Array(sourceBlocks[nextSourceIndex..<endIndex])
             loadedBlocks.append(contentsOf: newBlocks)
             nextSourceIndex = endIndex
+            let effectiveNewBlocks = newBlocks.enumerated().map { offset, block in
+                effectiveBlock(block, at: startIndex + offset, in: sourceBlocks)
+            }
             for (offset, block) in newBlocks.enumerated() where indexesByID[block.id] == nil {
                 indexesByID[block.id] = startIndex + offset
             }
             loading = false
-            return FinishedLoad(
+            return BlockInputProgressiveMemoryFinishedLoad(
                 batch: BlockInputDocumentStoreBatch(
                     startIndex: startIndex,
-                    blocks: newBlocks,
+                    blocks: effectiveNewBlocks,
                     isComplete: nextSourceIndex >= sourceBlocks.count
                 ),
                 observers: Array(observers.values),
@@ -267,28 +308,28 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
         }
     }
 
-    private func finishFailedLoad() -> FailedLoad {
+    private func finishFailedLoad() -> BlockInputProgressiveMemoryFailedLoad {
         locked {
             loading = false
-            return FailedLoad(observers: Array(observers.values), waiters: removeLoadWaiters())
+            return BlockInputProgressiveMemoryFailedLoad(observers: Array(observers.values), waiters: removeLoadWaiters())
         }
     }
 
     @MainActor
-    private func emitFinishedLoad(_ finishedLoad: FinishedLoad) {
+    private func emitFinishedLoad(_ finishedLoad: BlockInputProgressiveMemoryFinishedLoad) {
         finishedLoad.waiters.forEach { $0.resume() }
         finishedLoad.observers.forEach { $0(.appendedBlocks(finishedLoad.batch)) }
         finishedLoad.observers.forEach { $0(.loadingStateChanged(isLoading: false)) }
     }
 
     @MainActor
-    private func emitCancelledLoad(_ cancelledLoad: FailedLoad) {
+    private func emitCancelledLoad(_ cancelledLoad: BlockInputProgressiveMemoryFailedLoad) {
         cancelledLoad.waiters.forEach { $0.resume() }
         cancelledLoad.observers.forEach { $0(.loadingStateChanged(isLoading: false)) }
     }
 
     @MainActor
-    private func emitFailedLoad(_ failedLoad: FailedLoad, error: Error) {
+    private func emitFailedLoad(_ failedLoad: BlockInputProgressiveMemoryFailedLoad, error: Error) {
         failedLoad.waiters.forEach { $0.resume() }
         failedLoad.observers.forEach { $0(.loadingStateChanged(isLoading: false)) }
         failedLoad.observers.forEach { $0(.failed(error.localizedDescription)) }
@@ -330,19 +371,109 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
     }
 }
 
-private enum LoadStart {
-    case started([@MainActor (BlockInputDocumentStoreChange) -> Void])
-    case wait
-    case finished
-}
+private extension BlockInputProgressiveMemoryDocumentStore {
+    func effectiveBlock(_ block: BlockInputBlock, at index: Int, in blocks: [BlockInputBlock]) -> BlockInputBlock {
+        effectiveBlock(block, at: index, in: blocks, applying: markerTransactions)
+    }
 
-private struct FinishedLoad {
-    var batch: BlockInputDocumentStoreBatch
-    var observers: [@MainActor (BlockInputDocumentStoreChange) -> Void]
-    var waiters: [CheckedContinuation<Void, Never>]
-}
+    func effectiveBlock(
+        _ block: BlockInputBlock,
+        at index: Int,
+        in blocks: [BlockInputBlock],
+        applying transactions: [BlockInputNumberedListMarkerTransaction]
+    ) -> BlockInputBlock {
+        guard case let .numberedListItem(start) = block.kind else {
+            return block
+        }
+        var resolvedStart = start
+        for transaction in transactions {
+            for override in transaction.overrides where override.blockID == block.id {
+                resolvedStart = override.start
+            }
+            for adjustment in transaction.adjustments where markerAdjustment(adjustment, appliesAt: index, to: block, in: blocks) {
+                resolvedStart += adjustment.delta
+            }
+        }
+        guard resolvedStart != start else {
+            return block
+        }
+        var resolvedBlock = block
+        resolvedBlock.kind = .numberedListItem(start: resolvedStart)
+        return resolvedBlock
+    }
 
-private struct FailedLoad {
-    var observers: [@MainActor (BlockInputDocumentStoreChange) -> Void]
-    var waiters: [CheckedContinuation<Void, Never>]
+    func removeMarkerOverride(for blockID: BlockInputBlockID) {
+        markerTransactions = markerTransactions.map { transaction in
+            BlockInputNumberedListMarkerTransaction(
+                adjustments: transaction.adjustments,
+                overrides: transaction.overrides.filter { $0.blockID != blockID }
+            )
+        }.filter { !$0.isEmpty }
+    }
+
+    func storedBlockForReplacement(
+        _ block: BlockInputBlock,
+        at index: Int,
+        in blocks: [BlockInputBlock]
+    ) -> BlockInputBlock {
+        guard case let .numberedListItem(start) = block.kind else {
+            return block
+        }
+        let adjustmentDelta = markerTransactions.reduce(0) { delta, transaction in
+            delta + transaction.adjustments.reduce(0) { adjustmentDelta, adjustment in
+                guard markerAdjustment(adjustment, appliesAt: index, to: block, in: blocks) else {
+                    return adjustmentDelta
+                }
+                return adjustmentDelta + adjustment.delta
+            }
+        }
+        guard adjustmentDelta != 0 else {
+            return block
+        }
+        var storedBlock = block
+        storedBlock.kind = .numberedListItem(start: start - adjustmentDelta)
+        return storedBlock
+    }
+
+    func shiftMarkerTransactionsForInsertion(at index: Int, count: Int) {
+        markerTransactions = markerTransactions.map { transaction in
+            BlockInputNumberedListMarkerTransaction(
+                adjustments: transaction.adjustments.map { $0.shiftedForInsertion(at: index, count: count) },
+                overrides: transaction.overrides
+            )
+        }
+    }
+
+    func shiftMarkerTransactionsForDeletion(at index: Int, count: Int) {
+        markerTransactions = markerTransactions.map { transaction in
+            BlockInputNumberedListMarkerTransaction(
+                adjustments: transaction.adjustments.compactMap { $0.shiftedForDeletion(at: index, count: count) },
+                overrides: transaction.overrides
+            )
+        }.filter { !$0.isEmpty }
+    }
+
+    func compactMarkerTransactions() {
+        let sourceTransactions = markerTransactions.resolvingListRunBounds(in: sourceBlocks)
+        let loadedTransactions = markerTransactions.resolvingListRunBounds(in: loadedBlocks)
+        sourceBlocks = sourceBlocks.enumerated().map { index, block in
+            effectiveBlock(block, at: index, in: sourceBlocks, applying: sourceTransactions)
+        }
+        loadedBlocks = loadedBlocks.enumerated().map { index, block in
+            effectiveBlock(block, at: index, in: loadedBlocks, applying: loadedTransactions)
+        }
+        markerTransactions = []
+    }
+
+    func markerAdjustment(
+        _ adjustment: BlockInputNumberedListMarkerAdjustment,
+        appliesAt index: Int,
+        to block: BlockInputBlock,
+        in blocks: [BlockInputBlock]
+    ) -> Bool {
+        guard adjustment.contains(index: index, block: block) else {
+            return false
+        }
+        return adjustment.isWithinListRunScope(at: index, in: blocks)
+    }
 }

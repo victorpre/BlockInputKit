@@ -10,6 +10,8 @@ extension BlockInputView {
         case deleteBlocks([BlockInputBlockID])
         case moveBlock(BlockInputBlockID, targetIndex: Int)
         case moveBlockAndReplaceChangedBlocks(BlockInputBlockID, targetIndex: Int, changedBlocks: [BlockInputBlock])
+        case numberedListMarkerTransaction(BlockInputNumberedListMarkerTransaction)
+        case moveBlockAndApplyMarkerTransaction(BlockInputBlockID, targetIndex: Int, transaction: BlockInputNumberedListMarkerTransaction)
     }
 
     func publishDocumentChange() {
@@ -287,40 +289,14 @@ extension BlockInputView {
                 blockID: movedBlockID,
                 to: moveIndex,
                 changedBlocks: result.replacedBlocks ?? [],
+                markerTransaction: result.markerTransaction,
                 selection: result.selection
             )
         }
 
         if let replacedBlock = result.replacedBlock,
            let replacementIndex = index(of: replacedBlock.id) {
-            if let insertedBlocks = result.insertedBlocks,
-               let insertionIndex = result.insertionIndex {
-                return applyGranularReplacementInsertionUndo(
-                    ReplacementInsertionUndoContext(
-                        replacement: replacedBlock,
-                        replacementIndex: replacementIndex,
-                        insertedBlocks: insertedBlocks,
-                        insertionIndex: insertionIndex,
-                        changedBlocks: result.replacedBlocks ?? []
-                    ),
-                    selection: result.selection
-                )
-            }
-            if let deletedBlockIDs = result.deletedBlockIDs,
-               let firstDeletedBlockID = deletedBlockIDs.first,
-               let deletionIndex = index(of: firstDeletedBlockID) {
-                return applyGranularReplacementDeletionUndo(
-                    ReplacementDeletionUndoContext(
-                        replacement: replacedBlock,
-                        replacementIndex: replacementIndex,
-                        deletedBlockIDs: deletedBlockIDs,
-                        deletionIndex: deletionIndex,
-                        changedBlocks: result.replacedBlocks ?? []
-                    ),
-                    selection: result.selection
-                )
-            }
-            return applyGranularReplacementUndo(replacedBlock, at: replacementIndex, selection: result.selection)
+            return applyGranularReplacementUndoResult(result, replacement: replacedBlock, replacementIndex: replacementIndex)
         }
 
         if let insertedBlocks = result.insertedBlocks,
@@ -334,7 +310,53 @@ extension BlockInputView {
             return applyGranularDeletionUndo(deletedBlockIDs, at: deletionIndex, selection: result.selection)
         }
 
+        if let markerTransaction = result.markerTransaction,
+           documentStore is BlockInputMarkerAdjustingStore {
+            syncDocumentStore(.numberedListMarkerTransaction(markerTransaction))
+            applySelection(validUndoSelection(result.selection), notify: true)
+            reloadDataKeepingFocus()
+            publishDocumentChange()
+            return true
+        }
+
         return false
+    }
+
+    private func applyGranularReplacementUndoResult(
+        _ result: BlockInputUndoResult,
+        replacement: BlockInputBlock,
+        replacementIndex: Int
+    ) -> Bool {
+        if let insertedBlocks = result.insertedBlocks,
+           let insertionIndex = result.insertionIndex {
+            return applyGranularReplacementInsertionUndo(
+                ReplacementInsertionUndoContext(
+                    replacement: replacement,
+                    replacementIndex: replacementIndex,
+                    insertedBlocks: insertedBlocks,
+                    insertionIndex: insertionIndex,
+                    changedBlocks: result.replacedBlocks ?? [],
+                    markerTransaction: result.markerTransaction
+                ),
+                selection: result.selection
+            )
+        }
+        if let deletedBlockIDs = result.deletedBlockIDs,
+           let firstDeletedBlockID = deletedBlockIDs.first,
+           let deletionIndex = index(of: firstDeletedBlockID) {
+            return applyGranularReplacementDeletionUndo(
+                ReplacementDeletionUndoContext(
+                    replacement: replacement,
+                    replacementIndex: replacementIndex,
+                    deletedBlockIDs: deletedBlockIDs,
+                    deletionIndex: deletionIndex,
+                    changedBlocks: result.replacedBlocks ?? [],
+                    markerTransaction: result.markerTransaction
+                ),
+                selection: result.selection
+            )
+        }
+        return applyGranularReplacementUndo(replacement, at: replacementIndex, selection: result.selection)
     }
 
     func applyGranularBlockReplacement(

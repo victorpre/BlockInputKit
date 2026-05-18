@@ -9,6 +9,8 @@ extension BlockInputView {
     private struct LeadingReturnNumberingChanges {
         var beforeChangedBlocks: [BlockInputBlock]
         var afterChangedBlocks: [BlockInputBlock]
+        var beforeMarkerTransaction: BlockInputNumberedListMarkerTransaction?
+        var afterMarkerTransaction: BlockInputNumberedListMarkerTransaction?
     }
 
     func leadingReturnMove(
@@ -50,7 +52,11 @@ extension BlockInputView {
         ))
         syncDocumentStore(.replaceBlock(afterBlock))
         syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: insertionIndex))
-        numberingChanges.afterChangedBlocks.forEach { syncDocumentStore(.replaceBlock($0)) }
+        if let markerTransaction = numberingChanges.afterMarkerTransaction {
+            syncDocumentStore(.numberedListMarkerTransaction(markerTransaction))
+        } else {
+            numberingChanges.afterChangedBlocks.forEach { syncDocumentStore(.replaceBlock($0)) }
+        }
         applySelection(afterSelection, notify: true)
         undoController?.registerBlockReplacementInsertionStructuralEdit(BlockInputReplaceInsertEdit(
             actionName: actionName,
@@ -60,6 +66,8 @@ extension BlockInputView {
             insertionIndex: insertionIndex,
             beforeChangedBlocks: numberingChanges.beforeChangedBlocks,
             afterChangedBlocks: numberingChanges.afterChangedBlocks,
+            beforeMarkerTransaction: numberingChanges.beforeMarkerTransaction,
+            afterMarkerTransaction: numberingChanges.afterMarkerTransaction,
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         ))
@@ -82,6 +90,14 @@ extension BlockInputView {
         let insertedBlock = leadingReturnMove.insertedBlock
         let insertedBlocks = [insertedBlock]
         guard canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) else {
+            if let markerChanges = leadingReturnMarkerTransaction(
+                beforeBlock: beforeBlock,
+                insertedBlock: insertedBlock,
+                replacementIndex: replacementIndex
+            ) {
+                markDocumentCacheUnsynchronized()
+                return markerChanges
+            }
             let changes = leadingReturnNumberingChanges(
                 beforeBlock: beforeBlock,
                 afterBlock: leadingReturnMove.afterBlock,
@@ -104,6 +120,43 @@ extension BlockInputView {
         return LeadingReturnNumberingChanges(
             beforeChangedBlocks: beforeDocument.blocks.filter { changedBlockIDs.contains($0.id) },
             afterChangedBlocks: afterChangedBlocks
+        )
+    }
+
+    private func leadingReturnMarkerTransaction(
+        beforeBlock: BlockInputBlock,
+        insertedBlock: BlockInputBlock,
+        replacementIndex: Int
+    ) -> LeadingReturnNumberingChanges? {
+        guard documentStore is BlockInputMarkerAdjustingStore,
+              case let .numberedListItem(start) = beforeBlock.kind else {
+            return nil
+        }
+        let indentationLevel = beforeBlock.indentationLevel(forLine: 0)
+        let insertedIndex = replacementIndex + 1
+        let afterTransaction = BlockInputNumberedListMarkerTransaction(
+            adjustments: [
+                BlockInputNumberedListMarkerAdjustment(
+                    startIndex: insertedIndex + 1,
+                    endIndex: nil,
+                    listRunStartIndex: replacementIndex,
+                    indentationLevel: indentationLevel,
+                    delta: 1
+                )
+            ],
+            overrides: [
+                BlockInputNumberedListMarkerOverride(
+                    blockID: insertedBlock.id,
+                    start: start + 1,
+                    previousStart: start + 1
+                )
+            ]
+        )
+        return LeadingReturnNumberingChanges(
+            beforeChangedBlocks: [],
+            afterChangedBlocks: [],
+            beforeMarkerTransaction: afterTransaction.inverted,
+            afterMarkerTransaction: afterTransaction
         )
     }
 

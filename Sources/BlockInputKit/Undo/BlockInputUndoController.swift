@@ -11,6 +11,7 @@ public struct BlockInputUndoResult: Equatable, Sendable {
     var deletedBlockIDs: [BlockInputBlockID]?
     var movedBlockID: BlockInputBlockID?
     var moveIndex: Int?
+    var markerTransaction: BlockInputNumberedListMarkerTransaction?
 
     init(
         selection: BlockInputSelection?,
@@ -21,7 +22,8 @@ public struct BlockInputUndoResult: Equatable, Sendable {
         insertionIndex: Int? = nil,
         deletedBlockIDs: [BlockInputBlockID]? = nil,
         movedBlockID: BlockInputBlockID? = nil,
-        moveIndex: Int? = nil
+        moveIndex: Int? = nil,
+        markerTransaction: BlockInputNumberedListMarkerTransaction? = nil
     ) {
         self.selection = selection
         self.actionName = actionName
@@ -32,40 +34,8 @@ public struct BlockInputUndoResult: Equatable, Sendable {
         self.deletedBlockIDs = deletedBlockIDs
         self.movedBlockID = movedBlockID
         self.moveIndex = moveIndex
+        self.markerTransaction = markerTransaction
     }
-}
-
-struct BlockInputReplaceInsertEdit {
-    var actionName: String
-    var beforeBlock: BlockInputBlock
-    var afterBlock: BlockInputBlock
-    var insertedBlocks: [BlockInputBlock]
-    var insertionIndex: Int
-    var beforeChangedBlocks: [BlockInputBlock] = []
-    var afterChangedBlocks: [BlockInputBlock] = []
-    var selectionBefore: BlockInputSelection?
-    var selectionAfter: BlockInputSelection?
-}
-
-struct BlockInputReplaceDeleteEdit {
-    var actionName: String
-    var beforeBlock: BlockInputBlock
-    var afterBlock: BlockInputBlock
-    var deletedBlocks: [BlockInputBlock]
-    var deletionIndex: Int
-    var selectionBefore: BlockInputSelection?
-    var selectionAfter: BlockInputSelection?
-}
-
-struct BlockInputMoveEdit {
-    var actionName: String
-    var blockID: BlockInputBlockID
-    var beforeIndex: Int
-    var afterIndex: Int
-    var beforeChangedBlocks: [BlockInputBlock]
-    var afterChangedBlocks: [BlockInputBlock]
-    var selectionBefore: BlockInputSelection?
-    var selectionAfter: BlockInputSelection?
 }
 
 /// Coordinates per-block text undo with a separate structural undo stack.
@@ -201,7 +171,9 @@ public final class BlockInputUndoController {
                 insertedBlocks: edit.insertedBlocks,
                 insertionIndex: edit.insertionIndex,
                 beforeChangedBlocks: edit.beforeChangedBlocks,
-                afterChangedBlocks: edit.afterChangedBlocks
+                afterChangedBlocks: edit.afterChangedBlocks,
+                beforeMarkerTransaction: edit.beforeMarkerTransaction,
+                afterMarkerTransaction: edit.afterMarkerTransaction
             ),
             selectionBefore: edit.selectionBefore,
             selectionAfter: edit.selectionAfter
@@ -243,7 +215,9 @@ public final class BlockInputUndoController {
                 beforeIndex: edit.beforeIndex,
                 afterIndex: edit.afterIndex,
                 beforeChangedBlocks: edit.beforeChangedBlocks,
-                afterChangedBlocks: edit.afterChangedBlocks
+                afterChangedBlocks: edit.afterChangedBlocks,
+                beforeMarkerTransaction: edit.beforeMarkerTransaction,
+                afterMarkerTransaction: edit.afterMarkerTransaction
             ),
             selectionBefore: edit.selectionBefore,
             selectionAfter: edit.selectionAfter

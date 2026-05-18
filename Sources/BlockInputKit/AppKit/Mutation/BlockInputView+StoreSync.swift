@@ -1,6 +1,7 @@
 import AppKit
 
 extension BlockInputView {
+    // swiftlint:disable:next cyclomatic_complexity
     func syncDocumentStore(_ action: StoreSyncAction) {
         guard let documentStore else {
             return
@@ -20,8 +21,8 @@ extension BlockInputView {
         case let .moveBlock(blockID, targetIndex):
             documentStore.moveBlock(withID: blockID, to: targetIndex)
         case let .moveBlockAndReplaceChangedBlocks(blockID, targetIndex, changedBlocks):
-            if let memoryStore = documentStore as? BlockInputMemoryDocumentStore {
-                memoryStore.moveBlockWithoutNormalizing(withID: blockID, to: targetIndex)
+            if let markerStore = documentStore as? BlockInputMarkerAdjustingStore {
+                markerStore.moveBlockWithoutNormalizing(withID: blockID, to: targetIndex)
             } else {
                 documentStore.moveBlock(withID: blockID, to: targetIndex)
             }
@@ -30,6 +31,20 @@ extension BlockInputView {
                 documentStore.replaceBlock(block)
                 publishDocumentMutation(.replaceBlock(block))
             }
+            return
+        case let .numberedListMarkerTransaction(transaction):
+            guard let markerStore = documentStore as? BlockInputMarkerAdjustingStore else {
+                return
+            }
+            markerStore.applyNumberedListMarkerTransaction(transaction)
+        case let .moveBlockAndApplyMarkerTransaction(blockID, targetIndex, transaction):
+            guard let markerStore = documentStore as? BlockInputMarkerAdjustingStore else {
+                return
+            }
+            markerStore.moveBlockWithoutNormalizing(withID: blockID, to: targetIndex)
+            publishDocumentMutation(.moveBlock(blockID, index: targetIndex))
+            markerStore.applyNumberedListMarkerTransaction(transaction)
+            publishDocumentMutation(.numberedListMarkersChanged(transaction))
             return
         }
         publishDocumentMutation(action.documentChange(document: document))
@@ -60,6 +75,10 @@ extension BlockInputView.StoreSyncAction {
             return .deleteBlocks(blockIDs)
         case let .moveBlock(blockID, targetIndex),
              let .moveBlockAndReplaceChangedBlocks(blockID, targetIndex, _):
+            return .moveBlock(blockID, index: targetIndex)
+        case let .numberedListMarkerTransaction(transaction):
+            return .numberedListMarkersChanged(transaction)
+        case let .moveBlockAndApplyMarkerTransaction(blockID, targetIndex, _):
             return .moveBlock(blockID, index: targetIndex)
         }
     }

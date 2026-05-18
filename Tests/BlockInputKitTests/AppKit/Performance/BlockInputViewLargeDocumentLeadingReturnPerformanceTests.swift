@@ -8,13 +8,13 @@ final class LargeLeadingReturnPerformanceTests: XCTestCase {
         let targetIndex = largeDocumentCacheMutationLimit + 2
         let count = largeDocumentCacheMutationLimit + 5
         let blockID = BlockInputBlockID(rawValue: "number-\(targetIndex)")
-        let nextID = BlockInputBlockID(rawValue: "number-\(targetIndex + 1)")
-        let secondNextID = BlockInputBlockID(rawValue: "number-\(targetIndex + 2)")
         let store = DocumentReadCountingStore(document: largeNumberedListDocument(count: count))
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        var mutations: [BlockInputDocumentChange] = []
         view.configure(BlockInputConfiguration(
             documentStore: store,
-            undoController: BlockInputUndoController()
+            undoController: BlockInputUndoController(),
+            onDocumentMutation: { mutations.append($0) }
         ))
         view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
         store.resetCounts()
@@ -24,7 +24,10 @@ final class LargeLeadingReturnPerformanceTests: XCTestCase {
         let insertedBlock = try XCTUnwrap(store.insertedBlockBatches.first?.blocks.first)
         XCTAssertEqual(store.documentReadCount, 0)
         XCTAssertEqual(store.replaceDocumentCount, 0)
-        XCTAssertEqual(store.replacedBlockIDs, [blockID, nextID, secondNextID])
+        XCTAssertEqual(store.replacedBlockIDs, [blockID])
+        XCTAssertEqual(store.markerTransactions.count, 1)
+        XCTAssertEqual(mutations.count, 3)
+        XCTAssertEqual(mutations.last, .numberedListMarkersChanged(store.markerTransactions[0]))
         XCTAssertEqual(store.insertedBlockBatches.first?.index, targetIndex + 1)
         XCTAssertEqual(store.block(at: targetIndex)?.kind, .numberedListItem(start: targetIndex + 1))
         XCTAssertEqual(store.block(at: targetIndex + 1)?.kind, .numberedListItem(start: targetIndex + 2))
@@ -36,7 +39,8 @@ final class LargeLeadingReturnPerformanceTests: XCTestCase {
 
         XCTAssertEqual(store.documentReadCount, 0)
         XCTAssertEqual(store.replaceDocumentCount, 0)
-        XCTAssertEqual(store.replacedBlockIDs, [blockID, nextID, secondNextID])
+        XCTAssertEqual(store.replacedBlockIDs, [blockID])
+        XCTAssertEqual(store.markerTransactions.count, 1)
         XCTAssertEqual(store.deletedBlockIDs, [[insertedBlock.id]])
         XCTAssertEqual(store.block(at: targetIndex)?.kind, .numberedListItem(start: targetIndex + 1))
         XCTAssertEqual(store.block(at: targetIndex + 1)?.kind, .numberedListItem(start: targetIndex + 2))
@@ -47,7 +51,8 @@ final class LargeLeadingReturnPerformanceTests: XCTestCase {
 
         XCTAssertEqual(store.documentReadCount, 0)
         XCTAssertEqual(store.replaceDocumentCount, 0)
-        XCTAssertEqual(store.replacedBlockIDs, [blockID, nextID, secondNextID])
+        XCTAssertEqual(store.replacedBlockIDs, [blockID])
+        XCTAssertEqual(store.markerTransactions.count, 1)
         XCTAssertEqual(store.insertedBlockBatches.first?.index, targetIndex + 1)
         XCTAssertEqual(store.block(at: targetIndex + 1)?.id, insertedBlock.id)
         XCTAssertEqual(store.block(at: targetIndex + 3)?.kind, .numberedListItem(start: targetIndex + 4))
@@ -57,7 +62,6 @@ final class LargeLeadingReturnPerformanceTests: XCTestCase {
         let parentIndex = largeDocumentCacheMutationLimit + 1
         let targetIndex = parentIndex + 3
         let targetID = BlockInputBlockID(rawValue: "number-\(targetIndex)")
-        let nextID = BlockInputBlockID(rawValue: "number-\(targetIndex + 1)")
         let store = DocumentReadCountingStore(document: largeNestedNumberedListDocument(parentIndex: parentIndex))
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
         view.configure(BlockInputConfiguration(documentStore: store))
@@ -68,10 +72,55 @@ final class LargeLeadingReturnPerformanceTests: XCTestCase {
 
         XCTAssertEqual(store.documentReadCount, 0)
         XCTAssertEqual(store.replaceDocumentCount, 0)
-        XCTAssertEqual(store.replacedBlockIDs, [targetID, nextID])
+        XCTAssertEqual(store.replacedBlockIDs, [targetID])
+        XCTAssertEqual(store.markerTransactions.count, 1)
         XCTAssertEqual(store.block(at: targetIndex)?.kind, .numberedListItem(start: 2))
         XCTAssertEqual(store.block(at: targetIndex + 1)?.kind, .numberedListItem(start: 3))
         XCTAssertEqual(store.block(at: targetIndex + 2)?.kind, .numberedListItem(start: 4))
+    }
+
+    func testStoreBackedReturnAtFrontOfNestedNumberedListDoesNotRenumberNextParentChild() throws {
+        let parentIndex = largeDocumentCacheMutationLimit + 1
+        let targetIndex = parentIndex + 1
+        let targetID = BlockInputBlockID(rawValue: "number-\(targetIndex)")
+        let nextParentChildID = BlockInputBlockID(rawValue: "number-\(targetIndex + 3)")
+        let store = DocumentReadCountingStore(document: nestedNumberedListWithFollowingParentDocument(parentIndex: parentIndex))
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: targetID, utf16Offset: 0)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.documentReadCount, 0)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replacedBlockIDs, [targetID])
+        XCTAssertEqual(store.markerTransactions.count, 1)
+        XCTAssertEqual(store.block(at: targetIndex)?.kind, .numberedListItem(start: 1))
+        XCTAssertEqual(store.block(at: targetIndex + 1)?.kind, .numberedListItem(start: 2))
+        XCTAssertEqual(store.block(at: targetIndex + 2)?.kind, .numberedListItem(start: 3))
+        XCTAssertEqual(store.block(withID: nextParentChildID)?.kind, .numberedListItem(start: 1))
+    }
+
+    func testStoreBackedReturnAtFrontOfNumberedListDoesNotRenumberSeparateFollowingList() throws {
+        let targetIndex = largeDocumentCacheMutationLimit + 2
+        let targetID = BlockInputBlockID(rawValue: "number-\(targetIndex)")
+        let separateListID = BlockInputBlockID(rawValue: "separate-list")
+        let store = DocumentReadCountingStore(document: separatedNumberedListDocument(targetIndex: targetIndex))
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: targetID, utf16Offset: 0)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.documentReadCount, 0)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.markerTransactions.count, 1)
+        XCTAssertEqual(store.block(at: targetIndex)?.kind, .numberedListItem(start: 1))
+        XCTAssertEqual(store.block(at: targetIndex + 1)?.kind, .numberedListItem(start: 2))
+        XCTAssertEqual(store.block(at: targetIndex + 2)?.kind, .numberedListItem(start: 3))
+        XCTAssertEqual(store.block(withID: separateListID)?.kind, .numberedListItem(start: 1))
     }
 
     private func largeNumberedListDocument(count: Int) -> BlockInputDocument {
@@ -101,6 +150,55 @@ final class LargeLeadingReturnPerformanceTests: XCTestCase {
                 return BlockInputBlock(id: id, kind: .numberedListItem(start: 3), text: "Third child", indentationLevel: 1)
             default:
                 return BlockInputBlock(id: id, text: "Block \(index)")
+            }
+        })
+    }
+
+    private func nestedNumberedListWithFollowingParentDocument(parentIndex: Int) -> BlockInputDocument {
+        let count = parentIndex + 5
+        return BlockInputDocument(blocks: (0..<count).map { index in
+            let id = BlockInputBlockID(rawValue: "number-\(index)")
+            switch index {
+            case parentIndex:
+                return BlockInputBlock(id: id, kind: .numberedListItem(start: 1), text: "Parent one")
+            case parentIndex + 1:
+                return BlockInputBlock(id: id, kind: .numberedListItem(start: 1), text: "First child", indentationLevel: 1)
+            case parentIndex + 2:
+                return BlockInputBlock(id: id, kind: .numberedListItem(start: 2), text: "Second child", indentationLevel: 1)
+            case parentIndex + 3:
+                return BlockInputBlock(id: id, kind: .numberedListItem(start: 2), text: "Parent two")
+            case parentIndex + 4:
+                return BlockInputBlock(id: id, kind: .numberedListItem(start: 1), text: "Other child", indentationLevel: 1)
+            default:
+                return BlockInputBlock(id: id, text: "Block \(index)")
+            }
+        })
+    }
+
+    private func separatedNumberedListDocument(targetIndex: Int) -> BlockInputDocument {
+        let count = targetIndex + 5
+        return BlockInputDocument(blocks: (0..<count).map { index in
+            switch index {
+            case targetIndex:
+                return BlockInputBlock(
+                    id: BlockInputBlockID(rawValue: "number-\(index)"),
+                    kind: .numberedListItem(start: 1),
+                    text: "First"
+                )
+            case targetIndex + 1:
+                return BlockInputBlock(
+                    id: BlockInputBlockID(rawValue: "number-\(index)"),
+                    kind: .numberedListItem(start: 2),
+                    text: "Second"
+                )
+            case targetIndex + 3:
+                return BlockInputBlock(
+                    id: BlockInputBlockID(rawValue: "separate-list"),
+                    kind: .numberedListItem(start: 1),
+                    text: "Separate"
+                )
+            default:
+                return BlockInputBlock(id: BlockInputBlockID(rawValue: "text-\(index)"), text: "Block \(index)")
             }
         })
     }

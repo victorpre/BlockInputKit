@@ -95,7 +95,7 @@ struct EditorScreen: View {
 - `dropIndicatorColor`: Colors drag insertion and selected horizontal-rule affordances.
 - `undoController`: Shares text and structural undo coordination with the host.
 - `completionProvider`: Supplies mention and slash-command suggestions.
-- `onDocumentMutation`: Receives granular edits as they are applied.
+- `onDocumentMutation`: Receives granular edits as they are applied, including marker-only numbered-list updates for marker-adjusting stores.
 - `onDocumentChange`: Receives full document snapshots after editor mutations.
 - `documentChangeSnapshotDelay`: Coalesces full-document snapshot callbacks for large store-backed documents.
 - `onSelectionChange`: Observes cursor, text, and block selection changes.

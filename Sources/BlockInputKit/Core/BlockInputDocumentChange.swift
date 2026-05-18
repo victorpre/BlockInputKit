@@ -12,4 +12,6 @@ public enum BlockInputDocumentChange: Equatable, Sendable {
     case deleteBlocks([BlockInputBlockID])
     /// One block was moved to a final document index.
     case moveBlock(BlockInputBlockID, index: Int)
+    /// Numbered-list markers changed without replacing block content.
+    case numberedListMarkersChanged(BlockInputNumberedListMarkerTransaction)
 }

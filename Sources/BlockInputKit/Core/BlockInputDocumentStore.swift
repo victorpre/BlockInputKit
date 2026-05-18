@@ -65,168 +65,13 @@ public protocol BlockInputDocumentStore: AnyObject {
     func moveBlock(withID id: BlockInputBlockID, to index: Int)
 }
 
-/// Append or loading state change emitted by a document store.
-public enum BlockInputDocumentStoreChange: Sendable {
-    /// Store loading state changed.
-    case loadingStateChanged(isLoading: Bool)
-    /// Blocks were appended at a tail range.
-    case appendedBlocks(BlockInputDocumentStoreBatch)
-    /// The full store document was replaced.
-    case replacedDocument
-    /// Loading failed.
-    case failed(String)
-}
-
-/// Errors thrown by document-store progressive loading helpers.
-public enum BlockInputDocumentStoreError: Error, Equatable, Sendable {
-    /// A store reported that loading was incomplete but a batch load made no observable progress.
-    case progressiveLoadMadeNoProgress
-}
-
-/// Tail append metadata for progressive stores.
-public struct BlockInputDocumentStoreBatch: Equatable, Sendable {
-    /// Ordered index where the batch starts.
-    public var startIndex: Int
-    /// Complete parsed blocks appended to the store.
-    public var blocks: [BlockInputBlock]
-    /// Whether the store is complete after this batch.
-    public var isComplete: Bool
-
-    /// Creates tail append metadata.
-    public init(startIndex: Int, blocks: [BlockInputBlock], isComplete: Bool) {
-        self.startIndex = startIndex
-        self.blocks = blocks
-        self.isComplete = isComplete
-    }
-}
-
-/// Cancellable store observation token.
-public final class BlockInputDocumentStoreObservation: @unchecked Sendable {
-    private let cancellation: @Sendable () -> Void
-    private var isCancelled = false
-    private let lock = NSLock()
-
-    /// Creates an observation token that runs `cancellation` once when cancelled or deallocated.
-    public init(_ cancellation: @escaping @Sendable () -> Void = {}) {
-        self.cancellation = cancellation
-    }
-
-    deinit {
-        cancel()
-    }
-
-    /// Cancels the observation. Repeated calls are ignored.
-    public func cancel() {
-        lock.lock()
-        let shouldCancel = !isCancelled
-        isCancelled = true
-        lock.unlock()
-        if shouldCancel {
-            cancellation()
-        }
-    }
-}
-
-public extension BlockInputDocumentStore {
-    var totalBlockCount: Int? {
-        isComplete ? loadedBlockCount : nil
-    }
-
-    var isComplete: Bool {
-        true
-    }
-
-    var isLoading: Bool {
-        false
-    }
-
-    func observeChanges(_ observer: @escaping @MainActor (BlockInputDocumentStoreChange) -> Void) -> BlockInputDocumentStoreObservation {
-        BlockInputDocumentStoreObservation()
-    }
-
-    @MainActor
-    func loadNextBlockBatch(limit: Int) async throws {}
-
-    @MainActor
-    func loadAllRemainingBlocks(limit: Int) async throws {
-        while !isComplete {
-            try Task.checkCancellation()
-            let beforeCount = loadedBlockCount
-            try await loadNextBlockBatch(limit: limit)
-            guard isComplete || loadedBlockCount > beforeCount else {
-                throw BlockInputDocumentStoreError.progressiveLoadMadeNoProgress
-            }
-        }
-    }
-
-    @MainActor
-    func completeDocumentSnapshot(limit: Int) async throws -> BlockInputDocument {
-        try await loadAllRemainingBlocks(limit: limit)
-        return BlockInputDocument(blocks: (0..<loadedBlockCount).compactMap { block(at: $0) })
-    }
-
-    func replaceBlock(_ block: BlockInputBlock) {
-        guard isComplete else {
-            return
-        }
-        var updatedDocument = BlockInputDocument(blocks: (0..<loadedBlockCount).compactMap { self.block(at: $0) })
-        guard let index = updatedDocument.index(of: block.id) else {
-            return
-        }
-        guard updatedDocument.blocks[index] != block else {
-            return
-        }
-        updatedDocument.blocks[index] = block
-        replaceDocument(updatedDocument)
-    }
-
-    func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
-        guard isComplete else {
-            return
-        }
-        var updatedDocument = BlockInputDocument(blocks: (0..<loadedBlockCount).compactMap { self.block(at: $0) })
-        guard updatedDocument.insertBlocks(blocks, at: index) != nil else {
-            return
-        }
-        replaceDocument(updatedDocument)
-    }
-
-    func deleteBlocks(withIDs ids: [BlockInputBlockID]) {
-        guard isComplete else {
-            return
-        }
-        guard !ids.isEmpty else {
-            return
-        }
-        var updatedDocument = BlockInputDocument(blocks: (0..<loadedBlockCount).compactMap { self.block(at: $0) })
-        let beforeDocument = updatedDocument
-        let deletedIDs = Set(ids)
-        updatedDocument.blocks.removeAll { deletedIDs.contains($0.id) }
-        guard updatedDocument != beforeDocument else {
-            return
-        }
-        replaceDocument(updatedDocument)
-    }
-
-    func moveBlock(withID id: BlockInputBlockID, to index: Int) {
-        guard isComplete else {
-            return
-        }
-        var updatedDocument = BlockInputDocument(blocks: (0..<loadedBlockCount).compactMap { self.block(at: $0) })
-        guard updatedDocument.moveBlock(blockID: id, to: index) != nil else {
-            return
-        }
-        replaceDocument(updatedDocument)
-    }
-}
-
 /// In-memory store for simple editors and tests.
-public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unchecked Sendable {
+public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, BlockInputMarkerAdjustingStore, @unchecked Sendable {
     /// Current document snapshot.
     public var document: BlockInputDocument {
         lock.lock()
         defer { lock.unlock() }
-        return storedDocument
+        return effectiveDocument()
     }
 
     /// Number of blocks available to the editor.
@@ -243,6 +88,7 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
 
     private var storedDocument: BlockInputDocument
     private var indexesByID: [BlockInputBlockID: Int]
+    private var markerTransactions: [BlockInputNumberedListMarkerTransaction] = []
     private let lock = NSLock()
     // Inserts and deletes leave suffix indexes stale; rebuild lazily only when
     // a later lookup asks for one, keeping 100k-demo mutations responsive.
@@ -265,13 +111,14 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
         guard storedDocument.blocks.indices.contains(index) else {
             return nil
         }
-        return storedDocument.blocks[index]
+        return effectiveBlock(storedDocument.blocks[index], at: index)
     }
 
     public func replaceDocument(_ document: BlockInputDocument) {
         lock.lock()
         defer { lock.unlock() }
         storedDocument = document
+        markerTransactions = []
         rebuildIndexes()
     }
 
@@ -281,7 +128,7 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
         guard let index = unlockedIndex(of: id) else {
             return nil
         }
-        return storedDocument.blocks[index]
+        return effectiveBlock(storedDocument.blocks[index], at: index)
     }
 
     public func index(of id: BlockInputBlockID) -> Int? {
@@ -296,7 +143,8 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
         guard let index = unlockedIndex(of: block.id) else {
             return
         }
-        storedDocument.blocks[index] = block
+        storedDocument.blocks[index] = storedBlockForReplacement(block, at: index)
+        removeMarkerOverride(for: block.id)
     }
 
     public func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
@@ -306,6 +154,7 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
         guard storedDocument.insertBlocks(blocks, at: index) != nil else {
             return
         }
+        shiftMarkerTransactionsForInsertion(at: insertionIndex, count: blocks.count)
         indexesNeedRebuild = true
         for (offset, block) in blocks.enumerated() {
             let insertedIndex = insertionIndex + offset
@@ -328,12 +177,19 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
            let id = ids.first,
            let index = unlockedIndex(of: id) {
             storedDocument.blocks.remove(at: index)
+            removeMarkerOverride(for: id)
+            shiftMarkerTransactionsForDeletion(at: index, count: 1)
             indexesByID[id] = nil
             indexesNeedRebuild = true
             return
         }
         let deletedIDs = Set(ids)
+        let deletedIndexes = storedDocument.blocks.indices.filter { deletedIDs.contains(storedDocument.blocks[$0].id) }
         storedDocument.blocks.removeAll { deletedIDs.contains($0.id) }
+        deletedIDs.forEach { removeMarkerOverride(for: $0) }
+        for deletedIndex in deletedIndexes.reversed() {
+            shiftMarkerTransactionsForDeletion(at: deletedIndex, count: 1)
+        }
         deletedIDs.forEach { indexesByID[$0] = nil }
         indexesNeedRebuild = true
     }
@@ -341,6 +197,9 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
     public func moveBlock(withID id: BlockInputBlockID, to index: Int) {
         lock.lock()
         defer { lock.unlock() }
+        if !markerTransactions.isEmpty {
+            compactMarkerTransactions()
+        }
         if indexesNeedRebuild {
             rebuildIndexes()
         }
@@ -357,9 +216,12 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
         updateIndexesAfterMove(from: sourceIndex, to: finalTargetIndex)
     }
 
-    func moveBlockWithoutNormalizing(withID id: BlockInputBlockID, to index: Int) {
+    public func moveBlockWithoutNormalizing(withID id: BlockInputBlockID, to index: Int) {
         lock.lock()
         defer { lock.unlock() }
+        if !markerTransactions.isEmpty {
+            compactMarkerTransactions()
+        }
         if indexesNeedRebuild {
             rebuildIndexes()
         }
@@ -385,6 +247,18 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
         let block = storedDocument.blocks.remove(at: sourceIndex)
         storedDocument.blocks.insert(block, at: finalTargetIndex)
         updateIndexesAfterMove(from: sourceIndex, to: finalTargetIndex)
+    }
+
+    public func applyNumberedListMarkerTransaction(_ transaction: BlockInputNumberedListMarkerTransaction) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !transaction.isEmpty else {
+            return
+        }
+        markerTransactions.append(transaction)
+        if markerTransactions.count > markerAdjustmentCompactionLimit {
+            compactMarkerTransactions()
+        }
     }
 
     private func unlockedIndex(of id: BlockInputBlockID) -> Int? {
@@ -439,5 +313,104 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
             indexes[block.id] = index
         }
         return indexes
+    }
+
+    private func effectiveDocument() -> BlockInputDocument {
+        let resolvedTransactions = markerTransactions.resolvingListRunBounds(in: storedDocument.blocks)
+        return BlockInputDocument(blocks: storedDocument.blocks.enumerated().map { index, block in
+            effectiveBlock(block, at: index, applying: resolvedTransactions)
+        })
+    }
+
+    private func effectiveBlock(_ block: BlockInputBlock, at index: Int) -> BlockInputBlock {
+        effectiveBlock(block, at: index, applying: markerTransactions)
+    }
+
+    private func effectiveBlock(
+        _ block: BlockInputBlock,
+        at index: Int,
+        applying transactions: [BlockInputNumberedListMarkerTransaction]
+    ) -> BlockInputBlock {
+        guard case let .numberedListItem(start) = block.kind else {
+            return block
+        }
+        var resolvedStart = start
+        for transaction in transactions {
+            for override in transaction.overrides where override.blockID == block.id {
+                resolvedStart = override.start
+            }
+            for adjustment in transaction.adjustments where markerAdjustment(adjustment, appliesAt: index, to: block) {
+                resolvedStart += adjustment.delta
+            }
+        }
+        guard resolvedStart != start else {
+            return block
+        }
+        var resolvedBlock = block
+        resolvedBlock.kind = .numberedListItem(start: resolvedStart)
+        return resolvedBlock
+    }
+
+    private func removeMarkerOverride(for blockID: BlockInputBlockID) {
+        markerTransactions = markerTransactions.map { transaction in
+            BlockInputNumberedListMarkerTransaction(
+                adjustments: transaction.adjustments,
+                overrides: transaction.overrides.filter { $0.blockID != blockID }
+            )
+        }.filter { !$0.isEmpty }
+    }
+
+    private func storedBlockForReplacement(_ block: BlockInputBlock, at index: Int) -> BlockInputBlock {
+        guard case let .numberedListItem(start) = block.kind else {
+            return block
+        }
+        let adjustmentDelta = markerTransactions.reduce(0) { delta, transaction in
+            delta + transaction.adjustments.reduce(0) { adjustmentDelta, adjustment in
+                guard markerAdjustment(adjustment, appliesAt: index, to: block) else {
+                    return adjustmentDelta
+                }
+                return adjustmentDelta + adjustment.delta
+            }
+        }
+        guard adjustmentDelta != 0 else {
+            return block
+        }
+        var storedBlock = block
+        storedBlock.kind = .numberedListItem(start: start - adjustmentDelta)
+        return storedBlock
+    }
+
+    private func shiftMarkerTransactionsForInsertion(at index: Int, count: Int) {
+        markerTransactions = markerTransactions.map { transaction in
+            BlockInputNumberedListMarkerTransaction(
+                adjustments: transaction.adjustments.map { $0.shiftedForInsertion(at: index, count: count) },
+                overrides: transaction.overrides
+            )
+        }
+    }
+
+    private func shiftMarkerTransactionsForDeletion(at index: Int, count: Int) {
+        markerTransactions = markerTransactions.map { transaction in
+            BlockInputNumberedListMarkerTransaction(
+                adjustments: transaction.adjustments.compactMap { $0.shiftedForDeletion(at: index, count: count) },
+                overrides: transaction.overrides
+            )
+        }.filter { !$0.isEmpty }
+    }
+
+    private func compactMarkerTransactions() {
+        storedDocument = effectiveDocument()
+        markerTransactions = []
+    }
+
+    private func markerAdjustment(
+        _ adjustment: BlockInputNumberedListMarkerAdjustment,
+        appliesAt index: Int,
+        to block: BlockInputBlock
+    ) -> Bool {
+        guard adjustment.contains(index: index, block: block) else {
+            return false
+        }
+        return adjustment.isWithinListRunScope(at: index, in: storedDocument.blocks)
     }
 }
