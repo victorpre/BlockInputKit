@@ -146,6 +146,10 @@ final class BlockInputTextView: NSTextView {
            blockItem?.requestUndoShortcut(undoShortcut) == true {
             return true
         }
+        if let formattingShortcut = event.blockInputTextFormattingShortcut {
+            _ = blockItem?.requestTextFormattingShortcut(formattingShortcut)
+            return true
+        }
         if handleDocumentBoundaryShortcut(event) {
             BlockInputSelectionDebug.emit("text equivalent consumed document boundary")
             return true

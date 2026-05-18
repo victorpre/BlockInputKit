@@ -299,6 +299,14 @@ extension BlockInputView {
             return applyGranularReplacementUndoResult(result, replacement: replacedBlock, replacementIndex: replacementIndex)
         }
 
+        if let replacedBlocks = result.replacedBlocks,
+           !replacedBlocks.isEmpty,
+           result.insertedBlocks == nil,
+           result.deletedBlockIDs == nil,
+           result.markerTransaction == nil {
+            return applyGranularBlockReplacements(replacedBlocks, selection: result.selection)
+        }
+
         if let insertedBlocks = result.insertedBlocks,
            let insertionIndex = result.insertionIndex {
             return applyGranularInsertionUndo(insertedBlocks, at: insertionIndex, selection: result.selection)
@@ -374,6 +382,27 @@ extension BlockInputView {
         collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
         collectionView.layoutSubtreeIfNeeded()
         restoreMountedSelection()
+        publishDocumentChange()
+        return true
+    }
+
+    func applyGranularBlockReplacements(
+        _ blocks: [BlockInputBlock],
+        selection: BlockInputSelection?
+    ) -> Bool {
+        guard !blocks.isEmpty else {
+            applySelection(validUndoSelection(selection), notify: true)
+            return true
+        }
+        for block in blocks {
+            guard let index = index(of: block.id) else {
+                return false
+            }
+            syncDocumentStore(.replaceBlock(block))
+            _ = replaceCachedBlock(block, at: index)
+        }
+        applySelection(validUndoSelection(selection), notify: true)
+        reloadDataKeepingFocus()
         publishDocumentChange()
         return true
     }

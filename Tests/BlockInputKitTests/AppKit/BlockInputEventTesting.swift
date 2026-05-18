@@ -105,6 +105,22 @@ func commandCEvent() throws -> NSEvent {
     try keyEquivalentEvent(keyCode: 8, characters: "c", modifierFlags: .command)
 }
 
+func commandBEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 11, characters: "b", modifierFlags: .command)
+}
+
+func commandIEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 34, characters: "i", modifierFlags: .command)
+}
+
+func commandUEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 32, characters: "u", modifierFlags: .command)
+}
+
+func commandShiftXEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 7, characters: "X", modifierFlags: [.command, .shift])
+}
+
 func commandUpEvent() throws -> NSEvent {
     try keyEquivalentEvent(keyCode: 126, characters: "\u{F700}", modifierFlags: .command)
 }

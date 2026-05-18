@@ -35,6 +35,11 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         blockID: BlockInputBlockID,
         didRequestUndoShortcut shortcut: BlockInputUndoShortcut
     ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestTextFormattingShortcut shortcut: BlockInputTextFormattingShortcut
+    ) -> Bool
     func blockItemDidRequestSelectHorizontalRule(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidBeginReordering(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)

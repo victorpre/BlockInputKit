@@ -20,3 +20,4 @@
 
 - Keep clipboard shortcuts intentionally asymmetric: Cmd+C may use a direct key-equivalent path for editor/block selections, but paste should stay on AppKit `NSText`/responder actions to preserve native insertion semantics.
 - Preserve Cmd+Up/Cmd+Down as document-boundary caret movement; they must not extend block selection.
+- Keep text-formatting shortcuts editor-owned source mutations; consume Cmd+B/I/U and Cmd+Shift+X so AppKit rich-text toggles cannot affect editor state.

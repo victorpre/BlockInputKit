@@ -135,6 +135,24 @@ public final class BlockInputUndoController {
         redoOrder = []
     }
 
+    /// Records a structural edit that replaces multiple blocks without snapshotting the full document.
+    func registerMultiBlockReplacementStructuralEdit(_ edit: BlockInputMultiBlockReplacementEdit) {
+        guard edit.beforeBlocks.count == edit.afterBlocks.count,
+              zip(edit.beforeBlocks, edit.afterBlocks).contains(where: !=) else {
+            return
+        }
+        structuralUndoStack.append(BlockInputStructuralUndoEntry(
+            actionName: edit.actionName,
+            payload: .multiBlockReplacement(beforeBlocks: edit.beforeBlocks, afterBlocks: edit.afterBlocks),
+            selectionBefore: edit.selectionBefore,
+            selectionAfter: edit.selectionAfter
+        ))
+        undoOrder.append(.structural)
+        structuralRedoStack = []
+        textRedoByBlockID = [:]
+        redoOrder = []
+    }
+
     /// Records a structural edit that inserts blocks without snapshotting the full document.
     func registerBlockInsertionStructuralEdit(
         actionName: String,

@@ -56,7 +56,7 @@ extension BlockInputBlockItem {
         return ranges.contains { selectedRange.intersectsStyledContent($0) }
     }
 
-    private static func supportsInlineMarkdownStyling(_ kind: BlockInputBlockKind) -> Bool {
+    static func supportsInlineMarkdownStyling(_ kind: BlockInputBlockKind) -> Bool {
         switch kind {
         case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true

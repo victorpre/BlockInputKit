@@ -5,6 +5,14 @@ enum BlockInputUndoShortcut {
     case redo
 }
 
+/// Editor-owned text formatting shortcuts that mutate Markdown source instead of AppKit attributes.
+enum BlockInputTextFormattingShortcut {
+    case bold
+    case italic
+    case underline
+    case strikethrough
+}
+
 extension NSEvent {
     var blockInputIsSelectAllShortcut: Bool {
         modifierFlags.contains(.command)
@@ -30,6 +38,28 @@ extension NSEvent {
             return nil
         }
         return modifierFlags.contains(.shift) ? .redo : .undo
+    }
+
+    var blockInputTextFormattingShortcut: BlockInputTextFormattingShortcut? {
+        guard modifierFlags.contains(.command),
+              !modifierFlags.contains(.option),
+              !modifierFlags.contains(.control) else {
+            return nil
+        }
+        let key = charactersIgnoringModifiers?.lowercased()
+        if !modifierFlags.contains(.shift) {
+            switch key {
+            case "b":
+                return .bold
+            case "i":
+                return .italic
+            case "u":
+                return .underline
+            default:
+                return nil
+            }
+        }
+        return key == "x" ? .strikethrough : nil
     }
 
     var blockInputSelectionExpansionDirection: BlockInputVerticalMovementDirection? {

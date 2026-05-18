@@ -119,6 +119,10 @@ public final class BlockInputView: NSView {
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.blockInputIsSelectAllShortcut, selectAllFromActiveSelection() { return true }
         if let undoShortcut = event.blockInputUndoShortcut, performUndoShortcut(undoShortcut) { return true }
+        if let formattingShortcut = event.blockInputTextFormattingShortcut {
+            _ = performTextFormattingShortcut(formattingShortcut)
+            return true
+        }
         if let direction = event.blockInputDocumentBoundaryDirection, moveCaretToDocumentBoundary(direction) { return true }
         if handleSelectionExpansionShortcut(event) { return true }
         // Copy needs a direct key-equivalent path; paste stays on NSText so insertion uses AppKit's normal edit pipeline.
@@ -134,31 +138,6 @@ public final class BlockInputView: NSView {
             return
         }
         super.selectAll(sender)
-    }
-
-    @objc(undo:)
-    func blockInputUndo(_ sender: Any?) {
-        _ = performUndoShortcut(.undo)
-    }
-
-    @objc(redo:)
-    func blockInputRedo(_ sender: Any?) {
-        _ = performUndoShortcut(.redo)
-    }
-
-    @objc(copy:)
-    func blockInputCopy(_ sender: Any?) {
-        _ = copyActiveSelection()
-    }
-
-    @objc(cut:)
-    func blockInputCut(_ sender: Any?) {
-        _ = cutActiveSelection()
-    }
-
-    @objc(paste:)
-    func blockInputPaste(_ sender: Any?) {
-        _ = pasteIntoActiveSelection()
     }
 
     /// Focuses a specific block at a UTF-16 text offset.

@@ -314,6 +314,17 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         performUndoShortcut(shortcut, preferredBlockID: blockID)
     }
 
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestTextFormattingShortcut shortcut: BlockInputTextFormattingShortcut
+    ) -> Bool {
+        if item.currentSelectedRange.length > 0 {
+            applySelection(.text(BlockInputTextRange(blockID: blockID, range: item.currentSelectedRange)), notify: false)
+        }
+        return performTextFormattingShortcut(shortcut)
+    }
+
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
         _ = toggleChecklistItem(blockID: blockID)
     }
