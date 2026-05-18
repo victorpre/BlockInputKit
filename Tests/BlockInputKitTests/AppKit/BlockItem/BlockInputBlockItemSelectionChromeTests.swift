@@ -43,15 +43,47 @@ final class BlockInputBlockItemSelectionChromeTests: XCTestCase {
         XCTAssertEqual(ruleItem.testingSelectionBackgroundView.frame.minX, paragraphItem.testingSelectionBackgroundView.frame.minX)
     }
 
-    func testCodeBlockSelectionChromeUsesPlainTextLeadingEdge() throws {
-        let paragraphItem = selectedItemForWidthTesting(
-            block: BlockInputBlock(id: "paragraph", text: "Try mention query")
-        )
+    func testCodeBlockWholeSelectionChromeMatchesCodeSurface() throws {
         let codeItem = selectedItemForWidthTesting(
             block: BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1")
         )
+        let codeSurface = codeItem.testingCodeBackgroundView
 
-        XCTAssertEqual(codeItem.testingSelectionBackgroundView.frame.minX, paragraphItem.testingSelectionBackgroundView.frame.minX)
+        XCTAssertEqual(codeItem.testingSelectionBackgroundView.frame, codeSurface.frame)
+        XCTAssertEqual(codeItem.testingSelectionBackgroundSegmentFrames, [codeSurface.frame])
+        XCTAssertLessThan(codeItem.testingSelectionBackgroundView.frame.width, codeItem.view.bounds.width / 2)
+    }
+
+    func testSelectedCodeBlockSelectionChromeResizesWithCodeSurfaceAfterTextChange() throws {
+        let shortBlock = BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1")
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: shortBlock,
+            allowsReordering: true,
+            isSelected: true,
+            delegate: BlockInputView()
+        )
+        item.view.frame = NSRect(x: 0, y: 0, width: 900, height: 44)
+        item.view.layoutSubtreeIfNeeded()
+        let shortSurfaceWidth = item.testingCodeBackgroundView.frame.width
+
+        let longBlock = BlockInputBlock(
+            id: "code",
+            kind: .code(language: "swift"),
+            text: "let value = \"\(String(repeating: "wide ", count: 30))\""
+        )
+        item.testingTextView?.string = longBlock.text
+        item.updateTextDependentChrome(for: longBlock)
+        item.view.layoutSubtreeIfNeeded()
+
+        XCTAssertGreaterThan(item.testingCodeBackgroundView.frame.width, shortSurfaceWidth)
+        XCTAssertEqual(item.testingSelectionBackgroundView.frame, item.testingCodeBackgroundView.frame)
+
+        item.testingTextView?.string = shortBlock.text
+        item.updateTextDependentChrome(for: shortBlock)
+        item.view.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(item.testingCodeBackgroundView.frame.width, shortSurfaceWidth, accuracy: 0.5)
+        XCTAssertEqual(item.testingSelectionBackgroundView.frame, item.testingCodeBackgroundView.frame)
     }
 
     func testPartialSelectionChromeCollapsesNativeTextSelection() throws {

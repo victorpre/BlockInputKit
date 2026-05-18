@@ -91,6 +91,10 @@ extension BlockInputBlockItem {
     }
 
     private func selectedWholeContentBackgroundFrame() -> NSRect {
+        if case .code = renderedBlock?.kind,
+           !codeBackgroundView.isHidden {
+            return codeBackgroundView.frame.integral
+        }
         let leadingPadding: CGFloat = 0
         let trailingPadding: CGFloat = 6
         let verticalInset: CGFloat = 2

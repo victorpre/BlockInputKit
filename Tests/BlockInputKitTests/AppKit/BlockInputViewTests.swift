@@ -22,10 +22,11 @@ final class BlockInputViewTests: XCTestCase {
         XCTAssertEqual(layout?.minimumLineSpacing, 0)
     }
 
-    func testMountedEditorKeepsTrailingInsetsStableWhenReorderingIsDisabled() throws {
+    func testMountedEditorUsesMinimumCodeSurfaceWhenReorderingIsDisabled() throws {
+        let codeBlock = BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1")
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
             document: BlockInputDocument(blocks: [
-                BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1")
+                codeBlock
             ]),
             allowsBlockReordering: false
         ))
@@ -38,16 +39,22 @@ final class BlockInputViewTests: XCTestCase {
             scrollView.frame.width,
             BlockInputBlockItem.textScrollViewWidth(
                 for: item.view.bounds.width,
-                block: mounted.view.document.blocks[0],
+                block: codeBlock,
                 allowsReordering: false
             ),
             accuracy: 0.5
         )
         XCTAssertEqual(
-            item.view.bounds.maxX - codeSurface.frame.maxX,
-            BlockInputBlockItem.codeBackgroundTrailingInset(allowsReordering: false),
+            codeSurface.frame.minX,
+            BlockInputBlockItem.codeBackgroundLeadingInset(allowsReordering: false),
             accuracy: 0.5
         )
+        XCTAssertEqual(
+            codeSurface.frame.width,
+            max(ceil(BlockInputBlockItem.font(for: codeBlock.kind).pointSize * 12), 144),
+            accuracy: 0.5
+        )
+        XCTAssertLessThan(codeSurface.frame.maxX, scrollView.frame.maxX)
     }
 
     func testMountedEditorPreservesReorderLaneWhenReorderingIsEnabled() throws {

@@ -49,6 +49,7 @@ extension BlockInputBlockItem {
         guard case .code = renderedBlock?.kind else {
             return
         }
+        updateCodeBackgroundFrame()
         updateSelectionChromeFrame()
     }
 

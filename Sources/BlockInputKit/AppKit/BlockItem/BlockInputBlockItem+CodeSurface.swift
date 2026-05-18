@@ -56,12 +56,34 @@ extension BlockInputBlockItem {
             editorHorizontalInset: editorHorizontalInset
         )
         let maxX = max(minX, view.bounds.maxX - trailingPadding)
+        let availableWidth = max(0, maxX - minX)
         codeBackgroundView.frame = NSRect(
             x: minX,
             y: max(0, scrollView.frame.minY + verticalInset),
-            width: max(0, maxX - minX),
+            width: Self.codeSurfaceWidth(
+                for: textView.string,
+                font: textView.font ?? Self.font(for: renderedBlock?.kind ?? .code(language: nil)),
+                availableWidth: availableWidth
+            ),
             height: max(0, scrollView.frame.height - verticalInset * 2)
         ).integral
+    }
+
+    static func codeSurfaceWidth(for text: String, font: NSFont, availableWidth: CGFloat) -> CGFloat {
+        let naturalWidth = widestCodeLineWidth(in: text, font: font) + codeTextHorizontalPadding * 2
+        let minimumWidth = max(ceil(font.pointSize * 12), 144)
+        return min(max(naturalWidth, minimumWidth), max(availableWidth, 0))
+    }
+
+    private static func widestCodeLineWidth(in text: String, font: NSFont) -> CGFloat {
+        let code = text.isEmpty ? " " : text
+        return code
+            .components(separatedBy: .newlines)
+            .map { line in
+                let measuredLine = line.isEmpty ? " " : line
+                return ceil((measuredLine as NSString).size(withAttributes: [.font: font]).width)
+            }
+            .max() ?? 0
     }
 
     private var effectiveCodeColorScheme: BlockInputSyntaxColorScheme {

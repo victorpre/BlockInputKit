@@ -94,9 +94,10 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
     }
 
     @MainActor
-    func testCodeAndHorizontalRuleChromeKeepNormalTrailingInsetsWithoutReordering() throws {
+    func testCodeSurfaceHugsContentAndRuleKeepsTrailingInsetWithoutReordering() throws {
+        let block = BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1")
         let codeItem = configuredItem(
-            block: BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1"),
+            block: block,
             allowsReordering: false,
             delegate: BlockInputView()
         )
@@ -108,11 +109,15 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
             accuracy: 0.5
         )
         XCTAssertEqual(
-            codeItem.view.bounds.maxX - codeSurface.frame.maxX,
-            BlockInputBlockItem.codeBackgroundTrailingInset(allowsReordering: false),
+            codeSurface.frame.width,
+            expectedCodeSurfaceWidth(for: block, in: codeItem, allowsReordering: false),
             accuracy: 0.5
         )
-        XCTAssertEqual(codeSurface.frame.minX, codeItem.view.bounds.maxX - codeSurface.frame.maxX, accuracy: 0.5)
+        XCTAssertEqual(
+            codeSurface.frame.width,
+            max(ceil(BlockInputBlockItem.font(for: block.kind).pointSize * 12), 144),
+            accuracy: 0.5
+        )
 
         let ruleItem = configuredItem(
             block: BlockInputBlock(id: "rule", kind: .horizontalRule),
@@ -130,9 +135,10 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
     }
 
     @MainActor
-    func testCodeAndHorizontalRuleChromeStayBalancedWithReorderingEnabled() throws {
+    func testCodeSurfaceHugsContentAndRuleStaysBalancedWithReorderingEnabled() throws {
+        let block = BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1")
         let codeItem = configuredItem(
-            block: BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1"),
+            block: block,
             allowsReordering: true,
             delegate: BlockInputView()
         )
@@ -144,11 +150,10 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
             accuracy: 0.5
         )
         XCTAssertEqual(
-            codeItem.view.bounds.maxX - codeSurface.frame.maxX,
-            BlockInputBlockItem.codeBackgroundTrailingInset(allowsReordering: true),
+            codeSurface.frame.width,
+            expectedCodeSurfaceWidth(for: block, in: codeItem, allowsReordering: true),
             accuracy: 0.5
         )
-        XCTAssertEqual(codeSurface.frame.minX, codeItem.view.bounds.maxX - codeSurface.frame.maxX, accuracy: 0.5)
 
         let ruleItem = configuredItem(
             block: BlockInputBlock(id: "rule", kind: .horizontalRule),
@@ -163,6 +168,37 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
             accuracy: 0.5
         )
         XCTAssertEqual(ruleView.frame.minX, ruleItem.view.bounds.maxX - ruleView.frame.maxX, accuracy: 0.5)
+    }
+
+    @MainActor
+    func testWideCodeBlockSurfaceCapsAtAvailableWidthAndKeepsTextOverflow() throws {
+        let block = BlockInputBlock(
+            id: "code",
+            kind: .code(language: "swift"),
+            text: "let value = \"\(String(repeating: "wide ", count: 80))\""
+        )
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: block,
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        item.view.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: 320,
+            height: BlockInputBlockItem.height(for: block, textWidth: 240)
+        )
+        item.view.layoutSubtreeIfNeeded()
+        let scrollView = try XCTUnwrap(item.testingTextScrollView)
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        XCTAssertEqual(
+            item.testingCodeBackgroundView.frame.width,
+            codeSurfaceAvailableWidth(in: item, allowsReordering: true),
+            accuracy: 0.5
+        )
+        XCTAssertTrue(scrollView.hasHorizontalScroller)
+        XCTAssertGreaterThan(textView.frame.width, scrollView.contentView.bounds.width)
     }
 
     @MainActor
@@ -246,8 +282,9 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
             delegate: view
         )
         let paragraphTextMinX = try textContentMinX(in: paragraphItem)
+        let codeBlock = BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1\nprint(value)")
         let codeItem = configuredItem(
-            block: BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1\nprint(value)"),
+            block: codeBlock,
             delegate: view
         )
         let codeSurface = codeItem.testingCodeBackgroundView
@@ -262,7 +299,12 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
         )
         XCTAssertEqual(codeTextMinX - codeSurface.frame.minX, BlockInputBlockItem.codeTextHorizontalPadding, accuracy: 0.5)
         XCTAssertEqual(codeSurface.frame.minX - codeScrollView.frame.minX, BlockInputBlockItem.textContainerContentLeading, accuracy: 0.5)
-        XCTAssertEqual(codeScrollView.frame.maxX - codeSurface.frame.maxX, BlockInputBlockItem.textContainerContentLeading, accuracy: 0.5)
+        XCTAssertEqual(
+            codeSurface.frame.width,
+            expectedCodeSurfaceWidth(for: codeBlock, in: codeItem, allowsReordering: true),
+            accuracy: 0.5
+        )
+        XCTAssertLessThan(codeSurface.frame.maxX, codeScrollView.frame.maxX)
         XCTAssertEqual(codeSurface.layer?.cornerRadius, 6)
         XCTAssertEqual(codeSurface.layer?.borderWidth, 1)
         XCTAssertNotNil(codeSurface.layer?.backgroundColor)
@@ -427,5 +469,25 @@ private extension BlockInputBlockItemChromeLayoutTests {
             dy: textView.textContainerOrigin.y
         )
         return textView.convert(lineRect, to: item.view)
+    }
+
+    @MainActor
+    func expectedCodeSurfaceWidth(
+        for block: BlockInputBlock,
+        in item: BlockInputBlockItem,
+        allowsReordering: Bool
+    ) -> CGFloat {
+        BlockInputBlockItem.codeSurfaceWidth(
+            for: block.text,
+            font: BlockInputBlockItem.font(for: block.kind),
+            availableWidth: codeSurfaceAvailableWidth(in: item, allowsReordering: allowsReordering)
+        )
+    }
+
+    @MainActor
+    func codeSurfaceAvailableWidth(in item: BlockInputBlockItem, allowsReordering: Bool) -> CGFloat {
+        let minX = BlockInputBlockItem.codeBackgroundLeadingInset(allowsReordering: allowsReordering)
+        let trailingInset = BlockInputBlockItem.codeBackgroundTrailingInset(allowsReordering: allowsReordering)
+        return max(0, item.view.bounds.maxX - trailingInset - minX)
     }
 }

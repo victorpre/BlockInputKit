@@ -110,8 +110,8 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         super.viewDidLayout()
         refreshCodeAppearanceIfNeeded()
         updateTextViewDocumentFrame()
-        updateSelectionChromeFrame()
         updateCodeBackgroundFrame()
+        updateSelectionChromeFrame()
         updateHoverTrackingArea()
         updateMarkerLineYOffsets()
         updateQuoteBarVerticalExtent()
@@ -200,6 +200,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     func updateTextDependentChrome(for block: BlockInputBlock) {
         renderedBlock = block
         configureBlockKindChrome(block: block)
+        updateSelectionChromeFrame()
     }
 
     func focusText(atUTF16Offset offset: Int) {
