@@ -4,5 +4,6 @@
 - **Keep skills concise.** Put only agent-facing workflow details in `SKILL.md`; keep human-facing docs in `README.md`.
 - **Use release skill.** For release bumps or release dry runs, follow `.agents/skills/create-release/SKILL.md`.
 - **Use self-review skill.** For self reviews or audits, follow `.agents/skills/self-review/SKILL.md`.
+- **Use block-support skill.** For adding or extending block types, follow `.agents/skills/add-block-support/SKILL.md`.
 - **Protect secrets.** Never commit signing keys, tokens, passwords, or base64 secret values.
 - **Validate changes.** Run the skill validator after editing `.agents/skills/*/SKILL.md` when one is available.
