@@ -186,4 +186,39 @@ final class BlockInputViewTypingShortcutUndoTests: XCTestCase {
         XCTAssertEqual(view.document.blocks[1].text, "Existing")
         XCTAssertEqual(view.document.blocks[2].id, secondID)
     }
+
+    func testHeadingHorizontalRuleTypingShortcutUndoRestoresHeading() throws {
+        let blockID = BlockInputBlockID(rawValue: "heading")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .heading(level: 2), text: "Heading")
+            ]),
+            undoController: undoController
+        ))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        _ = item.textView(textView, shouldChangeTextIn: NSRange(location: 0, length: 0), replacementString: "--- ")
+        textView.string = "--- Heading"
+        textView.setSelectedRange(NSRange(location: 4, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Format Block")
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .heading(level: 2), text: "Heading")
+        ])
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(redo?.actionName, "Format Block")
+        XCTAssertEqual(view.document.blocks.map(\.kind), [.horizontalRule, .heading(level: 2)])
+        XCTAssertEqual(view.document.blocks[1].text, "Heading")
+    }
 }

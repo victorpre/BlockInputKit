@@ -203,6 +203,53 @@ final class BlockInputViewDocumentStoreCommandTests: XCTestCase {
     }
 
     @MainActor
+    func testReturnAtFrontOfHeadingPublishesReplacementAndInsertionToStore() {
+        let blockID = BlockInputBlockID(rawValue: "heading")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .heading(level: 2), text: "Heading")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID])
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].index, 1)
+        XCTAssertEqual(store.document.blocks[0], BlockInputBlock(id: blockID, kind: .paragraph))
+        XCTAssertEqual(store.document.blocks[1].kind, .heading(level: 2))
+        XCTAssertEqual(store.document.blocks[1].text, "Heading")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    @MainActor
+    func testReturnAtFrontOfNumberedListPublishesNormalizedFollowingBlockToStore() {
+        let blockID = BlockInputBlockID(rawValue: "number")
+        let nextID = BlockInputBlockID(rawValue: "next")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3), text: "Item"),
+            BlockInputBlock(id: nextID, kind: .numberedListItem(start: 4), text: "Next")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replaceBlockIDs, [blockID, nextID])
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.document.blocks[0], BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3)))
+        XCTAssertEqual(store.document.blocks[1].kind, .numberedListItem(start: 4))
+        XCTAssertEqual(store.document.blocks[1].text, "Item")
+        XCTAssertEqual(store.document.blocks[2], BlockInputBlock(id: nextID, kind: .numberedListItem(start: 5), text: "Next"))
+    }
+
+    @MainActor
     func testReturnInListBlockPublishesDocumentReplacementToStoreWhenSplittingText() {
         let blockID = BlockInputBlockID(rawValue: "bullet")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [

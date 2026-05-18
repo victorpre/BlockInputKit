@@ -25,6 +25,73 @@ final class BlockInputTextCommandReturnTests: XCTestCase {
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
     }
 
+    func testReturnCommandAtFrontOfHeadingMovesHeadingDownThroughDelegatePath() throws {
+        let blockID = BlockInputBlockID(rawValue: "heading")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .heading(level: 2), text: "Heading")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .paragraph))
+        XCTAssertEqual(view.document.blocks[1].kind, .heading(level: 2))
+        XCTAssertEqual(view.document.blocks[1].text, "Heading")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    func testReturnCommandAtFrontOfQuoteMovesQuoteDownThroughDelegatePath() throws {
+        let blockID = BlockInputBlockID(rawValue: "quote")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .quote, text: "Quoted")
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .paragraph))
+        XCTAssertEqual(view.document.blocks[1].kind, .quote)
+        XCTAssertEqual(view.document.blocks[1].text, "Quoted")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    func testReturnCommandAtFrontOfListItemMovesListItemDownThroughDelegatePath() throws {
+        let blockID = BlockInputBlockID(rawValue: "bullet")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Item", indentationLevel: 1)
+        ])))
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: view.document.blocks[0],
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, indentationLevel: 1))
+        XCTAssertEqual(view.document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(view.document.blocks[1].text, "Item")
+        XCTAssertEqual(view.document.blocks[1].indentationLevel, 1)
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
     func testReturnCommandConvertsCodeFenceThroughDelegatePath() throws {
         let blockID = BlockInputBlockID(rawValue: "code")
         let undoController = BlockInputUndoController()

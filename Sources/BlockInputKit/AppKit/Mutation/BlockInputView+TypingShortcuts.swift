@@ -108,7 +108,10 @@ extension BlockInputView {
         if !shortcut.preservesIndentation {
             afterBlock.indentationLevel = 0
         }
-        let insertedBlock = BlockInputBlock(kind: .paragraph, text: shortcut.insertedBlockText ?? "")
+        let insertedBlock = BlockInputBlock(
+            kind: shortcut.insertedBlockKind ?? .paragraph,
+            text: shortcut.insertedBlockText ?? ""
+        )
         let insertedBlocks = [insertedBlock]
         let insertionIndex = index + 1
         if canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) {

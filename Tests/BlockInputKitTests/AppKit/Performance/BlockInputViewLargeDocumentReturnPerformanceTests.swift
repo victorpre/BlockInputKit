@@ -82,6 +82,35 @@ final class LargeDocumentMutationPerformanceTests: XCTestCase {
         XCTAssertEqual(store.insertedBlockBatches[0].index, targetIndex + 1)
     }
 
+    func testStoreBackedReturnAtFrontOfHeadingDoesNotReadFullDocumentSnapshot() {
+        let targetIndex = 50_000
+        let blockID = BlockInputBlockID(rawValue: "block-\(targetIndex)")
+        let document = BlockInputDocument(blocks: (0..<100_000).map { index in
+            BlockInputBlock(
+                id: BlockInputBlockID(rawValue: "block-\(index)"),
+                kind: index == targetIndex ? .heading(level: 2) : .paragraph,
+                text: index == targetIndex ? "Heading" : "Block \(index)"
+            )
+        })
+        let store = DocumentReadCountingStore(document: document)
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(
+            documentStore: store,
+            undoController: BlockInputUndoController()
+        ))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+        store.resetCounts()
+
+        _ = view.insertBlockBelowCurrentBlock()
+
+        XCTAssertEqual(store.documentReadCount, 0)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replacedBlockIDs, [blockID])
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].index, targetIndex + 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks.first?.kind, .heading(level: 2))
+    }
+
     func testMountedLargeEmptyQuoteReturnReconfiguresWithoutFullSnapshot() throws {
         let quoteID = BlockInputBlockID(rawValue: "large-2")
         let document = BlockInputDocument(blocks: (0..<100_000).map { index in

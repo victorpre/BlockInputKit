@@ -1,7 +1,7 @@
 import AppKit
 
 extension BlockInputView {
-    private struct ReturnSelection {
+    struct ReturnSelection {
         var offset: Int
         var length: Int
     }
@@ -57,6 +57,14 @@ extension BlockInputView {
               let block = block(at: index),
               cachedBlockMatches(block, at: index) else {
             return nil
+        }
+        if let leadingReturnMove = leadingReturnMove(from: block, selection: returnSelection) {
+            return performGranularLeadingReturnMove(
+                actionName: "Insert Block",
+                beforeBlock: block,
+                leadingReturnMove: leadingReturnMove,
+                replacementIndex: index
+            )
         }
         if let replacement = block.codeFenceBlockForReturn(
             utf16Offset: returnSelection?.offset,
@@ -299,7 +307,7 @@ extension BlockInputView {
         return afterSelection
     }
 
-    private func reloadVisibleBlock(at index: Int) {
+    func reloadVisibleBlock(at index: Int) {
         let indexPath = IndexPath(item: index, section: 0)
         if shouldDeferGranularCountLayout,
            let block = block(at: index),

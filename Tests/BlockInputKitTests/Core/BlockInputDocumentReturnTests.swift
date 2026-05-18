@@ -31,6 +31,119 @@ final class BlockInputDocumentReturnTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
+    func testReturnAtFrontOfParagraphMovesBlockDown() {
+        let blockID = BlockInputBlockID(rawValue: "paragraph")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Paragraph")
+        ])
+
+        let selection = document.handleReturn(in: blockID, utf16Offset: 0)
+
+        XCTAssertEqual(document.blocks.count, 2)
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .paragraph))
+        XCTAssertEqual(document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(document.blocks[1].text, "Paragraph")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    func testReturnAtFrontOfHeadingMovesHeadingDownBelowEmptyParagraph() {
+        let blockID = BlockInputBlockID(rawValue: "heading")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .heading(level: 2), text: "Heading")
+        ])
+
+        let selection = document.handleReturn(in: blockID, utf16Offset: 0)
+
+        XCTAssertEqual(document.blocks.count, 2)
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .paragraph))
+        XCTAssertEqual(document.blocks[1].kind, .heading(level: 2))
+        XCTAssertEqual(document.blocks[1].text, "Heading")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    func testReturnAtFrontOfCodeBlockMovesCodeBlockDownBelowEmptyParagraph() {
+        let blockID = BlockInputBlockID(rawValue: "code")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .code(language: "swift"), text: "let value = 1")
+        ])
+
+        _ = document.handleReturn(in: blockID, utf16Offset: 0)
+
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .paragraph))
+        XCTAssertEqual(document.blocks[1].kind, .code(language: "swift"))
+        XCTAssertEqual(document.blocks[1].text, "let value = 1")
+    }
+
+    func testReturnAtFrontOfRawMarkdownMovesRawMarkdownDownBelowEmptyParagraph() {
+        let blockID = BlockInputBlockID(rawValue: "raw")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .rawMarkdown, text: "| A |\n| - |")
+        ])
+
+        _ = document.handleReturn(in: blockID, utf16Offset: 0)
+
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .paragraph))
+        XCTAssertEqual(document.blocks[1].kind, .rawMarkdown)
+        XCTAssertEqual(document.blocks[1].text, "| A |\n| - |")
+    }
+
+    func testReturnAtFrontOfBulletedListMovesItemDownBelowEmptyListItem() {
+        let blockID = BlockInputBlockID(rawValue: "bullet")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .bulletedListItem, text: "Item", indentationLevel: 2)
+        ])
+
+        let selection = document.handleReturn(in: blockID, utf16Offset: 0)
+
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .bulletedListItem, indentationLevel: 2))
+        XCTAssertEqual(document.blocks[1].kind, .bulletedListItem)
+        XCTAssertEqual(document.blocks[1].text, "Item")
+        XCTAssertEqual(document.blocks[1].indentationLevel, 2)
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    func testReturnAtFrontOfNumberedListMovesItemDownWithNextNumber() {
+        let blockID = BlockInputBlockID(rawValue: "number")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3), text: "Item")
+        ])
+
+        _ = document.handleReturn(in: blockID, utf16Offset: 0)
+
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3)))
+        XCTAssertEqual(document.blocks[1].kind, .numberedListItem(start: 4))
+        XCTAssertEqual(document.blocks[1].text, "Item")
+    }
+
+    func testReturnAtFrontOfNumberedListNormalizesFollowingNumber() {
+        let blockID = BlockInputBlockID(rawValue: "number")
+        let nextID = BlockInputBlockID(rawValue: "next")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3), text: "Item"),
+            BlockInputBlock(id: nextID, kind: .numberedListItem(start: 4), text: "Next")
+        ])
+
+        _ = document.handleReturn(in: blockID, utf16Offset: 0)
+
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3)))
+        XCTAssertEqual(document.blocks[1].kind, .numberedListItem(start: 4))
+        XCTAssertEqual(document.blocks[1].text, "Item")
+        XCTAssertEqual(document.blocks[2], BlockInputBlock(id: nextID, kind: .numberedListItem(start: 5), text: "Next"))
+    }
+
+    func testReturnAtFrontOfChecklistMovesItemDownBelowUncheckedItem() {
+        let blockID = BlockInputBlockID(rawValue: "check")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: true), text: "Done")
+        ])
+
+        _ = document.handleReturn(in: blockID, utf16Offset: 0)
+
+        XCTAssertEqual(document.blocks[0], BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false)))
+        XCTAssertEqual(document.blocks[1].kind, .checklistItem(isChecked: true))
+        XCTAssertEqual(document.blocks[1].text, "Done")
+    }
+
     func testReturnConvertsParagraphCodeFenceWithoutLanguageToCodeBlock() {
         let blockID = BlockInputBlockID(rawValue: "code")
         var document = BlockInputDocument(blocks: [

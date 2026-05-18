@@ -202,6 +202,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             lineIndentationLevels: block.lineIndentationLevels
         )
         if block.kind.acceptsInlineReturn,
+           !(selectedRange.length == 0 &&
+             selectedRange.location == 0 &&
+             currentBlock.canMoveDownOnLeadingReturn),
            !currentBlock.requiresStructuralReturnHandling(
                utf16Offset: selectedRange.location,
                selectedUTF16Length: selectedRange.length

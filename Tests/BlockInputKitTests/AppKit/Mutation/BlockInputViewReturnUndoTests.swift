@@ -3,6 +3,68 @@ import XCTest
 
 @MainActor
 final class BlockInputViewReturnUndoTests: XCTestCase {
+    func testReturnAtFrontOfHeadingUsesInsertBlockStructuralUndoAction() {
+        let blockID = BlockInputBlockID(rawValue: "heading")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .heading(level: 2), text: "Heading")
+            ]),
+            undoController: undoController
+        ))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+
+        _ = view.insertBlockBelowCurrentBlock()
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Insert Block")
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .heading(level: 2), text: "Heading")
+        ])
+        XCTAssertEqual(undo?.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(redo?.actionName, "Insert Block")
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .paragraph))
+        XCTAssertEqual(view.document.blocks[1].kind, .heading(level: 2))
+        XCTAssertEqual(view.document.blocks[1].text, "Heading")
+        XCTAssertEqual(redo?.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    func testReturnAtFrontOfNumberedListUndoRestoresNormalizedFollowingBlock() {
+        let blockID = BlockInputBlockID(rawValue: "number")
+        let nextID = BlockInputBlockID(rawValue: "next")
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3), text: "Item"),
+                BlockInputBlock(id: nextID, kind: .numberedListItem(start: 4), text: "Next")
+            ]),
+            undoController: undoController
+        ))
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+
+        _ = view.insertBlockBelowCurrentBlock()
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Insert Block")
+        XCTAssertEqual(view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3), text: "Item"),
+            BlockInputBlock(id: nextID, kind: .numberedListItem(start: 4), text: "Next")
+        ])
+
+        let redo = view.redoStructuralEdit()
+
+        XCTAssertEqual(redo?.actionName, "Insert Block")
+        XCTAssertEqual(view.document.blocks[0], BlockInputBlock(id: blockID, kind: .numberedListItem(start: 3)))
+        XCTAssertEqual(view.document.blocks[1].kind, .numberedListItem(start: 4))
+        XCTAssertEqual(view.document.blocks[1].text, "Item")
+        XCTAssertEqual(view.document.blocks[2], BlockInputBlock(id: nextID, kind: .numberedListItem(start: 5), text: "Next"))
+    }
+
     func testReturnInEmptyFormattedBlockUsesUnformatStructuralUndoAction() {
         let blockID = BlockInputBlockID(rawValue: "quote")
         let undoController = BlockInputUndoController()

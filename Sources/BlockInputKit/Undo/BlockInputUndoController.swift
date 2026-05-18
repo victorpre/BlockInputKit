@@ -41,6 +41,8 @@ struct BlockInputReplaceInsertEdit {
     var afterBlock: BlockInputBlock
     var insertedBlocks: [BlockInputBlock]
     var insertionIndex: Int
+    var beforeChangedBlocks: [BlockInputBlock] = []
+    var afterChangedBlocks: [BlockInputBlock] = []
     var selectionBefore: BlockInputSelection?
     var selectionAfter: BlockInputSelection?
 }
@@ -197,7 +199,9 @@ public final class BlockInputUndoController {
                 beforeBlock: edit.beforeBlock,
                 afterBlock: edit.afterBlock,
                 insertedBlocks: edit.insertedBlocks,
-                insertionIndex: edit.insertionIndex
+                insertionIndex: edit.insertionIndex,
+                beforeChangedBlocks: edit.beforeChangedBlocks,
+                afterChangedBlocks: edit.afterChangedBlocks
             ),
             selectionBefore: edit.selectionBefore,
             selectionAfter: edit.selectionAfter

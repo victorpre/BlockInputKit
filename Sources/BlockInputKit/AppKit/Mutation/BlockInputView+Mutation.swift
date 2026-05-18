@@ -296,10 +296,13 @@ extension BlockInputView {
             if let insertedBlocks = result.insertedBlocks,
                let insertionIndex = result.insertionIndex {
                 return applyGranularReplacementInsertionUndo(
-                    replacement: replacedBlock,
-                    replacementIndex: replacementIndex,
-                    insertedBlocks: insertedBlocks,
-                    insertionIndex: insertionIndex,
+                    ReplacementInsertionUndoContext(
+                        replacement: replacedBlock,
+                        replacementIndex: replacementIndex,
+                        insertedBlocks: insertedBlocks,
+                        insertionIndex: insertionIndex,
+                        changedBlocks: result.replacedBlocks ?? []
+                    ),
                     selection: result.selection
                 )
             }
@@ -307,10 +310,13 @@ extension BlockInputView {
                let firstDeletedBlockID = deletedBlockIDs.first,
                let deletionIndex = index(of: firstDeletedBlockID) {
                 return applyGranularReplacementDeletionUndo(
-                    replacement: replacedBlock,
-                    replacementIndex: replacementIndex,
-                    deletedBlockIDs: deletedBlockIDs,
-                    deletionIndex: deletionIndex,
+                    ReplacementDeletionUndoContext(
+                        replacement: replacedBlock,
+                        replacementIndex: replacementIndex,
+                        deletedBlockIDs: deletedBlockIDs,
+                        deletionIndex: deletionIndex,
+                        changedBlocks: result.replacedBlocks ?? []
+                    ),
                     selection: result.selection
                 )
             }
@@ -356,72 +362,6 @@ extension BlockInputView {
         selection: BlockInputSelection?
     ) -> Bool {
         applyGranularBlockReplacement(block, at: index, selection: selection)
-    }
-
-    private func applyGranularReplacementInsertionUndo(
-        replacement: BlockInputBlock,
-        replacementIndex: Int,
-        insertedBlocks: [BlockInputBlock],
-        insertionIndex: Int,
-        selection: BlockInputSelection?
-    ) -> Bool {
-        let resolvedInsertionIndex = frontMatterPreservingInsertionIndex(
-            insertionIndex,
-            afterReplacing: replacement,
-            at: replacementIndex
-        )
-        syncDocumentStore(.replaceBlock(replacement))
-        syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: resolvedInsertionIndex))
-        _ = replaceCachedBlock(replacement, at: replacementIndex)
-        if canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) {
-            guard document.insertBlocks(insertedBlocks, at: resolvedInsertionIndex) != nil else {
-                return false
-            }
-        } else {
-            markDocumentCacheUnsynchronized()
-        }
-        applySelection(validUndoSelection(selection), notify: true)
-        if !reconfigureVisibleReplacement(replacement, at: replacementIndex) {
-            collectionView.reloadItems(at: [IndexPath(item: replacementIndex, section: 0)])
-            collectionView.layoutSubtreeIfNeeded()
-        }
-        if insertedBlocks.count == 1 {
-            insertVisibleBlock(at: resolvedInsertionIndex)
-        } else {
-            reloadDataKeepingFocus()
-        }
-        publishDocumentChange()
-        return true
-    }
-
-    private func applyGranularReplacementDeletionUndo(
-        replacement: BlockInputBlock,
-        replacementIndex: Int,
-        deletedBlockIDs: [BlockInputBlockID],
-        deletionIndex: Int,
-        selection: BlockInputSelection?
-    ) -> Bool {
-        syncDocumentStore(.replaceBlock(replacement))
-        syncDocumentStore(.deleteBlocks(deletedBlockIDs))
-        _ = replaceCachedBlock(replacement, at: replacementIndex)
-        if canSynchronizeCacheForGranularDeletion(deletedBlockCount: deletedBlockIDs.count) {
-            let deletedIDs = Set(deletedBlockIDs)
-            document.blocks.removeAll { deletedIDs.contains($0.id) }
-        } else {
-            markDocumentCacheUnsynchronized()
-        }
-        applySelection(validUndoSelection(selection), notify: true)
-        if !reconfigureVisibleReplacement(replacement, at: replacementIndex) {
-            collectionView.reloadItems(at: [IndexPath(item: replacementIndex, section: 0)])
-            collectionView.layoutSubtreeIfNeeded()
-        }
-        if deletedBlockIDs.count == 1 {
-            deleteVisibleBlock(at: deletionIndex, deletedBlockIDs: deletedBlockIDs)
-        } else {
-            reloadDataKeepingFocus()
-        }
-        publishDocumentChange()
-        return true
     }
 
     private func applyGranularInsertionUndo(

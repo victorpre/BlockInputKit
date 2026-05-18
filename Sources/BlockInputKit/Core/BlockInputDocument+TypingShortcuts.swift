@@ -6,6 +6,7 @@ extension BlockInputDocument {
         var text: String
         var cursorOffset: Int
         var preservesIndentation: Bool = false
+        var insertedBlockKind: BlockInputBlockKind?
         var insertedBlockText: String?
     }
 
@@ -48,6 +49,7 @@ extension BlockInputDocument {
             text: match.kind == .horizontalRule ? "" : match.text,
             cursorOffset: min(cursorOffset, (match.text as NSString).length),
             preservesIndentation: match.preservesIndentation,
+            insertedBlockKind: match.kind == .horizontalRule ? insertedBlockKindAfterHorizontalRuleShortcut(from: block.kind) : nil,
             insertedBlockText: match.kind == .horizontalRule ? match.text : nil
         )
     }
@@ -66,7 +68,10 @@ extension BlockInputDocument {
             blocks[index].indentationLevel = 0
         }
         if shortcut.kind == .horizontalRule {
-            let nextBlock = BlockInputBlock(kind: .paragraph, text: shortcut.insertedBlockText ?? "")
+            let nextBlock = BlockInputBlock(
+                kind: shortcut.insertedBlockKind ?? .paragraph,
+                text: shortcut.insertedBlockText ?? ""
+            )
             blocks.insert(nextBlock, at: index + 1)
             return .cursor(BlockInputCursor(
                 blockID: nextBlock.id,
@@ -75,6 +80,10 @@ extension BlockInputDocument {
         }
         let offset = min(shortcut.cursorOffset, blocks[index].utf16Length)
         return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: offset))
+    }
+
+    func insertedBlockKindAfterHorizontalRuleShortcut(from kind: BlockInputBlockKind) -> BlockInputBlockKind {
+        kind.isHeading ? kind : .paragraph
     }
 
     @discardableResult
@@ -121,7 +130,7 @@ private enum BlockInputTypingShortcutParser {
            let frontMatter = frontMatterMatch(in: text) {
             return frontMatter
         }
-        if currentKind == .paragraph,
+        if currentKind == .paragraph || currentKind.isHeading,
            let horizontalRule = horizontalRuleMatch(in: text) {
             return horizontalRule
         }

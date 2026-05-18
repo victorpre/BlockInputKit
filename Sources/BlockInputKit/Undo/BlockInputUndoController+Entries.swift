@@ -49,7 +49,9 @@ enum BlockInputStructuralUndoPayload {
         beforeBlock: BlockInputBlock,
         afterBlock: BlockInputBlock,
         insertedBlocks: [BlockInputBlock],
-        insertionIndex: Int
+        insertionIndex: Int,
+        beforeChangedBlocks: [BlockInputBlock] = [],
+        afterChangedBlocks: [BlockInputBlock] = []
     )
     case blockReplacementDeletion(
         beforeBlock: BlockInputBlock,
@@ -70,7 +72,7 @@ enum BlockInputStructuralUndoPayload {
     var replacementBlockForUndo: BlockInputBlock? {
         switch self {
         case let .blockReplacement(beforeBlock, _),
-             let .blockReplacementInsertion(beforeBlock, _, _, _),
+             let .blockReplacementInsertion(beforeBlock, _, _, _, _, _),
              let .blockReplacementDeletion(beforeBlock, _, _, _):
             return beforeBlock
         case .documentReplacement, .blockInsertion, .blockDeletion, .blockMove:
@@ -81,7 +83,7 @@ enum BlockInputStructuralUndoPayload {
     var replacementBlockForRedo: BlockInputBlock? {
         switch self {
         case let .blockReplacement(_, afterBlock),
-             let .blockReplacementInsertion(_, afterBlock, _, _),
+             let .blockReplacementInsertion(_, afterBlock, _, _, _, _),
              let .blockReplacementDeletion(_, afterBlock, _, _):
             return afterBlock
         case .documentReplacement, .blockInsertion, .blockDeletion, .blockMove:
@@ -91,18 +93,22 @@ enum BlockInputStructuralUndoPayload {
 
     var replacementBlocksForUndo: [BlockInputBlock]? {
         switch self {
+        case let .blockReplacementInsertion(_, _, _, _, beforeChangedBlocks, _):
+            return beforeChangedBlocks
         case let .blockMove(_, _, _, beforeChangedBlocks, _):
             return beforeChangedBlocks
-        case .documentReplacement, .blockReplacement, .blockReplacementInsertion, .blockReplacementDeletion, .blockInsertion, .blockDeletion:
+        case .documentReplacement, .blockReplacement, .blockReplacementDeletion, .blockInsertion, .blockDeletion:
             return nil
         }
     }
 
     var replacementBlocksForRedo: [BlockInputBlock]? {
         switch self {
+        case let .blockReplacementInsertion(_, _, _, _, _, afterChangedBlocks):
+            return afterChangedBlocks
         case let .blockMove(_, _, _, _, afterChangedBlocks):
             return afterChangedBlocks
-        case .documentReplacement, .blockReplacement, .blockReplacementInsertion, .blockReplacementDeletion, .blockInsertion, .blockDeletion:
+        case .documentReplacement, .blockReplacement, .blockReplacementDeletion, .blockInsertion, .blockDeletion:
             return nil
         }
     }
@@ -110,7 +116,7 @@ enum BlockInputStructuralUndoPayload {
     var deletedBlockIDsForUndo: [BlockInputBlockID]? {
         switch self {
         case let .blockInsertion(insertedBlocks, _),
-             let .blockReplacementInsertion(_, _, insertedBlocks, _):
+             let .blockReplacementInsertion(_, _, insertedBlocks, _, _, _):
             return insertedBlocks.map(\.id)
         case .documentReplacement, .blockReplacement, .blockReplacementDeletion, .blockDeletion, .blockMove:
             return nil
@@ -120,7 +126,7 @@ enum BlockInputStructuralUndoPayload {
     var insertedBlocksForRedo: [BlockInputBlock]? {
         switch self {
         case let .blockInsertion(insertedBlocks, _),
-             let .blockReplacementInsertion(_, _, insertedBlocks, _):
+             let .blockReplacementInsertion(_, _, insertedBlocks, _, _, _):
             return insertedBlocks
         case .documentReplacement, .blockReplacement, .blockReplacementDeletion, .blockDeletion, .blockMove:
             return nil
@@ -130,7 +136,7 @@ enum BlockInputStructuralUndoPayload {
     var insertionIndexForRedo: Int? {
         switch self {
         case let .blockInsertion(_, insertionIndex),
-             let .blockReplacementInsertion(_, _, _, insertionIndex):
+             let .blockReplacementInsertion(_, _, _, insertionIndex, _, _):
             return insertionIndex
         case .documentReplacement, .blockReplacement, .blockReplacementDeletion, .blockDeletion, .blockMove:
             return nil
@@ -246,8 +252,9 @@ enum BlockInputStructuralUndoPayload {
             document = beforeDocument
         case let .blockReplacement(beforeBlock, _):
             replace(beforeBlock, in: &document)
-        case let .blockReplacementInsertion(beforeBlock, _, insertedBlocks, _):
+        case let .blockReplacementInsertion(beforeBlock, _, insertedBlocks, _, beforeChangedBlocks, _):
             replace(beforeBlock, in: &document)
+            replace(beforeChangedBlocks, in: &document)
             let insertedIDs = Set(insertedBlocks.map(\.id))
             document.blocks.removeAll { insertedIDs.contains($0.id) }
         case let .blockReplacementDeletion(beforeBlock, _, deletedBlocks, deletionIndex):
@@ -270,9 +277,10 @@ enum BlockInputStructuralUndoPayload {
             document = afterDocument
         case let .blockReplacement(_, afterBlock):
             replace(afterBlock, in: &document)
-        case let .blockReplacementInsertion(_, afterBlock, insertedBlocks, insertionIndex):
+        case let .blockReplacementInsertion(_, afterBlock, insertedBlocks, insertionIndex, _, afterChangedBlocks):
             replace(afterBlock, in: &document)
             document.insertBlocks(insertedBlocks, at: insertionIndex)
+            replace(afterChangedBlocks, in: &document)
         case let .blockReplacementDeletion(_, afterBlock, deletedBlocks, _):
             replace(afterBlock, in: &document)
             let deletedIDs = Set(deletedBlocks.map(\.id))

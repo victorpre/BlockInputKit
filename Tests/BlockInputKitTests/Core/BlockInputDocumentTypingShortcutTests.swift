@@ -291,6 +291,26 @@ final class BlockInputDocumentTypingShortcutTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
     }
 
+    func testTypingShortcutMovesHeadingTextAfterHorizontalRuleMarkerIntoHeadingBelow() {
+        let blockID = BlockInputBlockID(rawValue: "heading")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, kind: .heading(level: 2), text: "Heading")
+        ])
+        let shortcut = document.typingShortcut(
+            for: blockID,
+            proposedText: "--- Heading",
+            proposedUTF16Offset: 4
+        )
+
+        let selection = shortcut.flatMap { document.applyTypingShortcut(blockID: blockID, shortcut: $0) }
+
+        XCTAssertEqual(document.blocks[0].kind, .horizontalRule)
+        XCTAssertEqual(document.blocks[0].text, "")
+        XCTAssertEqual(document.blocks[1].kind, .heading(level: 2))
+        XCTAssertEqual(document.blocks[1].text, "Heading")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
+    }
+
     func testTypingShortcutTrimsLeadingSpacesFromTextMovedBelowHorizontalRule() {
         let blockID = BlockInputBlockID(rawValue: "rule")
         var document = BlockInputDocument(blocks: [

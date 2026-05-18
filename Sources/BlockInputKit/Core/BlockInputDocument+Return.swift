@@ -12,12 +12,17 @@ public extension BlockInputDocument {
             return nil
         }
         let currentBlock = blocks[index]
-        if let codeBlock = currentBlock.codeFenceBlockForReturn(
+        if selectedUTF16Length == 0,
+           (utf16Offset ?? currentBlock.utf16Length) == 0,
+           currentBlock.canMoveDownOnLeadingReturn {
+            return moveBlockDownOnLeadingReturn(at: index)
+        }
+        if let selection = convertCodeFenceToCodeBlockIfNeeded(
+            at: index,
             utf16Offset: utf16Offset,
             selectedUTF16Length: selectedUTF16Length
         ) {
-            blocks[index] = codeBlock
-            return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
+            return selection
         }
         if currentBlock.isEmpty, currentBlock.kind.exitsToParagraphOnEmptyReturn {
             if currentBlock.kind.supportsIndentation,
@@ -34,28 +39,12 @@ public extension BlockInputDocument {
                 selectedUTF16Length: selectedUTF16Length
             )
         }
-        if currentBlock.kind.acceptsInlineReturn {
-            let insertionOffset = min(max(utf16Offset ?? currentBlock.utf16Length, 0), currentBlock.utf16Length)
-            let mutableText = NSMutableString(string: currentBlock.text)
-            let replacementLength = min(max(selectedUTF16Length, 0), currentBlock.utf16Length - insertionOffset)
-            if replacementLength == 0,
-               let removalRange = currentBlock.emptyInlineLineRemovalRangeForReturn(utf16Offset: insertionOffset) {
-                if outdentEmptyInlineLineIfNeeded(at: index, utf16Offset: insertionOffset) {
-                    return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: insertionOffset))
-                }
-                return exitInlineBlock(at: index, removing: removalRange)
-            }
-            mutableText.replaceCharacters(in: NSRange(location: insertionOffset, length: replacementLength), with: "\n")
-            let updatedText = mutableText as String
-            blocks[index].text = updatedText
-            if let lineIndentationLevels = currentBlock.lineIndentationLevelsAfterReplacingTextWithLineEnding(
-                utf16Offset: insertionOffset,
-                selectedUTF16Length: replacementLength,
-                updatedText: updatedText
-            ) {
-                blocks[index].lineIndentationLevels = lineIndentationLevels
-            }
-            return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: insertionOffset + 1))
+        if let selection = handleInlineReturnIfNeeded(
+            at: index,
+            utf16Offset: utf16Offset,
+            selectedUTF16Length: selectedUTF16Length
+        ) {
+            return selection
         }
         return insertBlock(BlockInputBlock(), at: index + 1)
     }
@@ -77,6 +66,62 @@ extension BlockInputBlock {
 }
 
 private extension BlockInputDocument {
+    mutating func convertCodeFenceToCodeBlockIfNeeded(
+        at index: Int,
+        utf16Offset: Int?,
+        selectedUTF16Length: Int
+    ) -> BlockInputSelection? {
+        let currentBlock = blocks[index]
+        guard let codeBlock = currentBlock.codeFenceBlockForReturn(
+            utf16Offset: utf16Offset,
+            selectedUTF16Length: selectedUTF16Length
+        ) else {
+            return nil
+        }
+        blocks[index] = codeBlock
+        return .cursor(BlockInputCursor(blockID: currentBlock.id, utf16Offset: 0))
+    }
+
+    mutating func moveBlockDownOnLeadingReturn(at index: Int) -> BlockInputSelection {
+        let currentBlock = blocks[index]
+        blocks[index] = currentBlock.leadingReturnPlaceholder()
+        blocks.insert(currentBlock.blockMovedDownOnLeadingReturn(), at: index + 1)
+        normalizeNumberedListStartsIfNeeded(around: index)
+        return .cursor(BlockInputCursor(blockID: currentBlock.id, utf16Offset: 0))
+    }
+
+    mutating func handleInlineReturnIfNeeded(
+        at index: Int,
+        utf16Offset: Int?,
+        selectedUTF16Length: Int
+    ) -> BlockInputSelection? {
+        let currentBlock = blocks[index]
+        guard currentBlock.kind.acceptsInlineReturn else {
+            return nil
+        }
+        let insertionOffset = min(max(utf16Offset ?? currentBlock.utf16Length, 0), currentBlock.utf16Length)
+        let mutableText = NSMutableString(string: currentBlock.text)
+        let replacementLength = min(max(selectedUTF16Length, 0), currentBlock.utf16Length - insertionOffset)
+        if replacementLength == 0,
+           let removalRange = currentBlock.emptyInlineLineRemovalRangeForReturn(utf16Offset: insertionOffset) {
+            if outdentEmptyInlineLineIfNeeded(at: index, utf16Offset: insertionOffset) {
+                return .cursor(BlockInputCursor(blockID: currentBlock.id, utf16Offset: insertionOffset))
+            }
+            return exitInlineBlock(at: index, removing: removalRange)
+        }
+        mutableText.replaceCharacters(in: NSRange(location: insertionOffset, length: replacementLength), with: "\n")
+        let updatedText = mutableText as String
+        blocks[index].text = updatedText
+        if let lineIndentationLevels = currentBlock.lineIndentationLevelsAfterReplacingTextWithLineEnding(
+            utf16Offset: insertionOffset,
+            selectedUTF16Length: replacementLength,
+            updatedText: updatedText
+        ) {
+            blocks[index].lineIndentationLevels = lineIndentationLevels
+        }
+        return .cursor(BlockInputCursor(blockID: currentBlock.id, utf16Offset: insertionOffset + 1))
+    }
+
     mutating func insertSiblingListItemAfterReturn(
         at index: Int,
         utf16Offset: Int?,
@@ -223,5 +268,55 @@ private extension BlockInputDocument {
             return text
         }
         return String(text.dropLast())
+    }
+}
+
+extension BlockInputBlock {
+    var canMoveDownOnLeadingReturn: Bool {
+        guard !isEmpty else {
+            return false
+        }
+        switch kind {
+        case .paragraph, .heading, .code, .quote, .bulletedListItem, .numberedListItem, .checklistItem, .rawMarkdown:
+            return true
+        case .horizontalRule, .frontMatter:
+            return false
+        }
+    }
+
+    func leadingReturnPlaceholder() -> BlockInputBlock {
+        switch kind {
+        case .bulletedListItem:
+            return BlockInputBlock(
+                id: id,
+                kind: .bulletedListItem,
+                indentationLevel: indentationLevel(forLine: 0)
+            )
+        case let .numberedListItem(start):
+            return BlockInputBlock(
+                id: id,
+                kind: .numberedListItem(start: start),
+                indentationLevel: indentationLevel(forLine: 0)
+            )
+        case .checklistItem:
+            return BlockInputBlock(
+                id: id,
+                kind: .checklistItem(isChecked: false),
+                indentationLevel: indentationLevel(forLine: 0)
+            )
+        case .paragraph, .heading, .code, .quote, .rawMarkdown:
+            return BlockInputBlock(id: id, kind: .paragraph)
+        case .horizontalRule, .frontMatter:
+            return self
+        }
+    }
+
+    func blockMovedDownOnLeadingReturn() -> BlockInputBlock {
+        var movedBlock = self
+        movedBlock.id = .unique()
+        if case let .numberedListItem(start) = kind {
+            movedBlock.kind = .numberedListItem(start: start + 1)
+        }
+        return movedBlock
     }
 }
