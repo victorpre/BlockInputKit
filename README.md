@@ -2,7 +2,7 @@
 
 BlockInputKit is a native Swift library for macOS apps that need structured block editing with AppKit-backed text inputs.
 
-The package is SPM-first, targets macOS 26, and is designed around real editable blocks: each block owns text content and editing state, while the root editor coordinates focus, selection, reordering, document changes, and undo.
+The package is SPM-first and designed around real editable blocks: each block owns text content and editing state, while the root editor coordinates focus, selection, reordering, document changes, and undo.
 
 ## Installation
 
@@ -18,7 +18,7 @@ Then add the library product to your macOS target:
 .product(name: "BlockInputKit", package: "BlockInputKit")
 ```
 
-## AppKit
+## Editor Setup
 
 ```swift
 import AppKit
@@ -31,22 +31,37 @@ let document = BlockInputDocument(blocks: [
 
 let store = BlockInputMemoryDocumentStore(document: document)
 let undoController = BlockInputUndoController()
-let editor = BlockInputView()
+let completionProvider: (any BlockInputCompletionProvider)? = nil
 
-editor.configure(BlockInputConfiguration(
+let configuration = BlockInputConfiguration(
     documentStore: store,
     allowsBlockReordering: true,
     editorHorizontalInset: 20,
+    editorVerticalInset: 8,
     dropIndicatorColor: .systemTeal,
     undoController: undoController,
+    completionProvider: completionProvider,
     onDocumentMutation: { change in
         print("Applied edit:", change)
     },
     onDocumentChange: { updatedDocument in
         // Full snapshots are useful for persistence, export, and small documents.
         print(updatedDocument.markdown)
+    },
+    onSelectionChange: { selection in
+        print("Selection:", String(describing: selection))
+    },
+    onFocusChange: { focused in
+        print("Focused:", focused)
     }
-))
+)
+```
+
+## AppKit
+
+```swift
+let editor = BlockInputView()
+editor.configure(configuration)
 ```
 
 ## SwiftUI
@@ -56,17 +71,37 @@ import BlockInputKit
 import SwiftUI
 
 struct EditorScreen: View {
-    private let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(markdown: "- [ ] Ship it"))
+    let configuration: BlockInputConfiguration
     @State private var isEditorFocused = false
 
     var body: some View {
         BlockInputEditor(
-            configuration: BlockInputConfiguration(documentStore: store),
+            configuration: configuration,
             isFocused: $isEditorFocused
         )
     }
 }
 ```
+
+## Configuration Options
+
+`BlockInputConfiguration` accepts these host integration options:
+
+- `document`: Initial in-memory document when no custom store is supplied.
+- `documentStore`: Host-owned source of truth for block reads and mutations.
+- `allowsBlockReordering`: Enables or disables drag reordering.
+- `editorHorizontalInset`: Controls the leading and trailing block content inset.
+- `editorVerticalInset`: Controls the top and bottom editor content inset.
+- `dropIndicatorColor`: Colors drag insertion and selected horizontal-rule affordances.
+- `undoController`: Shares text and structural undo coordination with the host.
+- `completionProvider`: Supplies mention and slash-command suggestions.
+- `onDocumentMutation`: Receives granular edits as they are applied.
+- `onDocumentChange`: Receives full document snapshots after editor mutations.
+- `documentChangeSnapshotDelay`: Coalesces full-document snapshot callbacks for large store-backed documents.
+- `onSelectionChange`: Observes cursor, text, and block selection changes.
+- `onFocusChange`: Observes AppKit focus changes.
+
+`BlockInputEditor` is the SwiftUI wrapper around `BlockInputView`; pass `isFocused` when SwiftUI state should drive or observe editor focus.
 
 ## Markdown Streaming
 
@@ -111,58 +146,6 @@ Run the local demo:
 ```sh
 ./scripts/run-demo.sh
 ```
-
-The demo app includes:
-
-- A native sidebar with `Mixed` and `100K` notes.
-- A main editor area that can switch between editable raw Markdown and rendered structured blocks.
-- A runtime reordering toggle for rendered blocks.
-- Mixed paragraph, heading, divider, code, quote, list, numbered list, and checklist data.
-- A 100,000-block note for exercising large-document behavior.
-
-## Architecture
-
-- `BlockInputDocument` is the structured document model and Markdown source of truth.
-- `BlockInputBlock` models a stable block ID, kind, text, and indentation level.
-- `BlockInputBlockKind.rawMarkdown` preserves unsupported block-level Markdown verbatim in `BlockInputBlock.text`.
-- `BlockInputView` is the primary AppKit editor surface.
-- `BlockInputEditor` wraps `BlockInputView` for SwiftUI hosts and can bridge focus with `Binding<Bool>`.
-- `BlockInputDocumentStore` lets hosts provide indexed block reads, progressive loading, complete snapshots, and granular block mutations.
-- `BlockInputCompletionProvider` keeps mention and slash-command suggestions host-owned.
-- `BlockInputUndoController` separates per-block text undo from structural undo.
-
-## Project Layout
-
-- `Sources/BlockInputKit/Core`: document, block, selection, typing shortcut, and store primitives.
-- `Sources/BlockInputKit/AppKit`: primary editor surface, with topical subfolders for block items, mutations, reordering, and selection behavior.
-- `Sources/BlockInputKit/Markdown`, `Completion`, `Undo`, `SwiftUI`, and `Support`: feature-specific library areas.
-- `Sources/BlockInputKitDemo`: demo app for exercising library behavior.
-- `Tests/BlockInputKitTests` mirrors the same high-level source areas for focused coverage.
-
-## Current Behavior
-
-- Return inserts a paragraph below paragraph-like blocks; list, checklist, quote, and code blocks can keep editing
-  inside the same block, and empty inline items exit to a paragraph below.
-- Backspace/Delete removes an empty block and moves focus to the previous block end, or the next remaining block.
-- Cmd+A first selects the current block text, then all blocks.
-- Tab and Shift+Tab indent and outdent blocks.
-- Arrow movement crosses block boundaries at the start or end of a block.
-- Markdown typing shortcuts convert leading quote, list, checklist, numbered-list, heading, and `---` markers into block kinds.
-- Backspace/Delete at the front of formatted blocks unwraps them into paragraph text with the Markdown marker visible.
-- Drag reordering is enabled by default and can be disabled with `allowsBlockReordering`.
-- Block content uses a 20-point horizontal inset by default; customize it with `editorHorizontalInset`.
-  When reordering is enabled, the reorder handle is centered inside that inset when possible and the gutter grows only if the handle lane needs more room.
-- Drag insertion and selected horizontal-rule colors default to the system accent color and can be customized with `dropIndicatorColor`.
-- Clicking a horizontal rule selects the rule; Backspace/Delete removes the selected rule block.
-- Markdown import/export supports paragraph, heading, horizontal rule, code, quote, bulleted list, numbered list, and checklist blocks.
-- Unsupported block-level Markdown such as front matter, tables, raw HTML blocks, setext headings, and footnote definitions imports as editable `rawMarkdown` blocks and exports the raw block text verbatim.
-- Rendered `rawMarkdown` blocks use editable wrapping monospaced source text without code-block chrome, Markdown typing shortcuts, or list indentation behavior.
-- `BlockInputMarkdownLineReader` and `BlockInputMarkdownWriter` support sequential Markdown import/export for files and custom storage.
-- File URL insertion helpers and built-in file drops create Markdown link blocks.
-
-## Performance Expectations
-
-BlockInputKit is designed for large documents. The AppKit surface uses `NSCollectionView` so visible items are reused instead of mounting every block view at once. `BlockInputDocumentStore` supports indexed block reads for rendering; large host stores should make `block(at:)`, `block(withID:)`, and `index(of:)` cheap. Progressive stores can expose a loaded prefix through `loadedBlockCount`, append more editor-visible blocks with `loadNextBlockBatch(limit:)`, and provide a save-ready document through `completeDocumentSnapshot(limit:)` without forcing every remaining row into the collection view. Common editor edits publish granular store mutations for block replacement, insertion, deletion, and movement through `onDocumentMutation`; use that callback for immediate host syncing in large documents. `onDocumentChange` publishes full document snapshots, and large store-backed editors defer and coalesce those snapshots so hot edit paths do not synchronously materialize every block. Broad structural undo/redo can still publish a full document replacement. The demo includes a 100,000-block progressive loading path to keep large-document behavior visible during development.
 
 ## Validation
 
