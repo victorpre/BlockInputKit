@@ -107,6 +107,8 @@ struct EditorScreen: View {
 
 Use the async Markdown APIs when reading or writing files. File reads are UTF-8 line-by-line, and streaming writes emit chunks in block order without first converting the document to one full Markdown string. Streaming deserialization buffers only the current block and any lookahead needed to match snapshot import behavior; leading frontmatter is retained as a `frontMatter` block, and unsupported block-level constructs are retained as `rawMarkdown` blocks rather than discarded.
 
+Rendered text blocks visually style inline Markdown while preserving the source text for editing and export. Paragraphs, headings, quotes, list items, and checklist items support `*italic text*`, `_italic text_`, `**bold text**`, `***bold italic text***`, `<u>underlined text</u>`, `<ins>underlined text</ins>`, `~~struck text~~`, and inline code spans. Supported spans can also be nested, such as `**_bold italic text_**`, `**<u>bold underlined text</u>**`, and `~~*struck italic text*~~`.
+
 ```swift
 let url = URL(filePath: "/tmp/note.md")
 let document = try await BlockInputDocument.readingMarkdown(from: url)

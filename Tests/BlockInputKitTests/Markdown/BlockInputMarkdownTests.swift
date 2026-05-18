@@ -172,4 +172,26 @@ final class BlockInputMarkdownTests: XCTestCase {
         XCTAssertEqual(parsed.blocks[1].kind, .numberedListItem(start: 3))
         XCTAssertEqual(parsed.blocks[1].text, "Three")
     }
+
+    func testMarkdownRoundTripKeepsInlineStylingMarkersLiteral() {
+        let expectedTexts = [
+            "*italic text*",
+            "_italic text_",
+            "**bold text**",
+            "***bold and italic***",
+            "<u>underlined text</u>",
+            "<ins>underlined text</ins>",
+            "~~struck text~~",
+            "**_bold and italic_**",
+            "**<u>bold and underlined</u>**",
+            "~~*strikethrough and italic*~~"
+        ]
+        let source = expectedTexts.joined(separator: "\n\n")
+
+        let parsed = BlockInputDocument(markdown: source)
+
+        XCTAssertEqual(parsed.blocks.map(\.kind), Array(repeating: .paragraph, count: expectedTexts.count))
+        XCTAssertEqual(parsed.blocks.map(\.text), expectedTexts)
+        XCTAssertEqual(parsed.markdown, source)
+    }
 }

@@ -173,6 +173,30 @@ final class BlockInputMarkdownStreamingTests: XCTestCase {
         XCTAssertEqual(snapshot, expected.markdown)
     }
 
+    func testStreamingMarkdownKeepsInlineStylingMarkersLiteral() async throws {
+        let expectedTexts = [
+            "*italic text*",
+            "_italic text_",
+            "**bold text**",
+            "***bold and italic***",
+            "<u>underlined text</u>",
+            "<ins>underlined text</ins>",
+            "~~struck text~~",
+            "**_bold and italic_**",
+            "**<u>bold and underlined</u>**",
+            "~~*strikethrough and italic*~~"
+        ]
+        let source = expectedTexts.joined(separator: "\n\n")
+        var reader = ArrayMarkdownLineReader(markdown: source)
+        var writer = RecordingMarkdownWriter()
+
+        let document = try await BlockInputDocument.readingMarkdown(from: &reader)
+        try await document.writeMarkdown(to: &writer)
+
+        XCTAssertEqual(document.blocks.map(\.text), expectedTexts)
+        XCTAssertEqual(writer.markdown, source)
+    }
+
     func testURLReadAndWriteUseStreamingMarkdown() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

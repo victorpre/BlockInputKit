@@ -72,6 +72,7 @@ extension BlockInputBlockItem {
         textView.allowsUndo = false
         textView.font = .preferredFont(forTextStyle: .body)
         textView.delegate = self
+        textView.layoutManager?.delegate = hiddenDelimiterLayoutDelegate
     }
 
     private func setupHorizontalRuleView() {

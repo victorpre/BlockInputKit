@@ -3,6 +3,18 @@ import XCTest
 
 final class BlockInputBlockItemHeightTests: XCTestCase {
     @MainActor
+    func testHeightMeasurementCollapsesInlineMarkdownDelimiters() {
+        let plainBlock = BlockInputBlock(kind: .paragraph, text: "underlined text")
+        let underlinedBlock = BlockInputBlock(kind: .paragraph, text: "<ins>underlined text</ins>")
+
+        XCTAssertEqual(
+            BlockInputBlockItem.height(for: underlinedBlock, textWidth: 120),
+            BlockInputBlockItem.height(for: plainBlock, textWidth: 120),
+            accuracy: 0.5
+        )
+    }
+
+    @MainActor
     func testListHeightAccountsForIndentedTextWidth() {
         let text = Array(repeating: "Wrapped list content", count: 8).joined(separator: " ")
         let itemWidth: CGFloat = 260

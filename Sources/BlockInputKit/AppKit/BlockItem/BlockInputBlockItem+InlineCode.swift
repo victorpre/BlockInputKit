@@ -30,7 +30,8 @@ extension BlockInputBlockItem {
                     [
                         .font: delimiterFont,
                         .foregroundColor: NSColor.clear,
-                        .backgroundColor: backgroundColor
+                        .backgroundColor: backgroundColor,
+                        .blockInputHiddenDelimiter: true
                     ],
                     range: clampedDelimiterRange
                 )
@@ -63,6 +64,6 @@ extension BlockInputBlockItem {
     }
 
     private static func inlineCodeDelimiterFont(for font: NSFont) -> NSFont {
-        .monospacedSystemFont(ofSize: max(font.pointSize * 0.38, 4.5), weight: .regular)
+        .monospacedSystemFont(ofSize: max(font.pointSize * 0.1, 1), weight: .regular)
     }
 }

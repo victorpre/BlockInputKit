@@ -1,91 +1,6 @@
 import AppKit
 
 extension BlockInputBlockItem {
-    static func height(for block: BlockInputBlock, textWidth: CGFloat) -> CGFloat {
-        let text = block.text.isEmpty ? " " : block.text
-        let availableTextWidth = max(textWidth - perLineContentIndent(for: block), 120)
-        let font = font(for: block.kind)
-        let metrics = verticalMetrics(for: block)
-        let frontMatterReserve = block.kind == .frontMatter
-            ? (frontMatterDividerVerticalInset * 2) + frontMatterDividerHeight
-            : 0
-        if case .code = block.kind {
-            let codeWidth = max(unwrappedTextWidth(for: text, font: font), availableTextWidth)
-            let horizontalScrollerReserve = codeWidth > availableTextWidth
-                ? codeHorizontalScrollerReserve
-                : 0
-            return max(
-                metrics.minimumHeight,
-                textKitHeight(for: text, width: codeWidth, font: font)
-                    + metrics.topContentInset
-                    + metrics.bottomContentInset
-                    + horizontalScrollerReserve
-                    + 2
-            )
-        }
-        if isShortSingleLine(text, likelyFitting: availableTextWidth, font: font) {
-            return max(
-                metrics.minimumHeight + frontMatterReserve,
-                singleLineTextHeight(font: font) + metrics.topContentInset + metrics.bottomContentInset + frontMatterReserve + 2
-            )
-        }
-        let boundingRect = (text as NSString).boundingRect(
-            with: NSSize(width: availableTextWidth, height: CGFloat.greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: font]
-        )
-        return max(
-            metrics.minimumHeight + frontMatterReserve,
-            max(ceil(boundingRect.height), textKitHeight(for: text, width: availableTextWidth, font: font))
-                + metrics.topContentInset
-                + metrics.bottomContentInset
-                + frontMatterReserve
-                + 2
-        )
-    }
-
-    private static func isShortSingleLine(_ text: String, likelyFitting width: CGFloat, font: NSFont) -> Bool {
-        guard text.rangeOfCharacter(from: .newlines) == nil else {
-            return false
-        }
-        guard text.utf16.count <= 24 else {
-            return false
-        }
-        let conservativeCharacterWidth = max(font.pointSize * 0.75, 1)
-        return CGFloat(text.utf16.count) * conservativeCharacterWidth <= width
-    }
-
-    private static func singleLineTextHeight(font: NSFont) -> CGFloat {
-        let boundingRect = (" " as NSString).boundingRect(
-            with: NSSize(width: 120, height: CGFloat.greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: font]
-        )
-        return ceil(boundingRect.height)
-    }
-
-    private static func textKitHeight(for text: String, width: CGFloat, font: NSFont) -> CGFloat {
-        let textStorage = NSTextStorage(string: text, attributes: [.font: font])
-        let layoutManager = NSLayoutManager()
-        let textContainer = NSTextContainer(size: NSSize(width: width, height: CGFloat.greatestFiniteMagnitude))
-        textContainer.lineFragmentPadding = 0
-        textContainer.widthTracksTextView = false
-        layoutManager.addTextContainer(textContainer)
-        textStorage.addLayoutManager(layoutManager)
-        layoutManager.ensureLayout(for: textContainer)
-        let usedRect = layoutManager.usedRect(for: textContainer)
-        return ceil(max(usedRect.maxY, singleLineTextHeight(font: font)))
-    }
-
-    private static func unwrappedTextWidth(for text: String, font: NSFont) -> CGFloat {
-        text.components(separatedBy: .newlines)
-            .map { line in
-                let measuredLine = line.isEmpty ? " " : line
-                return ceil((measuredLine as NSString).size(withAttributes: [.font: font]).width)
-            }
-            .max() ?? 120
-    }
-
     static func verticalMetrics(for block: BlockInputBlock) -> BlockInputBlockItemVerticalMetrics {
         switch block.kind {
         case .bulletedListItem, .numberedListItem:
@@ -324,10 +239,13 @@ extension BlockInputBlockItem {
         textStorage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
         textStorage.removeAttribute(.backgroundColor, range: fullRange)
         textStorage.removeAttribute(.underlineStyle, range: fullRange)
+        textStorage.removeAttribute(.strikethroughStyle, range: fullRange)
         textStorage.removeAttribute(.kern, range: fullRange)
+        textStorage.removeAttribute(.blockInputHiddenDelimiter, range: fullRange)
         textStorage.removeAttribute(.paragraphStyle, range: fullRange)
         applyCodeBlockAttributes(for: block, textStorage: textStorage)
         applyLineIndentationAttributes(for: block, textStorage: textStorage)
+        applyInlineMarkdownAttributes(for: block, textStorage: textStorage)
         applyInlineCodeAttributes(for: block, textStorage: textStorage)
         applyFrontMatterKeyValueAttributes(for: block, textStorage: textStorage)
         applyFrontMatterValidationAttributes(for: block, textStorage: textStorage)
@@ -347,16 +265,20 @@ extension BlockInputBlockItem {
         attributes.removeValue(forKey: .foregroundColor)
         attributes.removeValue(forKey: .backgroundColor)
         attributes.removeValue(forKey: .underlineStyle)
+        attributes.removeValue(forKey: .strikethroughStyle)
         attributes.removeValue(forKey: .kern)
-        let textLength = (textView.string as NSString).length
-        let selectedLocation = min(textView.selectedRange().location, max(textLength - 1, 0))
-        let insertionRange = NSRange(location: selectedLocation, length: max(textView.selectedRange().length, 1))
-        if inlineCodeContentRanges(for: block).contains(where: { range in
-            return NSIntersectionRange(range, insertionRange).length > 0
-        }) {
+        attributes.removeValue(forKey: .blockInputHiddenDelimiter)
+        let isInlineCodeSelection = currentSelectionIntersectsStyledContent(inlineCodeContentRanges(for: block))
+        if isInlineCodeSelection {
             attributes[.font] = Self.inlineCodeFont(for: font)
             attributes[.foregroundColor] = NSColor.labelColor
             attributes[.backgroundColor] = Self.inlineCodeBackgroundColor
+        } else {
+            attributes = Self.applyingInlineMarkdownStyles(
+                inlineMarkdownStylesForCurrentSelection(in: block),
+                to: attributes,
+                baseFont: font
+            )
         }
         if block.kind.supportsIndentation, !block.lineIndentationLevels.isEmpty {
             let lineIndex = block.lineIndex(containingUTF16Offset: textView.selectedRange().location)
@@ -479,16 +401,5 @@ extension BlockInputBlockItem {
         }
         let glyphIndex = layoutManager.glyphIndexForCharacter(at: lineStart)
         return layoutManager.lineFragmentUsedRect(forGlyphAt: glyphIndex, effectiveRange: nil)
-    }
-}
-
-private extension BlockInputBlockKind {
-    var repeatsPrefixForTextLines: Bool {
-        switch self {
-        case .quote, .bulletedListItem, .numberedListItem:
-            return true
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .checklistItem, .rawMarkdown:
-            return false
-        }
     }
 }

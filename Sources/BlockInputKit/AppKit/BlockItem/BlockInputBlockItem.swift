@@ -40,7 +40,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     let horizontalRuleView = BlockInputHorizontalRuleView()
     let frontMatterDividerView = BlockInputFrontMatterDividerView()
     let selectionBackgroundView = BlockInputSelectionBackgroundView()
-    let textView = BlockInputTextView()
+    let textView = BlockInputTextView(), hiddenDelimiterLayoutDelegate = BlockInputDelimiterGlyphs()
     private var trackingArea: NSTrackingArea?
     private(set) weak var delegate: BlockInputBlockItemDelegate?
     private(set) var blockID: BlockInputBlockID?

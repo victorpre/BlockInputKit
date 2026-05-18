@@ -57,6 +57,21 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
     }
 
     @MainActor
+    func testInlineCodeDelimitersDoNotReserveLayoutWidth() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Use `git status` now"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        let layoutManager = try preparedLayoutManager(for: textView)
+
+        XCTAssertEqual(try glyphX(at: 5, layoutManager: layoutManager), try glyphX(at: 4, layoutManager: layoutManager), accuracy: 0.5)
+        XCTAssertEqual(try glyphX(at: 16, layoutManager: layoutManager), try glyphX(at: 15, layoutManager: layoutManager), accuracy: 0.5)
+        XCTAssertEqual(textView.string, "Use `git status` now")
+    }
+
+    @MainActor
     func testInlineCodeIgnoresUnmatchedBackticks() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Use `git status"),
@@ -126,6 +141,7 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 4, effectiveRange: nil) as? NSColor, .labelColor)
         XCTAssertNil(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputHiddenDelimiter, at: 4, effectiveRange: nil))
         XCTAssertFalse(try XCTUnwrap(textStorage.attribute(.font, at: 4, effectiveRange: nil) as? NSFont)
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
     }
@@ -150,4 +166,19 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         XCTAssertNil(textView.typingAttributes[.foregroundColor] as? NSColor)
         XCTAssertNil(textView.typingAttributes[.backgroundColor] as? NSColor)
     }
+}
+
+@MainActor
+private func preparedLayoutManager(for textView: NSTextView) throws -> NSLayoutManager {
+    textView.frame = NSRect(x: 0, y: 0, width: 320, height: 60)
+    textView.textContainer?.containerSize = NSSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+    let layoutManager = try XCTUnwrap(textView.layoutManager)
+    let textContainer = try XCTUnwrap(textView.textContainer)
+    layoutManager.ensureLayout(for: textContainer)
+    return layoutManager
+}
+
+private func glyphX(at utf16Offset: Int, layoutManager: NSLayoutManager) throws -> CGFloat {
+    let glyphIndex = layoutManager.glyphIndexForCharacter(at: utf16Offset)
+    return layoutManager.location(forGlyphAt: glyphIndex).x
 }
