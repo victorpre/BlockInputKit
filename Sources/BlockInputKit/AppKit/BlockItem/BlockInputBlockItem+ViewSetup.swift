@@ -12,6 +12,7 @@ extension BlockInputBlockItem {
         setupCodeBackgroundView()
         setupTextView()
         setupHorizontalRuleView()
+        setupFrontMatterDividerView()
         setupQuoteBarView()
         addArrangedSubviews()
         activateLayoutConstraints()
@@ -77,6 +78,15 @@ extension BlockInputBlockItem {
         horizontalRuleView.blockItem = self
     }
 
+    private func setupFrontMatterDividerView() {
+        frontMatterDividerView.wantsLayer = true
+        frontMatterDividerView.layer?.backgroundColor = NSColor.separatorColor.cgColor
+        frontMatterDividerView.isHidden = true
+        frontMatterDividerView.alphaValue = 0
+        frontMatterDividerView.setAccessibilityElement(false)
+        frontMatterDividerView.identifier = NSUserInterfaceItemIdentifier("BlockInputFrontMatterDividerView")
+    }
+
     private func setupQuoteBarView() {
         quoteBarView.wantsLayer = true
         quoteBarView.identifier = Self.quoteBarIdentifier
@@ -89,7 +99,7 @@ extension BlockInputBlockItem {
         view.addSubview(codeBackgroundView)
         selectionBackgroundView.translatesAutoresizingMaskIntoConstraints = true
         view.addSubview(selectionBackgroundView)
-        for subview in [kindLabel, checklistButton, quoteBarView, scrollView, horizontalRuleView, handleView] {
+        for subview in [kindLabel, checklistButton, quoteBarView, scrollView, horizontalRuleView, frontMatterDividerView, handleView] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
@@ -195,6 +205,30 @@ extension BlockInputBlockItem {
             horizontalRuleTrailingConstraint,
             horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             horizontalRuleView.heightAnchor.constraint(equalToConstant: 9)
+        ] + frontMatterDividerLayoutConstraints()
+    }
+
+    private func frontMatterDividerLayoutConstraints() -> [NSLayoutConstraint] {
+        let leading = frontMatterDividerView.leadingAnchor.constraint(
+            equalTo: scrollView.leadingAnchor,
+            constant: Self.horizontalRuleInnerInset
+        )
+        self.frontMatterDividerLeadingConstraint = leading
+        let trailing = frontMatterDividerView.trailingAnchor.constraint(
+            equalTo: scrollView.trailingAnchor,
+            constant: -Self.horizontalRuleTrailingInset(allowsReordering: true)
+        )
+        self.frontMatterDividerTrailingConstraint = trailing
+        let bottom = frontMatterDividerView.bottomAnchor.constraint(
+            equalTo: view.bottomAnchor,
+            constant: -Self.frontMatterDividerVerticalInset
+        )
+        self.frontMatterDividerBottomConstraint = bottom
+        return [
+            leading,
+            trailing,
+            bottom,
+            frontMatterDividerView.heightAnchor.constraint(equalToConstant: Self.frontMatterDividerHeight)
         ]
     }
 

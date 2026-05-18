@@ -109,6 +109,26 @@ final class BlockInputViewFileInsertionTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: insertedID, utf16Offset: 0)))
     }
 
+    func testInsertFileURLsAtStartKeepsFrontMatterLeading() {
+        let frontID = BlockInputBlockID(rawValue: "front")
+        let bodyID = BlockInputBlockID(rawValue: "body")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: frontID, kind: .frontMatter, text: "title: Demo"),
+            BlockInputBlock(id: bodyID, text: "Body")
+        ])))
+
+        let selection = view.insertFileURLs([
+            URL(fileURLWithPath: "/tmp/Alpha File.md")
+        ], at: 0)
+
+        XCTAssertEqual(view.document.blocks.map(\.kind), [.frontMatter, .paragraph, .paragraph])
+        XCTAssertEqual(view.document.blocks.map(\.id).first, frontID)
+        XCTAssertEqual(view.document.blocks.map(\.id).last, bodyID)
+        XCTAssertEqual(view.document.blocks[1].text, "[Alpha File.md](<file:///tmp/Alpha%20File.md>)")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
+    }
+
     func testInsertFileURLsClampsExplicitIndex() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let view = BlockInputView()

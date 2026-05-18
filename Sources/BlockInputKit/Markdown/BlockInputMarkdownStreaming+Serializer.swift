@@ -38,6 +38,8 @@ enum BlockInputStreamingMarkdownSerializer {
             try await writer.writeMarkdown("\n```")
         case .horizontalRule:
             try await writer.writeMarkdown("---")
+        case .frontMatter:
+            try await writer.writeMarkdown(frontMatterMarkdown(block.text))
         case .quote:
             try await writeLines(BlockInputLineBreaks.lines(in: block.text), to: &writer) { _, line in
                 "> \(line)"
@@ -70,6 +72,15 @@ enum BlockInputStreamingMarkdownSerializer {
         }
     }
 
+    private static func frontMatterMarkdown(_ body: String) -> String {
+        guard !body.isEmpty else {
+            return "---\n---"
+        }
+        // Keep the closing delimiter separator out of editable body text, then
+        // recreate it consistently for streaming snapshots and file writes.
+        return "---\n\(body)\n---"
+    }
+
     private static func writeNumberedList<Writer: BlockInputMarkdownWriter>(
         _ block: BlockInputBlock,
         start: Int,
@@ -100,7 +111,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
             return false
         }
     }

@@ -29,6 +29,12 @@ public enum BlockInputBlockKind: Equatable, Codable, Sendable {
     case code(language: String?)
     /// Horizontal divider exported as `---`.
     case horizontalRule
+    /// Document-leading Markdown frontmatter exported with `---` delimiters.
+    ///
+    /// The block's `text` stores the raw YAML body without opening or closing
+    /// delimiters. The required newline before the closing delimiter is recreated
+    /// during Markdown export instead of being exposed as an editable blank line.
+    case frontMatter
     /// Markdown quote block.
     case quote
     /// Unordered list item.
@@ -57,6 +63,8 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
     /// Text content owned by editable block kinds.
     ///
     /// For ``BlockInputBlockKind/rawMarkdown``, this stores the original Markdown source.
+    /// For ``BlockInputBlockKind/frontMatter``, this stores the delimiter-free raw YAML body
+    /// without the required closing-delimiter separator line break.
     /// Non-text blocks such as horizontal rules normalize this value to an empty string.
     public var text: String {
         didSet {
@@ -346,7 +354,7 @@ extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
             return false
         }
     }
@@ -355,14 +363,14 @@ extension BlockInputBlockKind {
         switch self {
         case .paragraph, .code, .rawMarkdown:
             return false
-        case .heading, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+        case .heading, .horizontalRule, .frontMatter, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
         }
     }
 
     var exitsToParagraphOnEmptyReturn: Bool {
         switch self {
-        case .heading, .code, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+        case .heading, .code, .frontMatter, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
         case .paragraph, .horizontalRule, .rawMarkdown:
             return false
@@ -371,7 +379,7 @@ extension BlockInputBlockKind {
 
     var acceptsInlineReturn: Bool {
         switch self {
-        case .code, .quote, .rawMarkdown:
+        case .code, .frontMatter, .quote, .rawMarkdown:
             return true
         case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem:
             return false
@@ -380,7 +388,7 @@ extension BlockInputBlockKind {
 
     var exitsInlineBlockOnEmptyReturn: Bool {
         switch self {
-        case .code, .quote:
+        case .code, .frontMatter, .quote:
             return true
         case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem, .rawMarkdown:
             return false
@@ -391,7 +399,7 @@ extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
             return false
         }
     }

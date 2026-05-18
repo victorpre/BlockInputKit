@@ -108,7 +108,7 @@ extension BlockInputBlockItem {
                 allowsReordering: allowsReordering,
                 editorHorizontalInset: editorHorizontalInset
             ) + contentIndent
-        case .paragraph, .heading, .code, .horizontalRule, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .rawMarkdown:
             return contentIndent
         }
     }
@@ -225,7 +225,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .rawMarkdown:
             return false
         }
     }

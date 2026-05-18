@@ -286,7 +286,7 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
     }
 
     @MainActor
-    func testHorizontalRuleTypingShortcutPublishesGranularStoreMutations() throws {
+    func testFrontMatterTypingShortcutPublishesGranularStoreMutation() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
@@ -307,16 +307,13 @@ final class BlockInputViewDocumentStoreMutationTests: XCTestCase {
 
         item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
 
-        XCTAssertEqual(store.document.blocks.count, 3)
+        XCTAssertEqual(store.document.blocks.count, 2)
         XCTAssertEqual(store.document.blocks[0].id, firstID)
-        XCTAssertEqual(store.document.blocks[2].id, secondID)
-        XCTAssertEqual(store.document.blocks[0].kind, .horizontalRule)
-        XCTAssertEqual(store.document.blocks[1].kind, .paragraph)
+        XCTAssertEqual(store.document.blocks[1].id, secondID)
+        XCTAssertEqual(store.document.blocks[0].kind, .frontMatter)
         XCTAssertEqual(store.replaceDocumentCount, 0)
         XCTAssertEqual(store.replaceBlockIDs, [firstID])
-        XCTAssertEqual(store.insertedBlockBatches.count, 1)
-        XCTAssertEqual(store.insertedBlockBatches[0].index, 1)
-        XCTAssertEqual(store.insertedBlockBatches[0].blocks, [store.document.blocks[1]])
+        XCTAssertTrue(store.insertedBlockBatches.isEmpty)
     }
 
     @MainActor

@@ -2,6 +2,17 @@ import XCTest
 @testable import BlockInputKit
 
 final class BlockInputDocumentReorderingTests: XCTestCase {
+    func testFrontMatterMoveHelperRejectsOutOfRangeIndexes() {
+        let blocks = [
+            BlockInputBlock(id: "front", kind: .frontMatter, text: "title: Demo"),
+            BlockInputBlock(id: "body", text: "Body")
+        ]
+
+        XCTAssertFalse(BlockInputDocument.canMovePreservingLeadingFrontMatter(sourceIndex: -1, targetIndex: 0, in: blocks))
+        XCTAssertFalse(BlockInputDocument.canMovePreservingLeadingFrontMatter(sourceIndex: 0, targetIndex: 2, in: blocks))
+        XCTAssertFalse(BlockInputDocument.canMovePreservingLeadingFrontMatter(sourceIndex: 1, targetIndex: -1, in: blocks))
+    }
+
     func testMoveTopLevelNumberedItemAboveSiblingRenumbersMovedBlock() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

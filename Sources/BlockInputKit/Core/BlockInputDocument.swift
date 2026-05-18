@@ -25,9 +25,14 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         BlockInputMarkdownSerializer.markdown(from: self)
     }
 
-    /// Returns true when every block is empty.
+    /// Returns true when every block is empty and no frontmatter block is present.
+    ///
+    /// Empty frontmatter is still document metadata and therefore counts as
+    /// meaningful content for placeholder and empty-state decisions.
     public var isEffectivelyEmpty: Bool {
-        blocks.allSatisfy(\.isEmpty)
+        blocks.allSatisfy { block in
+            block.kind != .frontMatter && block.isEmpty
+        }
     }
 
     /// Returns a block by stable ID.
@@ -41,12 +46,15 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
     }
 
     /// Inserts a block at a clamped document index and returns the cursor selection for it.
+    ///
+    /// Insertions at index `0` are placed after existing leading frontmatter so
+    /// document metadata stays canonical at the physical start of the document.
     @discardableResult
     public mutating func insertBlock(
         _ block: BlockInputBlock = .emptyParagraph(),
         at index: Int
     ) -> BlockInputSelection {
-        let insertionIndex = min(max(index, 0), blocks.count)
+        let insertionIndex = Self.insertionIndexPreservingLeadingFrontMatter(index, in: blocks)
         blocks.insert(block, at: insertionIndex)
         return .cursor(BlockInputCursor(blockID: block.id, utf16Offset: 0))
     }
@@ -183,7 +191,8 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         guard let index = index(of: blockID),
               index > 0,
               blocks[index].kind == .paragraph,
-              blocks[index - 1].kind != .horizontalRule else {
+              blocks[index - 1].kind != .horizontalRule,
+              blocks[index - 1].kind != .frontMatter else {
             return nil
         }
         let cursorOffset = blocks[index - 1].utf16Length
@@ -328,6 +337,15 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
             blockID: currentBlockID,
             range: NSRange(location: 0, length: block.utf16Length)
         )
+        if block.kind == .frontMatter {
+            let blockSelection = BlockInputSelection.blocks([currentBlockID])
+            if currentSelection == blockSelection {
+                return .blocks(allBlockIDs)
+            }
+            if block.text.isEmpty || currentSelection == .text(fullRange) {
+                return blockSelection
+            }
+        }
         if currentSelection == .text(fullRange) {
             return .blocks(allBlockIDs)
         }
@@ -347,6 +365,13 @@ private extension BlockInputDocument {
         }
         let leadingBlock = blocks[leadingIndex]
         let trailingBlock = blocks[trailingIndex]
+        // Frontmatter is document metadata, so deleting a mixed selection across
+        // its boundary should trim both edge blocks instead of merging body text
+        // into the raw frontmatter source.
+        guard leadingBlock.kind != .frontMatter,
+              trailingBlock.kind != .frontMatter else {
+            return nil
+        }
         let leadingRange = leadingBlock.text.clampedUTF16Range(leadingTextRange.range)
         let trailingRange = trailingBlock.text.clampedUTF16Range(trailingTextRange.range)
         let leadingText = leadingBlock.text as NSString

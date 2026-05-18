@@ -202,6 +202,7 @@ private extension BlockInputDocument {
     // One document intentionally covers all built-in block renderers so the
     // appearance/size matrix stays small and stable.
     static let snapshotRepresentative = BlockInputDocument(blocks: [
+        BlockInputBlock(id: "frontmatter", kind: .frontMatter, text: "title: Demo\npublished: true\nbad line"),
         BlockInputBlock(id: "heading", kind: .heading(level: 1), text: "BlockInputKit demo"),
         BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Each visible block owns its own AppKit text input."),
         BlockInputBlock(id: "quote", kind: .quote, text: "Focus, selection, return, delete, and Cmd+A coordinate across blocks."),

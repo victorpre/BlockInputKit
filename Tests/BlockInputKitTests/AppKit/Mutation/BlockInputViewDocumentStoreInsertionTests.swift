@@ -48,6 +48,37 @@ final class BlockInputStoreInsertionTests: XCTestCase {
     }
 
     @MainActor
+    func testMarkdownInsertionDowngradesFrontMatterWhenInsertedMidDocument() {
+        let blockID = BlockInputBlockID(rawValue: "body")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Body")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+
+        _ = view.insertMarkdown("---\ntitle: Demo\n---", below: blockID)
+
+        XCTAssertEqual(store.document.blocks.map(\.kind), [.paragraph, .rawMarkdown])
+        XCTAssertEqual(store.document.blocks[1].text, "---\ntitle: Demo\n---")
+    }
+
+    @MainActor
+    func testMarkdownInsertionPreservesDotClosedFrontMatterWhenDowngradingMidDocument() {
+        let blockID = BlockInputBlockID(rawValue: "body")
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Body")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+
+        _ = view.insertMarkdown("---\ntitle: Demo\n...\n\nTail", below: blockID)
+
+        XCTAssertEqual(store.document.blocks.map(\.kind), [.paragraph, .rawMarkdown, .paragraph])
+        XCTAssertEqual(store.document.blocks[1].text, "---\ntitle: Demo\n...\n")
+        XCTAssertEqual(store.document.blocks[2].text, "Tail")
+    }
+
+    @MainActor
     func testMarkdownInsertionFallsBackToFirstStoreBlockWhenSelectionWasRemoved() {
         let staleID = BlockInputBlockID(rawValue: "stale")
         let replacementID = BlockInputBlockID(rawValue: "replacement")
@@ -136,6 +167,26 @@ final class BlockInputStoreInsertionTests: XCTestCase {
         let selection = view.insertFileURLs([URL(fileURLWithPath: "/tmp/example.txt")], below: replacementID)
 
         XCTAssertEqual(store.document.blocks.map(\.text), ["New", "[example.txt](<file:///tmp/example.txt>)"])
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches.first?.index, 1)
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: store.document.blocks[1].id, utf16Offset: 0)))
+    }
+
+    @MainActor
+    func testFileInsertionAtStartKeepsStoreFrontMatterLeading() {
+        let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: "front", kind: .frontMatter, text: "title: Demo"),
+            BlockInputBlock(id: "body", text: "Body")
+        ]))
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store))
+        store.resetCounts()
+
+        let selection = view.insertFileURLs([URL(fileURLWithPath: "/tmp/example.txt")], at: 0)
+
+        XCTAssertEqual(store.document.blocks.map(\.kind), [.frontMatter, .paragraph, .paragraph])
+        XCTAssertEqual(store.document.blocks.map(\.text), ["title: Demo", "[example.txt](<file:///tmp/example.txt>)", "Body"])
         XCTAssertEqual(store.replaceDocumentCount, 0)
         XCTAssertEqual(store.insertedBlockBatches.count, 1)
         XCTAssertEqual(store.insertedBlockBatches.first?.index, 1)

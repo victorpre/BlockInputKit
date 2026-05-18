@@ -113,7 +113,7 @@ private extension BlockInputDocument {
             return .numberedListItem(start: start + 1)
         case .checklistItem:
             return .checklistItem(isChecked: false)
-        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
             return kind
         }
     }
@@ -199,6 +199,12 @@ private extension BlockInputDocument {
     }
 
     func continuationKind(for kind: BlockInputBlockKind, afterPrefix prefix: String) -> BlockInputBlockKind {
+        // Frontmatter is canonical only at document start; trailing text after
+        // an inline exit remains editable raw Markdown instead of becoming a
+        // second frontmatter block.
+        if kind == .frontMatter {
+            return .rawMarkdown
+        }
         guard case let .numberedListItem(start) = kind else {
             return kind
         }

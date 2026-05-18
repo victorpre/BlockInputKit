@@ -1,6 +1,7 @@
 ## Block Item Reuse
 
 - Preserve collection-view reuse assumptions: every item configuration must fully reset text, chrome, selection, drag handles, horizontal-rule state, and callbacks that can survive reuse.
+- Reset frontmatter divider visibility and validation warning text attributes during reuse; stale frontmatter chrome must not leak into raw Markdown or paragraph rows.
 - Suppress item delegate callbacks during programmatic block-item configuration; visible-row reuse in large documents must not report caret movement or force store index rebuilds.
 
 ## Chrome And Metrics

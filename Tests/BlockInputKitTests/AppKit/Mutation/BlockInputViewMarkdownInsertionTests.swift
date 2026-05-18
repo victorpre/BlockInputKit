@@ -67,6 +67,22 @@ final class BlockInputViewMarkdownInsertionTests: XCTestCase {
         XCTAssertEqual(view.document.blocks[0].text, "")
     }
 
+    func testInsertMarkdownKeepsFrontMatterWhenReplacingDefaultEmptyParagraph() {
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument()))
+
+        let selection = view.insertMarkdown("""
+        ---
+        title: Demo
+        ---
+        Body
+        """)
+
+        XCTAssertEqual(view.document.blocks.map(\.kind), [.frontMatter, .paragraph])
+        XCTAssertEqual(view.document.blocks[0].text, "title: Demo")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: view.document.blocks[0].id, utf16Offset: 0)))
+    }
+
     func testInsertMarkdownBelowExplicitBlockIgnoresActiveBlock() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

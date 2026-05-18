@@ -210,7 +210,8 @@ extension BlockInputView: NSCollectionViewDelegate {
         guard allowsBlockReordering else {
             return nil
         }
-        guard let block = block(at: indexPath.item) else {
+        guard let block = block(at: indexPath.item),
+              block.kind != .frontMatter else {
             return nil
         }
         _ = cancelMultiBlockSelectionForReorderStart()
@@ -250,7 +251,10 @@ extension BlockInputView: NSCollectionViewDelegate {
                     location: location
                 )
             }
-            guard let blockID, let targetIndex, index(of: blockID) != targetIndex else {
+            guard let blockID,
+                  let targetIndex,
+                  index(of: blockID) != targetIndex,
+                  canMoveBlockWithoutDisplacingFrontMatter(blockID: blockID, targetIndex: targetIndex) else {
                 hideDropIndicator()
                 return []
             }
@@ -261,10 +265,11 @@ extension BlockInputView: NSCollectionViewDelegate {
             return .move
         }
         if canAcceptFileDrop(draggingInfo) {
-            let insertionIndex = resolvedDropInsertionIndex(
+            let resolvedInsertionIndex = resolvedDropInsertionIndex(
                 from: draggingInfo,
                 proposedItemIndex: proposedDropIndexPath.pointee.item
             )
+            let insertionIndex = frontMatterAwareFileDropInsertionIndex(resolvedInsertionIndex)
             proposedDropIndexPath.pointee = NSIndexPath(forItem: insertionIndex, inSection: 0)
             proposedDropOperation.pointee = .before
             showDropIndicator(atInsertionIndex: insertionIndex)
@@ -281,7 +286,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         dropOperation: NSCollectionView.DropOperation
     ) -> Bool {
         hideDropIndicator()
-        let insertionIndex = resolvedDropInsertionIndex(
+        let resolvedInsertionIndex = resolvedDropInsertionIndex(
             from: draggingInfo,
             proposedItemIndex: indexPath.item
         )
@@ -293,19 +298,40 @@ extension BlockInputView: NSCollectionViewDelegate {
             guard let sourceIndex = index(of: blockID),
                   let targetIndex = collectionDropTargetIndex(
                       forBlockID: blockID,
-                      proposedItemIndex: insertionIndex,
+                      proposedItemIndex: resolvedInsertionIndex,
                       location: collectionView.convert(draggingInfo.draggingLocation, from: nil)
                   ),
-                  targetIndex != sourceIndex else {
+                  targetIndex != sourceIndex,
+                  canMoveBlockWithoutDisplacingFrontMatter(blockID: blockID, targetIndex: targetIndex) else {
                 return false
             }
             return moveBlock(blockID: blockID, to: targetIndex) != nil
         }
         let fileURLs = fileURLs(from: draggingInfo.draggingPasteboard)
         if !fileURLs.isEmpty {
+            let insertionIndex = frontMatterAwareFileDropInsertionIndex(resolvedInsertionIndex)
             return insertFileURLs(fileURLs, at: insertionIndex) != nil
         }
         return false
+    }
+
+    private func canMoveBlockWithoutDisplacingFrontMatter(blockID: BlockInputBlockID, targetIndex: Int) -> Bool {
+        guard let sourceIndex = index(of: blockID) else {
+            return false
+        }
+        if block(at: sourceIndex)?.kind == .frontMatter {
+            return false
+        }
+        return !(block(at: 0)?.kind == .frontMatter && targetIndex == 0)
+    }
+
+    private func frontMatterAwareFileDropInsertionIndex(_ insertionIndex: Int) -> Int {
+        let clampedIndex = clampedInsertionIndex(insertionIndex)
+        guard block(at: 0)?.kind == .frontMatter,
+              clampedIndex == 0 else {
+            return clampedIndex
+        }
+        return 1
     }
 
     func collectionDropTargetIndex(
@@ -345,7 +371,8 @@ extension BlockInputView: NSCollectionViewDelegate {
     func canAcceptBlockReorderDrop(_ draggingInfo: NSDraggingInfo) -> Bool {
         guard allowsBlockReordering,
               let rawID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID),
-              index(of: BlockInputBlockID(rawValue: rawID)) != nil else {
+              let index = index(of: BlockInputBlockID(rawValue: rawID)),
+              block(at: index)?.kind != .frontMatter else {
             return false
         }
         return true

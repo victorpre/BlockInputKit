@@ -233,7 +233,7 @@ final class BlockInputDocumentTypingShortcutTests: XCTestCase {
         XCTAssertEqual(document.blocks[0].text, "Heading")
     }
 
-    func testTypingShortcutTurnsThreeDashesIntoHorizontalRule() {
+    func testTypingShortcutTurnsFirstEmptyBlockThreeDashesIntoFrontMatter() {
         let blockID = BlockInputBlockID(rawValue: "rule")
         var document = BlockInputDocument(blocks: [
             BlockInputBlock(id: blockID, text: "")
@@ -246,13 +246,13 @@ final class BlockInputDocumentTypingShortcutTests: XCTestCase {
 
         let selection = shortcut.flatMap { document.applyTypingShortcut(blockID: blockID, shortcut: $0) }
 
-        XCTAssertEqual(document.blocks[0].kind, .horizontalRule)
+        XCTAssertEqual(document.blocks[0].kind, .frontMatter)
         XCTAssertEqual(document.blocks[0].text, "")
-        XCTAssertEqual(document.blocks[1].kind, .paragraph)
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
+        XCTAssertEqual(document.blocks.count, 1)
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
-    func testTypingShortcutTurnsThreeDashesAndSpaceIntoHorizontalRule() {
+    func testTypingShortcutTurnsFirstEmptyBlockThreeDashesAndSpaceIntoFrontMatter() {
         let blockID = BlockInputBlockID(rawValue: "rule")
         var document = BlockInputDocument(blocks: [
             BlockInputBlock(id: blockID, text: "")
@@ -265,10 +265,10 @@ final class BlockInputDocumentTypingShortcutTests: XCTestCase {
 
         let selection = shortcut.flatMap { document.applyTypingShortcut(blockID: blockID, shortcut: $0) }
 
-        XCTAssertEqual(document.blocks[0].kind, .horizontalRule)
+        XCTAssertEqual(document.blocks[0].kind, .frontMatter)
         XCTAssertEqual(document.blocks[0].text, "")
-        XCTAssertEqual(document.blocks[1].kind, .paragraph)
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
+        XCTAssertEqual(document.blocks.count, 1)
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
     }
 
     func testTypingShortcutMovesTextAfterHorizontalRuleMarkerIntoParagraphBelow() {
@@ -309,24 +309,23 @@ final class BlockInputDocumentTypingShortcutTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 8)))
     }
 
-    func testTypingShortcutInsertsParagraphImmediatelyBelowHorizontalRuleInMiddleOfDocument() {
+    func testTypingShortcutTurnsNonFirstThreeDashesIntoHorizontalRule() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         var document = BlockInputDocument(blocks: [
-            BlockInputBlock(id: firstID, text: ""),
-            BlockInputBlock(id: secondID, text: "Second")
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "")
         ])
         let shortcut = document.typingShortcut(
-            for: firstID,
+            for: secondID,
             proposedText: "---",
             proposedUTF16Offset: 3
         )
 
-        let selection = shortcut.flatMap { document.applyTypingShortcut(blockID: firstID, shortcut: $0) }
+        let selection = shortcut.flatMap { document.applyTypingShortcut(blockID: secondID, shortcut: $0) }
 
-        XCTAssertEqual(document.blocks.map(\.kind), [.horizontalRule, .paragraph, .paragraph])
-        XCTAssertEqual(document.blocks[2].id, secondID)
-        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[1].id, utf16Offset: 0)))
+        XCTAssertEqual(document.blocks.map(\.kind), [.paragraph, .horizontalRule, .paragraph])
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: document.blocks[2].id, utf16Offset: 0)))
     }
 
     func testUnwrapListItemRevealsListMarkerForReformatting() {

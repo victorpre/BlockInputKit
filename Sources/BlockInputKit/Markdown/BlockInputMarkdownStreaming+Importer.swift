@@ -76,15 +76,18 @@ enum BlockInputStreamingMarkdownImporter {
             rawLines.append(nextLine)
             let trimmed = nextLine.trimmingCharacters(in: .whitespaces)
             if trimmed == "---" || trimmed == "..." {
-                guard hasBodyContent else {
-                    reader.pushFront(Array(rawLines.dropFirst()))
-                    return nil
-                }
-                return try await rawBlock(rawLines, from: &reader)
+                let bodyLines = rawLines.dropFirst().dropLast()
+                // Streaming import mirrors snapshot import: keep editor-visible
+                // YAML body lines and leave delimiter separator reconstruction to export.
+                let body = bodyLines.joined(separator: "\n")
+                return BlockInputBlock(kind: .frontMatter, text: body)
             }
             if !trimmed.isEmpty {
                 hasBodyContent = true
             }
+        }
+        if hasBodyContent {
+            return try await rawBlock(rawLines, from: &reader)
         }
         reader.pushFront(Array(rawLines.dropFirst()))
         return nil

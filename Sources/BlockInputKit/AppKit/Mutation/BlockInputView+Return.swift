@@ -146,12 +146,13 @@ extension BlockInputView {
         let suffix = textStorage.substring(from: NSMaxRange(removalRange))
         var afterBlock = block
         afterBlock.text = prefix
-        // Exiting an empty inline quote/code line is a composite edit: trim
-        // the current block and insert the plain paragraph that receives focus.
+        // Empty inline exits are composite edits: trim the current block and
+        // insert the plain paragraph that receives focus.
         var insertedBlocks = [BlockInputBlock()]
         if !suffix.isEmpty {
             var continuationBlock = block
             continuationBlock.id = .unique()
+            continuationBlock.kind = inlineExitContinuationKind(for: block.kind)
             continuationBlock.text = suffix
             insertedBlocks.append(continuationBlock)
         }
@@ -214,8 +215,9 @@ extension BlockInputView {
     ) -> BlockInputSelection? {
         let beforeSelection = selection
         let insertedBlocks = [insertedBlock]
+        let resolvedInsertionIndex = frontMatterPreservingInsertionIndex(insertionIndex)
         if canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) {
-            guard document.insertBlocks(insertedBlocks, at: insertionIndex) != nil else {
+            guard document.insertBlocks(insertedBlocks, at: resolvedInsertionIndex) != nil else {
                 return nil
             }
         } else {
@@ -225,16 +227,16 @@ extension BlockInputView {
             blockID: insertedBlock.id,
             utf16Offset: 0
         ))
-        syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: insertionIndex))
+        syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: resolvedInsertionIndex))
         applySelection(afterSelection, notify: true)
         undoController?.registerBlockInsertionStructuralEdit(
             actionName: actionName,
             insertedBlocks: insertedBlocks,
-            insertionIndex: insertionIndex,
+            insertionIndex: resolvedInsertionIndex,
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         )
-        insertVisibleBlock(at: insertionIndex)
+        insertVisibleBlock(at: resolvedInsertionIndex)
         publishDocumentChange()
         return afterSelection
     }
@@ -251,10 +253,15 @@ extension BlockInputView {
         guard let insertedBlock = insertedBlocks.first else {
             return nil
         }
+        let resolvedInsertionIndex = frontMatterPreservingInsertionIndex(
+            insertionIndex,
+            afterReplacing: afterBlock,
+            at: replacementIndex
+        )
         let beforeSelection = selection
         if canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) {
             guard replaceCachedBlock(afterBlock, at: replacementIndex),
-                  document.insertBlocks(insertedBlocks, at: insertionIndex) != nil else {
+                  document.insertBlocks(insertedBlocks, at: resolvedInsertionIndex) != nil else {
                 return nil
             }
         } else {
@@ -265,21 +272,21 @@ extension BlockInputView {
             utf16Offset: 0
         ))
         syncDocumentStore(.replaceBlock(afterBlock))
-        syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: insertionIndex))
+        syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: resolvedInsertionIndex))
         applySelection(afterSelection, notify: true)
         undoController?.registerBlockReplacementInsertionStructuralEdit(BlockInputReplaceInsertEdit(
             actionName: actionName,
             beforeBlock: beforeBlock,
             afterBlock: afterBlock,
             insertedBlocks: insertedBlocks,
-            insertionIndex: insertionIndex,
+            insertionIndex: resolvedInsertionIndex,
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         ))
         if shouldDeferGranularCountLayout {
             reloadVisibleBlock(at: replacementIndex)
             if insertedBlocks.count == 1 {
-                insertVisibleBlock(at: insertionIndex)
+                insertVisibleBlock(at: resolvedInsertionIndex)
             } else {
                 reloadDataKeepingFocus()
             }
@@ -456,9 +463,15 @@ extension BlockInputView {
             return .numberedListItem(start: start + 1)
         case .checklistItem:
             return .checklistItem(isChecked: false)
-        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
             return kind
         }
+    }
+
+    private func inlineExitContinuationKind(for kind: BlockInputBlockKind) -> BlockInputBlockKind {
+        // Frontmatter is only meaningful at index 0, so any trailing body text
+        // split after an inserted paragraph remains raw Markdown.
+        kind == .frontMatter ? .rawMarkdown : kind
     }
 }
 
@@ -467,7 +480,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
             return false
         }
     }

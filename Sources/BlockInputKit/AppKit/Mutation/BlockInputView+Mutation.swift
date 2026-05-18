@@ -365,11 +365,16 @@ extension BlockInputView {
         insertionIndex: Int,
         selection: BlockInputSelection?
     ) -> Bool {
+        let resolvedInsertionIndex = frontMatterPreservingInsertionIndex(
+            insertionIndex,
+            afterReplacing: replacement,
+            at: replacementIndex
+        )
         syncDocumentStore(.replaceBlock(replacement))
-        syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: insertionIndex))
+        syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: resolvedInsertionIndex))
         _ = replaceCachedBlock(replacement, at: replacementIndex)
         if canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) {
-            guard document.insertBlocks(insertedBlocks, at: insertionIndex) != nil else {
+            guard document.insertBlocks(insertedBlocks, at: resolvedInsertionIndex) != nil else {
                 return false
             }
         } else {
@@ -381,7 +386,7 @@ extension BlockInputView {
             collectionView.layoutSubtreeIfNeeded()
         }
         if insertedBlocks.count == 1 {
-            insertVisibleBlock(at: insertionIndex)
+            insertVisibleBlock(at: resolvedInsertionIndex)
         } else {
             reloadDataKeepingFocus()
         }
@@ -424,17 +429,18 @@ extension BlockInputView {
         at insertionIndex: Int,
         selection: BlockInputSelection?
     ) -> Bool {
+        let resolvedInsertionIndex = frontMatterPreservingInsertionIndex(insertionIndex)
         if canSynchronizeCacheForGranularInsertion(insertedBlockCount: blocks.count) {
-            guard document.insertBlocks(blocks, at: insertionIndex) != nil else {
+            guard document.insertBlocks(blocks, at: resolvedInsertionIndex) != nil else {
                 return false
             }
         } else {
             markDocumentCacheUnsynchronized()
         }
-        syncDocumentStore(.insertBlocks(blocks, insertionIndex: insertionIndex))
+        syncDocumentStore(.insertBlocks(blocks, insertionIndex: resolvedInsertionIndex))
         applySelection(validUndoSelection(selection), notify: true)
         if blocks.count == 1 {
-            insertVisibleBlock(at: insertionIndex)
+            insertVisibleBlock(at: resolvedInsertionIndex)
         } else {
             reloadDataKeepingFocus()
         }
@@ -466,6 +472,26 @@ extension BlockInputView {
 
     func validUndoSelection(_ selection: BlockInputSelection?) -> BlockInputSelection? {
         selection.flatMap { containsValidSelection($0) ? $0 : nil }
+    }
+
+    /// Resolves granular insertion indexes before document, store, undo, and
+    /// collection-view mutations so all layers agree when frontmatter is pinned.
+    func frontMatterPreservingInsertionIndex(
+        _ index: Int,
+        afterReplacing replacement: BlockInputBlock? = nil,
+        at replacementIndex: Int? = nil
+    ) -> Int {
+        let clampedIndex = min(max(index, 0), document.blocks.count)
+        guard clampedIndex == 0 else {
+            return clampedIndex
+        }
+        if let replacement,
+           let replacementIndex,
+           replacementIndex == document.blocks.startIndex,
+           document.blocks.indices.contains(replacementIndex) {
+            return replacement.kind == .frontMatter ? 1 : 0
+        }
+        return document.blocks.first?.kind == .frontMatter ? 1 : 0
     }
 
 }

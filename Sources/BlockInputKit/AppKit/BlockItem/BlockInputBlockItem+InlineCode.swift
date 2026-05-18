@@ -49,7 +49,7 @@ extension BlockInputBlockItem {
         switch kind {
         case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .code, .horizontalRule, .rawMarkdown:
+        case .code, .horizontalRule, .frontMatter, .rawMarkdown:
             return false
         }
     }

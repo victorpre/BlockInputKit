@@ -28,7 +28,8 @@ public extension BlockInputView {
     /// Inserts file URLs as Markdown link paragraph blocks at a document index.
     ///
     /// This is used by the built-in collection view drop handling. The insertion
-    /// index is clamped to the current document.
+    /// index is clamped to the current document, but never before leading
+    /// frontmatter because frontmatter is only canonical at index `0`.
     @discardableResult
     func insertFileURLs(
         _ fileURLs: [URL],
@@ -40,7 +41,7 @@ public extension BlockInputView {
         }
 
         return insertFileBlocks(insertedBlocks) { document in
-            min(max(insertionIndex, 0), document.blocks.count)
+            self.fileInsertionIndex(at: insertionIndex, in: document)
         }
     }
 
@@ -74,6 +75,15 @@ public extension BlockInputView {
             return document.blocks.count
         }
         return index + 1
+    }
+
+    private func fileInsertionIndex(at insertionIndex: Int, in document: BlockInputDocument) -> Int {
+        let clampedIndex = min(max(insertionIndex, 0), document.blocks.count)
+        guard document.blocks.first?.kind == .frontMatter,
+              clampedIndex == 0 else {
+            return clampedIndex
+        }
+        return 1
     }
 
     private func insertFileBlocks(

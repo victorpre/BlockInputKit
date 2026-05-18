@@ -121,6 +121,11 @@ extension BlockInputBlockItem {
                 height: view.bounds.height
             )
         }
+        if renderedBlock?.kind == .frontMatter, !frontMatterDividerView.isHidden {
+            let minX = min(textGlyphLeadingX(), frontMatterDividerView.frame.minX)
+            let maxX = max(textGlyphTrailingX(), frontMatterDividerView.frame.maxX)
+            return NSRect(x: minX, y: 0, width: max(1, maxX - minX), height: view.bounds.height)
+        }
         var minX = min(textGlyphLeadingX(), standardTextSelectionLeadingX())
         var maxX = textGlyphTrailingX()
         if !kindLabel.markerLines.isEmpty {

@@ -252,6 +252,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
            selection == .blocks([blockID]) {
             return deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil
         }
+        if currentBlock.kind == .frontMatter, currentBlock.isEmpty {
+            return false
+        }
         guard currentBlock.kind.canUnwrapToParagraph else {
             return false
         }

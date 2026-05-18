@@ -174,7 +174,7 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
     /// Inserts loaded blocks into both the visible prefix and full source.
     public func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
         locked {
-            let insertionIndex = min(max(index, 0), loadedBlocks.count)
+            let insertionIndex = BlockInputDocument.insertionIndexPreservingLeadingFrontMatter(index, in: loadedBlocks)
             loadedBlocks.insert(contentsOf: blocks, at: insertionIndex)
             sourceBlocks.insert(contentsOf: blocks, at: insertionIndex)
             nextSourceIndex += blocks.count
@@ -200,14 +200,24 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
     /// Moves a loaded block in both the visible prefix and full source.
     public func moveBlock(withID id: BlockInputBlockID, to index: Int) {
         locked {
-            if let sourceIndex = indexesByID[id], loadedBlocks.indices.contains(sourceIndex) {
-                let block = loadedBlocks.remove(at: sourceIndex)
-                let targetIndex = min(max(index, 0), loadedBlocks.count)
-                loadedBlocks.insert(block, at: targetIndex)
-                if let sourceBlockIndex = sourceBlocks.firstIndex(where: { $0.id == id }) {
-                    let sourceBlock = sourceBlocks.remove(at: sourceBlockIndex)
-                    sourceBlocks.insert(sourceBlock, at: min(targetIndex, sourceBlocks.count))
-                }
+            guard let sourceIndex = indexesByID[id], loadedBlocks.indices.contains(sourceIndex) else {
+                return
+            }
+            let targetIndex = min(max(index, 0), loadedBlocks.count - 1)
+            guard targetIndex != sourceIndex,
+                  BlockInputDocument.canMovePreservingLeadingFrontMatter(
+                    sourceIndex: sourceIndex,
+                    targetIndex: targetIndex,
+                    in: loadedBlocks
+                  ) else {
+                return
+            }
+
+            let block = loadedBlocks.remove(at: sourceIndex)
+            loadedBlocks.insert(block, at: targetIndex)
+            if let sourceBlockIndex = sourceBlocks.firstIndex(where: { $0.id == id }) {
+                let sourceBlock = sourceBlocks.remove(at: sourceBlockIndex)
+                sourceBlocks.insert(sourceBlock, at: min(targetIndex, sourceBlocks.count))
             }
             indexesByID = Self.indexesByID(for: loadedBlocks)
         }

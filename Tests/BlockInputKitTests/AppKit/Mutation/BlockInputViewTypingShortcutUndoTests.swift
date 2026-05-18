@@ -104,7 +104,7 @@ final class BlockInputViewTypingShortcutUndoTests: XCTestCase {
         XCTAssertEqual(view.document.blocks[0].kind, .checklistItem(isChecked: false))
     }
 
-    func testHorizontalRuleTypingShortcutUndoRestoresOriginalBlockCount() throws {
+    func testFrontMatterTypingShortcutUndoRestoresOriginalBlock() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let undoController = BlockInputUndoController()
@@ -138,11 +138,11 @@ final class BlockInputViewTypingShortcutUndoTests: XCTestCase {
         let redo = view.redoStructuralEdit()
 
         XCTAssertEqual(redo?.actionName, "Format Block")
-        XCTAssertEqual(view.document.blocks.count, 3)
+        XCTAssertEqual(view.document.blocks.count, 2)
         XCTAssertEqual(view.document.blocks[0].id, firstID)
-        XCTAssertEqual(view.document.blocks[0].kind, .horizontalRule)
-        XCTAssertEqual(view.document.blocks[2].id, secondID)
-        XCTAssertEqual(redo?.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
+        XCTAssertEqual(view.document.blocks[0].kind, .frontMatter)
+        XCTAssertEqual(view.document.blocks[1].id, secondID)
+        XCTAssertEqual(redo?.selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 0)))
     }
 
     func testHorizontalRuleTypingShortcutUndoRestoresTextMovedBelowRule() throws {

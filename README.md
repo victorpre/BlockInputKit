@@ -105,7 +105,7 @@ struct EditorScreen: View {
 
 ## Markdown Streaming
 
-Use the async Markdown APIs when reading or writing files. File reads are UTF-8 line-by-line, and streaming writes emit chunks in block order without first converting the document to one full Markdown string. Streaming deserialization buffers only the current block and any lookahead needed to match snapshot import behavior; unsupported block-level constructs are retained as `rawMarkdown` blocks rather than discarded.
+Use the async Markdown APIs when reading or writing files. File reads are UTF-8 line-by-line, and streaming writes emit chunks in block order without first converting the document to one full Markdown string. Streaming deserialization buffers only the current block and any lookahead needed to match snapshot import behavior; leading frontmatter is retained as a `frontMatter` block, and unsupported block-level constructs are retained as `rawMarkdown` blocks rather than discarded.
 
 ```swift
 let url = URL(filePath: "/tmp/note.md")

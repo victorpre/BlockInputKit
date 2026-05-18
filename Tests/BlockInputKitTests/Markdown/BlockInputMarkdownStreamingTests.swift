@@ -73,7 +73,10 @@ final class BlockInputMarkdownStreamingTests: XCTestCase {
         let expected = BlockInputDocument(markdown: source)
 
         XCTAssertBlockDocumentsEqualIgnoringIDs(streamed, expected)
+        XCTAssertEqual(streamed.blocks.map(\.kind), [.rawMarkdown])
+        XCTAssertEqual(streamed.blocks[0].text, source)
         XCTAssertEqual(streamed.markdown, expected.markdown)
+        XCTAssertEqual(streamed.markdown, source)
     }
 
     func testStreamingReadMatchesExistingImportWhenUnclosedFrontMatterRequiresLargeLookahead() async throws {
@@ -87,7 +90,10 @@ final class BlockInputMarkdownStreamingTests: XCTestCase {
         let expected = BlockInputDocument(markdown: source)
 
         XCTAssertBlockDocumentsEqualIgnoringIDs(streamed, expected)
+        XCTAssertEqual(streamed.blocks.map(\.kind), [.rawMarkdown])
+        XCTAssertEqual(streamed.blocks[0].text, source)
         XCTAssertEqual(streamed.markdown, expected.markdown)
+        XCTAssertEqual(streamed.markdown, source)
     }
 
     func testStreamingReadPreservesLongFrontMatter() async throws {

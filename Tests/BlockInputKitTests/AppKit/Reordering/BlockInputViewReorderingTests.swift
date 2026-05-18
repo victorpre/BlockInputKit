@@ -76,6 +76,21 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertEqual(writer.string(forType: .blockInputBlockID), blockID.rawValue)
     }
 
+    func testPasteboardWriterIsDisabledForFrontMatter() {
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: "front", kind: .frontMatter, text: "title: Demo"),
+            BlockInputBlock(id: "body", text: "Body")
+        ])))
+
+        let writer = view.collectionView(
+            view.collectionView,
+            pasteboardWriterForItemAt: IndexPath(item: 0, section: 0)
+        )
+
+        XCTAssertNil(writer)
+    }
+
     func testHoveringReorderHandleHidesOtherVisibleHandles() throws {
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "first", text: "First"),
@@ -141,6 +156,16 @@ final class BlockInputViewReorderingTests: XCTestCase {
         let view = configuredReorderView(blockIDs: ["first"])
 
         XCTAssertFalse(view.canAcceptBlockReorderDrop(BlockInputDraggingInfo(blockID: "missing")))
+    }
+
+    func testCanAcceptBlockReorderDropRejectsFrontMatterBlockID() {
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: "front", kind: .frontMatter, text: "title: Demo"),
+            BlockInputBlock(id: "body", text: "Body")
+        ])))
+
+        XCTAssertFalse(view.canAcceptBlockReorderDrop(BlockInputDraggingInfo(blockID: "front")))
     }
 
     func testCanAcceptBlockReorderDropRejectsMissingBlockID() {

@@ -11,6 +11,11 @@ extension BlockInputView {
     }
 
     func cutActiveSelection() -> Bool {
+        if let copiedText = markdownAwareCopiedTextForTextCut() {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(copiedText, forType: .string)
+            return performTextViewEditAction(#selector(NSText.delete(_:)))
+        }
         if case .text = selection {
             return performTextViewEditAction(#selector(NSText.cut(_:)))
         }
@@ -75,6 +80,18 @@ extension BlockInputView {
         }
     }
 
+    private func markdownAwareCopiedTextForTextCut() -> String? {
+        // Full-body frontmatter cuts copy the Markdown block, while partial body
+        // cuts intentionally stay on AppKit's raw text path.
+        guard case let .text(textRange) = selection,
+              let block = block(withID: textRange.blockID),
+              visibleItem(for: textRange.blockID) != nil,
+              block.kind == .frontMatter else {
+            return nil
+        }
+        return block.markdownAwareCopiedTextForFullTextRange(textRange.range)
+    }
+
     private var isMixedSelection: Bool {
         if case .mixed = selection {
             return true
@@ -137,7 +154,22 @@ extension BlockInputBlock {
            NSMaxRange(clampedRange) == utf16Length {
             return BlockInputDocument(blocks: [self]).markdown
         }
+        if kind == .frontMatter,
+           clampedRange.location == 0,
+           NSMaxRange(clampedRange) == utf16Length {
+            return BlockInputDocument(blocks: [self]).markdown
+        }
         return (text as NSString).substring(with: clampedRange)
+    }
+
+    func markdownAwareCopiedTextForFullTextRange(_ range: NSRange) -> String? {
+        let clampedRange = text.clampedRange(range)
+        guard clampedRange.length > 0,
+              clampedRange.location == 0,
+              NSMaxRange(clampedRange) == utf16Length else {
+            return nil
+        }
+        return markdownAwareCopiedText(in: clampedRange)
     }
 
     mutating func applyPartialMarkdownCopyRange(_ range: NSRange) {
@@ -160,6 +192,9 @@ extension BlockInputBlock {
 
     var hasInvisibleMarkdownFence: Bool {
         if case .code = kind {
+            return true
+        }
+        if kind == .frontMatter {
             return true
         }
         return false

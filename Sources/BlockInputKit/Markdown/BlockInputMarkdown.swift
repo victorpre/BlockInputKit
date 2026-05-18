@@ -113,15 +113,20 @@ enum BlockInputMarkdownImporter {
         while index < lines.count {
             let trimmed = lines[index].trimmingCharacters(in: .whitespaces)
             if trimmed == "---" || trimmed == "..." {
-                guard hasBodyContent else {
-                    return nil
-                }
-                return rawBlock(lines: lines, range: startIndex..<(index + 1))
+                let bodyLines = lines[(startIndex + 1)..<index]
+                // Keep only editor-visible YAML body lines. Export recreates the
+                // required line break before the closing delimiter so ordinary file
+                // loads do not display a synthetic blank line in the editor.
+                let body = bodyLines.joined(separator: "\n")
+                return (BlockInputBlock(kind: .frontMatter, text: body), index + 1)
             }
             if !trimmed.isEmpty {
                 hasBodyContent = true
             }
             index += 1
+        }
+        if hasBodyContent {
+            return rawBlock(lines: lines, range: startIndex..<lines.count)
         }
         return nil
     }
@@ -367,6 +372,8 @@ enum BlockInputMarkdownSerializer {
             return "\(fence)\n\(block.text)\n```"
         case .horizontalRule:
             return "---"
+        case .frontMatter:
+            return frontMatterMarkdown(block.text)
         case .quote:
             return BlockInputLineBreaks.lines(in: block.text).map { "> \($0)" }.joined(separator: "\n")
         case .bulletedListItem:
@@ -388,6 +395,15 @@ enum BlockInputMarkdownSerializer {
         String(repeating: "  ", count: block.indentationLevel(forLine: lineOffset))
     }
 
+    private static func frontMatterMarkdown(_ body: String) -> String {
+        guard !body.isEmpty else {
+            return "---\n---"
+        }
+        // The block owns the raw YAML body; only reconstruct delimiters and
+        // the delimiter separator line break that is not shown as editable body text.
+        return "---\n\(body)\n---"
+    }
+
     private static func numberedListMarkdown(_ block: BlockInputBlock, start: Int) -> String {
         var countersByLevel: [Int: Int] = [:]
         let baselineIndentationLevel = block.indentationLevel(forLine: 0)
@@ -407,7 +423,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
             return false
         }
     }

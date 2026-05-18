@@ -31,6 +31,9 @@ extension BlockInputBlockItem {
         quoteBarBottomConstraint?.constant = -Self.quoteBarVerticalInset
         horizontalRuleLeadingConstraint?.constant = Self.horizontalRuleInnerInset
         horizontalRuleTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: true)
+        frontMatterDividerLeadingConstraint?.constant = Self.horizontalRuleInnerInset
+        frontMatterDividerTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: true)
+        frontMatterDividerBottomConstraint?.constant = -Self.frontMatterDividerVerticalInset
     }
 
     func resetChromeForReuse() {
@@ -43,6 +46,8 @@ extension BlockInputBlockItem {
         checklistButton.isHidden = true
         checklistButton.isEnabled = false
         checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
+        frontMatterDividerView.isHidden = true
+        frontMatterDividerView.alphaValue = 0
         handleView.isEnabled = false
         handleView.isHidden = true
         handleView.alphaValue = 0

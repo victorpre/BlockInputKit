@@ -17,8 +17,10 @@ extension BlockInputDocument {
         guard let block = block(withID: blockID) else {
             return nil
         }
+        let isFirstEmptyBlock = blocks.first?.id == blockID && block.text.isEmpty
         return typingShortcut(
             for: block,
+            isFirstEmptyBlock: isFirstEmptyBlock,
             proposedText: proposedText,
             proposedUTF16Offset: proposedUTF16Offset
         )
@@ -26,13 +28,18 @@ extension BlockInputDocument {
 
     func typingShortcut(
         for block: BlockInputBlock,
+        isFirstEmptyBlock: Bool = false,
         proposedText: String,
         proposedUTF16Offset: Int
     ) -> TypingShortcut? {
         guard block.kind == .paragraph || block.kind.isHeading || block.kind == .bulletedListItem else {
             return nil
         }
-        guard let match = BlockInputTypingShortcutParser.match(in: proposedText, currentKind: block.kind) else {
+        guard let match = BlockInputTypingShortcutParser.match(
+            in: proposedText,
+            currentKind: block.kind,
+            isFirstEmptyBlock: isFirstEmptyBlock
+        ) else {
             return nil
         }
         let cursorOffset = max(0, proposedUTF16Offset - match.consumedUTF16Length)
@@ -76,19 +83,27 @@ extension BlockInputDocument {
               blocks[index].kind.canUnwrapToParagraph else {
             return nil
         }
-        let marker = blocks[index].kind.plainTextRevealMarker
-        let cursorOffset: Int
-        if let marker {
-            let revealedText = marker + blocks[index].text
-            blocks[index].kind = .paragraph
-            blocks[index].text = revealedText
-            cursorOffset = (marker as NSString).length
-        } else {
-            blocks[index].kind = .paragraph
-            cursorOffset = 0
-        }
+        let unwrapped = blocks[index].unwrappedParagraphSource()
+        blocks[index].kind = .paragraph
+        blocks[index].text = unwrapped.text
         blocks[index].indentationLevel = 0
-        return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: cursorOffset))
+        return .cursor(BlockInputCursor(blockID: blockID, utf16Offset: unwrapped.cursorOffset))
+    }
+}
+
+extension BlockInputBlock {
+    func unwrappedParagraphSource() -> (text: String, cursorOffset: Int) {
+        if kind == .frontMatter {
+            // Unlike prefix-only block markers, frontmatter has a closing
+            // delimiter. Recover the full Markdown source so unformatting does
+            // not silently drop delimiter text on the next raw snapshot.
+            let source = BlockInputDocument(blocks: [self]).markdown
+            return (source, min(("---\n" as NSString).length, (source as NSString).length))
+        }
+        guard let marker = kind.plainTextRevealMarker else {
+            return (text, 0)
+        }
+        return (marker + text, (marker as NSString).length)
     }
 }
 
@@ -100,7 +115,12 @@ private enum BlockInputTypingShortcutParser {
         var preservesIndentation: Bool = false
     }
 
-    static func match(in text: String, currentKind: BlockInputBlockKind) -> Match? {
+    static func match(in text: String, currentKind: BlockInputBlockKind, isFirstEmptyBlock: Bool) -> Match? {
+        if currentKind == .paragraph,
+           isFirstEmptyBlock,
+           let frontMatter = frontMatterMatch(in: text) {
+            return frontMatter
+        }
         if currentKind == .paragraph,
            let horizontalRule = horizontalRuleMatch(in: text) {
             return horizontalRule
@@ -119,6 +139,24 @@ private enum BlockInputTypingShortcutParser {
             ?? checklistMatch(in: text, consumesLeadingDash: true, preservesIndentation: false)
             ?? bulletMatch(in: text)
             ?? numberedListMatch(in: text)
+    }
+
+    private static func frontMatterMatch(in text: String) -> Match? {
+        if text == "---" {
+            return Match(kind: .frontMatter, text: "", consumedUTF16Length: 3)
+        }
+        guard text.hasPrefix("--- ") else {
+            return nil
+        }
+        let suffixStart = text.index(text.startIndex, offsetBy: 4)
+        let suffix = text[suffixStart...]
+        let trimmedSuffix = suffix.drop { $0 == " " }
+        let trimmedLeadingSpaceCount = suffix.distance(from: suffix.startIndex, to: trimmedSuffix.startIndex)
+        return Match(
+            kind: .frontMatter,
+            text: String(trimmedSuffix),
+            consumedUTF16Length: 4 + trimmedLeadingSpaceCount
+        )
     }
 
     private static func horizontalRuleMatch(in text: String) -> Match? {
@@ -253,6 +291,8 @@ extension BlockInputBlockKind {
             return String(repeating: "#", count: min(max(level, 1), 6))
         case .horizontalRule:
             return "---"
+        case .frontMatter:
+            return nil
         case .quote:
             return ">"
         case .bulletedListItem:

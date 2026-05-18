@@ -78,6 +78,39 @@ final class BlockInputDocumentStoreTests: XCTestCase {
         XCTAssertEqual(store.block(withID: secondID)?.text, "Second")
     }
 
+    func testMemoryDocumentStoreInsertionAtStartKeepsLeadingFrontMatterPinned() {
+        let frontID = BlockInputBlockID(rawValue: "front")
+        let insertedID = BlockInputBlockID(rawValue: "inserted")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: frontID, kind: .frontMatter, text: "title: Demo"),
+            BlockInputBlock(id: "body", text: "Body")
+        ]))
+
+        store.insertBlocks([BlockInputBlock(id: insertedID, text: "Inserted")], at: 0)
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [frontID, insertedID, "body"])
+        XCTAssertEqual(store.index(of: frontID), 0)
+        XCTAssertEqual(store.index(of: insertedID), 1)
+        XCTAssertEqual(store.block(withID: insertedID)?.text, "Inserted")
+    }
+
+    func testMemoryDocumentStoreMovePathsDoNotDisplaceLeadingFrontMatter() {
+        let leadingID = BlockInputBlockID(rawValue: "leading")
+        let duplicateID = BlockInputBlockID(rawValue: "duplicate")
+        let store = BlockInputMemoryDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: leadingID, kind: .frontMatter, text: "title: Leading"),
+            BlockInputBlock(id: "body", text: "Body"),
+            BlockInputBlock(id: duplicateID, kind: .frontMatter, text: "title: Duplicate")
+        ]))
+
+        store.moveBlock(withID: duplicateID, to: 0)
+        store.moveBlockWithoutNormalizing(withID: duplicateID, to: 0)
+
+        XCTAssertEqual(store.document.blocks.map(\.id), [leadingID, "body", duplicateID])
+        XCTAssertEqual(store.index(of: leadingID), 0)
+        XCTAssertEqual(store.index(of: duplicateID), 2)
+    }
+
     func testMemoryDocumentStoreUpdatesIndexesAfterMiddleDeletion() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
@@ -184,6 +217,20 @@ final class BlockInputDocumentStoreTests: XCTestCase {
         XCTAssertEqual(fallbackStore.document.blocks.map(\.id), [thirdID, firstID])
         XCTAssertEqual(fallbackStore.document.blocks.map(\.text), ["Third", "Updated"])
         XCTAssertEqual(fallbackStore.replaceDocumentCount, 5)
+    }
+
+    func testDefaultStoreInsertionAtStartKeepsLeadingFrontMatterPinned() {
+        let frontID = BlockInputBlockID(rawValue: "front")
+        let insertedID = BlockInputBlockID(rawValue: "inserted")
+        let fallbackStore = FallbackDocumentStore(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: frontID, kind: .frontMatter, text: "title: Demo"),
+            BlockInputBlock(id: "body", text: "Body")
+        ]))
+
+        fallbackStore.insertBlocks([BlockInputBlock(id: insertedID, text: "Inserted")], at: 0)
+
+        XCTAssertEqual(fallbackStore.document.blocks.map(\.id), [frontID, insertedID, "body"])
+        XCTAssertEqual(fallbackStore.replaceDocumentCount, 1)
     }
 
     func testDefaultGranularNoOpsDoNotReplaceDocument() {

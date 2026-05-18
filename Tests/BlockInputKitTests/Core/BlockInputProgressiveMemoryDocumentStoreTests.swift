@@ -17,6 +17,77 @@ final class ProgressiveMemoryDocumentStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testCompleteSnapshotPreservesFrontMatterKindAndRawBody() async throws {
+        let front = BlockInputBlock(id: "front", kind: .frontMatter, text: "title: Demo\n  nested: true\n")
+        let body = BlockInputBlock(id: "body", text: "Body")
+        let store = BlockInputProgressiveMemoryDocumentStore(blocks: [front, body], initialLimit: 1)
+
+        let snapshot = try await store.completeDocumentSnapshot(limit: 10)
+
+        XCTAssertEqual(snapshot.blocks, [front, body])
+    }
+
+    @MainActor
+    func testProgressiveMemoryStoreKeepsFrontMatterPinnedDuringMoves() async throws {
+        let front = BlockInputBlock(id: "front", kind: .frontMatter, text: "title: Demo")
+        let body = BlockInputBlock(id: "body", text: "Body")
+        let tail = BlockInputBlock(id: "tail", text: "Tail")
+        let store = BlockInputProgressiveMemoryDocumentStore(blocks: [front, body, tail], initialLimit: 3)
+
+        store.moveBlock(withID: front.id, to: 1)
+        store.moveBlock(withID: body.id, to: 0)
+        let snapshot = try await store.completeDocumentSnapshot(limit: 10)
+
+        XCTAssertEqual(snapshot.blocks, [front, body, tail])
+        XCTAssertEqual(store.index(of: front.id), 0)
+        XCTAssertEqual(store.index(of: body.id), 1)
+    }
+
+    @MainActor
+    func testProgressiveMemoryStoreCanRepairNonLeadingFrontMatter() async throws {
+        let front = BlockInputBlock(id: "front", kind: .frontMatter, text: "title: Demo")
+        let body = BlockInputBlock(id: "body", text: "Body")
+        let store = BlockInputProgressiveMemoryDocumentStore(blocks: [body, front], initialLimit: 2)
+
+        store.moveBlock(withID: front.id, to: 0)
+        let snapshot = try await store.completeDocumentSnapshot(limit: 10)
+
+        XCTAssertEqual(snapshot.blocks, [front, body])
+        XCTAssertEqual(store.index(of: front.id), 0)
+        XCTAssertEqual(store.index(of: body.id), 1)
+    }
+
+    @MainActor
+    func testProgressiveMemoryStoreDoesNotMoveDuplicateFrontMatterBeforeLeadingFrontMatter() async throws {
+        let leading = BlockInputBlock(id: "leading", kind: .frontMatter, text: "title: Leading")
+        let body = BlockInputBlock(id: "body", text: "Body")
+        let duplicate = BlockInputBlock(id: "duplicate", kind: .frontMatter, text: "title: Duplicate")
+        let store = BlockInputProgressiveMemoryDocumentStore(blocks: [leading, body, duplicate], initialLimit: 3)
+
+        store.moveBlock(withID: duplicate.id, to: 0)
+        let snapshot = try await store.completeDocumentSnapshot(limit: 10)
+
+        XCTAssertEqual(snapshot.blocks, [leading, body, duplicate])
+        XCTAssertEqual(store.index(of: leading.id), 0)
+        XCTAssertEqual(store.index(of: duplicate.id), 2)
+    }
+
+    @MainActor
+    func testProgressiveMemoryStoreInsertionAtStartKeepsLeadingFrontMatterPinned() async throws {
+        let front = BlockInputBlock(id: "front", kind: .frontMatter, text: "title: Demo")
+        let inserted = BlockInputBlock(id: "inserted", text: "Inserted")
+        let body = BlockInputBlock(id: "body", text: "Body")
+        let store = BlockInputProgressiveMemoryDocumentStore(blocks: [front, body], initialLimit: 2)
+
+        store.insertBlocks([inserted], at: 0)
+        let snapshot = try await store.completeDocumentSnapshot(limit: 10)
+
+        XCTAssertEqual(snapshot.blocks, [front, inserted, body])
+        XCTAssertEqual(store.index(of: front.id), 0)
+        XCTAssertEqual(store.index(of: inserted.id), 1)
+    }
+
+    @MainActor
     func testProgressiveMemoryStoreLoadsBatchesAndEmitsUpdates() async throws {
         let blocks = (0..<5).map { index in
             BlockInputBlock(id: BlockInputBlockID(rawValue: "block-\(index)"), text: "Block \(index)")

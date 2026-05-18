@@ -30,6 +30,9 @@ extension BlockInputDocument {
         guard finalTargetIndex != sourceIndex else {
             return nil
         }
+        guard Self.canMovePreservingLeadingFrontMatter(sourceIndex: sourceIndex, targetIndex: finalTargetIndex, in: blocks) else {
+            return nil
+        }
         let sourceBlock = blocks[sourceIndex]
         let sourceListRange = sourceBlock.kind.isNumberedListItem ? listRange(near: sourceIndex) : nil
         let sourceListFirstTopLevelStart = sourceBlock.kind.isNumberedListItem
@@ -193,6 +196,30 @@ extension BlockInputDocument {
         }
         return uniqueBlocks
     }
+
+    /// Returns whether a move keeps existing frontmatter document-leading.
+    ///
+    /// Custom stores that mutate their own block arrays should use this helper
+    /// before applying granular move mutations. A misplaced frontmatter block can
+    /// still move back to index `0` only when doing so does not displace an
+    /// existing leading frontmatter block.
+    public static func canMovePreservingLeadingFrontMatter(
+        sourceIndex: Int,
+        targetIndex: Int,
+        in blocks: [BlockInputBlock]
+    ) -> Bool {
+        guard blocks.indices.contains(sourceIndex),
+              blocks.indices.contains(targetIndex) else {
+            return false
+        }
+        if blocks[sourceIndex].kind == .frontMatter {
+            guard targetIndex == 0 else {
+                return false
+            }
+            return sourceIndex == 0 || blocks.first?.kind != .frontMatter
+        }
+        return !(blocks.first?.kind == .frontMatter && targetIndex == 0)
+    }
 }
 
 private extension BlockInputBlockKind {
@@ -207,7 +234,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
             return false
         }
     }

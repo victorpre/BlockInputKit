@@ -177,6 +177,37 @@ final class BlockInputViewDropIndicatorTests: XCTestCase {
         )
     }
 
+    func testValidateFileDropBeforeFrontMatterShowsIndicatorAfterFrontMatter() throws {
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "front", kind: .frontMatter, text: "title: Demo"),
+            BlockInputBlock(id: "body", text: "Body")
+        ])
+        let frontAttributes = try XCTUnwrap(mounted.view.collectionView.layoutAttributesForItem(
+            at: IndexPath(item: 0, section: 0)
+        ))
+        let collectionLocation = NSPoint(x: frontAttributes.frame.midX, y: frontAttributes.frame.minY + 1)
+        let windowLocation = mounted.view.collectionView.convert(collectionLocation, to: nil)
+        var indexPath = NSIndexPath(forItem: 0, inSection: 0)
+        var operation = NSCollectionView.DropOperation.on
+
+        let dragOperation = withUnsafeMutablePointer(to: &indexPath) { pointer in
+            mounted.view.collectionView(
+                mounted.view.collectionView,
+                validateDrop: BlockInputDraggingInfo(fileURLs: [URL(fileURLWithPath: "/tmp/example.txt")], location: windowLocation),
+                proposedIndexPath: AutoreleasingUnsafeMutablePointer(pointer),
+                dropOperation: &operation
+            )
+        }
+
+        XCTAssertTrue(dragOperation.contains(.copy))
+        XCTAssertEqual(indexPath.item, 1)
+        XCTAssertEqual(operation, .before)
+        XCTAssertEqual(
+            mounted.view.dropIndicatorView.frame.minY,
+            mounted.view.dropIndicatorFrame(forInsertionIndex: 1)?.minY
+        )
+    }
+
     func testAcceptDropUsesResolvedInsertionIndexInsteadOfStaleProposedIndex() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

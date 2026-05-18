@@ -10,8 +10,10 @@ extension BlockInputView {
         guard let blockBeforeEdit = block(withID: blockID) else {
             return nil
         }
+        let isFirstEmptyBlock = index(of: blockID) == 0 && blockBeforeEdit.text.isEmpty
         guard let shortcut = document.typingShortcut(
             for: blockBeforeEdit,
+            isFirstEmptyBlock: isFirstEmptyBlock,
             proposedText: proposedText,
             proposedUTF16Offset: proposedUTF16Offset
         ) else {
@@ -151,19 +153,13 @@ extension BlockInputView {
         }
         let beforeSelection = selection
         var afterBlock = beforeBlock
-        let cursorOffset: Int
-        if let marker = afterBlock.kind.plainTextRevealMarker {
-            afterBlock.kind = .paragraph
-            afterBlock.text = marker + afterBlock.text
-            cursorOffset = (marker as NSString).length
-        } else {
-            afterBlock.kind = .paragraph
-            cursorOffset = 0
-        }
+        let unwrapped = afterBlock.unwrappedParagraphSource()
+        afterBlock.kind = .paragraph
+        afterBlock.text = unwrapped.text
         afterBlock.indentationLevel = 0
         let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
             blockID: blockID,
-            utf16Offset: cursorOffset
+            utf16Offset: unwrapped.cursorOffset
         ))
 
         syncDocumentStore(.replaceBlock(afterBlock))

@@ -15,7 +15,7 @@ public extension BlockInputView {
             return nil
         }
 
-        let insertedBlocks = BlockInputDocument(markdown: markdown).blocks
+        let parsedBlocks = BlockInputDocument(markdown: markdown).blocks
         let targetBlockID = blockID ?? activeBlockID
         if let targetBlockID, index(of: targetBlockID) == nil {
             return nil
@@ -31,14 +31,15 @@ public extension BlockInputView {
                 }
                 let insertionIndex = markdownInsertionIndex(below: targetBlockID, in: beforeDocument)
                     ?? beforeDocument.blocks.count
+                let insertedBlocks = frontMatterDowngradedBlocks(parsedBlocks, sourceMarkdown: markdown)
                 return .insertBlocks(insertedBlocks, insertionIndex: insertionIndex)
             },
             edit: { document in
                 if document.blocks.count == 1,
                    document.blocks[0].kind == .paragraph,
                    document.blocks[0].isEmpty {
-                    document.blocks = insertedBlocks
-                    guard let firstBlock = insertedBlocks.first else {
+                    document.blocks = parsedBlocks
+                    guard let firstBlock = parsedBlocks.first else {
                         return nil
                     }
                     return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0))
@@ -47,6 +48,7 @@ public extension BlockInputView {
                 guard let insertionIndex = markdownInsertionIndex(below: targetBlockID, in: document) else {
                     return nil
                 }
+                let insertedBlocks = frontMatterDowngradedBlocks(parsedBlocks, sourceMarkdown: markdown)
                 return document.insertBlocks(insertedBlocks, at: insertionIndex)
             }
         )
@@ -61,4 +63,42 @@ public extension BlockInputView {
         }
         return document.blocks.count
     }
+}
+
+private func frontMatterDowngradedBlocks(_ blocks: [BlockInputBlock], sourceMarkdown: String) -> [BlockInputBlock] {
+    let frontMatterSource = leadingFrontMatterSource(in: sourceMarkdown)
+    return blocks.map { block in
+        guard block.kind == .frontMatter else {
+            return block
+        }
+        // Frontmatter is meaningful only at document start; pasted mid-document
+        // source stays editable and round-trippable as raw Markdown. Use the
+        // original source slice so delimiter style, including `...`, survives.
+        return BlockInputBlock(
+            id: block.id,
+            kind: .rawMarkdown,
+            text: frontMatterSource ?? BlockInputDocument(blocks: [block]).markdown
+        )
+    }
+}
+
+private func leadingFrontMatterSource(in markdown: String) -> String? {
+    let lines = BlockInputLineBreaks.lines(in: markdown)
+    guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else {
+        return nil
+    }
+    for index in lines.indices.dropFirst() {
+        let trimmed = lines[index].trimmingCharacters(in: .whitespaces)
+        if trimmed == "---" || trimmed == "..." {
+            var upperBound = index
+            var lookahead = lines.index(after: index)
+            while lookahead < lines.endIndex,
+                  lines[lookahead].trimmingCharacters(in: .whitespaces).isEmpty {
+                upperBound = lookahead
+                lookahead = lines.index(after: lookahead)
+            }
+            return lines[0...upperBound].joined(separator: "\n")
+        }
+    }
+    return nil
 }

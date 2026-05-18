@@ -79,6 +79,12 @@ extension BlockInputBlockItem {
         view.firstDescendant(of: BlockInputHorizontalRuleView.self)
     }
 
+    var testingFrontMatterDividerView: NSView? {
+        view.firstDescendant(of: NSView.self) { view in
+            view.identifier?.rawValue == "BlockInputFrontMatterDividerView"
+        }
+    }
+
     var testingSelectionBackgroundView: NSView {
         selectionBackgroundView
     }

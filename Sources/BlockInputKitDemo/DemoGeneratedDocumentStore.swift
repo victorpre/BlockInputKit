@@ -1,6 +1,11 @@
 import BlockInputKit
 import Foundation
 
+/// Demo-only progressive store that synthesizes large documents on demand.
+///
+/// The store mutates its own loaded block array for benchmark realism, so
+/// granular insert and move paths call BlockInputDocument's shared frontmatter
+/// helpers instead of duplicating document-leading metadata policy.
 final class DemoGeneratedDocumentStore: BlockInputDocumentStore, @unchecked Sendable {
     var loadedBlockCount: Int {
         locked { loadedBlocks.count }
@@ -171,7 +176,7 @@ final class DemoGeneratedDocumentStore: BlockInputDocumentStore, @unchecked Send
 
     func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
         locked {
-            let insertionIndex = min(max(index, 0), loadedBlocks.count)
+            let insertionIndex = BlockInputDocument.insertionIndexPreservingLeadingFrontMatter(index, in: loadedBlocks)
             loadedBlocks.insert(contentsOf: blocks, at: insertionIndex)
             totalCount += blocks.count
             indexesByID = Self.indexesByID(for: loadedBlocks)
@@ -199,8 +204,16 @@ final class DemoGeneratedDocumentStore: BlockInputDocumentStore, @unchecked Send
                   loadedBlocks.indices.contains(sourceIndex) else {
                 return
             }
+            let targetIndex = min(max(index, 0), loadedBlocks.count - 1)
+            guard targetIndex != sourceIndex,
+                  BlockInputDocument.canMovePreservingLeadingFrontMatter(
+                    sourceIndex: sourceIndex,
+                    targetIndex: targetIndex,
+                    in: loadedBlocks
+                  ) else {
+                return
+            }
             let block = loadedBlocks.remove(at: sourceIndex)
-            let targetIndex = min(max(index, 0), loadedBlocks.count)
             loadedBlocks.insert(block, at: targetIndex)
             indexesByID = Self.indexesByID(for: loadedBlocks)
         }

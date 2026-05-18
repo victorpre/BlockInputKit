@@ -28,6 +28,8 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let quoteTextLeading: CGFloat = 9
     static let codeTextHorizontalPadding: CGFloat = 6
     static let horizontalRuleInnerInset: CGFloat = defaultTextLeading + 4
+    static let frontMatterDividerHeight: CGFloat = 1
+    static let frontMatterDividerVerticalInset: CGFloat = 10
 
     let handleView = BlockInputDragHandleView()
     let kindLabel = BlockInputMarkerView()
@@ -36,6 +38,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     let scrollView = BlockInputBlockItemScrollView()
     let codeBackgroundView = NSView()
     let horizontalRuleView = BlockInputHorizontalRuleView()
+    let frontMatterDividerView = BlockInputFrontMatterDividerView()
     let selectionBackgroundView = BlockInputSelectionBackgroundView()
     let textView = BlockInputTextView()
     private var trackingArea: NSTrackingArea?
@@ -71,6 +74,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var quoteBarBottomConstraint: NSLayoutConstraint?
     var horizontalRuleLeadingConstraint: NSLayoutConstraint?
     var horizontalRuleTrailingConstraint: NSLayoutConstraint?
+    var frontMatterDividerLeadingConstraint: NSLayoutConstraint?
+    var frontMatterDividerTrailingConstraint: NSLayoutConstraint?
+    var frontMatterDividerBottomConstraint: NSLayoutConstraint?
     private var isHorizontalRule = false
 
     enum TextLinePosition {
@@ -180,10 +186,13 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         }
         configureBlockKindChrome(block: block)
         setBlockSelection(isSelected)
-        handleView.isEnabled = allowsReordering
-        handleView.isHidden = !allowsReordering
+        // Frontmatter is pinned to document index 0, so keep the reorder
+        // gutter width for alignment without exposing an unusable drag handle.
+        let canReorderBlock = allowsReordering && block.kind != .frontMatter
+        handleView.isEnabled = canReorderBlock
+        handleView.isHidden = !canReorderBlock
         handleView.alphaValue = 0
-        handleView.toolTip = allowsReordering ? "Drag to reorder block" : nil
+        handleView.toolTip = canReorderBlock ? "Drag to reorder block" : nil
         view.window?.invalidateCursorRects(for: view)
         handleLeadingConstraint?.constant = Self.handleLeadingInset(
             allowsReordering: allowsReordering,
@@ -195,6 +204,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             editorHorizontalInset: editorHorizontalInset
         )
         horizontalRuleTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: allowsReordering)
+        frontMatterDividerTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: allowsReordering)
     }
 
     func updateTextDependentChrome(for block: BlockInputBlock) {

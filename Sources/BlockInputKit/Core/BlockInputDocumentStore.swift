@@ -47,7 +47,9 @@ public protocol BlockInputDocumentStore: AnyObject {
     /// Inserts blocks at an ordered index.
     ///
     /// The default implementation calls `replaceDocument(_:)` only for complete
-    /// stores when the insertion changes the current document.
+    /// stores when the insertion changes the current document. Stores should not
+    /// insert blocks before existing leading frontmatter; direct array-backed
+    /// stores can use `BlockInputDocument.insertionIndexPreservingLeadingFrontMatter`.
     func insertBlocks(_ blocks: [BlockInputBlock], at index: Int)
     /// Deletes blocks by stable ID.
     ///
@@ -57,7 +59,9 @@ public protocol BlockInputDocumentStore: AnyObject {
     /// Moves one block to a final ordered index.
     ///
     /// The default implementation calls `replaceDocument(_:)` only for complete
-    /// stores when the block exists and its index changes.
+    /// stores when the block exists and its index changes. Direct array-backed
+    /// stores can use `BlockInputDocument.canMovePreservingLeadingFrontMatter`
+    /// before applying a move.
     func moveBlock(withID id: BlockInputBlockID, to index: Int)
 }
 
@@ -298,10 +302,10 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
     public func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
         lock.lock()
         defer { lock.unlock() }
+        let insertionIndex = BlockInputDocument.insertionIndexPreservingLeadingFrontMatter(index, in: storedDocument.blocks)
         guard storedDocument.insertBlocks(blocks, at: index) != nil else {
             return
         }
-        let insertionIndex = min(max(index, 0), storedDocument.blocks.count - blocks.count)
         indexesNeedRebuild = true
         for (offset, block) in blocks.enumerated() {
             let insertedIndex = insertionIndex + offset
@@ -364,6 +368,13 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, @unch
         }
         let finalTargetIndex = min(max(index, 0), storedDocument.blocks.count - 1)
         guard finalTargetIndex != sourceIndex else {
+            return
+        }
+        guard BlockInputDocument.canMovePreservingLeadingFrontMatter(
+            sourceIndex: sourceIndex,
+            targetIndex: finalTargetIndex,
+            in: storedDocument.blocks
+        ) else {
             return
         }
         if abs(finalTargetIndex - sourceIndex) == 1 {

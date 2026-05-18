@@ -6,6 +6,9 @@ extension BlockInputBlockItem {
         let availableTextWidth = max(textWidth - perLineContentIndent(for: block), 120)
         let font = font(for: block.kind)
         let metrics = verticalMetrics(for: block)
+        let frontMatterReserve = block.kind == .frontMatter
+            ? (frontMatterDividerVerticalInset * 2) + frontMatterDividerHeight
+            : 0
         if case .code = block.kind {
             let codeWidth = max(unwrappedTextWidth(for: text, font: font), availableTextWidth)
             let horizontalScrollerReserve = codeWidth > availableTextWidth
@@ -22,8 +25,8 @@ extension BlockInputBlockItem {
         }
         if isShortSingleLine(text, likelyFitting: availableTextWidth, font: font) {
             return max(
-                metrics.minimumHeight,
-                singleLineTextHeight(font: font) + metrics.topContentInset + metrics.bottomContentInset + 2
+                metrics.minimumHeight + frontMatterReserve,
+                singleLineTextHeight(font: font) + metrics.topContentInset + metrics.bottomContentInset + frontMatterReserve + 2
             )
         }
         let boundingRect = (text as NSString).boundingRect(
@@ -32,10 +35,11 @@ extension BlockInputBlockItem {
             attributes: [.font: font]
         )
         return max(
-            metrics.minimumHeight,
+            metrics.minimumHeight + frontMatterReserve,
             max(ceil(boundingRect.height), textKitHeight(for: text, width: availableTextWidth, font: font))
                 + metrics.topContentInset
                 + metrics.bottomContentInset
+                + frontMatterReserve
                 + 2
         )
     }
@@ -90,14 +94,14 @@ extension BlockInputBlockItem {
             return .checklist
         case .paragraph, .quote:
             return .textBlock
-        case .heading, .code, .horizontalRule, .rawMarkdown:
+        case .heading, .code, .horizontalRule, .frontMatter, .rawMarkdown:
             return .standard
         }
     }
 
     static func prefix(for kind: BlockInputBlockKind, indentationLevel: Int) -> String {
         switch kind {
-        case .paragraph, .heading, .code, .horizontalRule, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
             return ""
         case .bulletedListItem:
             return unorderedListMarker(indentationLevel: indentationLevel)
@@ -114,7 +118,7 @@ extension BlockInputBlockItem {
             let clampedLevel = min(max(level, 1), 6)
             let sizes: [CGFloat] = [26, 23, 20, 18, 16, 15]
             return .systemFont(ofSize: sizes[clampedLevel - 1], weight: .semibold)
-        case .code, .rawMarkdown:
+        case .code, .frontMatter, .rawMarkdown:
             return .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         case .paragraph, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return .preferredFont(forTextStyle: .body)
@@ -319,11 +323,14 @@ extension BlockInputBlockItem {
         textStorage.addAttribute(.font, value: font, range: fullRange)
         textStorage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
         textStorage.removeAttribute(.backgroundColor, range: fullRange)
+        textStorage.removeAttribute(.underlineStyle, range: fullRange)
         textStorage.removeAttribute(.kern, range: fullRange)
         textStorage.removeAttribute(.paragraphStyle, range: fullRange)
         applyCodeBlockAttributes(for: block, textStorage: textStorage)
         applyLineIndentationAttributes(for: block, textStorage: textStorage)
         applyInlineCodeAttributes(for: block, textStorage: textStorage)
+        applyFrontMatterKeyValueAttributes(for: block, textStorage: textStorage)
+        applyFrontMatterValidationAttributes(for: block, textStorage: textStorage)
         textStorage.endEditing()
         textView.layoutManager?.invalidateLayout(forCharacterRange: fullRange, actualCharacterRange: nil)
         textView.needsDisplay = true
@@ -339,6 +346,7 @@ extension BlockInputBlockItem {
         attributes[.font] = font
         attributes.removeValue(forKey: .foregroundColor)
         attributes.removeValue(forKey: .backgroundColor)
+        attributes.removeValue(forKey: .underlineStyle)
         attributes.removeValue(forKey: .kern)
         let textLength = (textView.string as NSString).length
         let selectedLocation = min(textView.selectedRange().location, max(textLength - 1, 0))
@@ -479,7 +487,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .quote, .bulletedListItem, .numberedListItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .checklistItem, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .checklistItem, .rawMarkdown:
             return false
         }
     }

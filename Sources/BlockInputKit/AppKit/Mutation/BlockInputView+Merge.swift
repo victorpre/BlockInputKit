@@ -10,7 +10,8 @@ public extension BlockInputView {
               let currentBlock = block(at: index),
               let previousBlock = block(at: index - 1),
               currentBlock.kind == .paragraph,
-              previousBlock.kind != .horizontalRule else {
+              previousBlock.kind != .horizontalRule,
+              previousBlock.kind != .frontMatter else {
             return nil
         }
         let beforeSelection = selection

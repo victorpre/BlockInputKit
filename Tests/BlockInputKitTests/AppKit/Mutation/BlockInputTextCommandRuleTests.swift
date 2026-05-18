@@ -51,7 +51,7 @@ final class BlockInputTextCommandRuleTests: XCTestCase {
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
     }
 
-    func testTypingHorizontalRuleShortcutFocusesInsertedBlockBelowRule() throws {
+    func testTypingFirstEmptyBlockThreeDashesCreatesFrontMatter() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let view = BlockInputView()
@@ -70,21 +70,23 @@ final class BlockInputTextCommandRuleTests: XCTestCase {
 
         item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
 
-        XCTAssertEqual(view.document.blocks.map(\.kind), [.horizontalRule, .paragraph, .paragraph])
-        XCTAssertEqual(view.document.blocks[2].id, secondID)
-        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
+        XCTAssertEqual(view.document.blocks.map(\.kind), [.frontMatter, .paragraph])
+        XCTAssertEqual(view.document.blocks[0].id, firstID)
+        XCTAssertEqual(view.document.blocks[0].text, "")
+        XCTAssertEqual(view.document.blocks[1].id, secondID)
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 0)))
     }
 
-    func testTypingHorizontalRuleShortcutWithTrailingSpaceInEmptyBlockCreatesRule() throws {
+    func testTypingNonFirstHorizontalRuleShortcutWithTrailingSpaceCreatesRule() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let view = BlockInputView()
         view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
-            BlockInputBlock(id: firstID, text: ""),
-            BlockInputBlock(id: secondID, text: "Second")
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "")
         ])))
         let item = BlockInputBlockItem.configuredForTesting(
-            block: view.document.blocks[0],
+            block: view.document.blocks[1],
             allowsReordering: true,
             delegate: view
         )
@@ -94,10 +96,10 @@ final class BlockInputTextCommandRuleTests: XCTestCase {
 
         item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
 
-        XCTAssertEqual(view.document.blocks.map(\.kind), [.horizontalRule, .paragraph, .paragraph])
-        XCTAssertEqual(view.document.blocks[1].text, "")
-        XCTAssertEqual(view.document.blocks[2].id, secondID)
-        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
+        XCTAssertEqual(view.document.blocks.map(\.kind), [.paragraph, .horizontalRule, .paragraph])
+        XCTAssertEqual(view.document.blocks[1].id, secondID)
+        XCTAssertEqual(view.document.blocks[2].text, "")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: view.document.blocks[2].id, utf16Offset: 0)))
     }
 
     func testTypingHorizontalRuleShortcutMovesExistingTextBelowRule() throws {

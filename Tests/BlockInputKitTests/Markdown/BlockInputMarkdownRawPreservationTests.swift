@@ -3,7 +3,7 @@ import XCTest
 @testable import BlockInputKit
 
 final class BlockInputMarkdownRawPreservationTests: XCTestCase {
-    func testMarkdownPreservesFrontMatterAsRawMarkdown() {
+    func testMarkdownParsesFrontMatterAsStructuredBlock() {
         let source = """
         ---
         title: Demo
@@ -15,18 +15,20 @@ final class BlockInputMarkdownRawPreservationTests: XCTestCase {
 
         let parsed = BlockInputDocument(markdown: source)
 
-        XCTAssertEqual(parsed.blocks.map(\.kind), [.rawMarkdown, .heading(level: 1)])
-        XCTAssertEqual(parsed.blocks[0].text, """
+        XCTAssertEqual(parsed.blocks.map(\.kind), [.frontMatter, .heading(level: 1)])
+        XCTAssertEqual(parsed.blocks[0].text, "title: Demo\ntags:\n  - swift")
+        XCTAssertEqual(parsed.markdown, """
         ---
         title: Demo
         tags:
           - swift
         ---
+
+        # Heading
         """)
-        XCTAssertEqual(parsed.markdown, source)
     }
 
-    func testMarkdownPreservesBlankLineAfterRawMarkdownBlock() {
+    func testMarkdownNormalizesBlankLineAfterFrontMatterBlock() {
         let source = """
         ---
         title: Demo
@@ -37,13 +39,8 @@ final class BlockInputMarkdownRawPreservationTests: XCTestCase {
 
         let parsed = BlockInputDocument(markdown: source)
 
-        XCTAssertEqual(parsed.blocks.map(\.kind), [.rawMarkdown, .heading(level: 1)])
-        XCTAssertEqual(parsed.blocks[0].text, """
-        ---
-        title: Demo
-        ---
-
-        """)
+        XCTAssertEqual(parsed.blocks.map(\.kind), [.frontMatter, .heading(level: 1)])
+        XCTAssertEqual(parsed.blocks[0].text, "title: Demo")
         XCTAssertEqual(parsed.markdown, source)
     }
 
@@ -381,11 +378,10 @@ final class BlockInputMarkdownRawPreservationTests: XCTestCase {
         """)
 
         XCTAssertEqual(parsed.blocks.map(\.kind), [
-            .horizontalRule,
-            .horizontalRule,
+            .frontMatter,
             .heading(level: 1)
         ])
-        XCTAssertEqual(parsed.blocks.map(\.text), ["", "", "Heading"])
+        XCTAssertEqual(parsed.blocks.map(\.text), ["", "Heading"])
     }
 
     func testMarkdownKeepsConsecutiveHorizontalRulesAfterSupportedBlockSemantic() {

@@ -4,6 +4,7 @@ extension BlockInputBlockItem {
     func configureBlockKindChrome(block: BlockInputBlock) {
         let kind = block.kind
         let isHorizontalRule = kind == .horizontalRule
+        let isFrontMatter = kind == .frontMatter
         let contentIndent = Self.contentIndent(for: block)
         let perLineContentIndent = Self.perLineContentIndent(for: block)
         let verticalMetrics = Self.verticalMetrics(for: block)
@@ -15,7 +16,7 @@ extension BlockInputBlockItem {
         scrollView.isHidden = isHorizontalRule
         configureCodeBackground(for: block)
         scrollViewTopConstraint?.constant = 0
-        scrollViewBottomConstraint?.constant = 0
+        configureFrontMatterDivider(isVisible: isFrontMatter)
         handleTopConstraint?.constant = Self.dragHandleTopConstant(for: block.kind, metrics: verticalMetrics)
         kindLabelTopConstraint?.constant = 0
         checklistButtonTopConstraint?.constant = verticalMetrics.checklistButtonTopConstant(
@@ -34,7 +35,19 @@ extension BlockInputBlockItem {
         horizontalRuleView.setVisible(isHorizontalRule)
         applyKindLabelAttributes(for: block)
         updateQuoteBarVerticalExtent()
-        switch kind {
+        configureChecklistButton(for: block, contentIndent: contentIndent)
+    }
+
+    private func configureFrontMatterDivider(isVisible: Bool) {
+        scrollViewBottomConstraint?.constant = isVisible
+            ? -((Self.frontMatterDividerVerticalInset * 2) + Self.frontMatterDividerHeight)
+            : 0
+        frontMatterDividerView.isHidden = !isVisible
+        frontMatterDividerView.alphaValue = isVisible ? 1 : 0
+    }
+
+    private func configureChecklistButton(for block: BlockInputBlock, contentIndent: CGFloat) {
+        switch block.kind {
         case let .checklistItem(isChecked):
             checklistButton.isHidden = false
             checklistButton.isEnabled = true
@@ -55,7 +68,7 @@ extension BlockInputBlockItem {
         switch block.kind {
         case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return markerAlignmentLeading() + contentIndent
-        case .paragraph, .heading, .code, .horizontalRule, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .rawMarkdown:
             return contentIndent
         }
     }
@@ -157,7 +170,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .rawMarkdown:
             return false
         }
     }
