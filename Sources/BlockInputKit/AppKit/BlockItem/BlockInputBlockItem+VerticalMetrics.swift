@@ -21,6 +21,13 @@ struct BlockInputBlockItemVerticalMetrics {
         minimumHeight: 29
     )
 
+    static let quote = BlockInputBlockItemVerticalMetrics(
+        textContainerInset: NSSize(width: 4, height: 10),
+        topContentInset: 10,
+        bottomContentInset: 6,
+        minimumHeight: 40
+    )
+
     static let textList = BlockInputBlockItemVerticalMetrics(
         textContainerInset: NSSize(width: 4, height: 4),
         topContentInset: 4,

@@ -119,7 +119,8 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
 
         XCTAssertGreaterThan(paragraphMultiline, paragraphSingleLine)
         XCTAssertGreaterThan(quoteMultiline, quoteSingleLine)
-        XCTAssertEqual(paragraphMultiline, quoteMultiline)
+        XCTAssertGreaterThanOrEqual(quoteSingleLine, BlockInputBlockItem.minimumQuoteBarHeight + BlockInputBlockItem.quoteBarVerticalInset * 2)
+        XCTAssertGreaterThan(quoteMultiline, paragraphMultiline)
     }
 
     @MainActor

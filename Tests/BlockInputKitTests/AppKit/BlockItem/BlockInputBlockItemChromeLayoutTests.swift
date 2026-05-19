@@ -209,6 +209,7 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
             BlockInputBlock(id: "heading", kind: .heading(level: 1), text: "Heading"),
             BlockInputBlock(id: "bullet", kind: .bulletedListItem, text: "Bullet"),
             BlockInputBlock(id: "checklist", kind: .checklistItem(isChecked: false), text: "Task"),
+            BlockInputBlock(id: "quote", kind: .quote, text: "Quoted"),
             BlockInputBlock(id: "code", kind: .code(language: nil), text: "let value = 1")
         ]
 
@@ -335,30 +336,6 @@ final class BlockInputBlockItemChromeLayoutTests: XCTestCase {
         XCTAssertLessThanOrEqual(textRect.maxY, item.view.bounds.maxY)
         XCTAssertEqual(quoteBar.frame.minY, textRect.minY, accuracy: 2)
         XCTAssertEqual(quoteBar.frame.maxY, textRect.maxY, accuracy: 2)
-    }
-
-    @MainActor
-    func testSingleLineQuoteBarUsesMinimumVisualHeightInsideRow() throws {
-        let block = BlockInputBlock(id: "quote", kind: .quote, text: "Quoted")
-        let item = BlockInputBlockItem.configuredForTesting(
-            block: block,
-            allowsReordering: true,
-            delegate: BlockInputView()
-        )
-        item.view.frame = NSRect(
-            x: 0,
-            y: 0,
-            width: 420,
-            height: BlockInputBlockItem.height(for: block, textWidth: 340)
-        )
-        item.view.layoutSubtreeIfNeeded()
-
-        let quoteBar = try XCTUnwrap(item.testingQuoteBarView)
-        let textRect = try textUsedRect(in: item)
-
-        XCTAssertGreaterThan(quoteBar.frame.height, textRect.height)
-        XCTAssertGreaterThanOrEqual(quoteBar.frame.minY, item.view.bounds.minY)
-        XCTAssertLessThanOrEqual(quoteBar.frame.maxY, item.view.bounds.maxY)
     }
 
     @MainActor

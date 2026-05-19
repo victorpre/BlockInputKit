@@ -7,8 +7,10 @@ extension BlockInputBlockItem {
             return .textList
         case .checklistItem:
             return .checklist
-        case .paragraph, .quote:
+        case .paragraph:
             return .textBlock
+        case .quote:
+            return .quote
         case .heading, .code, .horizontalRule, .frontMatter, .rawMarkdown:
             return .standard
         }
@@ -378,14 +380,43 @@ extension BlockInputBlockItem {
         }
 
         let itemTextRect = textView.convert(textRect, to: view)
-        let quoteBarHeight = max(Self.minimumQuoteBarHeight, itemTextRect.height)
-        let textMidY = itemTextRect.midY
-        let quoteBarMinY = max(view.bounds.minY + Self.quoteBarVerticalInset, textMidY - quoteBarHeight / 2)
-        let quoteBarMaxY = min(view.bounds.maxY - Self.quoteBarVerticalInset, textMidY + quoteBarHeight / 2)
+        let quoteBarHeight = min(
+            max(Self.minimumQuoteBarHeight, itemTextRect.height),
+            max(0, view.bounds.height - Self.quoteBarVerticalInset * 2)
+        )
+        let textMidY = quoteBarAlignmentRect(
+            itemTextRect: itemTextRect,
+            layoutManager: layoutManager,
+            textContainer: textContainer
+        ).midY
+        let quoteBarMinY = min(
+            max(view.bounds.minY + Self.quoteBarVerticalInset, textMidY - quoteBarHeight / 2),
+            view.bounds.maxY - Self.quoteBarVerticalInset - quoteBarHeight
+        )
+        let quoteBarMaxY = quoteBarMinY + quoteBarHeight
         let topInset = max(Self.quoteBarVerticalInset, view.bounds.maxY - quoteBarMaxY)
         let bottomInset = max(Self.quoteBarVerticalInset, quoteBarMinY - view.bounds.minY)
         quoteBarTopConstraint?.constant = topInset
         quoteBarBottomConstraint?.constant = -bottomInset
+        quoteBarView.frame.origin.y = quoteBarMinY
+        quoteBarView.frame.size.height = quoteBarHeight
+    }
+
+    private func quoteBarAlignmentRect(
+        itemTextRect: NSRect,
+        layoutManager: NSLayoutManager,
+        textContainer: NSTextContainer
+    ) -> NSRect {
+        let glyphRange = layoutManager.glyphRange(for: textContainer)
+        guard glyphRange.length > 0,
+              layoutManager.lineFragmentCount(in: glyphRange) == 1 else {
+            return itemTextRect
+        }
+        let firstLineRect = layoutManager.lineFragmentUsedRect(forGlyphAt: glyphRange.location, effectiveRange: nil).offsetBy(
+            dx: textView.textContainerOrigin.x,
+            dy: textView.textContainerOrigin.y
+        )
+        return textView.convert(firstLineRect, to: view)
     }
 
     private func markerAlignmentRect(
@@ -405,5 +436,18 @@ extension BlockInputBlockItem {
         }
         let glyphIndex = layoutManager.glyphIndexForCharacter(at: lineStart)
         return layoutManager.lineFragmentUsedRect(forGlyphAt: glyphIndex, effectiveRange: nil)
+    }
+}
+
+private extension NSLayoutManager {
+    func lineFragmentCount(in glyphRange: NSRange) -> Int {
+        var lineCount = 0
+        enumerateLineFragments(forGlyphRange: glyphRange) { _, _, _, _, stop in
+            lineCount += 1
+            if lineCount > 1 {
+                stop.pointee = true
+            }
+        }
+        return lineCount
     }
 }
