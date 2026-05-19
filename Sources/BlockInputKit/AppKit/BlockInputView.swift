@@ -95,6 +95,7 @@ public final class BlockInputView: NSView {
         if event.isCancelOperation, cancelMultiBlockSelection() { return }
         if let direction = event.blockInputDocumentBoundaryDirection, moveCaretToDocumentBoundary(direction) { return }
         if handleSelectionExpansionShortcut(event) { return }
+        if handleWordMovementShortcut(event) { return }
         if let direction = event.plainVerticalMovementDirection, collapseMultiBlockSelection(direction: direction) { return }
         if let direction = event.verticalMovementDirection, moveSelectedBlockVertically(direction) { return }
         if event.isBackspaceOrDelete {
@@ -112,7 +113,8 @@ public final class BlockInputView: NSView {
         if selector == #selector(moveDown(_:)), collapseMultiBlockSelection(direction: .downward) { return }
         if handleDocumentBoundaryCommand(selector) ||
             handleSelectionExpansionCommand(selector) ||
-            handleHorizontalSelectionAdjustmentCommand(selector) { return }
+            handleHorizontalSelectionAdjustmentCommand(selector) ||
+            handleWordMovementCommand(selector) { return }
         super.doCommand(by: selector)
     }
 
@@ -125,6 +127,7 @@ public final class BlockInputView: NSView {
         }
         if let direction = event.blockInputDocumentBoundaryDirection, moveCaretToDocumentBoundary(direction) { return true }
         if handleSelectionExpansionShortcut(event) { return true }
+        if handleWordMovementShortcut(event) { return true }
         // Copy needs a direct key-equivalent path; paste stays on NSText so insertion uses AppKit's normal edit pipeline.
         if event.blockInputIsCopyShortcut,
            copyActiveSelection() {

@@ -216,11 +216,40 @@ final class BlockInputTextView: NSTextView {
             handleDocumentBoundaryCommand(selector) ||
             handleSelectionExpansionCommand(selector) ||
             handleHorizontalSelectionAdjustmentCommand(selector) ||
+            handleWordMovementCommand(selector) ||
             handleBoundaryCommand(selector) {
             BlockInputSelectionDebug.emit("text command consumed selector=\(selector)")
             return
         }
         super.doCommand(by: selector)
+    }
+
+    override func moveWordLeft(_ sender: Any?) {
+        if requestWordMovementFromOwningBlock(.leftward) {
+            return
+        }
+        super.moveWordLeft(sender)
+    }
+
+    override func moveWordRight(_ sender: Any?) {
+        if requestWordMovementFromOwningBlock(.rightward) {
+            return
+        }
+        super.moveWordRight(sender)
+    }
+
+    override func moveWordBackward(_ sender: Any?) {
+        if requestWordMovementFromOwningBlock(.leftward) {
+            return
+        }
+        super.moveWordBackward(sender)
+    }
+
+    override func moveWordForward(_ sender: Any?) {
+        if requestWordMovementFromOwningBlock(.rightward) {
+            return
+        }
+        super.moveWordForward(sender)
     }
 
     override func moveToBeginningOfDocument(_ sender: Any?) {
@@ -321,48 +350,6 @@ final class BlockInputTextView: NSTextView {
             return true
         }
         return false
-    }
-
-    func requestSelectionExpansionFromOwningBlock(_ direction: BlockInputVerticalMovementDirection) -> Bool {
-        let result = blockItem?.requestExpandSelection(direction) == true
-        BlockInputSelectionDebug.emit(
-            "text request expand direction=\(direction.debugName) range=\(selectedRange()) result=\(result)"
-        )
-        return result
-    }
-
-    func requestActiveBlockSelectionExpansionFromOwningBlock(_ direction: BlockInputVerticalMovementDirection) -> Bool {
-        let result = blockItem?.requestExpandActiveBlockSelection(direction) == true
-        BlockInputSelectionDebug.emit(
-            "text request expand active blocks direction=\(direction.debugName) range=\(selectedRange()) result=\(result)"
-        )
-        return result
-    }
-
-    func requestDocumentBoundaryFromOwningBlock(_ direction: BlockInputVerticalMovementDirection) -> Bool {
-        let result = blockItem?.requestDocumentBoundary(direction) == true
-        BlockInputSelectionDebug.emit(
-            "text request document boundary direction=\(direction.debugName) range=\(selectedRange()) result=\(result)"
-        )
-        return result
-    }
-
-    func requestCancelSelectionFromOwningBlock() -> Bool {
-        blockItem?.requestCancelSelection() == true
-    }
-
-    func requestMouseDownCancelSelectionFromOwningBlock() -> Bool {
-        blockItem?.requestMouseDownCancelSelection() == true
-    }
-
-    func rememberBlockSelectionDragRange(_ range: NSRange) {
-        blockSelectionDragSelectedRange = range
-    }
-
-    func collapsedBlockSelectionDragNativeRange() -> NSRange {
-        let textLength = (string as NSString).length
-        let offset = min(max(blockSelectionDragAnchorOffset ?? selectedRange().location, 0), textLength)
-        return NSRange(location: offset, length: 0)
     }
 
     private func copySelectedPlainText() -> Bool {

@@ -157,6 +157,14 @@ func shiftRightEvent() throws -> NSEvent {
     try keyEquivalentEvent(keyCode: 124, characters: "\u{F703}", modifierFlags: .shift)
 }
 
+func optionLeftEvent(modifierFlags: NSEvent.ModifierFlags = .option) throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 123, characters: "\u{F702}", modifierFlags: modifierFlags)
+}
+
+func optionRightEvent(modifierFlags: NSEvent.ModifierFlags = .option) throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 124, characters: "\u{F703}", modifierFlags: modifierFlags)
+}
+
 func plainUpEvent() throws -> NSEvent {
     try keyDownEvent(keyCode: 126, characters: "\u{F700}")
 }

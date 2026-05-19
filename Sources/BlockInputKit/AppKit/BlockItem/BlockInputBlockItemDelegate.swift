@@ -13,6 +13,12 @@ enum BlockInputHorizontalMovementDirection: Equatable {
     case rightward
 }
 
+/// Logical Option+Left/Right direction after AppKit key events and selectors are normalized.
+enum BlockInputWordMovementDirection: Equatable {
+    case leftward
+    case rightward
+}
+
 @MainActor
 protocol BlockInputBlockItemDelegate: AnyObject {
     func blockItemDidBeginEditing(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
@@ -91,6 +97,12 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
         didRequestHorizontalSelectionAdjustment direction: BlockInputHorizontalMovementDirection,
+        selectedRange: NSRange
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestWordMovement direction: BlockInputWordMovementDirection,
         selectedRange: NSRange
     ) -> Bool
     func blockItem(
