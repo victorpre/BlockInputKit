@@ -25,4 +25,24 @@ extension BlockInputView {
     func blockInputPaste(_ sender: Any?) {
         _ = pasteIntoActiveSelection()
     }
+
+    @objc(blockInputFormatBold:)
+    func blockInputFormatBold(_ sender: Any?) {
+        _ = performTextFormattingShortcut(.bold)
+    }
+
+    @objc(blockInputFormatItalic:)
+    func blockInputFormatItalic(_ sender: Any?) {
+        _ = performTextFormattingShortcut(.italic)
+    }
+
+    @objc(blockInputFormatUnderline:)
+    func blockInputFormatUnderline(_ sender: Any?) {
+        _ = performTextFormattingShortcut(.underline)
+    }
+
+    @objc(blockInputFormatStrikethrough:)
+    func blockInputFormatStrikethrough(_ sender: Any?) {
+        _ = performTextFormattingShortcut(.strikethrough)
+    }
 }

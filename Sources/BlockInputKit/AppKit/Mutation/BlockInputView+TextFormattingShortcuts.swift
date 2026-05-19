@@ -3,23 +3,67 @@ import AppKit
 extension BlockInputView {
     @discardableResult
     func performTextFormattingShortcut(_ shortcut: BlockInputTextFormattingShortcut) -> Bool {
-        refreshDocumentFromStore()
-        guard let selection,
-              containsValidSelection(selection) else {
+        guard let context = textFormattingContext() else {
             return false
         }
-        let segments = formattingSegments(in: selection)
-        guard !segments.isEmpty else {
-            return false
-        }
+        let segments = context.segments
         let style = TextFormattingStyle(shortcut)
         let shouldRemove = segments.allSatisfy { style.formattedRange(in: $0.block.text, selectedRange: $0.range) != nil }
-        let result = formattedBlocks(from: segments, style: style, removesFormatting: shouldRemove, originalSelection: selection)
+        let result = formattedBlocks(from: segments, style: style, removesFormatting: shouldRemove, originalSelection: context.selection)
         guard !result.changedBlocks.isEmpty else {
             return false
         }
         applyTextFormattingResult(result, actionName: shouldRemove ? "Unformat Text" : "Format Text")
         return true
+    }
+
+    func textFormattingContextMenuItemStates(
+        selectedRange: NSRange,
+        in blockID: BlockInputBlockID
+    ) -> [BlockInputTextFormattingMenuItemState] {
+        if usesEditorLevelTextFormattingSelection {
+            return textFormattingContextMenuItemStates(selection: selection, clickedBlockID: blockID)
+        }
+        guard selectedRange.length > 0 else {
+            return []
+        }
+        let selection = BlockInputSelection.text(BlockInputTextRange(blockID: blockID, range: selectedRange))
+        return textFormattingContextMenuItemStates(selection: selection, clickedBlockID: blockID)
+    }
+
+    var usesEditorLevelTextFormattingSelection: Bool {
+        switch selection {
+        case .blocks, .mixed:
+            return true
+        case .cursor, .text, nil:
+            return false
+        }
+    }
+
+    func textFormattingContextMenuItemStates(for event: NSEvent) -> [BlockInputTextFormattingMenuItemState] {
+        let clickedBlockID = blockIDForContextMenuEvent(event)
+        return textFormattingContextMenuItemStates(selection: selection, clickedBlockID: clickedBlockID)
+    }
+
+    private func textFormattingContextMenuItemStates(
+        selection: BlockInputSelection?,
+        clickedBlockID: BlockInputBlockID?
+    ) -> [BlockInputTextFormattingMenuItemState] {
+        guard let context = textFormattingContext(selection: selection),
+              let clickedBlockID,
+              context.contains(blockID: clickedBlockID) else {
+            return []
+        }
+        return BlockInputTextFormattingMenuAction.all.map { action in
+            let style = TextFormattingStyle(action.shortcut)
+            let isFormatted = context.segments.allSatisfy {
+                style.formattedRange(in: $0.block.text, selectedRange: $0.range) != nil
+            }
+            return BlockInputTextFormattingMenuItemState(
+                action: action,
+                state: isFormatted ? .on : .off
+            )
+        }
     }
 
     private func applyTextFormattingResult(
@@ -52,6 +96,29 @@ extension BlockInputView {
             selectionBefore: result.selectionBefore,
             selectionAfter: result.selectionAfter
         ))
+    }
+
+    private func textFormattingContext(selection: BlockInputSelection? = nil) -> TextFormattingContext? {
+        refreshDocumentFromStore()
+        let selection = selection ?? self.selection
+        guard let selection,
+              containsValidSelection(selection) else {
+            return nil
+        }
+        let segments = formattingSegments(in: selection)
+        guard !segments.isEmpty else {
+            return nil
+        }
+        return TextFormattingContext(selection: selection, segments: segments)
+    }
+
+    private func blockIDForContextMenuEvent(_ event: NSEvent) -> BlockInputBlockID? {
+        let collectionLocation = collectionView.convert(event.locationInWindow, from: nil)
+        guard let indexPath = collectionView.indexPathForItem(at: collectionLocation),
+              let item = collectionView.item(at: indexPath) as? BlockInputBlockItem else {
+            return nil
+        }
+        return item.representedBlockID
     }
 
     private func formattingSegments(in selection: BlockInputSelection) -> [TextFormattingSegment] {
@@ -259,4 +326,13 @@ private struct TextFormattingResult {
     var changedBlocks: [BlockInputBlock]
     var selectionBefore: BlockInputSelection
     var selectionAfter: BlockInputSelection
+}
+
+private struct TextFormattingContext {
+    var selection: BlockInputSelection
+    var segments: [TextFormattingSegment]
+
+    func contains(blockID: BlockInputBlockID) -> Bool {
+        segments.contains { $0.block.id == blockID }
+    }
 }

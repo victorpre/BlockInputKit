@@ -30,6 +30,19 @@ final class BlockInputCollectionView: NSCollectionView {
         super.mouseUp(with: event)
     }
 
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu()
+        guard let blockInputView else {
+            return menu.items.isEmpty ? nil : menu
+        }
+        menu.blockInputPrependingTextFormattingItems(
+            blockInputView.textFormattingContextMenuItemStates(for: event).map {
+                $0.action.menuItem(target: blockInputView, state: $0.state)
+            }
+        )
+        return menu.items.isEmpty ? nil : menu
+    }
+
     override func draggingExited(_ sender: NSDraggingInfo?) {
         super.draggingExited(sender)
         blockInputView?.hideDropIndicator()

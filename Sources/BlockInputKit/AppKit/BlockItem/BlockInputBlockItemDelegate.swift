@@ -40,6 +40,16 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         blockID: BlockInputBlockID,
         didRequestTextFormattingShortcut shortcut: BlockInputTextFormattingShortcut
     ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        textFormattingMenuItemStatesForSelectedRange selectedRange: NSRange
+    ) -> [BlockInputTextFormattingMenuItemState]
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        textFormattingMenuItemStatesForContextEvent event: NSEvent
+    ) -> [BlockInputTextFormattingMenuItemState]
     func blockItemDidRequestSelectHorizontalRule(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidBeginReordering(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)

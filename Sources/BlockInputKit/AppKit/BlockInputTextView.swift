@@ -170,6 +170,13 @@ final class BlockInputTextView: NSTextView {
         return super.performKeyEquivalent(with: event)
     }
 
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = systemMenuPreservingSelectedRange(for: event)
+        menu.blockInputRemovingSystemFontItems()
+        menu.blockInputPrependingTextFormattingItems(textFormattingMenuItems(for: event))
+        return menu.items.isEmpty ? nil : menu
+    }
+
     override func selectAll(_ sender: Any?) {
         guard let blockItem else {
             super.selectAll(sender)

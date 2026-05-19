@@ -23,4 +23,10 @@ final class BlockInputBlockItemRootView: NSView {
         }
         cursor.set()
     }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu()
+        menu.blockInputPrependingTextFormattingItems(blockItem?.textFormattingContextMenuItems(for: event) ?? [])
+        return menu.items.isEmpty ? nil : menu
+    }
 }

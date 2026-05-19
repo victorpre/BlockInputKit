@@ -29,6 +29,10 @@ func mouseUpEvent(location: NSPoint, windowNumber: Int) throws -> NSEvent {
     try mouseEvent(type: .leftMouseUp, location: location, windowNumber: windowNumber)
 }
 
+func rightMouseDownEvent(location: NSPoint = .zero, windowNumber: Int) throws -> NSEvent {
+    try mouseEvent(type: .rightMouseDown, location: location, windowNumber: windowNumber)
+}
+
 private func mouseEvent(
     type: NSEvent.EventType,
     location: NSPoint = .zero,

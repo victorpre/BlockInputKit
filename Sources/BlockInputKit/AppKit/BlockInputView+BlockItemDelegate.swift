@@ -319,10 +319,27 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         blockID: BlockInputBlockID,
         didRequestTextFormattingShortcut shortcut: BlockInputTextFormattingShortcut
     ) -> Bool {
-        if item.currentSelectedRange.length > 0 {
+        if item.currentSelectedRange.length > 0,
+           !usesEditorLevelTextFormattingSelection {
             applySelection(.text(BlockInputTextRange(blockID: blockID, range: item.currentSelectedRange)), notify: false)
         }
         return performTextFormattingShortcut(shortcut)
+    }
+
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        textFormattingMenuItemStatesForSelectedRange selectedRange: NSRange
+    ) -> [BlockInputTextFormattingMenuItemState] {
+        textFormattingContextMenuItemStates(selectedRange: selectedRange, in: blockID)
+    }
+
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        textFormattingMenuItemStatesForContextEvent event: NSEvent
+    ) -> [BlockInputTextFormattingMenuItemState] {
+        textFormattingContextMenuItemStates(for: event)
     }
 
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
