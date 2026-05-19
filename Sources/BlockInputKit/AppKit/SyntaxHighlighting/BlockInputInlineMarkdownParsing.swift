@@ -6,6 +6,7 @@ enum BlockInputInlineMarkdownStyle: Hashable {
     case italic
     case underline
     case strikethrough
+    case link
 }
 
 /// UTF-16 ranges for one visual inline Markdown span.
@@ -17,6 +18,22 @@ struct BlockInputInlineMarkdownRange: Equatable {
     let fullRange: NSRange
     let contentRange: NSRange
     let delimiterRanges: [NSRange]
+    /// Populated only for `.link` ranges so click handling can use the already-validated destination.
+    let linkDestination: URL?
+
+    init(
+        style: BlockInputInlineMarkdownStyle,
+        fullRange: NSRange,
+        contentRange: NSRange,
+        delimiterRanges: [NSRange],
+        linkDestination: URL? = nil
+    ) {
+        self.style = style
+        self.fullRange = fullRange
+        self.contentRange = contentRange
+        self.delimiterRanges = delimiterRanges
+        self.linkDestination = linkDestination
+    }
 }
 
 /// Dependency-free row-local scanner for visual inline Markdown styling.
@@ -37,6 +54,7 @@ enum BlockInputInlineMarkdownParsing {
             ranges: excludedRanges
         )
         return mergedByContentLocation([
+            linkRanges(in: nsText, excluding: excludedRangeLookup),
             composedDelimiterRanges(in: nsText, delimiter: tripleAsterisk, styles: [.bold, .italic], excluding: excludedRangeLookup),
             delimiterRanges(in: nsText, delimiter: doubleAsterisk, style: .bold, excluding: excludedRangeLookup),
             delimiterRanges(in: nsText, delimiter: doubleTilde, style: .strikethrough, excluding: excludedRangeLookup),
@@ -312,7 +330,7 @@ private struct BlockInputClosingSearch {
 ///
 /// Building a UTF-16 coverage prefix keeps delimiter/tag checks from becoming
 /// `candidateCount * inlineCodeSpanCount` on dense rows.
-private struct BlockInputExcludedRangeLookup {
+struct BlockInputExcludedRangeLookup {
     private let coveredUTF16Prefix: [Int]
 
     init(textLength: Int, ranges: [NSRange]) {

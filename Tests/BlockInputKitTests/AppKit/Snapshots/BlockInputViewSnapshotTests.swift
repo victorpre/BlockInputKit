@@ -25,6 +25,16 @@ final class BlockInputViewSnapshotTests: XCTestCase {
         }
     }
 
+    func testLinkEditModalSnapshots() {
+        for snapshotCase in LinkModalSnapshotCase.matrix {
+            assertSnapshot(
+                of: makeLinkModalSnapshotView(for: snapshotCase),
+                as: .image(precision: 0.995, perceptualPrecision: 0.995),
+                named: snapshotCase.name
+            )
+        }
+    }
+
     private func makeSnapshotView(for snapshotCase: SnapshotCase) -> NSView {
         let view = BlockInputView(frame: NSRect(origin: .zero, size: snapshotCase.size))
         view.appearance = NSAppearance(named: snapshotCase.appearance)
@@ -36,6 +46,37 @@ final class BlockInputViewSnapshotTests: XCTestCase {
         ))
         view.layoutSubtreeIfNeeded()
         view.collectionView.layoutSubtreeIfNeeded()
+        return view
+    }
+
+    private func makeLinkModalSnapshotView(for snapshotCase: LinkModalSnapshotCase) -> NSView {
+        let view = BlockInputView(frame: NSRect(origin: .zero, size: snapshotCase.size))
+        view.appearance = NSAppearance(named: snapshotCase.appearance)
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "paragraph", text: "Open [Documentation](https://example.com/docs)")
+            ]),
+            allowsBlockReordering: false,
+            dropIndicatorColor: .systemBlue
+        ))
+        view.layoutSubtreeIfNeeded()
+        view.collectionView.layoutSubtreeIfNeeded()
+        guard let linkRange = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: view.document.blocks[0].text
+        ).first(where: { $0.style == .link }) else {
+            XCTFail("Expected a snapshot link range.")
+            return view
+        }
+        let anchorWindowRect = view.visibleBlockItemForTesting(at: 0)?.anchorWindowRect(forUTF16Range: linkRange.contentRange) ?? .zero
+        let context = BlockInputLinkContext(
+            blockID: "paragraph",
+            mode: .edit(linkRange),
+            sourceRange: NSRange(location: 6, length: 0),
+            sourceText: view.document.blocks[0].text,
+            anchorWindowRect: anchorWindowRect
+        )
+        view.showLinkModal(context: context)
+        view.linkModalView?.window?.makeFirstResponder(view.linkModalView)
         return view
     }
 }
@@ -52,6 +93,17 @@ private struct SnapshotCase {
         Self(name: "dark-large", appearance: .darkAqua, size: CGSize(width: 920, height: 620))
     ]
 
+}
+
+private struct LinkModalSnapshotCase {
+    var name: String
+    var appearance: NSAppearance.Name
+    var size: CGSize
+
+    static let matrix: [Self] = [
+        Self(name: "link-modal-light", appearance: .aqua, size: CGSize(width: 620, height: 280)),
+        Self(name: "link-modal-dark", appearance: .darkAqua, size: CGSize(width: 620, height: 280))
+    ]
 }
 
 @MainActor

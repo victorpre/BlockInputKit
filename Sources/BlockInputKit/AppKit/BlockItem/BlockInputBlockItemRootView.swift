@@ -27,6 +27,10 @@ final class BlockInputBlockItemRootView: NSView {
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = super.menu(for: event) ?? NSMenu()
         menu.blockInputPrependingTextFormattingItems(blockItem?.textFormattingContextMenuItems(for: event) ?? [])
+        menu.blockInputPrependingLinkItems(blockItem?.linkContextMenuItems(
+            for: event,
+            selectedRange: blockItem?.currentSelectedRange ?? NSRange(location: 0, length: 0)
+        ) ?? [])
         return menu.items.isEmpty ? nil : menu
     }
 }

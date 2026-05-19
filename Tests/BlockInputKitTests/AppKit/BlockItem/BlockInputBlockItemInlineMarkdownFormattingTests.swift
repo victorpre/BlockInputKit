@@ -69,6 +69,27 @@ final class BlockInputInlineMarkdownFormattingTests: XCTestCase {
     }
 
     @MainActor
+    func testInlineMarkdownStylesLinksAndHidesSourceChrome() throws {
+        let text = "Open [docs](https://example.com)"
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: text),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+        let contentOffset = contentLocation("docs", in: text)
+
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentOffset, effectiveRange: nil) as? NSColor, .linkColor)
+        XCTAssertEqual(textStorage.attribute(.underlineStyle, at: contentOffset, effectiveRange: nil) as? Int, NSUnderlineStyle.single.rawValue)
+        XCTAssertEqual((textStorage.attribute(.link, at: contentOffset, effectiveRange: nil) as? URL)?.absoluteString, "https://example.com")
+        XCTAssertEqual(textStorage.attribute(.toolTip, at: contentOffset, effectiveRange: nil) as? String, "https://example.com")
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 5, effectiveRange: nil) as? NSColor, .clear)
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 11, effectiveRange: nil) as? NSColor, .clear)
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 12, effectiveRange: nil) as? NSColor, .clear)
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 31, effectiveRange: nil) as? NSColor, .clear)
+    }
+
+    @MainActor
     func testSingleUnderscoreInlineMarkdownIsItalicWhileDoubleUnderscoreStaysLiteral() throws {
         let text = "_italic text_ __bold text__"
         let item = BlockInputBlockItem.configuredForTesting(
@@ -397,6 +418,27 @@ final class BlockInputInlineMarkdownFormattingTests: XCTestCase {
         XCTAssertTrue(try font(at: 1, in: textStorage).fontDescriptor.symbolicTraits.contains(.italic))
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .clear)
         XCTAssertEqual(view.document.blocks[0].text, "*some text*")
+    }
+
+    @MainActor
+    func testKeyboardTypedInlineMarkdownLinkRestylesEditedRow() throws {
+        let text = "Open [docs](https://example.com)"
+        let (view, _) = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Plain")
+        ])
+        let item = try XCTUnwrap(view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        textView.string = text
+        textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+
+        let textStorage = try XCTUnwrap(textView.textStorage)
+        let contentOffset = contentLocation("docs", in: text)
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentOffset, effectiveRange: nil) as? NSColor, .linkColor)
+        XCTAssertEqual((textStorage.attribute(.link, at: contentOffset, effectiveRange: nil) as? URL)?.absoluteString, "https://example.com")
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 5, effectiveRange: nil) as? NSColor, .clear)
+        XCTAssertEqual(view.document.blocks[0].text, text)
     }
 }
 

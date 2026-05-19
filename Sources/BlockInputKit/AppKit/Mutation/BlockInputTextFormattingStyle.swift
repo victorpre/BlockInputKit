@@ -183,7 +183,7 @@ struct TextFormattingStyle {
                 opening: NSRange(location: openingRange.location + 2, length: 1),
                 closing: NSRange(location: closingRange.location, length: 1)
             )
-        case .underline, .strikethrough:
+        case .underline, .strikethrough, .link:
             return (openingRange, closingRange)
         }
     }

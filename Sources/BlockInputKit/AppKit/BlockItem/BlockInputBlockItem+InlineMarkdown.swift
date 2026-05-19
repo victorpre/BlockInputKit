@@ -16,6 +16,10 @@ extension BlockInputBlockItem {
                 let clampedContentRange = NSIntersectionRange(contentRange, fullRange)
                 if clampedContentRange.length > 0 {
                     apply(markdownRange.style, to: clampedContentRange, in: textStorage, baseFont: Self.font(for: block.kind))
+                    if let destination = markdownRange.linkDestination {
+                        textStorage.addAttribute(.link, value: destination, range: clampedContentRange)
+                        textStorage.addAttribute(.toolTip, value: destination.absoluteString, range: clampedContentRange)
+                    }
                 }
             }
             for delimiterRange in markdownRange.delimiterRanges {
@@ -80,6 +84,14 @@ extension BlockInputBlockItem {
             textStorage.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: range)
         case .strikethrough:
             textStorage.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: range)
+        case .link:
+            textStorage.addAttributes(
+                [
+                    .foregroundColor: NSColor.linkColor,
+                    .underlineStyle: NSUnderlineStyle.single.rawValue
+                ],
+                range: range
+            )
         }
     }
 
@@ -115,6 +127,9 @@ extension BlockInputBlockItem {
                 attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
             case .strikethrough:
                 attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
+            case .link:
+                attributes[.foregroundColor] = NSColor.linkColor
+                attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
             }
         }
         return attributes
@@ -127,7 +142,7 @@ extension BlockInputBlockItem {
 
 private extension Set where Element == BlockInputInlineMarkdownStyle {
     var sortedByAttributeOrder: [BlockInputInlineMarkdownStyle] {
-        [.bold, .italic, .underline, .strikethrough].filter { contains($0) }
+        [.bold, .italic, .underline, .strikethrough, .link].filter { contains($0) }
     }
 }
 

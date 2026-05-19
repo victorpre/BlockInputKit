@@ -25,6 +25,73 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
         ])
     }
 
+    func testParsesSupportedInlineLinks() throws {
+        let text = "Open [web](https://example.com) and [file](file:///tmp/demo.md)"
+        let ranges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text)
+            .filter { $0.style == .link }
+
+        XCTAssertEqual(ranges.map { content(in: text, range: $0.contentRange) }, ["web", "file"])
+        XCTAssertEqual(ranges.map { $0.linkDestination?.scheme }, ["https", "file"])
+        XCTAssertEqual(ranges.first?.delimiterRanges, [
+            NSRange(location: 5, length: 1),
+            NSRange(location: 9, length: 2),
+            NSRange(location: 11, length: 19),
+            NSRange(location: 30, length: 1)
+        ])
+    }
+
+    func testParsesEscapedLinkLabelDelimitersAsHiddenSource() throws {
+        let text = "Open [a\\[b\\]c](https://example.com)"
+        let range = try XCTUnwrap(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text)
+            .first { $0.style == .link })
+
+        XCTAssertEqual(content(in: text, range: range.contentRange), "a\\[b\\]c")
+        XCTAssertTrue(range.delimiterRanges.contains(NSRange(location: 7, length: 1)))
+        XCTAssertTrue(range.delimiterRanges.contains(NSRange(location: 10, length: 1)))
+    }
+
+    func testParsesEscapedLinkDestinationParentheses() throws {
+        let text = "Open [docs](https://example.com/a\\(b\\))"
+        let range = try XCTUnwrap(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text)
+            .first { $0.style == .link })
+
+        XCTAssertEqual(content(in: text, range: range.contentRange), "docs")
+        XCTAssertEqual(range.linkDestination?.absoluteString, "https://example.com/a(b)")
+    }
+
+    func testRejectsUnsupportedInlineLinks() {
+        let examples = [
+            "[] (https://example.com)",
+            "[](https://example.com)",
+            "[text]()",
+            "[text](mailto:user@example.com)",
+            "[text](https://)",
+            "[text](https:example.com)",
+            "[text](file:)",
+            "[   ](https://example.com)",
+            "[text](https://example.com\nnext)",
+            "[[nested](https://example.com)](https://outer.com)",
+            "[a[b](https://inner.com)](https://outer.com)",
+            "![alt](https://example.com/image.png)"
+        ]
+
+        for example in examples {
+            XCTAssertTrue(
+                BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: example).filter { $0.style == .link }.isEmpty,
+                "Expected no link ranges for \(example)"
+            )
+        }
+    }
+
+    func testExcludesInlineLinksInsideInlineCode() {
+        let text = "`[code](https://example.com)` [text](https://example.com)"
+        let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
+        let ranges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
+            .filter { $0.style == .link }
+
+        XCTAssertEqual(ranges.map { content(in: text, range: $0.contentRange) }, ["text"])
+    }
+
     func testBoldPrecedenceSkipsSingleStarInsideDoubleStarDelimiters() {
         let ranges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: "**bold text**")
 

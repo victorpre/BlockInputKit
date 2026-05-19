@@ -30,6 +30,14 @@ extension NSEvent {
             && charactersIgnoringModifiers?.lowercased() == "c"
     }
 
+    var blockInputIsPasteShortcut: Bool {
+        modifierFlags.contains(.command)
+            && !modifierFlags.contains(.option)
+            && !modifierFlags.contains(.control)
+            && !modifierFlags.contains(.shift)
+            && charactersIgnoringModifiers?.lowercased() == "v"
+    }
+
     var blockInputUndoShortcut: BlockInputUndoShortcut? {
         guard modifierFlags.contains(.command),
               !modifierFlags.contains(.option),

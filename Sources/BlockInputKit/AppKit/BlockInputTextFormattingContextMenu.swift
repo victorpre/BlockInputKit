@@ -67,7 +67,34 @@ extension NSMenu {
         }
     }
 
+    /// Removes AppKit's rich-text link actions because BlockInput links are Markdown source mutations.
+    func blockInputRemovingSystemLinkItems() {
+        var removedItem = false
+        for (index, item) in items.enumerated().reversed() where item.blockInputIsSystemLinkMenuItem {
+            removeItem(at: index)
+            removedItem = true
+        }
+        if removedItem {
+            blockInputRemovingRedundantSeparators()
+        }
+    }
+
     func blockInputPrependingTextFormattingItems(_ items: [NSMenuItem]) {
+        guard !items.isEmpty else {
+            return
+        }
+        let hadExistingItems = !self.items.isEmpty
+        for item in items.reversed() {
+            insertItem(item, at: 0)
+        }
+        if hadExistingItems {
+            insertItem(.separator(), at: items.count)
+            blockInputRemovingRedundantSeparators()
+        }
+    }
+
+    /// Inserts editor-owned link actions ahead of the system menu while preserving separator cleanup.
+    func blockInputPrependingLinkItems(_ items: [NSMenuItem]) {
         guard !items.isEmpty else {
             return
         }
@@ -105,5 +132,18 @@ private extension NSMenuItem {
         return submenuActionNames.contains("orderFrontFontPanel:")
             && submenuActionNames.filter { $0 == "addFontTrait:" }.count >= 2
             && submenuActionNames.contains("underline:")
+    }
+
+    var blockInputIsSystemLinkMenuItem: Bool {
+        guard let action else {
+            return false
+        }
+        // AppKit exposes its default link commands through private selectors, while titles are localized.
+        return [
+            "_copyLinkFromMenu:",
+            "_editLinkFromMenu:",
+            "_openLinkFromMenu:",
+            "_removeLinkFromMenu:"
+        ].contains(NSStringFromSelector(action))
     }
 }

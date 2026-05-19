@@ -26,6 +26,10 @@ final class BlockInputTextView: NSTextView {
 
     override func mouseDown(with event: NSEvent) {
         _ = requestMouseDownCancelSelectionFromOwningBlock()
+        if shouldRequestCommandClickLink(with: event),
+           requestLinkClickIfNeeded(with: event) {
+            return
+        }
         guard shouldTrackBlockSelectionDrag(for: event) else {
             // Multi-click and modified-click selection are native NSTextView gestures; only plain single-click drags need
             // custom tracking.
@@ -74,7 +78,7 @@ final class BlockInputTextView: NSTextView {
             isUsingNativeMouseSelection = false
             return
         }
-        if completeTrackedBlockSelectionMouseUp() {
+        if completeTrackedMouseUp(with: event) {
             return
         }
         super.mouseUp(with: event)
@@ -162,9 +166,13 @@ final class BlockInputTextView: NSTextView {
             BlockInputSelectionDebug.emit("text equivalent consumed horizontal")
             return true
         }
-        // Copy needs a direct key-equivalent path; paste stays on NSText so insertion uses AppKit's normal edit pipeline.
         if event.blockInputIsCopyShortcut,
            copySelectedPlainText() {
+            return true
+        }
+        if event.blockInputIsPasteShortcut {
+            // Keep Cmd+V on the NSTextView paste path so URL interception and native fallback share one implementation.
+            paste(nil)
             return true
         }
         return super.performKeyEquivalent(with: event)
@@ -173,8 +181,24 @@ final class BlockInputTextView: NSTextView {
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = systemMenuPreservingSelectedRange(for: event)
         menu.blockInputRemovingSystemFontItems()
+        menu.blockInputRemovingSystemLinkItems()
         menu.blockInputPrependingTextFormattingItems(textFormattingMenuItems(for: event))
+        menu.blockInputPrependingLinkItems(linkContextMenuItems(for: event))
         return menu.items.isEmpty ? nil : menu
+    }
+
+    override func paste(_ sender: Any?) {
+        // Supported URL paste is the only custom path; invalid or unsupported pasteboard contents fall through to AppKit.
+        if let urlString = BlockInputLinkURL.supportedURLString(),
+           blockItem?.requestPasteURL(urlString, selectedRange: selectedRange()) == true {
+            return
+        }
+        super.paste(sender)
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addLinkCursorRects()
     }
 
     override func selectAll(_ sender: Any?) {
@@ -198,16 +222,6 @@ final class BlockInputTextView: NSTextView {
             return
         }
         delete(nil)
-    }
-
-    @objc(undo:)
-    func blockInputUndo(_ sender: Any?) {
-        _ = blockItem?.requestUndoShortcut(.undo)
-    }
-
-    @objc(redo:)
-    func blockInputRedo(_ sender: Any?) {
-        _ = blockItem?.requestUndoShortcut(.redo)
     }
 
     override func doCommand(by selector: Selector) {

@@ -277,6 +277,7 @@ extension BlockInputView {
 
     func applySelection(_ selection: BlockInputSelection?, notify: Bool) {
         BlockInputSelectionDebug.emit("apply selection=\(String(describing: selection)) notify=\(notify)")
+        dismissLinkModalIfSelectionMovedOutside(selection)
         self.selection = selection
         horizontalSelectionExpansion = nil
         preferredNavigationX = nil

@@ -109,6 +109,10 @@ func commandCEvent() throws -> NSEvent {
     try keyEquivalentEvent(keyCode: 8, characters: "c", modifierFlags: .command)
 }
 
+func commandVEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 9, characters: "v", modifierFlags: .command)
+}
+
 func commandBEvent() throws -> NSEvent {
     try keyEquivalentEvent(keyCode: 11, characters: "b", modifierFlags: .command)
 }

@@ -44,6 +44,10 @@ extension BlockInputTextView {
         } ?? []
     }
 
+    func linkContextMenuItems(for event: NSEvent) -> [NSMenuItem] {
+        return blockItem?.linkContextMenuItems(for: event, selectedRange: selectedRange()) ?? []
+    }
+
     private func requestTextFormattingShortcutFromContextMenu(_ shortcut: BlockInputTextFormattingShortcut) -> Bool {
         // Context menu items can outlive the text selection they were created for; stale text views should not rewrite source.
         guard window?.firstResponder === self else {

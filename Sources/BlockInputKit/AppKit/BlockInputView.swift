@@ -57,6 +57,14 @@ public final class BlockInputView: NSView {
     var lastNativeTextSelectionExpansion: BlockInputNativeTextSelectionExpansion?
     var blockSelectionExpansion: BlockInputBlockSelectionExpansion?
     var horizontalSelectionExpansion: BlockInputHorizontalSelectionExpansion?
+    // Production opens links through NSWorkspace; tests replace this hook to assert command-click and modal Open behavior.
+    var linkURLOpener: BlockInputURLOpener = { NSWorkspace.shared.open($0) }
+    // The link modal is editor-owned so it can be anchored to row geometry, clamped inside the editor, and snapshotted.
+    var linkModalView: BlockInputLinkModalView?
+    // Captured source context for the visible modal; save/remove actions verify it before mutating block text.
+    var linkModalContext: BlockInputLinkContext?
+    // Local monitors are needed because a child modal view does not receive every outside mouse-down by responder routing.
+    nonisolated(unsafe) var linkModalMouseDownMonitor: Any?
 
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -72,6 +80,8 @@ public final class BlockInputView: NSView {
         progressiveLoadTask?.cancel()
         documentStoreObservation?.cancel()
         if let selectionExpansionKeyMonitor { NSEvent.removeMonitor(selectionExpansionKeyMonitor) }
+        if let linkModalMouseDownMonitor { NSEvent.removeMonitor(linkModalMouseDownMonitor) }
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: nil)
     }
 
     public override var acceptsFirstResponder: Bool { true }
@@ -128,9 +138,13 @@ public final class BlockInputView: NSView {
         if let direction = event.blockInputDocumentBoundaryDirection, moveCaretToDocumentBoundary(direction) { return true }
         if handleSelectionExpansionShortcut(event) { return true }
         if handleWordMovementShortcut(event) { return true }
-        // Copy needs a direct key-equivalent path; paste stays on NSText so insertion uses AppKit's normal edit pipeline.
         if event.blockInputIsCopyShortcut,
            copyActiveSelection() {
+            return true
+        }
+        // Mounted text views handle normal text paste; the editor consumes Cmd+V only for editor-owned selections.
+        if event.blockInputIsPasteShortcut,
+           pasteIntoActiveSelection() {
             return true
         }
         return super.performKeyEquivalent(with: event)

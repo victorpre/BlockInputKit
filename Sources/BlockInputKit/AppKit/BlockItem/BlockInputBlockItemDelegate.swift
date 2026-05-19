@@ -46,6 +46,27 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         blockID: BlockInputBlockID,
         didRequestTextFormattingShortcut shortcut: BlockInputTextFormattingShortcut
     ) -> Bool
+    /// Lets a mounted text view offer supported URL paste to the editor before falling back to native AppKit paste.
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestPasteURL urlString: String,
+        selectedRange: NSRange
+    ) -> Bool
+    /// Builds editor-owned link context-menu items from mounted row state.
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestLinkContextMenuItemsFor event: NSEvent,
+        selectedRange: NSRange
+    ) -> [NSMenuItem]
+    /// Routes link activation through the editor so command-click open and plain-click edit share one context lookup.
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didClickLinkAt selectedRange: NSRange,
+        event: NSEvent
+    ) -> Bool
     func blockItem(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,

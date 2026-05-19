@@ -159,6 +159,9 @@ extension BlockInputBlock {
            NSMaxRange(clampedRange) == utf16Length {
             return BlockInputDocument(blocks: [self]).markdown
         }
+        if let copiedLinkLabelText = copiedVisibleLinkLabelText(in: clampedRange) {
+            return copiedLinkLabelText
+        }
         return (text as NSString).substring(with: clampedRange)
     }
 
@@ -199,6 +202,30 @@ extension BlockInputBlock {
         }
         return false
     }
+
+    private func copiedVisibleLinkLabelText(in range: NSRange) -> String? {
+        guard supportsInlineLinkCopy else {
+            return nil
+        }
+        let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
+        let linkRange = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
+            .first { markdownRange in
+                markdownRange.style == .link && markdownRange.contentRange.containsSourceRange(range)
+            }
+        guard linkRange != nil else {
+            return nil
+        }
+        return (text as NSString).substring(with: range).blockInputUnescapedLinkLabel
+    }
+
+    private var supportsInlineLinkCopy: Bool {
+        switch kind {
+        case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+            return true
+        case .code, .horizontalRule, .frontMatter, .rawMarkdown:
+            return false
+        }
+    }
 }
 
 private extension String {
@@ -207,5 +234,11 @@ private extension String {
         let location = min(max(range.location, 0), text.length)
         let length = min(max(range.length, 0), max(text.length - location, 0))
         return NSRange(location: location, length: length)
+    }
+}
+
+private extension NSRange {
+    func containsSourceRange(_ range: NSRange) -> Bool {
+        location <= range.location && NSMaxRange(range) <= NSMaxRange(self)
     }
 }

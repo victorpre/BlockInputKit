@@ -76,6 +76,39 @@ extension BlockInputBlockItem {
         return min(max(offset, 0), textLength)
     }
 
+    /// Returns a window-coordinate caret anchor for popovers that originate at a collapsed text offset.
+    func anchorWindowRect(forUTF16Offset offset: Int) -> NSRect {
+        let clampedOffset = min(max(offset, 0), (textView.string as NSString).length)
+        guard let window = textView.window else {
+            return .zero
+        }
+        let rect = textView.firstRect(forCharacterRange: NSRange(location: clampedOffset, length: 0), actualRange: nil)
+        guard rect != .zero, !rect.isNull, !rect.isInfinite else {
+            return textView.convert(textView.bounds, to: nil)
+        }
+        let origin = window.convertPoint(fromScreen: rect.origin)
+        return NSRect(origin: origin, size: rect.size)
+    }
+
+    /// Returns a window-coordinate anchor over visible glyphs, falling back to a caret anchor when layout has no glyphs.
+    func anchorWindowRect(forUTF16Range range: NSRange) -> NSRect {
+        guard range.length > 0,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else {
+            return anchorWindowRect(forUTF16Offset: range.location)
+        }
+        let characterRange = textView.string.linkAnchorClampedRange(range)
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
+            .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
+        guard glyphRange.length > 0 else {
+            return anchorWindowRect(forUTF16Offset: range.location)
+        }
+        layoutManager.ensureLayout(for: textContainer)
+        let localRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+            .offsetBy(dx: textView.textContainerOrigin.x, dy: textView.textContainerOrigin.y)
+        return textView.convert(localRect, to: nil)
+    }
+
     private func lineIndex(containingUTF16Offset offset: Int, lines: [TextLineFragment]) -> Int? {
         let textLength = (textView.string as NSString).length
         let clampedOffset = min(max(offset, 0), textLength)
@@ -159,6 +192,21 @@ private extension NSRange {
             upperBound -= 1
         }
         return NSRange(location: location, length: upperBound - location)
+    }
+
+    func clamped(toGlyphCount glyphCount: Int) -> NSRange {
+        let location = min(max(location, 0), glyphCount)
+        let length = min(max(length, 0), max(glyphCount - location, 0))
+        return NSRange(location: location, length: length)
+    }
+}
+
+private extension String {
+    func linkAnchorClampedRange(_ range: NSRange) -> NSRange {
+        let text = self as NSString
+        let location = min(max(range.location, 0), text.length)
+        let length = min(max(range.length, 0), max(text.length - location, 0))
+        return NSRange(location: location, length: length)
     }
 }
 

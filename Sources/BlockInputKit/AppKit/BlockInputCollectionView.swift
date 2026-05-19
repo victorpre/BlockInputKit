@@ -40,6 +40,7 @@ final class BlockInputCollectionView: NSCollectionView {
                 $0.action.menuItem(target: blockInputView, state: $0.state)
             }
         )
+        menu.blockInputPrependingLinkItems(blockInputView.linkContextMenuItems(for: event))
         return menu.items.isEmpty ? nil : menu
     }
 

@@ -71,8 +71,7 @@ extension BlockInputTextView {
             if event.type == .leftMouseUp {
                 // Mouse-up can be observed here without a matching `mouseUp(with:)` override call. Commit the local range
                 // from the monitor too so single-block drag selection persists after release.
-                updateTrackedSelectionForCurrentMouseEvent(event)
-                _ = completeTrackedBlockSelectionMouseUp()
+                _ = completeTrackedMouseUp(with: event)
                 return nil
             }
             return event
@@ -138,6 +137,34 @@ extension BlockInputTextView {
         if !isDraggingBlockSelection {
             updateTrackedLocalTextSelection(localDragRange)
         }
+    }
+
+    /// Completes a tracked plain-click sequence, including link activation for mouse-up events delivered through the
+    /// local drag monitor instead of `mouseUp(with:)`.
+    @discardableResult
+    func completeTrackedMouseUp(with event: NSEvent) -> Bool {
+        let finalLocalRange = blockSelectionDragRange(for: event)
+        if shouldRequestLinkClick(forFinalLocalRange: finalLocalRange),
+           requestLinkClickIfNeeded(with: event) {
+            finishBlockSelectionDrag()
+            return true
+        }
+        updateTrackedSelectionForCurrentMouseEvent(event)
+        return completeTrackedBlockSelectionMouseUp()
+    }
+
+    private func shouldRequestLinkClick(forFinalLocalRange range: NSRange) -> Bool {
+        // A plain click can mouse down and mouse up on neighboring insertion offsets without a drag event, especially
+        // near glyph boundaries. Treat that as a click so link activation does not feel intermittent.
+        if blockSelectionLocalDragRange == nil {
+            return !isDraggingBlockSelection
+                && range.length <= 1
+                && (blockSelectionDragSelectedRange?.length ?? 0) == 0
+        }
+        return !isDraggingBlockSelection
+            && range.length == 0
+            && (blockSelectionDragSelectedRange?.length ?? 0) == 0
+            && (blockSelectionLocalDragRange?.length ?? 0) == 0
     }
 
     /// Commits an editor-tracked mouse drag, whether it ended via `mouseUp(with:)` or the local event monitor.
