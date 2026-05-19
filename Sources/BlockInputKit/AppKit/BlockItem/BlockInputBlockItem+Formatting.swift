@@ -29,16 +29,30 @@ extension BlockInputBlockItem {
         }
     }
 
-    static func font(for kind: BlockInputBlockKind) -> NSFont {
+    static func font(for kind: BlockInputBlockKind, style: BlockInputStyle = .default) -> NSFont {
+        let defaultBaseFont = NSFont.preferredFont(forTextStyle: .body)
+        let customBaseFont = style.baseText.font
+        let baseFont = customBaseFont ?? defaultBaseFont
+        let scale = customBaseFont.map { $0.pointSize / max(defaultBaseFont.pointSize, 1) } ?? 1
         switch kind {
         case let .heading(level):
             let clampedLevel = min(max(level, 1), 6)
             let sizes: [CGFloat] = [26, 23, 20, 18, 16, 15]
-            return .systemFont(ofSize: sizes[clampedLevel - 1], weight: .semibold)
+            guard customBaseFont != nil else {
+                return .systemFont(ofSize: sizes[clampedLevel - 1], weight: .semibold)
+            }
+            let headingFont = NSFontManager.shared.convert(baseFont, toSize: sizes[clampedLevel - 1] * scale)
+            return NSFontManager.shared.convert(headingFont, toHaveTrait: .boldFontMask)
         case .code, .frontMatter, .rawMarkdown:
-            return .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+            if case .code = kind, let font = style.codeBlock.font {
+                return font
+            }
+            guard customBaseFont != nil else {
+                return .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+            }
+            return .monospacedSystemFont(ofSize: NSFont.systemFontSize * scale, weight: .regular)
         case .paragraph, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
-            return .preferredFont(forTextStyle: .body)
+            return baseFont
         }
     }
 
@@ -224,7 +238,8 @@ extension BlockInputBlockItem {
     }
 
     func applyTextAttributes(for block: BlockInputBlock) {
-        let font = Self.font(for: block.kind)
+        let font = Self.font(for: block.kind, style: style)
+        let foregroundColor = foregroundColor(for: block.kind)
         textView.font = font
         textView.typingAttributes[.font] = font
         guard let textStorage = textView.textStorage else {
@@ -238,7 +253,7 @@ extension BlockInputBlockItem {
         }
         textStorage.beginEditing()
         textStorage.addAttribute(.font, value: font, range: fullRange)
-        textStorage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
+        textStorage.addAttribute(.foregroundColor, value: foregroundColor, range: fullRange)
         textStorage.removeAttribute(.backgroundColor, range: fullRange)
         textStorage.removeAttribute(.underlineStyle, range: fullRange)
         textStorage.removeAttribute(.strikethroughStyle, range: fullRange)
@@ -264,7 +279,7 @@ extension BlockInputBlockItem {
             return
         }
         var attributes = textView.typingAttributes
-        let font = Self.font(for: block.kind)
+        let font = Self.font(for: block.kind, style: style)
         attributes[.font] = font
         attributes.removeValue(forKey: .foregroundColor)
         attributes.removeValue(forKey: .backgroundColor)
@@ -274,11 +289,14 @@ extension BlockInputBlockItem {
         attributes.removeValue(forKey: .toolTip)
         attributes.removeValue(forKey: .kern)
         attributes.removeValue(forKey: .blockInputHiddenDelimiter)
+        if let foregroundColor = typingForegroundColor(for: block.kind) {
+            attributes[.foregroundColor] = foregroundColor
+        }
         let isInlineCodeSelection = currentSelectionIntersectsStyledContent(inlineCodeContentRanges(for: block))
         if isInlineCodeSelection {
-            attributes[.font] = Self.inlineCodeFont(for: font)
-            attributes[.foregroundColor] = NSColor.labelColor
-            attributes[.backgroundColor] = Self.inlineCodeBackgroundColor
+            attributes[.font] = inlineCodeFont(for: font)
+            attributes[.foregroundColor] = inlineCodeForegroundColor()
+            attributes[.backgroundColor] = inlineCodeBackgroundColor()
         } else {
             attributes = Self.applyingInlineMarkdownStyles(
                 inlineMarkdownStylesForCurrentSelection(in: block),
@@ -301,6 +319,7 @@ extension BlockInputBlockItem {
     }
 
     func applyKindLabelAttributes(for block: BlockInputBlock) {
+        kindLabel.font = Self.font(for: block.kind, style: style)
         kindLabel.setMarkerLines(Self.markerLines(for: block))
         updateMarkerLineYOffsets()
     }
@@ -428,7 +447,7 @@ extension BlockInputBlockItem {
         guard textLength > 0, lineStart < textLength else {
             let extraLineFragmentRect = layoutManager.extraLineFragmentRect
             guard !extraLineFragmentRect.isEmpty else {
-                let font = Self.font(for: renderedBlock?.kind ?? .paragraph)
+                let font = Self.font(for: renderedBlock?.kind ?? .paragraph, style: style)
                 let lineHeight = ceil(font.ascender - font.descender + font.leading)
                 return NSRect(x: 0, y: CGFloat(lineIndex) * lineHeight, width: 0, height: lineHeight)
             }
@@ -436,6 +455,20 @@ extension BlockInputBlockItem {
         }
         let glyphIndex = layoutManager.glyphIndexForCharacter(at: lineStart)
         return layoutManager.lineFragmentUsedRect(forGlyphAt: glyphIndex, effectiveRange: nil)
+    }
+
+    func foregroundColor(for kind: BlockInputBlockKind) -> NSColor {
+        if case .code = kind {
+            return style.codeBlock.foregroundColor ?? style.baseText.foregroundColor ?? .labelColor
+        }
+        return style.baseText.foregroundColor ?? .labelColor
+    }
+
+    private func typingForegroundColor(for kind: BlockInputBlockKind) -> NSColor? {
+        if case .code = kind {
+            return style.codeBlock.foregroundColor ?? style.baseText.foregroundColor
+        }
+        return style.baseText.foregroundColor
     }
 }
 

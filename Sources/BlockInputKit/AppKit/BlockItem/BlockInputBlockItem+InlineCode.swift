@@ -6,16 +6,18 @@ extension BlockInputBlockItem {
             return
         }
         let fullRange = NSRange(location: 0, length: textStorage.length)
-        let inlineFont = Self.inlineCodeFont(for: Self.font(for: block.kind))
-        let delimiterFont = Self.inlineCodeDelimiterFont(for: Self.font(for: block.kind))
-        let backgroundColor = Self.inlineCodeBackgroundColor
+        let baseFont = Self.font(for: block.kind, style: style)
+        let inlineFont = inlineCodeFont(for: baseFont)
+        let delimiterFont = Self.inlineCodeDelimiterFont(for: baseFont)
+        let foregroundColor = inlineCodeForegroundColor()
+        let backgroundColor = inlineCodeBackgroundColor()
         for inlineCodeRange in BlockInputCodeParsing.inlineCodeRanges(in: textStorage.string) {
             let contentRange = NSIntersectionRange(inlineCodeRange.contentRange, fullRange)
             if contentRange.length > 0 {
                 textStorage.addAttributes(
                     [
                         .font: inlineFont,
-                        .foregroundColor: NSColor.labelColor,
+                        .foregroundColor: foregroundColor,
                         .backgroundColor: backgroundColor
                     ],
                     range: contentRange
@@ -46,7 +48,7 @@ extension BlockInputBlockItem {
         return BlockInputCodeParsing.inlineCodeRanges(in: textView.string).map(\.contentRange)
     }
 
-    private static func supportsInlineCodeStyling(_ kind: BlockInputBlockKind) -> Bool {
+    static func supportsInlineCodeStyling(_ kind: BlockInputBlockKind) -> Bool {
         switch kind {
         case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
@@ -55,7 +57,23 @@ extension BlockInputBlockItem {
         }
     }
 
-    static func inlineCodeFont(for font: NSFont) -> NSFont {
+    static func inlineCodeFont(for font: NSFont, style: BlockInputStyle = .default) -> NSFont {
+        style.inlineCode.font ?? defaultInlineCodeFont(for: font)
+    }
+
+    func inlineCodeFont(for font: NSFont) -> NSFont {
+        Self.inlineCodeFont(for: font, style: style)
+    }
+
+    func inlineCodeForegroundColor() -> NSColor {
+        style.inlineCode.foregroundColor ?? style.baseText.foregroundColor ?? .labelColor
+    }
+
+    func inlineCodeBackgroundColor() -> NSColor {
+        style.inlineCode.backgroundColor ?? Self.inlineCodeBackgroundColor
+    }
+
+    private static func defaultInlineCodeFont(for font: NSFont) -> NSFont {
         .monospacedSystemFont(ofSize: font.pointSize * 0.94, weight: .regular)
     }
 
@@ -63,7 +81,7 @@ extension BlockInputBlockItem {
         NSColor.quaternaryLabelColor
     }
 
-    private static func inlineCodeDelimiterFont(for font: NSFont) -> NSFont {
+    static func inlineCodeDelimiterFont(for font: NSFont) -> NSFont {
         .monospacedSystemFont(ofSize: max(font.pointSize * 0.1, 1), weight: .regular)
     }
 }

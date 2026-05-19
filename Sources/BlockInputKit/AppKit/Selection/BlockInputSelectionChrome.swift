@@ -50,10 +50,6 @@ enum BlockInputBlockSelectionChrome {
     case partial
     case whole
 
-    static var selectionColor: NSColor {
-        NSColor.selectedContentBackgroundColor.withAlphaComponent(0.72)
-    }
-
     static var nativeSelectedTextAttributes: [NSAttributedString.Key: Any] {
         [
             .backgroundColor: NSColor.clear,
@@ -77,12 +73,12 @@ enum BlockInputBlockSelectionChrome {
         }
     }
 
-    var contentBackgroundColor: NSColor {
+    func contentBackgroundColor(style: BlockInputStyle) -> NSColor {
         switch self {
         case .none:
             return .clear
         case .partial, .whole:
-            return Self.selectionColor
+            return style.selectionBackgroundColor
         }
     }
 

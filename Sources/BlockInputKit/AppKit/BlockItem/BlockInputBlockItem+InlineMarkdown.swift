@@ -15,7 +15,7 @@ extension BlockInputBlockItem {
             for contentRange in markdownRange.contentRange.subtractingSorted(inlineCodeRanges) {
                 let clampedContentRange = NSIntersectionRange(contentRange, fullRange)
                 if clampedContentRange.length > 0 {
-                    apply(markdownRange.style, to: clampedContentRange, in: textStorage, baseFont: Self.font(for: block.kind))
+                    apply(markdownRange.style, to: clampedContentRange, in: textStorage, baseFont: Self.font(for: block.kind, style: style))
                     if let destination = markdownRange.linkDestination {
                         textStorage.addAttribute(.link, value: destination, range: clampedContentRange)
                         textStorage.addAttribute(.toolTip, value: destination.absoluteString, range: clampedContentRange)
@@ -29,7 +29,7 @@ extension BlockInputBlockItem {
                 }
                 textStorage.addAttributes(
                     [
-                        .font: Self.inlineMarkdownDelimiterFont(for: Self.font(for: block.kind)),
+                        .font: Self.inlineMarkdownDelimiterFont(for: Self.font(for: block.kind, style: style)),
                         .foregroundColor: NSColor.clear,
                         .blockInputHiddenDelimiter: true
                     ],

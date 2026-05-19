@@ -79,6 +79,38 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
     }
 
     @MainActor
+    func testCustomBaseStyleAppliesToTextAndScalesHeadings() throws {
+        let baseFont = NSFont.systemFont(ofSize: 20, weight: .light)
+        let style = BlockInputStyle(baseText: BlockInputTextStyle(font: baseFont, foregroundColor: .systemPurple))
+        let paragraphItem = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", text: "Plain"),
+            allowsReordering: true,
+            style: style,
+            delegate: BlockInputView()
+        )
+        let headingItem = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "heading", kind: .heading(level: 2), text: "Title"),
+            allowsReordering: true,
+            style: style,
+            delegate: BlockInputView()
+        )
+
+        let paragraphTextView = try XCTUnwrap(paragraphItem.testingTextView)
+        let paragraphStorage = try XCTUnwrap(paragraphTextView.textStorage)
+        XCTAssertEqual(paragraphTextView.font?.pointSize, baseFont.pointSize)
+        XCTAssertEqual(paragraphStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .systemPurple)
+        XCTAssertEqual(paragraphTextView.typingAttributes[.foregroundColor] as? NSColor, .systemPurple)
+
+        let defaultBaseSize = NSFont.preferredFont(forTextStyle: .body).pointSize
+        let expectedHeadingSize = 23 * (baseFont.pointSize / defaultBaseSize)
+        XCTAssertEqual(try XCTUnwrap(headingItem.testingTextView?.font).pointSize, expectedHeadingSize, accuracy: 0.5)
+        XCTAssertGreaterThan(
+            BlockInputBlockItem.height(for: BlockInputBlock(kind: .heading(level: 2), text: "Title"), textWidth: 240, style: style),
+            BlockInputBlockItem.height(for: BlockInputBlock(kind: .paragraph, text: "Title"), textWidth: 240, style: style)
+        )
+    }
+
+    @MainActor
     func testQuoteUsesLeadingRuleInsteadOfMarkdownMarker() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "quote", kind: .quote, text: "Quoted"),

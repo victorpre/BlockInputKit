@@ -28,6 +28,7 @@ extension BlockInputView {
         editorHorizontalInset = configuration.editorHorizontalInset
         editorVerticalInset = configuration.editorVerticalInset
         dropIndicatorColor = configuration.dropIndicatorColor
+        style = configuration.style
         configureUndoController(
             previousDocumentStore: previousDocumentStore,
             previousDocument: previousDocument,

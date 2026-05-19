@@ -20,6 +20,8 @@ public final class BlockInputView: NSView {
     public internal(set) var editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
     /// Color used for the drag insertion indicator line.
     public internal(set) var dropIndicatorColor = NSColor.controlAccentColor
+    /// Visual styling used for text, code, and selection chrome.
+    public internal(set) var style = BlockInputStyle.default
 
     private let scrollView = BlockInputDocumentScrollView()
     let collectionView = BlockInputCollectionView()

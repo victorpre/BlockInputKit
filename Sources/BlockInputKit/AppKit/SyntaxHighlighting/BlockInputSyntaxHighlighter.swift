@@ -10,9 +10,10 @@ enum BlockInputSyntaxHighlighter {
         language: String?,
         colorScheme: BlockInputSyntaxColorScheme,
         font: NSFont? = nil,
+        baseForegroundColor: NSColor? = nil,
         preserveLineNumberPrefixes: Bool = false
     ) -> NSAttributedString {
-        let palette = BlockInputSyntaxPalette(colorScheme: colorScheme)
+        let palette = BlockInputSyntaxPalette(colorScheme: colorScheme, baseForegroundColor: baseForegroundColor)
         let baseAttributes = baseAttributes(font: font, foregroundColor: palette.base)
         let attributed = NSMutableAttributedString(string: source, attributes: baseAttributes)
         let normalizedLanguage = normalizedLanguage(language)
@@ -131,8 +132,8 @@ private extension BlockInputSyntaxHighlighter {
         let number: NSColor
         let symbol: NSColor
 
-        init(colorScheme: BlockInputSyntaxColorScheme) {
-            base = .labelColor
+        init(colorScheme: BlockInputSyntaxColorScheme, baseForegroundColor: NSColor? = nil) {
+            base = baseForegroundColor ?? .labelColor
             switch colorScheme {
             case .dark:
                 keyword = NSColor(srgbRed: 0.64, green: 0.74, blue: 1.0, alpha: 1)

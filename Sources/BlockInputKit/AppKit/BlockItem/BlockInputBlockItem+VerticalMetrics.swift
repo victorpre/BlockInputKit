@@ -61,9 +61,10 @@ extension BlockInputBlockItem {
 
     static func dragHandleTopConstant(
         for kind: BlockInputBlockKind,
-        metrics: BlockInputBlockItemVerticalMetrics
+        metrics: BlockInputBlockItemVerticalMetrics,
+        style: BlockInputStyle = .default
     ) -> CGFloat {
-        metrics.chromeTopConstant(font: font(for: kind), chromeHeight: dragHandleHeight)
+        metrics.chromeTopConstant(font: font(for: kind, style: style), chromeHeight: dragHandleHeight)
     }
 }
 

@@ -36,6 +36,37 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
     }
 
     @MainActor
+    func testInlineCodeUsesCustomStyleOverrides() throws {
+        let inlineFont = NSFont.monospacedSystemFont(ofSize: 18, weight: .medium)
+        let style = BlockInputStyle(
+            baseText: BlockInputTextStyle(font: .systemFont(ofSize: 16), foregroundColor: .systemGreen),
+            inlineCode: BlockInputInlineCodeStyle(
+                font: inlineFont,
+                foregroundColor: .systemRed,
+                backgroundColor: .systemYellow
+            )
+        )
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", text: "Use `git status` now"),
+            allowsReordering: true,
+            style: style,
+            delegate: BlockInputView()
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        let textStorage = try XCTUnwrap(textView.textStorage)
+
+        XCTAssertEqual(try XCTUnwrap(textStorage.attribute(.font, at: 5, effectiveRange: nil) as? NSFont).pointSize, inlineFont.pointSize)
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 5, effectiveRange: nil) as? NSColor, .systemRed)
+        XCTAssertEqual(textStorage.attribute(.backgroundColor, at: 5, effectiveRange: nil) as? NSColor, .systemYellow)
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .systemGreen)
+
+        item.setSelectedRange(NSRange(location: 7, length: 0))
+        XCTAssertEqual(try XCTUnwrap(textView.typingAttributes[.font] as? NSFont).pointSize, inlineFont.pointSize)
+        XCTAssertEqual(textView.typingAttributes[.foregroundColor] as? NSColor, .systemRed)
+        XCTAssertEqual(textView.typingAttributes[.backgroundColor] as? NSColor, .systemYellow)
+    }
+
+    @MainActor
     func testInlineCodeDelimitersAreHiddenButStored() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Use `git status` now"),

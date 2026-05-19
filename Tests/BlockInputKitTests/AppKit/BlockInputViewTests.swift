@@ -75,6 +75,25 @@ final class BlockInputViewTests: XCTestCase {
         XCTAssertFalse(handleView.isHidden)
     }
 
+    func testMountedEditorPassesConfigurationStyleToVisibleRows() throws {
+        let block = BlockInputBlock(id: "paragraph", text: "Styled")
+        let style = BlockInputStyle(baseText: BlockInputTextStyle(font: .systemFont(ofSize: 21), foregroundColor: .systemPink))
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [block]),
+            style: style
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let textStorage = try XCTUnwrap(textView.textStorage)
+
+        XCTAssertEqual(textView.font?.pointSize, 21)
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .systemPink)
+        XCTAssertEqual(
+            BlockInputBlockItem.height(for: block, textWidth: 240, style: style),
+            BlockInputBlockItem.height(for: block, textWidth: 240, style: mounted.view.style)
+        )
+    }
+
     func testInsertBlockBelowCurrentBlockPublishesDocumentChange() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let view = BlockInputView()

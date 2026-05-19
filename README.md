@@ -39,6 +39,20 @@ let configuration = BlockInputConfiguration(
     editorHorizontalInset: 20,
     editorVerticalInset: 8,
     dropIndicatorColor: .systemTeal,
+    style: BlockInputStyle(
+        baseText: BlockInputTextStyle(
+            font: .systemFont(ofSize: 16),
+            foregroundColor: .labelColor
+        ),
+        selectionBackgroundColor: .selectedContentBackgroundColor.withAlphaComponent(0.72),
+        inlineCode: BlockInputInlineCodeStyle(
+            backgroundColor: .quaternaryLabelColor
+        ),
+        codeBlock: BlockInputCodeBlockStyle(
+            font: .monospacedSystemFont(ofSize: 13, weight: .regular),
+            cornerRadius: 6
+        )
+    ),
     undoController: undoController,
     completionProvider: completionProvider,
     onDocumentMutation: { change in
@@ -93,6 +107,7 @@ struct EditorScreen: View {
 - `editorHorizontalInset`: Controls the leading and trailing block content inset.
 - `editorVerticalInset`: Controls the top and bottom editor content inset.
 - `dropIndicatorColor`: Colors drag insertion and selected horizontal-rule affordances.
+- `style`: Configures base text, selection backgrounds, inline code, and fenced code block styling.
 - `undoController`: Shares text and structural undo coordination with the host.
 - `completionProvider`: Supplies mention and slash-command suggestions.
 - `onDocumentMutation`: Receives granular edits as they are applied, including marker-only numbered-list updates for marker-adjusting stores.

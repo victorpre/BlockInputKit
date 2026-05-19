@@ -54,6 +54,19 @@ final class BlockInputBlockItemSelectionChromeTests: XCTestCase {
         XCTAssertLessThan(codeItem.testingSelectionBackgroundView.frame.width, codeItem.view.bounds.width / 2)
     }
 
+    func testSelectionChromeUsesConfiguredBackgroundColor() {
+        let style = BlockInputStyle(selectionBackgroundColor: .systemGreen)
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", text: "BlockInputKit demo"),
+            allowsReordering: true,
+            style: style,
+            isSelected: true,
+            delegate: BlockInputView()
+        )
+
+        XCTAssertEqual(item.testingSelectionBackgroundView.fillColor, .systemGreen)
+    }
+
     func testSelectedCodeBlockSelectionChromeResizesWithCodeSurfaceAfterTextChange() throws {
         let shortBlock = BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = 1")
         let item = BlockInputBlockItem.configuredForTesting(

@@ -6,6 +6,7 @@ extension BlockInputBlockItem {
         block: BlockInputBlock,
         allowsReordering: Bool,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
+        style: BlockInputStyle = .default,
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) -> BlockInputBlockItem {
@@ -17,6 +18,7 @@ extension BlockInputBlockItem {
             allowsReordering: allowsReordering,
             editorHorizontalInset: editorHorizontalInset,
             accentColor: .controlAccentColor,
+            style: style,
             isSelected: isSelected,
             delegate: delegate
         )
@@ -85,7 +87,7 @@ extension BlockInputBlockItem {
         }
     }
 
-    var testingSelectionBackgroundView: NSView {
+    var testingSelectionBackgroundView: BlockInputSelectionBackgroundView {
         selectionBackgroundView
     }
 

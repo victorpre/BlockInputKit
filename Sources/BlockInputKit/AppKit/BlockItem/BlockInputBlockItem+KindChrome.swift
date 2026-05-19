@@ -17,10 +17,10 @@ extension BlockInputBlockItem {
         configureCodeBackground(for: block)
         scrollViewTopConstraint?.constant = 0
         configureFrontMatterDivider(isVisible: isFrontMatter)
-        handleTopConstraint?.constant = Self.dragHandleTopConstant(for: block.kind, metrics: verticalMetrics)
+        handleTopConstraint?.constant = Self.dragHandleTopConstant(for: block.kind, metrics: verticalMetrics, style: style)
         kindLabelTopConstraint?.constant = 0
         checklistButtonTopConstraint?.constant = verticalMetrics.checklistButtonTopConstant(
-            font: Self.font(for: block.kind),
+            font: Self.font(for: block.kind, style: style),
             checkboxHeight: Self.checklistButtonHeight
         )
         kindLabelLeadingConstraint?.constant = kindLabelLeadingConstant(for: block, contentIndent: contentIndent)
@@ -83,7 +83,7 @@ extension BlockInputBlockItem {
         if block.kind == .quote {
             return 0
         }
-        return Self.markerGutterWidth(for: block) + perLineContentIndent
+        return Self.markerGutterWidth(for: block, style: style) + perLineContentIndent
     }
 
     func textLeadingConstant(
@@ -135,7 +135,7 @@ extension BlockInputBlockItem {
         checklistButtonBaseLeading + contentIndent(forIndentationLevel: indentationLevel) - rowContentIndent
     }
 
-    static func markerGutterWidth(for block: BlockInputBlock) -> CGFloat {
+    static func markerGutterWidth(for block: BlockInputBlock, style: BlockInputStyle = .default) -> CGFloat {
         guard block.kind.needsVisibleMarkerLane else {
             return 0
         }
@@ -148,7 +148,7 @@ extension BlockInputBlockItem {
             guard !marker.isEmpty else {
                 return widest
             }
-            let width = (marker as NSString).size(withAttributes: [.font: font(for: block.kind)]).width
+            let width = (marker as NSString).size(withAttributes: [.font: font(for: block.kind, style: style)]).width
             return max(widest, width)
         }
         return max(markerGutterWidth, widestMarker + minimumMarkerTextGap)

@@ -55,6 +55,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var isDraggingBlockSelection = false
     var isUpdatingBlockSelectionDrag = false
     var renderedCodeColorScheme: BlockInputSyntaxColorScheme?
+    var style = BlockInputStyle.default
     var allowsReordering = true
     var editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
     var handleLeadingConstraint: NSLayoutConstraint?
@@ -78,11 +79,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var frontMatterDividerTrailingConstraint: NSLayoutConstraint?
     var frontMatterDividerBottomConstraint: NSLayoutConstraint?
     private var isHorizontalRule = false
-
-    enum TextLinePosition {
-        case first
-        case last
-    }
 
     var currentSelectedRange: NSRange {
         textView.selectedRange()
@@ -163,6 +159,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         allowsReordering: Bool,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         accentColor: NSColor = .controlAccentColor,
+        style: BlockInputStyle = .default,
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) {
@@ -173,6 +170,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.delegate = delegate
         self.allowsReordering = allowsReordering
         self.editorHorizontalInset = editorHorizontalInset
+        self.style = style
         selectionBeforeTextChange = nil
         isHorizontalRule = block.kind == .horizontalRule
         handleView.blockItem = self
@@ -452,6 +450,13 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.trackingArea = trackingArea
     }
 
+}
+
+extension BlockInputBlockItem {
+    enum TextLinePosition {
+        case first
+        case last
+    }
 }
 
 extension BlockInputBlockItem {

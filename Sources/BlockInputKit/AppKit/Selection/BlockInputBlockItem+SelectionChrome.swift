@@ -4,7 +4,7 @@ extension BlockInputBlockItem {
     func applySelectionChrome(_ chrome: BlockInputBlockSelectionChrome) {
         blockSelectionChrome = chrome
         selectionBackgroundView.isHidden = !chrome.showsContentBackground
-        selectionBackgroundView.fillColor = chrome.contentBackgroundColor
+        selectionBackgroundView.fillColor = chrome.contentBackgroundColor(style: style)
         selectionBackgroundView.cornerRadius = chrome.cornerRadius
         updateSelectionChromeFrame()
     }
@@ -353,7 +353,7 @@ extension BlockInputBlockItem {
 
     private func measuredTextWidth() -> CGFloat {
         let text = textView.string.isEmpty ? " " : textView.string
-        let font = textView.font ?? Self.font(for: renderedBlock?.kind ?? .paragraph)
+        let font = textView.font ?? Self.font(for: renderedBlock?.kind ?? .paragraph, style: style)
         return text
             .components(separatedBy: .newlines)
             .map { line in

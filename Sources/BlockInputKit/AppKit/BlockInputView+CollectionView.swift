@@ -41,6 +41,7 @@ extension BlockInputView: NSCollectionViewDataSource {
             allowsReordering: allowsBlockReordering,
             editorHorizontalInset: editorHorizontalInset,
             accentColor: dropIndicatorColor,
+            style: style,
             isSelected: isBlockSelected(block.id),
             delegate: self
         )
@@ -69,9 +70,10 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
             for: availableWidth,
             block: block,
             allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset
+            editorHorizontalInset: editorHorizontalInset,
+            style: style
         )
-        let height = BlockInputBlockItem.height(for: block, textWidth: textWidth)
+        let height = BlockInputBlockItem.height(for: block, textWidth: textWidth, style: style)
         return NSSize(width: availableWidth, height: height)
     }
 }

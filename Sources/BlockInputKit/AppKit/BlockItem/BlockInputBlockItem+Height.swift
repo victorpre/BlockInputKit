@@ -1,55 +1,83 @@
 import AppKit
 
 extension BlockInputBlockItem {
-    static func height(for block: BlockInputBlock, textWidth: CGFloat) -> CGFloat {
+    static func height(for block: BlockInputBlock, textWidth: CGFloat, style: BlockInputStyle = .default) -> CGFloat {
         let text = block.text.isEmpty ? " " : block.text
         let availableTextWidth = max(textWidth - perLineContentIndent(for: block), 120)
-        let font = font(for: block.kind)
+        let font = font(for: block.kind, style: style)
         let metrics = verticalMetrics(for: block)
         let hiddenDelimiterRanges = hiddenInlineDelimiterRanges(for: block, text: text)
+        let inlineCodeRanges = inlineCodeRangesForHeight(for: block, text: text)
         let frontMatterReserve = block.kind == .frontMatter
             ? (frontMatterDividerVerticalInset * 2) + frontMatterDividerHeight
             : 0
         if case .code = block.kind {
-            let codeWidth = max(unwrappedTextWidth(for: text, font: font), availableTextWidth)
-            let horizontalScrollerReserve = codeWidth > availableTextWidth
-                ? codeHorizontalScrollerReserve
-                : 0
+            return codeBlockHeight(text: text, availableTextWidth: availableTextWidth, font: font, metrics: metrics)
+        }
+        return textBlockHeight(BlockInputTextHeightContext(
+            text: text,
+            availableTextWidth: availableTextWidth,
+            font: font,
+            metrics: metrics,
+            hiddenDelimiterRanges: hiddenDelimiterRanges,
+            inlineCodeRanges: inlineCodeRanges,
+            frontMatterReserve: frontMatterReserve,
+            style: style
+        ))
+    }
+
+    private static func codeBlockHeight(
+        text: String,
+        availableTextWidth: CGFloat,
+        font: NSFont,
+        metrics: BlockInputBlockItemVerticalMetrics
+    ) -> CGFloat {
+        let codeWidth = max(unwrappedTextWidth(for: text, font: font), availableTextWidth)
+        let horizontalScrollerReserve = codeWidth > availableTextWidth ? codeHorizontalScrollerReserve : 0
+        return max(
+            metrics.minimumHeight,
+            textKitHeight(for: text, width: codeWidth, font: font)
+                + metrics.topContentInset
+                + metrics.bottomContentInset
+                + horizontalScrollerReserve
+                + 2
+        )
+    }
+
+    private static func textBlockHeight(_ context: BlockInputTextHeightContext) -> CGFloat {
+        if context.inlineCodeRanges.isEmpty,
+           isShortSingleLine(context.text, likelyFitting: context.availableTextWidth, font: context.font) {
             return max(
-                metrics.minimumHeight,
-                textKitHeight(for: text, width: codeWidth, font: font)
-                    + metrics.topContentInset
-                    + metrics.bottomContentInset
-                    + horizontalScrollerReserve
+                context.metrics.minimumHeight + context.frontMatterReserve,
+                singleLineTextHeight(font: context.font)
+                    + context.metrics.topContentInset
+                    + context.metrics.bottomContentInset
+                    + context.frontMatterReserve
                     + 2
             )
         }
-        if isShortSingleLine(text, likelyFitting: availableTextWidth, font: font) {
-            return max(
-                metrics.minimumHeight + frontMatterReserve,
-                singleLineTextHeight(font: font) + metrics.topContentInset + metrics.bottomContentInset + frontMatterReserve + 2
-            )
-        }
-        let boundingRect = (text as NSString).boundingRect(
-            with: NSSize(width: availableTextWidth, height: CGFloat.greatestFiniteMagnitude),
+        let boundingRect = (context.text as NSString).boundingRect(
+            with: NSSize(width: context.availableTextWidth, height: CGFloat.greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: font]
+            attributes: [.font: context.font]
         )
         let textKitHeight = textKitHeight(
-            for: text,
-            width: availableTextWidth,
-            font: font,
-            hiddenDelimiterRanges: hiddenDelimiterRanges
+            for: context.text,
+            width: context.availableTextWidth,
+            font: context.font,
+            hiddenDelimiterRanges: context.hiddenDelimiterRanges,
+            inlineCodeRanges: context.inlineCodeRanges,
+            style: context.style
         )
-        let measuredTextHeight = hiddenDelimiterRanges.isEmpty
+        let measuredTextHeight = context.hiddenDelimiterRanges.isEmpty
             ? max(ceil(boundingRect.height), textKitHeight)
             : textKitHeight
         return max(
-            metrics.minimumHeight + frontMatterReserve,
+            context.metrics.minimumHeight + context.frontMatterReserve,
             measuredTextHeight
-                + metrics.topContentInset
-                + metrics.bottomContentInset
-                + frontMatterReserve
+                + context.metrics.topContentInset
+                + context.metrics.bottomContentInset
+                + context.frontMatterReserve
                 + 2
         )
     }
@@ -78,7 +106,9 @@ extension BlockInputBlockItem {
         for text: String,
         width: CGFloat,
         font: NSFont,
-        hiddenDelimiterRanges: [NSRange] = []
+        hiddenDelimiterRanges: [NSRange] = [],
+        inlineCodeRanges: [BlockInputInlineCodeRange] = [],
+        style: BlockInputStyle = .default
     ) -> CGFloat {
         let textStorage = NSTextStorage(string: text, attributes: [.font: font])
         let layoutManager = NSLayoutManager()
@@ -90,6 +120,13 @@ extension BlockInputBlockItem {
         layoutManager.addTextContainer(textContainer)
         textStorage.addLayoutManager(layoutManager)
         let fullRange = NSRange(location: 0, length: textStorage.length)
+        applyInlineCodeHeightAttributes(
+            inlineCodeRanges,
+            font: font,
+            style: style,
+            textStorage: textStorage,
+            fullRange: fullRange
+        )
         for delimiterRange in hiddenDelimiterRanges {
             let clampedDelimiterRange = NSIntersectionRange(delimiterRange, fullRange)
             guard clampedDelimiterRange.length > 0 else {
@@ -101,6 +138,40 @@ extension BlockInputBlockItem {
             layoutManager.ensureLayout(for: textContainer)
             let usedRect = layoutManager.usedRect(for: textContainer)
             return ceil(max(usedRect.maxY, singleLineTextHeight(font: font)))
+        }
+    }
+
+    private static func inlineCodeRangesForHeight(for block: BlockInputBlock, text: String) -> [BlockInputInlineCodeRange] {
+        guard supportsInlineCodeStyling(block.kind) else {
+            return []
+        }
+        return BlockInputCodeParsing.inlineCodeRanges(in: text)
+    }
+
+    private static func applyInlineCodeHeightAttributes(
+        _ inlineCodeRanges: [BlockInputInlineCodeRange],
+        font: NSFont,
+        style: BlockInputStyle,
+        textStorage: NSTextStorage,
+        fullRange: NSRange
+    ) {
+        guard !inlineCodeRanges.isEmpty else {
+            return
+        }
+        let inlineFont = inlineCodeFont(for: font, style: style)
+        let delimiterFont = inlineCodeDelimiterFont(for: font)
+        for inlineCodeRange in inlineCodeRanges {
+            let contentRange = NSIntersectionRange(inlineCodeRange.contentRange, fullRange)
+            if contentRange.length > 0 {
+                textStorage.addAttribute(.font, value: inlineFont, range: contentRange)
+            }
+            for delimiterRange in inlineCodeRange.delimiterRanges {
+                let clampedDelimiterRange = NSIntersectionRange(delimiterRange, fullRange)
+                guard clampedDelimiterRange.length > 0 else {
+                    continue
+                }
+                textStorage.addAttribute(.font, value: delimiterFont, range: clampedDelimiterRange)
+            }
         }
     }
 
@@ -133,4 +204,15 @@ extension BlockInputBlockItem {
             }
             .max() ?? 120
     }
+}
+
+private struct BlockInputTextHeightContext {
+    var text: String
+    var availableTextWidth: CGFloat
+    var font: NSFont
+    var metrics: BlockInputBlockItemVerticalMetrics
+    var hiddenDelimiterRanges: [NSRange]
+    var inlineCodeRanges: [BlockInputInlineCodeRange]
+    var frontMatterReserve: CGFloat
+    var style: BlockInputStyle
 }

@@ -118,6 +118,7 @@ extension BlockInputView {
                 allowsReordering: allowsBlockReordering,
                 editorHorizontalInset: editorHorizontalInset,
                 accentColor: dropIndicatorColor,
+                style: style,
                 isSelected: isBlockSelected(block.id),
                 delegate: self
             )
@@ -231,6 +232,7 @@ extension BlockInputView {
             allowsReordering: allowsBlockReordering,
             editorHorizontalInset: editorHorizontalInset,
             accentColor: dropIndicatorColor,
+            style: style,
             isSelected: isBlockSelected(block.id),
             delegate: self
         )

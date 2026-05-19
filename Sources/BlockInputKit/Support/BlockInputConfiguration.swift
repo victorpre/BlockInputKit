@@ -24,6 +24,8 @@ public struct BlockInputConfiguration {
     public var editorVerticalInset: CGFloat
     /// Color used for editor accent affordances, including drag insertion and selected horizontal rules.
     public var dropIndicatorColor: NSColor
+    /// Visual styling for editor text, code, and selection chrome.
+    public var style: BlockInputStyle
     /// Undo coordinator used by text and structural editor operations.
     ///
     /// When nil, `BlockInputView` uses a view-owned undo controller.
@@ -64,6 +66,7 @@ public struct BlockInputConfiguration {
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         editorVerticalInset: CGFloat = BlockInputConfiguration.defaultEditorVerticalInset,
         dropIndicatorColor: NSColor = .controlAccentColor,
+        style: BlockInputStyle = .default,
         undoController: BlockInputUndoController? = nil,
         completionProvider: (any BlockInputCompletionProvider)? = nil,
         onDocumentMutation: ((BlockInputDocumentChange) -> Void)? = nil,
@@ -78,6 +81,7 @@ public struct BlockInputConfiguration {
         self.editorHorizontalInset = editorHorizontalInset
         self.editorVerticalInset = editorVerticalInset
         self.dropIndicatorColor = dropIndicatorColor
+        self.style = style
         self.undoController = undoController
         self.completionProvider = completionProvider
         self.onDocumentMutation = onDocumentMutation

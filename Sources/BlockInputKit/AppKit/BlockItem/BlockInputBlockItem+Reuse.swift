@@ -8,6 +8,7 @@ extension BlockInputBlockItem {
         configureWrappingTextScrolling()
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         textView.font = Self.font(for: .paragraph)
+        style = .default
     }
 
     func resetLayoutForReuse() {

@@ -122,16 +122,18 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             for: itemWidth,
             block: beforeBlock,
             allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset
+            editorHorizontalInset: editorHorizontalInset,
+            style: style
         )
         let afterTextWidth = BlockInputBlockItem.measuredTextWidth(
             for: itemWidth,
             block: afterBlock,
             allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset
+            editorHorizontalInset: editorHorizontalInset,
+            style: style
         )
-        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: beforeTextWidth)
-        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: afterTextWidth)
+        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: beforeTextWidth, style: style)
+        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: afterTextWidth, style: style)
         let isStaleCodeBlockHeight: Bool
         if case .code = afterBlock.kind {
             isStaleCodeBlockHeight = abs(item.view.frame.height - afterHeight) > 0.5
@@ -479,16 +481,6 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         }
     }
 
-    private func configureBlockItem(_ item: BlockInputBlockItem, block: BlockInputBlock) {
-        item.configure(
-            block: block,
-            allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset,
-            accentColor: dropIndicatorColor,
-            isSelected: isBlockSelected(block.id),
-            delegate: self
-        )
-    }
 }
 
 private struct PlainTextChangeContext {

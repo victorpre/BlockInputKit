@@ -171,6 +171,7 @@ extension BlockInputView {
             allowsReordering: allowsBlockReordering,
             editorHorizontalInset: editorHorizontalInset,
             accentColor: dropIndicatorColor,
+            style: style,
             isSelected: isBlockSelected(block.id),
             delegate: self
         )
@@ -186,16 +187,18 @@ extension BlockInputView {
             for: itemWidth,
             block: beforeBlock,
             allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset
+            editorHorizontalInset: editorHorizontalInset,
+            style: style
         )
         let afterTextWidth = BlockInputBlockItem.measuredTextWidth(
             for: itemWidth,
             block: afterBlock,
             allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset
+            editorHorizontalInset: editorHorizontalInset,
+            style: style
         )
-        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: beforeTextWidth)
-        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: afterTextWidth)
+        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: beforeTextWidth, style: style)
+        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: afterTextWidth, style: style)
         return abs(beforeHeight - afterHeight) > 0.5
     }
 

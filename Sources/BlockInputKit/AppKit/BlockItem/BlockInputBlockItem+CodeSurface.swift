@@ -10,10 +10,15 @@ extension BlockInputBlockItem {
             textStorage.string,
             language: language,
             colorScheme: BlockInputSyntaxColorScheme(appearance: textView.effectiveAppearance),
-            font: Self.font(for: block.kind)
+            font: Self.font(for: block.kind, style: style),
+            baseForegroundColor: foregroundColor(for: block.kind)
         )
         highlighted.enumerateAttributes(in: fullRange, options: []) { attributes, range, _ in
             textStorage.addAttributes(attributes, range: range)
+        }
+        // An explicit code foreground color is a global override, including syntax-highlighted token ranges.
+        if let foregroundColor = style.codeBlock.foregroundColor {
+            textStorage.addAttribute(.foregroundColor, value: foregroundColor, range: fullRange)
         }
     }
 
@@ -26,8 +31,9 @@ extension BlockInputBlockItem {
         }
         codeBackgroundView.isHidden = false
         codeBackgroundView.alphaValue = 1
-        codeBackgroundView.layer?.backgroundColor = Self.codeBackgroundColor(for: effectiveCodeColorScheme).cgColor
+        codeBackgroundView.layer?.backgroundColor = codeBackgroundColor(for: effectiveCodeColorScheme).cgColor
         codeBackgroundView.layer?.borderColor = Self.codeBorderColor(for: effectiveCodeColorScheme).cgColor
+        codeBackgroundView.layer?.cornerRadius = style.codeBlock.cornerRadius ?? 6
         renderedCodeColorScheme = effectiveCodeColorScheme
         updateCodeBackgroundFrame()
     }
@@ -62,7 +68,7 @@ extension BlockInputBlockItem {
             y: max(0, scrollView.frame.minY + verticalInset),
             width: Self.codeSurfaceWidth(
                 for: textView.string,
-                font: textView.font ?? Self.font(for: renderedBlock?.kind ?? .code(language: nil)),
+                font: textView.font ?? Self.font(for: renderedBlock?.kind ?? .code(language: nil), style: style),
                 availableWidth: availableWidth
             ),
             height: max(0, scrollView.frame.height - verticalInset * 2)
@@ -90,7 +96,10 @@ extension BlockInputBlockItem {
         BlockInputSyntaxColorScheme(appearance: view.effectiveAppearance)
     }
 
-    private static func codeBackgroundColor(for colorScheme: BlockInputSyntaxColorScheme) -> NSColor {
+    private func codeBackgroundColor(for colorScheme: BlockInputSyntaxColorScheme) -> NSColor {
+        if let backgroundColor = style.codeBlock.backgroundColor {
+            return backgroundColor
+        }
         switch colorScheme {
         case .dark:
             return NSColor(srgbRed: 0.10, green: 0.11, blue: 0.13, alpha: 1)

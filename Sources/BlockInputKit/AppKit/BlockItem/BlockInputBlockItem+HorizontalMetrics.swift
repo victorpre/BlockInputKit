@@ -15,14 +15,16 @@ extension BlockInputBlockItem {
         for itemWidth: CGFloat,
         block: BlockInputBlock,
         allowsReordering: Bool,
-        editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset
+        editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
+        style: BlockInputStyle = .default
     ) -> CGFloat {
         max(
             textScrollViewWidth(
                 for: itemWidth,
                 block: block,
                 allowsReordering: allowsReordering,
-                editorHorizontalInset: editorHorizontalInset
+                editorHorizontalInset: editorHorizontalInset,
+                style: style
             )
                 - 2 * textContainerLineFragmentPadding,
             120
@@ -57,14 +59,16 @@ extension BlockInputBlockItem {
         for itemWidth: CGFloat,
         block: BlockInputBlock,
         allowsReordering: Bool,
-        editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset
+        editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
+        style: BlockInputStyle = .default
     ) -> CGFloat {
         max(
             itemWidth
                 - textScrollViewLeadingInset(
                     for: block,
                     allowsReordering: allowsReordering,
-                    editorHorizontalInset: editorHorizontalInset
+                    editorHorizontalInset: editorHorizontalInset,
+                    style: style
                 )
                 - horizontalContentTrailingInset(
                     allowsReordering: allowsReordering,
@@ -77,7 +81,8 @@ extension BlockInputBlockItem {
     private static func textScrollViewLeadingInset(
         for block: BlockInputBlock,
         allowsReordering: Bool,
-        editorHorizontalInset: CGFloat
+        editorHorizontalInset: CGFloat,
+        style: BlockInputStyle
     ) -> CGFloat {
         handleTrailingX(
             allowsReordering: allowsReordering,
@@ -88,7 +93,7 @@ extension BlockInputBlockItem {
                 allowsReordering: allowsReordering,
                 editorHorizontalInset: editorHorizontalInset
             )
-            + kindLabelWidthConstant(for: block)
+            + kindLabelWidthConstant(for: block, style: style)
             + textLeadingConstant(
                 for: block,
                 allowsReordering: allowsReordering,
@@ -113,14 +118,14 @@ extension BlockInputBlockItem {
         }
     }
 
-    private static func kindLabelWidthConstant(for block: BlockInputBlock) -> CGFloat {
+    private static func kindLabelWidthConstant(for block: BlockInputBlock, style: BlockInputStyle) -> CGFloat {
         guard block.kind.needsMeasuredMarkerLane else {
             return 0
         }
         if block.kind == .quote {
             return 0
         }
-        return markerGutterWidth(for: block) + perLineContentIndent(for: block)
+        return markerGutterWidth(for: block, style: style) + perLineContentIndent(for: block)
     }
 
     private static func textLeadingConstant(
