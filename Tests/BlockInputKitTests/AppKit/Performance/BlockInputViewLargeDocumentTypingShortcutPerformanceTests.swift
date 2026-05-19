@@ -146,6 +146,42 @@ final class LargeDocTypingShortcutPerformanceTests: XCTestCase {
         )))
     }
 
+    func testNoSpaceHorizontalRuleShortcutInLargeDocumentMovesTextIntoInsertedBlockGranularly() throws {
+        let blockID = BlockInputBlockID(rawValue: "block-50000")
+        let (store, view) = makeLargeDocumentView(
+            targetBlockID: blockID,
+            targetText: "Existing",
+            undoController: BlockInputUndoController()
+        )
+        store.resetCounts()
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: try XCTUnwrap(store.block(withID: blockID)),
+            allowsReordering: true,
+            delegate: view
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.string = "---Existing"
+        textView.setSelectedRange(NSRange(location: 3, length: 0))
+
+        view.blockItem(
+            item,
+            blockID: blockID,
+            didChangeText: "---Existing",
+            selectionBefore: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
+        )
+
+        XCTAssertEqual(store.block(withID: blockID)?.kind, .horizontalRule)
+        XCTAssertEqual(store.documentReadCount, 0)
+        XCTAssertEqual(store.replaceDocumentCount, 0)
+        XCTAssertEqual(store.replacedBlockIDs, [blockID])
+        XCTAssertEqual(store.insertedBlockBatches.count, 1)
+        XCTAssertEqual(store.insertedBlockBatches[0].blocks[0].text, "Existing")
+        XCTAssertEqual(view.selection, .cursor(BlockInputCursor(
+            blockID: store.insertedBlockBatches[0].blocks[0].id,
+            utf16Offset: 0
+        )))
+    }
+
     private func makeLargeDocumentView(
         targetBlockID: BlockInputBlockID,
         targetText: String,

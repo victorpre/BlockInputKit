@@ -52,6 +52,11 @@ extension BlockInputView {
             }
         }
         applySelection(validUndoSelection(selection), notify: true)
+        guard shouldDeferGranularCountLayout else {
+            reloadDataKeepingFocus()
+            publishDocumentChange()
+            return true
+        }
         if !reconfigureVisibleReplacement(context.replacement, at: context.replacementIndex) {
             collectionView.reloadItems(at: [IndexPath(item: context.replacementIndex, section: 0)])
             collectionView.layoutSubtreeIfNeeded()
@@ -90,6 +95,11 @@ extension BlockInputView {
             markDocumentCacheUnsynchronized()
         }
         applySelection(validUndoSelection(selection), notify: true)
+        guard shouldDeferGranularCountLayout else {
+            reloadDataKeepingFocus()
+            publishDocumentChange()
+            return true
+        }
         if !reconfigureVisibleReplacement(context.replacement, at: context.replacementIndex) {
             collectionView.reloadItems(at: [IndexPath(item: context.replacementIndex, section: 0)])
             collectionView.layoutSubtreeIfNeeded()

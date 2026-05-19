@@ -172,17 +172,28 @@ private enum BlockInputTypingShortcutParser {
         if text == "---" {
             return Match(kind: .horizontalRule, text: "", consumedUTF16Length: 3)
         }
-        guard text.hasPrefix("--- ") else {
+        guard text.hasPrefix("---") else {
             return nil
         }
-        let suffixStart = text.index(text.startIndex, offsetBy: 4)
+        let suffixStart = text.index(text.startIndex, offsetBy: 3)
         let suffix = text[suffixStart...]
+        guard suffix.first == " " else {
+            guard let firstCharacter = suffix.first,
+                  !firstCharacter.isWhitespace else {
+                return nil
+            }
+            return Match(
+                kind: .horizontalRule,
+                text: String(suffix),
+                consumedUTF16Length: 3
+            )
+        }
         let trimmedSuffix = suffix.drop { $0 == " " }
         let trimmedLeadingSpaceCount = suffix.distance(from: suffix.startIndex, to: trimmedSuffix.startIndex)
         return Match(
             kind: .horizontalRule,
             text: String(trimmedSuffix),
-            consumedUTF16Length: 4 + trimmedLeadingSpaceCount
+            consumedUTF16Length: 3 + trimmedLeadingSpaceCount
         )
     }
 
