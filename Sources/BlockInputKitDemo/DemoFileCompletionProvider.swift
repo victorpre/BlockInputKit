@@ -1,0 +1,174 @@
+import BlockInputKit
+import Foundation
+
+final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked Sendable {
+    private let maxCandidateMatches = 500
+    private let launchDirectory: URL
+    private let fileManager: FileManager
+
+    init(
+        launchDirectory: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true),
+        fileManager: FileManager = .default
+    ) {
+        self.launchDirectory = launchDirectory.standardizedFileURL
+        self.fileManager = fileManager
+    }
+
+    func suggestions(for context: BlockInputCompletionContext) async -> [BlockInputCompletionSuggestion] {
+        guard context.trigger == .mention else {
+            return []
+        }
+        let scope = completionScope(for: context)
+        let query = scope.query.lowercased()
+        return fileCandidates(under: scope.baseDirectory, matching: query)
+            .prefix(50)
+            .map { candidate in
+                let label = label(for: candidate, scope: scope)
+                return BlockInputCompletionSuggestion.fileLink(
+                    id: candidate.url.path,
+                    title: label,
+                    subtitle: candidate.url.deletingLastPathComponent().path,
+                    label: label,
+                    fileURL: candidate.url,
+                    detailText: candidate.isDirectory ? "Folder" : nil
+                )
+            }
+    }
+
+    private func completionScope(for context: BlockInputCompletionContext) -> DemoFileCompletionScope {
+        if context.rawQuery.hasPrefix("/") {
+            return absoluteCompletionScope(for: context.rawQuery)
+        }
+        return DemoFileCompletionScope(
+            baseDirectory: baseDirectory(for: context.fileQuery),
+            query: context.query,
+            fileQuery: context.fileQuery,
+            usesAbsoluteLabels: false
+        )
+    }
+
+    private func absoluteCompletionScope(for rawQuery: String) -> DemoFileCompletionScope {
+        let typedURL = URL(fileURLWithPath: rawQuery, isDirectory: rawQuery.hasSuffix("/")).standardizedFileURL
+        var directory = rawQuery.hasSuffix("/") ? typedURL : typedURL.deletingLastPathComponent()
+        var query = rawQuery.hasSuffix("/") ? "" : typedURL.lastPathComponent
+        while !directoryExists(directory), directory.path != "/" {
+            query = [directory.lastPathComponent, query]
+                .filter { !$0.isEmpty }
+                .joined(separator: "/")
+            directory.deleteLastPathComponent()
+        }
+        if !directoryExists(directory) {
+            directory = URL(fileURLWithPath: "/", isDirectory: true)
+        }
+        return DemoFileCompletionScope(
+            baseDirectory: directory.standardizedFileURL,
+            query: query,
+            fileQuery: nil,
+            usesAbsoluteLabels: true
+        )
+    }
+
+    private func baseDirectory(for fileQuery: BlockInputCompletionFileQuery?) -> URL {
+        var directory = launchDirectory
+        for _ in 0..<(fileQuery?.levelsUp ?? 0) {
+            directory.deleteLastPathComponent()
+        }
+        return directory.standardizedFileURL
+    }
+
+    private func directoryExists(_ url: URL) -> Bool {
+        var isDirectory = ObjCBool(false)
+        return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
+    }
+
+    private func fileCandidates(under baseDirectory: URL, matching query: String) -> [DemoFileCompletionCandidate] {
+        guard let enumerator = fileManager.enumerator(
+            at: baseDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return []
+        }
+        var candidates: [DemoFileCompletionCandidate] = []
+        for case let url as URL in enumerator {
+            guard !Task.isCancelled else {
+                break
+            }
+            let relativePath = relativePath(for: url, under: baseDirectory)
+            guard !relativePath.isEmpty else {
+                continue
+            }
+            let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey])
+            let candidate = DemoFileCompletionCandidate(
+                url: url.standardizedFileURL,
+                relativePath: relativePath,
+                isDirectory: resourceValues?.isDirectory == true
+            )
+            guard candidate.matches(query: query) else {
+                continue
+            }
+            candidates.append(candidate)
+            if candidates.count >= maxCandidateMatches {
+                break
+            }
+        }
+        return candidates.sorted { lhs, rhs in
+            lhs.relativePath.localizedStandardCompare(rhs.relativePath) == .orderedAscending
+        }
+    }
+
+    private func label(for candidate: DemoFileCompletionCandidate, scope: DemoFileCompletionScope) -> String {
+        if scope.usesAbsoluteLabels {
+            return candidate.url.path
+        }
+        guard let reference = scope.fileQuery?.directoryReference else {
+            return candidate.relativePath
+        }
+        switch reference {
+        case .current:
+            return "./\(candidate.relativePath)"
+        case .parent:
+            return "../\(candidate.relativePath)"
+        case .grandparent:
+            return ".../\(candidate.relativePath)"
+        }
+    }
+
+    private func relativePath(for url: URL, under baseDirectory: URL) -> String {
+        let basePath = baseDirectory.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        if basePath == "/" {
+            return path.replacingPrefix("/", with: "")
+        }
+        return path.replacingPrefix(basePath + "/", with: "")
+    }
+}
+
+private struct DemoFileCompletionScope {
+    var baseDirectory: URL
+    var query: String
+    var fileQuery: BlockInputCompletionFileQuery?
+    var usesAbsoluteLabels: Bool
+}
+
+private struct DemoFileCompletionCandidate {
+    var url: URL
+    var relativePath: String
+    var isDirectory: Bool
+
+    func matches(query: String) -> Bool {
+        query.isEmpty ||
+            relativePath.lowercased().contains(query) ||
+            url.path.lowercased().contains(query) ||
+            url.lastPathComponent.lowercased().contains(query)
+    }
+}
+
+private extension String {
+    func replacingPrefix(_ prefix: String, with replacement: String) -> String {
+        guard hasPrefix(prefix) else {
+            return self
+        }
+        return replacement + String(dropFirst(prefix.count))
+    }
+}

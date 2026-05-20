@@ -41,6 +41,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         let onDocumentMutation: (BlockInputDocumentChange) -> Void = { _ in }
         let onDocumentChange: (BlockInputDocument) -> Void = { _ in }
         let onFocusChange: (Bool) -> Void = { _ in }
+        let container = NSView()
 
         view.configure(BlockInputConfiguration(
             allowsBlockReordering: false,
@@ -49,6 +50,12 @@ final class BlockInputConfigurationTests: XCTestCase {
             dropIndicatorColor: .systemPink,
             undoController: undoController,
             completionProvider: provider,
+            completionPopupConfiguration: BlockInputCompletionPopupConfiguration(
+                placement: .overlay,
+                overlayProvider: { context in
+                    BlockInputCompletionPopupOverlay(container: container, frame: context.defaultFrame)
+                }
+            ),
             onDocumentMutation: onDocumentMutation,
             onDocumentChange: onDocumentChange,
             documentChangeSnapshotDelay: 0.01,
@@ -66,10 +73,29 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(view.dropIndicatorColor, .systemPink)
         XCTAssertTrue(view.undoController === undoController)
         XCTAssertTrue(view.completionProvider === provider)
+        XCTAssertEqual(view.completionPopupPlacement, .overlay)
+        let overlay = view.completionPopupConfiguration.overlayProvider?(BlockInputCompletionPopupOverlayContext(
+            editorView: view,
+            defaultContainer: view,
+            defaultFrame: .zero,
+            popupSize: .zero
+        ))
+        XCTAssertTrue(overlay?.container === container)
         XCTAssertNotNil(view.onDocumentMutation)
         XCTAssertNotNil(view.onDocumentChange)
         XCTAssertEqual(view.documentChangeSnapshotDelay, 0.01)
         XCTAssertNotNil(view.onFocusChange)
+    }
+
+    func testCompletionPopupPlacementParameterBuildsPopupConfiguration() {
+        var configuration = BlockInputConfiguration(completionPopupPlacement: .overlay)
+
+        XCTAssertEqual(configuration.completionPopupConfiguration.placement, .overlay)
+        XCTAssertEqual(configuration.completionPopupPlacement, .overlay)
+
+        configuration.completionPopupPlacement = .caret
+
+        XCTAssertEqual(configuration.completionPopupConfiguration.placement, .caret)
     }
 
     @MainActor

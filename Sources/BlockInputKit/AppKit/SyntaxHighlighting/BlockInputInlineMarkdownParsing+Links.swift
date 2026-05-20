@@ -7,6 +7,8 @@ extension BlockInputInlineMarkdownParsing {
     private static let linkClosingBracket: unichar = 0x5D
     private static let linkOpeningParenthesis: unichar = 0x28
     private static let linkClosingParenthesis: unichar = 0x29
+    private static let linkOpeningAngle: unichar = 0x3C
+    private static let linkClosingAngle: unichar = 0x3E
     private static let linkLineFeed: unichar = 0x0A
     private static let linkCarriageReturn: unichar = 0x0D
 
@@ -46,6 +48,47 @@ extension BlockInputInlineMarkdownParsing {
         return ranges
     }
 
+    static func linkSourceRanges(
+        in text: String,
+        excluding excludedRanges: [NSRange] = []
+    ) -> [NSRange] {
+        let nsText = text as NSString
+        return linkSourceRanges(
+            in: nsText,
+            excluding: BlockInputExcludedRangeLookup(textLength: nsText.length, ranges: excludedRanges)
+        )
+    }
+
+    private static func linkSourceRanges(
+        in text: NSString,
+        excluding excludedRangeLookup: BlockInputExcludedRangeLookup
+    ) -> [NSRange] {
+        var ranges: [NSRange] = []
+        var location = 0
+        while location < text.length {
+            guard text.character(at: location) == linkOpeningBracket else {
+                location += 1
+                continue
+            }
+            if location > 0, text.character(at: location - 1) == linkOpeningBracket {
+                location += 1
+                continue
+            }
+            if excludedRangeLookup.intersects(NSRange(location: location, length: 1)) {
+                location += 1
+                continue
+            }
+            let linkSearch = linkRange(in: text, openingBracketLocation: location, excluding: excludedRangeLookup)
+            if let sourceRange = linkSearch.sourceRange {
+                ranges.append(sourceRange)
+                location = NSMaxRange(sourceRange)
+            } else {
+                location = max(location + 1, linkSearch.resumeLocation)
+            }
+        }
+        return ranges
+    }
+
     private static func linkRange(
         in text: NSString,
         openingBracketLocation: Int,
@@ -57,11 +100,15 @@ extension BlockInputInlineMarkdownParsing {
             excluding: excludedRangeLookup
         )
         guard let closingBracketLocation = labelSearch.closingLocation,
-              closingBracketLocation > openingBracketLocation + 1,
+              closingBracketLocation >= openingBracketLocation + 1,
               closingBracketLocation + 1 < text.length,
               text.character(at: closingBracketLocation + 1) == linkOpeningParenthesis,
               !excludedRangeLookup.intersects(NSRange(location: closingBracketLocation, length: 2)) else {
-            return BlockInputLinkSearch(range: nil, resumeLocation: max(openingBracketLocation + 1, labelSearch.resumeLocation))
+            return BlockInputLinkSearch(
+                range: nil,
+                sourceRange: nil,
+                resumeLocation: max(openingBracketLocation + 1, labelSearch.resumeLocation)
+            )
         }
 
         let urlStart = closingBracketLocation + 2
@@ -70,9 +117,12 @@ extension BlockInputInlineMarkdownParsing {
             from: urlStart,
             excluding: excludedRangeLookup
         )
-        guard let closingParenthesisLocation = destinationSearch.closingLocation,
-              closingParenthesisLocation > urlStart else {
-            return BlockInputLinkSearch(range: nil, resumeLocation: max(openingBracketLocation + 1, destinationSearch.resumeLocation))
+        guard let closingParenthesisLocation = destinationSearch.closingLocation else {
+            return BlockInputLinkSearch(
+                range: nil,
+                sourceRange: nil,
+                resumeLocation: max(openingBracketLocation + 1, destinationSearch.resumeLocation)
+            )
         }
         let sourceRanges = BlockInputLinkSourceRanges(
             openingBracketLocation: openingBracketLocation,
@@ -80,10 +130,11 @@ extension BlockInputInlineMarkdownParsing {
             urlStart: urlStart,
             closingParenthesisLocation: closingParenthesisLocation
         )
+        let sourceRange = sourceRanges.fullRange
         guard let linkRange = parsedLinkRange(in: text, sourceRanges: sourceRanges) else {
-            return BlockInputLinkSearch(range: nil, resumeLocation: NSMaxRange(sourceRanges.fullRange))
+            return BlockInputLinkSearch(range: nil, sourceRange: sourceRange, resumeLocation: NSMaxRange(sourceRange))
         }
-        return BlockInputLinkSearch(range: linkRange, resumeLocation: NSMaxRange(sourceRanges.fullRange))
+        return BlockInputLinkSearch(range: linkRange, sourceRange: sourceRange, resumeLocation: NSMaxRange(sourceRange))
     }
 
     private static func parsedLinkRange(
@@ -91,7 +142,7 @@ extension BlockInputInlineMarkdownParsing {
         sourceRanges: BlockInputLinkSourceRanges
     ) -> BlockInputInlineMarkdownRange? {
         let label = text.substring(with: sourceRanges.labelRange)
-        let urlString = text.substring(with: sourceRanges.urlRange).blockInputUnescapedLinkDestination
+        let urlString = normalizedLinkDestination(text.substring(with: sourceRanges.urlRange).blockInputUnescapedLinkDestination)
         guard linkLabelIsSupported(label),
               let destination = BlockInputLinkURL.supportedURL(from: urlString) else {
             return nil
@@ -146,6 +197,10 @@ extension BlockInputInlineMarkdownParsing {
         from startLocation: Int,
         excluding excludedRangeLookup: BlockInputExcludedRangeLookup
     ) -> BlockInputLinkClosingSearch {
+        if startLocation < text.length,
+           text.character(at: startLocation) == linkOpeningAngle {
+            return closingAngleLinkDestinationLocation(in: text, from: startLocation, excluding: excludedRangeLookup)
+        }
         var location = startLocation
         while location < text.length {
             let character = text.character(at: location)
@@ -166,8 +221,44 @@ extension BlockInputInlineMarkdownParsing {
         return BlockInputLinkClosingSearch(closingLocation: nil, resumeLocation: text.length)
     }
 
+    private static func closingAngleLinkDestinationLocation(
+        in text: NSString,
+        from startLocation: Int,
+        excluding excludedRangeLookup: BlockInputExcludedRangeLookup
+    ) -> BlockInputLinkClosingSearch {
+        var location = startLocation + 1
+        while location < text.length {
+            let character = text.character(at: location)
+            if character == linkLineFeed || character == linkCarriageReturn {
+                return BlockInputLinkClosingSearch(closingLocation: nil, resumeLocation: location + 1)
+            }
+            if character == linkClosingAngle,
+               !isEscapedLinkCharacter(at: location, in: text) {
+                let closingParenthesisLocation = location + 1
+                guard closingParenthesisLocation < text.length,
+                      text.character(at: closingParenthesisLocation) == linkClosingParenthesis,
+                      !isEscapedLinkCharacter(at: closingParenthesisLocation, in: text),
+                      !excludedRangeLookup.intersects(NSRange(location: location, length: 2)) else {
+                    return BlockInputLinkClosingSearch(closingLocation: nil, resumeLocation: location + 1)
+                }
+                return BlockInputLinkClosingSearch(closingLocation: closingParenthesisLocation, resumeLocation: closingParenthesisLocation)
+            }
+            location += 1
+        }
+        return BlockInputLinkClosingSearch(closingLocation: nil, resumeLocation: text.length)
+    }
+
     private static func linkLabelIsSupported(_ label: String) -> Bool {
         !label.blockInputUnescapedLinkLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private static func normalizedLinkDestination(_ destination: String) -> String {
+        guard destination.hasPrefix("<"),
+              destination.hasSuffix(">"),
+              destination.count > 2 else {
+            return destination
+        }
+        return String(destination.dropFirst().dropLast())
     }
 
     private static func escapedLabelDelimiterRanges(in text: NSString, labelRange: NSRange) -> [NSRange] {
@@ -207,6 +298,7 @@ extension BlockInputInlineMarkdownParsing {
 /// Result of scanning from one `[` candidate, including where the outer scanner should resume.
 private struct BlockInputLinkSearch {
     let range: BlockInputInlineMarkdownRange?
+    let sourceRange: NSRange?
     let resumeLocation: Int
 }
 

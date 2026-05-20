@@ -1,5 +1,7 @@
 import AppKit
 
+private let fileLinkChipAdjacentWhitespaceKern: CGFloat = 5
+
 extension BlockInputBlockItem {
     func applyInlineMarkdownAttributes(for block: BlockInputBlock, textStorage: NSTextStorage) {
         guard Self.supportsInlineMarkdownStyling(block.kind) else {
@@ -11,11 +13,19 @@ extension BlockInputBlockItem {
             in: textStorage.string,
             excluding: inlineCodeRanges
         )
+        let baseFont = Self.font(for: block.kind, style: style)
         for markdownRange in markdownRanges {
+            let rendersFileLinkChip = markdownRange.style == .link &&
+                markdownRange.linkDestination?.isFileURL == true &&
+                !currentSelectionIntersectsFileLink(markdownRange)
             for contentRange in markdownRange.contentRange.subtractingSorted(inlineCodeRanges) {
                 let clampedContentRange = NSIntersectionRange(contentRange, fullRange)
                 if clampedContentRange.length > 0 {
-                    apply(markdownRange.style, to: clampedContentRange, in: textStorage, baseFont: Self.font(for: block.kind, style: style))
+                    if rendersFileLinkChip {
+                        applyFileLinkChip(to: clampedContentRange, in: textStorage, baseFont: baseFont)
+                    } else {
+                        apply(markdownRange.style, to: clampedContentRange, in: textStorage, baseFont: baseFont)
+                    }
                     if let destination = markdownRange.linkDestination {
                         textStorage.addAttribute(.link, value: destination, range: clampedContentRange)
                         textStorage.addAttribute(.toolTip, value: destination.absoluteString, range: clampedContentRange)
@@ -35,6 +45,9 @@ extension BlockInputBlockItem {
                     ],
                     range: clampedDelimiterRange
                 )
+            }
+            if rendersFileLinkChip {
+                applyFileLinkChipAdjacentWhitespaceSpacers(for: markdownRange, in: textStorage)
             }
         }
     }
@@ -93,6 +106,60 @@ extension BlockInputBlockItem {
                 range: range
             )
         }
+    }
+
+    private func applyFileLinkChip(
+        to range: NSRange,
+        in textStorage: NSTextStorage,
+        baseFont: NSFont
+    ) {
+        textStorage.addAttributes(
+            [
+                .font: NSFont.monospacedSystemFont(ofSize: max(baseFont.pointSize * 0.94, 1), weight: .regular),
+                .foregroundColor: NSColor.labelColor
+            ],
+            range: range
+        )
+    }
+
+    private func applyFileLinkChipAdjacentWhitespaceSpacers(
+        for markdownRange: BlockInputInlineMarkdownRange,
+        in textStorage: NSTextStorage
+    ) {
+        let text = textStorage.string as NSString
+        [
+            markdownRange.fullRange.location - 1,
+            NSMaxRange(markdownRange.fullRange)
+        ].forEach { location in
+            guard location >= 0,
+                  location < text.length,
+                  Self.isFileLinkChipAdjacentSpacerCharacter(text.character(at: location)) else {
+                return
+            }
+            textStorage.addAttribute(
+                .kern,
+                value: fileLinkChipAdjacentWhitespaceKern,
+                range: NSRange(location: location, length: 1)
+            )
+        }
+    }
+
+    private static func isFileLinkChipAdjacentSpacerCharacter(_ character: unichar) -> Bool {
+        guard let scalar = UnicodeScalar(Int(character)) else {
+            return false
+        }
+        return CharacterSet.whitespaces.contains(scalar)
+    }
+
+    private func currentSelectionIntersectsFileLink(_ markdownRange: BlockInputInlineMarkdownRange) -> Bool {
+        guard textView.window?.firstResponder === textView else {
+            return false
+        }
+        let selectedRange = textView.selectedRange()
+        if selectedRange.length == 0 {
+            return markdownRange.fullRange.containsOrTouches(selectedRange.location)
+        }
+        return markdownRange.fullRange.intersectionLength(with: selectedRange) > 0
     }
 
     private func applyFontTrait(

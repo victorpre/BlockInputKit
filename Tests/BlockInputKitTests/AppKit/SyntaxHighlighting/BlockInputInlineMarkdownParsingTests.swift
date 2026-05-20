@@ -59,6 +59,36 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
         XCTAssertEqual(range.linkDestination?.absoluteString, "https://example.com/a(b)")
     }
 
+    func testParsesAngleBracketFileLinkDestinations() throws {
+        let text = "Open [file](<file:///tmp/a%20b(1).md>)"
+        let range = try XCTUnwrap(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text)
+            .first { $0.style == .link })
+
+        XCTAssertEqual(content(in: text, range: range.contentRange), "file")
+        XCTAssertEqual(range.linkDestination?.absoluteString, "file:///tmp/a%20b(1).md")
+    }
+
+    func testReportsUnsupportedLinkSourceRangesForCompletionExclusion() {
+        let text = [
+            "Open [@read](mailto:user@example.com)",
+            "[file](@read)",
+            "[@empty]()",
+            "[](@dest)",
+            "![@image](file:///tmp/image.png)",
+            "![image](@dest)"
+        ].joined(separator: " and ")
+        let sourceRanges = BlockInputInlineMarkdownParsing.linkSourceRanges(in: text)
+
+        XCTAssertEqual(sourceRanges.map { content(in: text, range: $0) }, [
+            "[@read](mailto:user@example.com)",
+            "[file](@read)",
+            "[@empty]()",
+            "[](@dest)",
+            "[@image](file:///tmp/image.png)",
+            "[image](@dest)"
+        ])
+    }
+
     func testRejectsUnsupportedInlineLinks() {
         let examples = [
             "[] (https://example.com)",

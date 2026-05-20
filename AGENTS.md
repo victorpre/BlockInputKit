@@ -67,6 +67,7 @@ Read the nearest `AGENTS.md` before editing. Current scopes:
 - Search for same-type companion files before editing behavior.
 - Split large types into focused companions like `Type+Feature.swift`.
 - Cover AppKit focus/selection changes with mounted-view tests when model-only assertions could miss visible `NSTextView` state.
+- Document public completion popup configuration changes in `README.md`; overlay providers choose both popup parent view and frame in that parent's coordinate space.
 
 ## Commits
 

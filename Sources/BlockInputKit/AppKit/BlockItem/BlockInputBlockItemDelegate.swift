@@ -46,6 +46,18 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         blockID: BlockInputBlockID,
         didRequestTextFormattingShortcut shortcut: BlockInputTextFormattingShortcut
     ) -> Bool
+    /// Lets a mounted text view route completion key events through the editor-owned popup.
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestCompletionKeyDown event: NSEvent
+    ) -> Bool
+    /// Lets a mounted text view route completion commands through the editor-owned popup.
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestCompletionCommand selector: Selector
+    ) -> Bool
     /// Lets a mounted text view offer supported URL paste to the editor before falling back to native AppKit paste.
     func blockItem(
         _ item: BlockInputBlockItem,

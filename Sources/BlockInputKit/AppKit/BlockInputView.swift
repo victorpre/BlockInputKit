@@ -35,6 +35,11 @@ public final class BlockInputView: NSView {
     var fallbackUndoController = BlockInputUndoController()
     var undoController: BlockInputUndoController?
     var completionProvider: (any BlockInputCompletionProvider)?
+    var completionPopupConfiguration = BlockInputCompletionPopupConfiguration()
+    var completionPopupPlacement: BlockInputCompletionPopupPlacement {
+        get { completionPopupConfiguration.placement }
+        set { completionPopupConfiguration.placement = newValue }
+    }
     var onDocumentMutation: ((BlockInputDocumentChange) -> Void)?
     var onDocumentChange: ((BlockInputDocument) -> Void)?
     var documentChangeSnapshotDelay: TimeInterval = 0.25
@@ -67,6 +72,12 @@ public final class BlockInputView: NSView {
     var linkModalContext: BlockInputLinkContext?
     // Local monitors are needed because a child modal view does not receive every outside mouse-down by responder routing.
     nonisolated(unsafe) var linkModalMouseDownMonitor: Any?
+    var completionSession: BlockInputCompletionSession?
+    var completionRequestTask: Task<Void, Never>?
+    var completionPopupView: BlockInputCompletionPopupView?
+    let completionPopupEventCaptureView = BlockInputCompletionEventCaptureView()
+    nonisolated(unsafe) var completionPopupMouseDownMonitor: Any?
+    var completionPopupConsumesNextMouseUp = false
 
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -80,9 +91,9 @@ public final class BlockInputView: NSView {
 
     deinit {
         progressiveLoadTask?.cancel()
+        completionRequestTask?.cancel()
         documentStoreObservation?.cancel()
-        if let selectionExpansionKeyMonitor { NSEvent.removeMonitor(selectionExpansionKeyMonitor) }
-        if let linkModalMouseDownMonitor { NSEvent.removeMonitor(linkModalMouseDownMonitor) }
+        removeNonisolatedEventMonitors()
         NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: nil)
     }
 
@@ -407,7 +418,10 @@ public final class BlockInputView: NSView {
         return result
     }
 
-    private func setupCollectionView() {
+}
+
+private extension BlockInputView {
+    func setupCollectionView() {
         wantsLayer = true
         layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
 
@@ -449,6 +463,7 @@ public final class BlockInputView: NSView {
         scrollView.documentView = collectionView
         scrollView.onContentBoundsDidChange = { [weak self] in
             self?.scheduleProgressivePreloadCheck()
+            self?.dismissCompletionPopup()
         }
 
         addSubview(scrollView)
@@ -460,7 +475,6 @@ public final class BlockInputView: NSView {
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
-
 }
 
 extension BlockInputView {

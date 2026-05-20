@@ -143,6 +143,9 @@ extension BlockInputTextView {
     /// local drag monitor instead of `mouseUp(with:)`.
     @discardableResult
     func completeTrackedMouseUp(with event: NSEvent) -> Bool {
+        guard hasTrackedMouseInteraction else {
+            return false
+        }
         let finalLocalRange = blockSelectionDragRange(for: event)
         if shouldRequestLinkClick(forFinalLocalRange: finalLocalRange),
            requestLinkClickIfNeeded(with: event) {
@@ -173,11 +176,7 @@ extension BlockInputTextView {
     /// tracking. For a promoted block drag it only tears down tracking because `BlockInputView` already owns selection.
     @discardableResult
     func completeTrackedBlockSelectionMouseUp() -> Bool {
-        let hadTrackedDrag = isDraggingBlockSelection
-            || blockSelectionDragAnchorOffset != nil
-            || blockSelectionDragSelectedRange != nil
-            || blockSelectionLocalDragRange != nil
-        guard hadTrackedDrag else {
+        guard hasTrackedMouseInteraction else {
             return false
         }
         let wasDraggingBlockSelection = isDraggingBlockSelection
@@ -193,6 +192,13 @@ extension BlockInputTextView {
             blockItem?.setBlockSelection(false)
         }
         return true
+    }
+
+    private var hasTrackedMouseInteraction: Bool {
+        isDraggingBlockSelection
+            || blockSelectionDragAnchorOffset != nil
+            || blockSelectionDragSelectedRange != nil
+            || blockSelectionLocalDragRange != nil
     }
 
     func cancelBlockSelectionDrag() {

@@ -218,20 +218,20 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             length: 0
         ))
         textView.scrollRangeToVisible(textView.selectedRange())
-        updateTypingAttributesForCurrentSelection()
+        updateSelectionDependentAttributesForCurrentSelection()
     }
 
     func focusText(inUTF16Range range: NSRange) {
         view.window?.makeFirstResponder(textView)
         textView.setSelectedRange(range)
         textView.scrollRangeToVisible(range)
-        updateTypingAttributesForCurrentSelection()
+        updateSelectionDependentAttributesForCurrentSelection()
     }
 
     func setSelectedRange(_ range: NSRange) {
         textView.setSelectedRange(range)
         textView.scrollRangeToVisible(range)
-        updateTypingAttributesForCurrentSelection()
+        updateSelectionDependentAttributesForCurrentSelection()
     }
 
     func collapseNativeSelectionIfNeeded(at offset: Int? = nil) {
@@ -244,7 +244,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         let textLength = (textView.string as NSString).length
         let location = min(max(offset ?? textView.selectedRange().location, 0), textLength)
         textView.setSelectedRange(NSRange(location: location, length: 0))
-        updateTypingAttributesForCurrentSelection()
+        updateSelectionDependentAttributesForCurrentSelection()
         isConfiguringBlock = wasConfiguringBlock
     }
 
@@ -263,16 +263,14 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     func textDidBeginEditing(_ notification: Notification) {
-        guard let blockID else {
-            return
-        }
+        guard let blockID else { return }
+        updateSelectionDependentAttributesForCurrentSelection()
         delegate?.blockItemDidBeginEditing(self, blockID: blockID)
     }
 
     func textDidEndEditing(_ notification: Notification) {
-        guard let blockID else {
-            return
-        }
+        guard let blockID else { return }
+        updateSelectionDependentAttributesForCurrentSelection()
         delegate?.blockItemDidEndEditing(self, blockID: blockID)
     }
 
@@ -315,7 +313,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         guard let blockID else {
             return
         }
-        updateTypingAttributesForCurrentSelection()
+        updateSelectionDependentAttributesForCurrentSelection()
         delegate?.blockItem(self, didChangeSelectionIn: blockID)
     }
 
@@ -450,6 +448,17 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.trackingArea = trackingArea
     }
 
+}
+
+extension BlockInputBlockItem {
+    func replaceCurrentTextFromEditorCorrection(_ text: String, selectedRange: NSRange) {
+        let wasConfiguringBlock = isConfiguringBlock
+        isConfiguringBlock = true
+        textView.string = text
+        textView.setSelectedRange(selectedRange)
+        updateSelectionDependentAttributesForCurrentSelection()
+        isConfiguringBlock = wasConfiguringBlock
+    }
 }
 
 extension BlockInputBlockItem {

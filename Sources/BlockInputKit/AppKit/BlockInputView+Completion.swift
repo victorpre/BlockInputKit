@@ -5,22 +5,76 @@ extension BlockInputView {
     public func completionSuggestions(
         trigger: BlockInputCompletionTrigger,
         query: String,
-        blockID: BlockInputBlockID? = nil
+        blockID: BlockInputBlockID? = nil,
+        replacementRange: NSRange? = nil,
+        rawQuery: String? = nil,
+        fileQuery: BlockInputCompletionFileQuery? = nil
     ) async -> [BlockInputCompletionSuggestion] {
-        refreshDocumentFromStore()
-        guard let provider = completionProvider,
+        await completionSuggestions(
+            trigger: trigger,
+            query: query,
+            blockID: blockID,
+            replacementRange: replacementRange,
+            rawQuery: rawQuery,
+            fileQuery: fileQuery,
+            refreshesDocumentFromStore: true
+        )
+    }
+
+    func completionSuggestions(
+        trigger: BlockInputCompletionTrigger,
+        query: String,
+        blockID: BlockInputBlockID? = nil,
+        replacementRange: NSRange? = nil,
+        rawQuery: String? = nil,
+        fileQuery: BlockInputCompletionFileQuery? = nil,
+        refreshesDocumentFromStore: Bool
+    ) async -> [BlockInputCompletionSuggestion] {
+        guard let request = completionRequest(
+            trigger: trigger,
+            query: query,
+            blockID: blockID,
+            replacementRange: replacementRange,
+            rawQuery: rawQuery,
+            fileQuery: fileQuery,
+            refreshesDocumentFromStore: refreshesDocumentFromStore
+        ) else {
+            return []
+        }
+        return await Self.completionSuggestions(provider: request.provider, context: request.context)
+    }
+
+    func completionRequest(
+        trigger: BlockInputCompletionTrigger,
+        query: String,
+        blockID: BlockInputBlockID? = nil,
+        replacementRange: NSRange? = nil,
+        rawQuery: String? = nil,
+        fileQuery: BlockInputCompletionFileQuery? = nil,
+        refreshesDocumentFromStore: Bool
+    ) -> (provider: any BlockInputCompletionProvider, context: BlockInputCompletionContext)? {
+        guard let provider = completionProvider else {
+            return nil
+        }
+        if refreshesDocumentFromStore {
+            refreshDocumentFromStore()
+        }
+        guard
               let resolvedBlockID = blockID ?? activeBlockID,
               index(of: resolvedBlockID) != nil else {
-            return []
+            return nil
         }
         let context = BlockInputCompletionContext(
             trigger: trigger,
             query: query,
             document: document,
             blockID: resolvedBlockID,
-            selectedRange: completionSelectedRange(in: resolvedBlockID)
+            selectedRange: completionSelectedRange(in: resolvedBlockID),
+            replacementRange: replacementRange,
+            rawQuery: rawQuery,
+            fileQuery: fileQuery
         )
-        return await provider.suggestions(for: context)
+        return (provider, context)
     }
 
     /// Applies a host-provided completion suggestion to the active block.
@@ -76,6 +130,20 @@ extension BlockInputView {
 }
 
 private extension BlockInputView {
+    nonisolated static func completionSuggestions(
+        provider: any BlockInputCompletionProvider,
+        context: BlockInputCompletionContext
+    ) async -> [BlockInputCompletionSuggestion] {
+        let task = Task.detached(priority: .userInitiated) { [provider, context] in
+            await provider.suggestions(for: context)
+        }
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
     func completionSelectedRange(in blockID: BlockInputBlockID) -> NSRange? {
         switch selection {
         case let .cursor(cursor) where cursor.blockID == blockID:

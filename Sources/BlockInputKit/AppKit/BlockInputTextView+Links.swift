@@ -1,6 +1,11 @@
 import AppKit
 
 extension BlockInputTextView {
+    override func draw(_ dirtyRect: NSRect) {
+        drawFileLinkChipBackgrounds(in: dirtyRect)
+        super.draw(dirtyRect)
+    }
+
     /// Returns true for the exact command-click gesture that should open a link immediately.
     func shouldRequestCommandClickLink(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -24,7 +29,8 @@ extension BlockInputTextView {
 
     /// Adds pointing-hand cursor rects over visible link labels only; hidden Markdown delimiters are intentionally ignored.
     func addLinkCursorRects() {
-        guard let layoutManager,
+        guard supportsInlineMarkdownLinkRendering,
+              let layoutManager,
               let textContainer else {
             return
         }
@@ -41,6 +47,32 @@ extension BlockInputTextView {
                 continue
             }
             addLinkCursorRects(for: glyphRange, layoutManager: layoutManager, textContainer: textContainer)
+        }
+    }
+
+    func drawFileLinkChipBackgrounds(in dirtyRect: NSRect) {
+        guard supportsInlineMarkdownLinkRendering,
+              let layoutManager,
+              let textContainer else {
+            return
+        }
+        layoutManager.ensureLayout(for: textContainer)
+        for linkRange in linkRangesForCurrentText() where linkRange.linkDestination?.isFileURL == true {
+            guard shouldDrawFileLinkChip(for: linkRange) else {
+                continue
+            }
+            let characterRange = string.linkCursorClampedRange(linkRange.contentRange)
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
+                .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
+            guard glyphRange.length > 0 else {
+                continue
+            }
+            drawFileLinkChipBackground(
+                glyphRange: glyphRange,
+                dirtyRect: dirtyRect,
+                layoutManager: layoutManager,
+                textContainer: textContainer
+            )
         }
     }
 
@@ -70,6 +102,55 @@ extension BlockInputTextView {
             excluding: BlockInputCodeParsing.inlineCodeRanges(in: string).map(\.fullRange)
         )
         .filter { $0.style == .link }
+    }
+
+    private var supportsInlineMarkdownLinkRendering: Bool {
+        guard let kind = blockItem?.renderedBlock?.kind else {
+            return false
+        }
+        return BlockInputBlockItem.supportsInlineMarkdownStyling(kind)
+    }
+
+    private func shouldDrawFileLinkChip(for linkRange: BlockInputInlineMarkdownRange) -> Bool {
+        guard window?.firstResponder === self else {
+            return true
+        }
+        let selectedRange = selectedRange()
+        if selectedRange.length == 0 {
+            return !linkRange.fullRange.containsOrTouches(selectedRange.location)
+        }
+        return linkRange.fullRange.intersectionLength(with: selectedRange) == 0
+    }
+
+    private func drawFileLinkChipBackground(
+        glyphRange: NSRange,
+        dirtyRect: NSRect,
+        layoutManager: NSLayoutManager,
+        textContainer: NSTextContainer
+    ) {
+        let drawingOffset = textContainerOrigin
+        let selectedGlyphRange = NSRange(location: NSNotFound, length: 0)
+        layoutManager.enumerateEnclosingRects(
+            forGlyphRange: glyphRange,
+            withinSelectedGlyphRange: selectedGlyphRange,
+            in: textContainer
+        ) { enclosingRect, _ in
+            let drawRect = NSRect(
+                x: enclosingRect.minX + drawingOffset.x - 2,
+                y: enclosingRect.minY + drawingOffset.y - 2,
+                width: enclosingRect.width + 4,
+                height: enclosingRect.height + 4
+            )
+            guard drawRect.intersects(dirtyRect) else {
+                return
+            }
+            NSColor.controlAccentColor.withAlphaComponent(0.11).setFill()
+            NSBezierPath(roundedRect: drawRect, xRadius: 6, yRadius: 6).fill()
+            NSColor.controlAccentColor.withAlphaComponent(0.18).setStroke()
+            let stroke = NSBezierPath(roundedRect: drawRect.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
+            stroke.lineWidth = 1
+            stroke.stroke()
+        }
     }
 }
 

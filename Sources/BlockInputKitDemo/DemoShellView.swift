@@ -102,6 +102,16 @@ struct DemoShellView: View {
                 get: { model.allowsReordering },
                 set: { model.setAllowsReordering($0) }
             ))
+            Picker("Completion", selection: Binding(
+                get: { model.completionPopupPlacement },
+                set: { model.setCompletionPopupPlacement($0) }
+            )) {
+                ForEach(BlockInputCompletionPopupPlacement.allCases, id: \.self) { placement in
+                    Text(placement.demoTitle).tag(placement)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 180)
             Picker("Mode", selection: Binding(
                 get: { model.editorMode },
                 set: { model.setEditorMode($0) }
@@ -123,6 +133,21 @@ struct DemoShellView: View {
             return item.title
         }
         return url.path
+    }
+}
+
+enum DemoCompletionOverlayMetrics {
+    static let topInset: CGFloat = 12
+}
+
+private extension BlockInputCompletionPopupPlacement {
+    var demoTitle: String {
+        switch self {
+        case .caret:
+            return "Caret"
+        case .overlay:
+            return "Overlay"
+        }
     }
 }
 

@@ -1,6 +1,30 @@
 import AppKit
 
 extension BlockInputTextView {
+    override func keyDown(with event: NSEvent) {
+        if blockItem?.requestCompletionKeyDown(event) == true {
+            return
+        }
+        if event.isArrowKey {
+            BlockInputSelectionDebug.emit(
+                "text key key=\(event.debugKeyName) modifiers=\(event.debugModifierNames) range=\(selectedRange())"
+            )
+        }
+        if handleDocumentBoundaryShortcut(event) {
+            BlockInputSelectionDebug.emit("text key consumed document boundary")
+            return
+        }
+        if handleSelectionExpansionShortcut(event) {
+            BlockInputSelectionDebug.emit("text key consumed")
+            return
+        }
+        if handleHorizontalSelectionAdjustmentShortcut(event) {
+            BlockInputSelectionDebug.emit("text key consumed horizontal")
+            return
+        }
+        super.keyDown(with: event)
+    }
+
     func requestSelectionExpansionFromOwningBlock(_ direction: BlockInputVerticalMovementDirection) -> Bool {
         let result = blockItem?.requestExpandSelection(direction) == true
         BlockInputSelectionDebug.emit(

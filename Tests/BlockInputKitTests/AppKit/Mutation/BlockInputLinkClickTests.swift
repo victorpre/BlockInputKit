@@ -108,6 +108,33 @@ final class BlockInputLinkClickTests: XCTestCase {
         XCTAssertEqual(openedURL?.absoluteString, "https://example.com")
     }
 
+    func testCommandClickFileLinkThroughTextViewMouseDownAndMouseUpOpensURLOnce() throws {
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "block", text: "Open [file](file:///tmp/demo.md)")
+        ])
+        var openedURLs: [URL] = []
+        mounted.view.linkURLOpener = {
+            openedURLs.append($0)
+            return true
+        }
+        let textView = try textView(in: mounted.view)
+        let location = try windowLocation(forUTF16Offset: 7, in: textView)
+
+        textView.mouseDown(with: try mouseDownEvent(
+            location: location,
+            windowNumber: mounted.window.windowNumber,
+            modifierFlags: .command
+        ))
+        textView.mouseUp(with: try mouseUpEvent(
+            location: location,
+            windowNumber: mounted.window.windowNumber,
+            modifierFlags: .command
+        ))
+
+        XCTAssertEqual(openedURLs.map(\.absoluteString), ["file:///tmp/demo.md"])
+        XCTAssertNil(mounted.view.linkModalView)
+    }
+
     func testCommandClickOpensSupportedLinkSchemes() throws {
         let urls = [
             "http://example.com",
@@ -138,6 +165,30 @@ final class BlockInputLinkClickTests: XCTestCase {
             ))
             XCTAssertEqual(openedURL?.absoluteString, urlString)
         }
+    }
+
+    func testPlainClickFileURLOpensModalLikeRegularLinks() throws {
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "block", text: "Open [file](<file:///tmp/demo.md>)")
+        ])
+        var openedURL: URL?
+        mounted.view.linkURLOpener = {
+            openedURL = $0
+            return true
+        }
+        let textView = try textView(in: mounted.view)
+        let location = try windowLocation(forUTF16Offset: 7, in: textView)
+
+        XCTAssertTrue(mounted.view.handleLinkClick(
+            blockID: "block",
+            selectedRange: NSRange(location: 7, length: 0),
+            event: try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber)
+        ))
+
+        XCTAssertNil(openedURL)
+        let modal = try XCTUnwrap(mounted.view.linkModalView)
+        XCTAssertEqual(modal.textField.stringValue, "file")
+        XCTAssertEqual(modal.urlField.stringValue, "file:///tmp/demo.md")
     }
 
     func testDraggingFromLinkTextDoesNotOpenModalOnMouseUp() throws {

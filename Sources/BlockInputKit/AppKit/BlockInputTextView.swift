@@ -114,27 +114,6 @@ final class BlockInputTextView: NSTextView {
         super.scrollWheel(with: event)
     }
 
-    override func keyDown(with event: NSEvent) {
-        if event.isArrowKey {
-            BlockInputSelectionDebug.emit(
-                "text key key=\(event.debugKeyName) modifiers=\(event.debugModifierNames) range=\(selectedRange())"
-            )
-        }
-        if handleDocumentBoundaryShortcut(event) {
-            BlockInputSelectionDebug.emit("text key consumed document boundary")
-            return
-        }
-        if handleSelectionExpansionShortcut(event) {
-            BlockInputSelectionDebug.emit("text key consumed")
-            return
-        }
-        if handleHorizontalSelectionAdjustmentShortcut(event) {
-            BlockInputSelectionDebug.emit("text key consumed horizontal")
-            return
-        }
-        super.keyDown(with: event)
-    }
-
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.isArrowKey {
             BlockInputSelectionDebug.emit(
@@ -226,6 +205,10 @@ final class BlockInputTextView: NSTextView {
 
     override func doCommand(by selector: Selector) {
         BlockInputSelectionDebug.emit("text command selector=\(selector) range=\(selectedRange())")
+        if blockItem?.requestCompletionCommand(selector) == true {
+            BlockInputSelectionDebug.emit("text command consumed completion selector=\(selector)")
+            return
+        }
         if handleBlockCommand(selector) ||
             handleDocumentBoundaryCommand(selector) ||
             handleSelectionExpansionCommand(selector) ||
@@ -351,14 +334,14 @@ final class BlockInputTextView: NSTextView {
         }
     }
 
-    private func handleDocumentBoundaryShortcut(_ event: NSEvent) -> Bool {
+    func handleDocumentBoundaryShortcut(_ event: NSEvent) -> Bool {
         guard let direction = event.blockInputDocumentBoundaryDirection else {
             return false
         }
         return requestDocumentBoundaryFromOwningBlock(direction)
     }
 
-    private func handleSelectionExpansionShortcut(_ event: NSEvent) -> Bool {
+    func handleSelectionExpansionShortcut(_ event: NSEvent) -> Bool {
         if let direction = event.blockInputSelectionExpansionDirection {
             _ = requestSelectionExpansionFromOwningBlock(direction)
             return true

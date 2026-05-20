@@ -36,7 +36,10 @@ extension BlockInputView {
             configuration: configuration,
             configuredDocument: configuredDocument
         )
-        completionProvider = configuration.completionProvider
+        configureCompletion(configuration)
+        if documentStoreChanged || previousDocument != configuredDocument {
+            dismissCompletionPopup()
+        }
         onDocumentMutation = configuration.onDocumentMutation
         onDocumentChange = configuration.onDocumentChange
         documentChangeSnapshotDelay = configuration.documentChangeSnapshotDelay
@@ -92,6 +95,34 @@ extension BlockInputView {
             return false
         }
         return true
+    }
+
+    func configureCompletion(_ configuration: BlockInputConfiguration) {
+        let previousCompletionProvider = completionProvider
+        let previousCompletionPopupPlacement = completionPopupPlacement
+        completionProvider = configuration.completionProvider
+        completionPopupConfiguration = configuration.completionPopupConfiguration
+        if completionProvider == nil ||
+            previousCompletionPopupPlacement != completionPopupPlacement ||
+            !Self.sameCompletionProvider(previousCompletionProvider, completionProvider) {
+            dismissCompletionPopup()
+        } else {
+            positionCompletionPopup()
+        }
+    }
+
+    private static func sameCompletionProvider(
+        _ lhs: (any BlockInputCompletionProvider)?,
+        _ rhs: (any BlockInputCompletionProvider)?
+    ) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return true
+        case let (lhs?, rhs?):
+            return (lhs as AnyObject) === (rhs as AnyObject)
+        default:
+            return false
+        }
     }
 }
 

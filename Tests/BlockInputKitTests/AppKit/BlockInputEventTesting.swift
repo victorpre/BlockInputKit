@@ -25,12 +25,20 @@ func mouseDraggedEvent(location: NSPoint, windowNumber: Int) throws -> NSEvent {
     try mouseEvent(type: .leftMouseDragged, location: location, windowNumber: windowNumber)
 }
 
-func mouseUpEvent(location: NSPoint, windowNumber: Int) throws -> NSEvent {
-    try mouseEvent(type: .leftMouseUp, location: location, windowNumber: windowNumber)
+func mouseUpEvent(
+    location: NSPoint,
+    windowNumber: Int,
+    modifierFlags: NSEvent.ModifierFlags = []
+) throws -> NSEvent {
+    try mouseEvent(type: .leftMouseUp, location: location, windowNumber: windowNumber, modifierFlags: modifierFlags)
 }
 
 func rightMouseDownEvent(location: NSPoint = .zero, windowNumber: Int) throws -> NSEvent {
     try mouseEvent(type: .rightMouseDown, location: location, windowNumber: windowNumber)
+}
+
+func rightMouseUpEvent(location: NSPoint = .zero, windowNumber: Int) throws -> NSEvent {
+    try mouseEvent(type: .rightMouseUp, location: location, windowNumber: windowNumber)
 }
 
 private func mouseEvent(

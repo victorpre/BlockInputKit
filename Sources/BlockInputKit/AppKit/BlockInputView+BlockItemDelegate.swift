@@ -5,12 +5,18 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         guard index(of: blockID) != nil else {
             return
         }
+        let previousActiveBlockID = currentSelectionOwnerBlockID()
         publishFocusChange(true)
         let offset = item.currentSelectedRange.location
         applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: offset)), notify: true)
+        if let previousActiveBlockID,
+           previousActiveBlockID != blockID {
+            refreshSelectionDependentAttributesForVisibleItem(blockID: previousActiveBlockID)
+        }
     }
 
     func blockItemDidEndEditing(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+        dismissCompletionPopup()
         publishFocusLossIfNeeded()
     }
 
@@ -34,12 +40,16 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             return
         }
         replaceCachedBlock(beforeBlock, at: index)
-        let selectedRange = item.currentSelectedRange
-        let proposedOffset = selectedRange.location + selectedRange.length
+        let resolvedChange = resolvedFileLinkBoundaryTextChange(
+            item: item,
+            beforeBlock: beforeBlock,
+            proposedText: text,
+            selectionBefore: capturedSelectionBefore
+        )
         if let shortcutSelection = applyTypingShortcutIfNeeded(
             blockID: blockID,
-            proposedText: text,
-            proposedUTF16Offset: proposedOffset,
+            proposedText: resolvedChange.text,
+            proposedUTF16Offset: resolvedChange.proposedOffset,
             selectionBefore: capturedSelectionBefore
         ) {
             // Shortcuts can insert a new focused block and reload collection items,
@@ -59,11 +69,12 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             blockIndex: index,
             change: PlainTextChangeContext(
                 beforeBlock: beforeBlock,
-                afterText: text,
-                proposedOffset: proposedOffset,
+                afterText: resolvedChange.text,
+                proposedOffset: resolvedChange.proposedOffset,
                 selectionBefore: capturedSelectionBefore
             )
         )
+        refreshCompletionSession(item: item, blockID: blockID)
     }
 
     private func applyPlainTextChange(
@@ -144,58 +155,10 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             || isStaleCodeBlockHeight
     }
 
-    func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID) {
-        guard !item.isDraggingBlockSelection,
-              window?.firstResponder !== self else {
-            return
-        }
-        if case .blocks = selection,
-           NSApp.currentEvent?.type != .leftMouseDown,
-           NSApp.currentEvent?.type != .leftMouseDragged {
-            return
-        }
-        guard let block = block(withID: blockID),
-              block.kind != .horizontalRule else {
-            return
-        }
-        let range = item.currentSelectedRange
-        let nativeExpansionDirection = nativeTextSelectionExpansionDirection(
-            blockID: blockID,
-            selectedRange: range,
-            blockText: block.text
-        )
-        if let direction = nativeExpansionDirection,
-           shouldPromoteRepeatedNativeTextSelection(
-            blockID: blockID,
-            selectedRange: range,
-            direction: direction,
-            blockText: block.text
-           ),
-           promoteNativeSelectionExpansionIfNeeded(from: blockID, selectedRange: range, direction: direction) {
-            return
-        }
-        if range.length == 0 {
-            applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: range.location)), notify: true)
-        } else {
-            applySelection(.text(BlockInputTextRange(blockID: blockID, range: range)), notify: true)
-            if let direction = nativeExpansionDirection,
-               range.isSelectionExpansionBoundary(in: block.text, direction: direction) {
-                lastNativeTextSelectionExpansion = BlockInputNativeTextSelectionExpansion(
-                    blockID: blockID,
-                    range: range,
-                    direction: direction
-                )
-            } else {
-                lastNativeTextSelectionExpansion = nil
-            }
-        }
-    }
-
     func blockItemDidRequestReturn(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
         guard let block = block(withID: blockID) else {
             return true
         }
-        let selectedRange = item.currentSelectedRange
         let currentBlock = BlockInputBlock(
             id: block.id,
             kind: block.kind,
@@ -203,6 +166,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             indentationLevel: block.indentationLevel,
             lineIndentationLevels: block.lineIndentationLevels
         )
+        let selectedRange = fileLinkBoundaryAdjustedRange(item.currentSelectedRange, in: currentBlock)
         if block.kind.acceptsInlineReturn,
            !(selectedRange.length == 0 &&
              selectedRange.location == 0 &&

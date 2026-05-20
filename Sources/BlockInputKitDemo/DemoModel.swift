@@ -1,3 +1,4 @@
+import AppKit
 import BlockInputKit
 import Combine
 import Foundation
@@ -8,9 +9,11 @@ final class DemoModel: ObservableObject {
     @Published var selectedItemID: DemoSidebarItemID? = .builtIn(.mixed)
     @Published var editorMode: DemoEditorMode = .rendered
     @Published var allowsReordering = true
+    @Published var completionPopupPlacement = BlockInputCompletionPopupPlacement.caret
 
     var sessions: [DemoSidebarItemID: DemoNoteSession] = [:]
     var warmTasks: [DemoNoteID: Task<Void, Never>] = [:]
+    let completionProvider = DemoFileCompletionProvider()
 
     var currentItemID: DemoSidebarItemID {
         selectedItemID ?? .builtIn(.mixed)
@@ -51,6 +54,8 @@ final class DemoModel: ObservableObject {
             documentStore: session.store,
             allowsBlockReordering: allowsReordering,
             undoController: session.undoController,
+            completionProvider: completionProvider,
+            completionPopupConfiguration: completionPopupConfiguration(),
             onDocumentMutation: { [weak self, itemID = session.id] change in
                 Task { @MainActor in
                     self?.handleRenderedMutation(change, itemID: itemID)
@@ -92,7 +97,41 @@ final class DemoModel: ObservableObject {
         self.allowsReordering = allowsReordering
     }
 
+    func setCompletionPopupPlacement(_ placement: BlockInputCompletionPopupPlacement) {
+        completionPopupPlacement = placement
+    }
+
     func standardizedFileURL(for url: URL) -> URL {
         URL(fileURLWithPath: url.path).standardizedFileURL
+    }
+
+    private func completionPopupConfiguration() -> BlockInputCompletionPopupConfiguration {
+        guard completionPopupPlacement == .overlay else {
+            return BlockInputCompletionPopupConfiguration(placement: completionPopupPlacement)
+        }
+        return BlockInputCompletionPopupConfiguration(placement: .overlay) { context in
+            let container = context.editorView
+            return BlockInputCompletionPopupOverlay(
+                container: container,
+                frame: Self.overlayCompletionPopupFrame(context: context, in: container)
+            )
+        }
+    }
+
+    private static func overlayCompletionPopupFrame(
+        context: BlockInputCompletionPopupOverlayContext,
+        in container: NSView
+    ) -> NSRect {
+        let editorFrame = container.bounds
+        let popupHeight = context.popupSize.height
+        let popupY = container.isFlipped
+            ? editorFrame.minY + DemoCompletionOverlayMetrics.topInset
+            : editorFrame.maxY - popupHeight - DemoCompletionOverlayMetrics.topInset
+        return NSRect(
+            x: editorFrame.minX,
+            y: popupY,
+            width: editorFrame.width,
+            height: popupHeight
+        )
     }
 }

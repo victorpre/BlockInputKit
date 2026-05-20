@@ -1,5 +1,72 @@
 import AppKit
 
+/// Host-provided popup placement inside an overlay surface.
+///
+/// Return this from `BlockInputCompletionPopupConfiguration.overlayProvider` to choose both the destination parent
+/// view for the popup and the frame it should occupy inside that parent.
+public struct BlockInputCompletionPopupOverlay {
+    /// Parent view that should own the popup.
+    public var container: NSView
+    /// Popup frame in `container` coordinates.
+    public var frame: NSRect
+
+    public init(container: NSView, frame: NSRect) {
+        self.container = container
+        self.frame = frame
+    }
+}
+
+/// Layout values supplied when a host customizes overlay popup presentation.
+public struct BlockInputCompletionPopupOverlayContext {
+    /// Editor requesting the popup.
+    public var editorView: BlockInputView
+    /// Default parent view chosen by the editor when the host does not override popup placement.
+    public var defaultContainer: NSView
+    /// Default popup frame in `defaultContainer` coordinates.
+    public var defaultFrame: NSRect
+    /// Measured popup size before host adjustment.
+    public var popupSize: NSSize
+
+    public init(
+        editorView: BlockInputView,
+        defaultContainer: NSView,
+        defaultFrame: NSRect,
+        popupSize: NSSize
+    ) {
+        self.editorView = editorView
+        self.defaultContainer = defaultContainer
+        self.defaultFrame = defaultFrame
+        self.popupSize = popupSize
+    }
+
+    /// Converts the editor bounds into a candidate popup container.
+    @MainActor
+    public func editorFrame(in container: NSView) -> NSRect {
+        container.convert(editorView.bounds, from: editorView)
+    }
+}
+
+/// Built-in completion popup behavior and host integration points.
+public struct BlockInputCompletionPopupConfiguration {
+    /// Where the editor-owned completion popup should be shown.
+    public var placement: BlockInputCompletionPopupPlacement
+    /// Optional host override for overlay popup presentation.
+    ///
+    /// Return both the parent view and popup frame in that parent's coordinate space. Keeping the container and frame
+    /// together lets hosts rehost the popup into another surface while aligning it to that surface. When nil, the
+    /// editor falls back to the window content view, then its superview, then itself, and anchors the popup above the
+    /// editor.
+    public var overlayProvider: (@MainActor (BlockInputCompletionPopupOverlayContext) -> BlockInputCompletionPopupOverlay?)?
+
+    public init(
+        placement: BlockInputCompletionPopupPlacement = .caret,
+        overlayProvider: (@MainActor (BlockInputCompletionPopupOverlayContext) -> BlockInputCompletionPopupOverlay?)? = nil
+    ) {
+        self.placement = placement
+        self.overlayProvider = overlayProvider
+    }
+}
+
 /// Runtime options and host integration points for a block input editor.
 public struct BlockInputConfiguration {
     /// Default visual horizontal inset for block content.
@@ -32,6 +99,13 @@ public struct BlockInputConfiguration {
     public var undoController: BlockInputUndoController?
     /// Host completion source for mentions and slash commands.
     public var completionProvider: (any BlockInputCompletionProvider)?
+    /// Built-in completion popup behavior, including caret anchoring and optional overlay hosting.
+    public var completionPopupConfiguration: BlockInputCompletionPopupConfiguration
+    /// Convenience access to `completionPopupConfiguration.placement`.
+    public var completionPopupPlacement: BlockInputCompletionPopupPlacement {
+        get { completionPopupConfiguration.placement }
+        set { completionPopupConfiguration.placement = newValue }
+    }
     /// Called immediately with the granular store mutation applied by the editor.
     ///
     /// Marker-adjusting stores may receive marker-only numbered-list changes instead of a replacement for every
@@ -69,6 +143,8 @@ public struct BlockInputConfiguration {
         style: BlockInputStyle = .default,
         undoController: BlockInputUndoController? = nil,
         completionProvider: (any BlockInputCompletionProvider)? = nil,
+        completionPopupPlacement: BlockInputCompletionPopupPlacement = .caret,
+        completionPopupConfiguration: BlockInputCompletionPopupConfiguration? = nil,
         onDocumentMutation: ((BlockInputDocumentChange) -> Void)? = nil,
         onDocumentChange: ((BlockInputDocument) -> Void)? = nil,
         documentChangeSnapshotDelay: TimeInterval = 0.25,
@@ -84,6 +160,9 @@ public struct BlockInputConfiguration {
         self.style = style
         self.undoController = undoController
         self.completionProvider = completionProvider
+        self.completionPopupConfiguration = completionPopupConfiguration ?? BlockInputCompletionPopupConfiguration(
+            placement: completionPopupPlacement
+        )
         self.onDocumentMutation = onDocumentMutation
         self.onDocumentChange = onDocumentChange
         self.documentChangeSnapshotDelay = documentChangeSnapshotDelay

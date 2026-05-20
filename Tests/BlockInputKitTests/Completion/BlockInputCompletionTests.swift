@@ -9,7 +9,9 @@ final class BlockInputCompletionTests: XCTestCase {
             title: "Alice",
             subtitle: "Engineering",
             insertionText: "@alice",
-            trigger: .mention
+            trigger: .mention,
+            iconSystemName: "person",
+            detailText: "Team"
         )
 
         XCTAssertEqual(suggestion.id, "mention:alice")
@@ -17,6 +19,47 @@ final class BlockInputCompletionTests: XCTestCase {
         XCTAssertEqual(suggestion.subtitle, "Engineering")
         XCTAssertEqual(suggestion.insertionText, "@alice")
         XCTAssertEqual(suggestion.trigger, .mention)
+        XCTAssertEqual(suggestion.iconSystemName, "person")
+        XCTAssertEqual(suggestion.detailText, "Team")
+    }
+
+    func testFileLinkSuggestionBuildsEscapedMarkdownLink() {
+        let suggestion = BlockInputCompletionSuggestion.fileLink(
+            label: "../Docs/[Draft] (1).md",
+            fileURL: URL(fileURLWithPath: "/tmp/Docs/[Draft] (1).md"),
+            detailText: "/tmp/Docs"
+        )
+
+        XCTAssertEqual(suggestion.title, "../Docs/[Draft] (1).md")
+        XCTAssertEqual(suggestion.insertionText, "[../Docs/\\[Draft\\] (1).md](file:///tmp/Docs/%5BDraft%5D%20\\(1\\).md)")
+        XCTAssertEqual(suggestion.trigger, .mention)
+        XCTAssertEqual(suggestion.iconSystemName, "doc.text")
+        XCTAssertEqual(suggestion.detailText, "/tmp/Docs")
+    }
+
+    func testCompletionContextStoresReplacementRawQueryAndFileMetadata() {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let fileQuery = BlockInputCompletionFileQuery(
+            directoryReference: .parent,
+            levelsUp: 1,
+            remainder: "README"
+        )
+        let context = BlockInputCompletionContext(
+            trigger: .mention,
+            query: "README",
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "@../README")
+            ]),
+            blockID: blockID,
+            selectedRange: NSRange(location: 10, length: 0),
+            replacementRange: NSRange(location: 0, length: 10),
+            rawQuery: "../README",
+            fileQuery: fileQuery
+        )
+
+        XCTAssertEqual(context.replacementRange, NSRange(location: 0, length: 10))
+        XCTAssertEqual(context.rawQuery, "../README")
+        XCTAssertEqual(context.fileQuery, fileQuery)
     }
 
     func testCompletionProviderReceivesContext() async {
@@ -77,7 +120,7 @@ final class BlockInputCompletionTests: XCTestCase {
             ]),
             completionProvider: provider
         ))
-        view.focus(blockID: blockID, utf16Offset: 3)
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 3)), notify: false)
 
         _ = await view.completionSuggestions(trigger: .mention, query: "al")
 
@@ -87,6 +130,43 @@ final class BlockInputCompletionTests: XCTestCase {
             document: view.document,
             blockID: blockID,
             selectedRange: NSRange(location: 3, length: 0)
+        ))
+    }
+
+    @MainActor
+    func testCompletionSuggestionsForwardsExplicitFileQueryContext() async {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let provider = CapturingCompletionProvider()
+        let fileQuery = BlockInputCompletionFileQuery(
+            directoryReference: .grandparent,
+            levelsUp: 2,
+            remainder: "Sources/Block"
+        )
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "@.../Sources/Block")
+            ]),
+            completionProvider: provider
+        ))
+
+        _ = await view.completionSuggestions(
+            trigger: .mention,
+            query: "Sources/Block",
+            blockID: blockID,
+            replacementRange: NSRange(location: 0, length: 17),
+            rawQuery: ".../Sources/Block",
+            fileQuery: fileQuery
+        )
+
+        XCTAssertEqual(provider.lastContext, BlockInputCompletionContext(
+            trigger: .mention,
+            query: "Sources/Block",
+            document: view.document,
+            blockID: blockID,
+            replacementRange: NSRange(location: 0, length: 17),
+            rawQuery: ".../Sources/Block",
+            fileQuery: fileQuery
         ))
     }
 
