@@ -18,6 +18,7 @@ final class BlockInputTextView: NSTextView {
     var blockSelectionDragSelectedRange: NSRange?
     var blockSelectionLocalDragRange: NSRange?
     var blockSelectionDragAnchorOffset: Int?
+    let fileDropCaretView = NSView()
     // Native modified-click and multi-click gestures can re-enter mouseDragged/mouseUp during AppKit tracking. Keep that
     // separate from the custom plain-drag state so native selection restoration cannot be consumed as a block drag.
     var isUsingNativeMouseSelection = false
@@ -174,6 +175,20 @@ final class BlockInputTextView: NSTextView {
         }
         super.paste(sender)
     }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { fileDropOperation(sender, super.draggingEntered(sender)) }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { fileDropOperation(sender, super.draggingUpdated(sender)) }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) { hideFileDropCaret(); super.draggingExited(sender) }
+
+    override func draggingEnded(_ sender: NSDraggingInfo) { hideFileDropCaret(); super.draggingEnded(sender) }
+
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        prepareFileDropOperation(sender, super.prepareForDragOperation(sender))
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool { performFileDropOperation(sender, super.performDragOperation(sender)) }
 
     override func resetCursorRects() {
         super.resetCursorRects()

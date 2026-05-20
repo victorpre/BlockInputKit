@@ -75,6 +75,13 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         didRequestPasteURL urlString: String,
         selectedRange: NSRange
     ) -> Bool
+    /// Lets a mounted text view route local file drops through editor-owned source mutation.
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestInsertFileURLs fileURLs: [URL],
+        atUTF16Offset utf16Offset: Int
+    ) -> Bool
     /// Builds editor-owned link context-menu items from mounted row state.
     func blockItem(
         _ item: BlockInputBlockItem,

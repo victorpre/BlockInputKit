@@ -14,6 +14,19 @@ extension BlockInputBlockItem {
         ) ?? false
     }
 
+    /// Asks the editor to handle local file drops so source mutation, selection, and undo stay editor-owned.
+    func requestInsertFileURLs(_ fileURLs: [URL], atUTF16Offset utf16Offset: Int) -> Bool {
+        guard let blockID else {
+            return false
+        }
+        return delegate?.blockItem(
+            self,
+            blockID: blockID,
+            didRequestInsertFileURLs: fileURLs,
+            atUTF16Offset: utf16Offset
+        ) ?? false
+    }
+
     /// Builds link menu items from the editor because the decision depends on global selection state and block source.
     func linkContextMenuItems(for event: NSEvent, selectedRange: NSRange) -> [NSMenuItem] {
         guard let blockID else {

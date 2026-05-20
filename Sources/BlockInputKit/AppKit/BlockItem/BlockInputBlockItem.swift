@@ -172,12 +172,14 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.editorHorizontalInset = editorHorizontalInset
         self.style = style
         selectionBeforeTextChange = nil
+        textView.hideFileDropCaret()
         isHorizontalRule = block.kind == .horizontalRule
         handleView.blockItem = self
         scrollView.blockItem = self
         horizontalRuleView.blockItem = self
         horizontalRuleView.accentColor = accentColor
         textView.blockItem = self
+        textView.updateFileDropCaretColor(accentColor)
         let text = block.kind == .horizontalRule ? "" : block.text
         if textView.string != text {
             textView.string = text

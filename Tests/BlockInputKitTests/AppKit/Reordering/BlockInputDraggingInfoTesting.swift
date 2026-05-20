@@ -8,6 +8,7 @@ final class BlockInputDraggingInfo: NSObject, NSDraggingInfo {
     init(
         blockID: BlockInputBlockID? = nil,
         fileURLs: [URL] = [],
+        pasteboardTypes: [NSPasteboard.PasteboardType] = [],
         location: NSPoint = .zero
     ) {
         pasteboard = NSPasteboard(name: NSPasteboard.Name("BlockInputKitTests.\(UUID().uuidString)"))
@@ -18,6 +19,9 @@ final class BlockInputDraggingInfo: NSObject, NSDraggingInfo {
         }
         if !fileURLs.isEmpty {
             pasteboard.writeObjects(fileURLs as [NSURL])
+        }
+        for type in pasteboardTypes {
+            pasteboard.setData(Data(), forType: type)
         }
     }
 

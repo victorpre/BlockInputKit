@@ -177,7 +177,7 @@ final class BlockInputViewDropIndicatorTests: XCTestCase {
         )
     }
 
-    func testValidateFileDropBeforeFrontMatterShowsIndicatorAfterFrontMatter() throws {
+    func testCollectionValidateFileDropBeforeFrontMatterRejectsWithoutIndicator() throws {
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "front", kind: .frontMatter, text: "title: Demo"),
             BlockInputBlock(id: "body", text: "Body")
@@ -199,13 +199,10 @@ final class BlockInputViewDropIndicatorTests: XCTestCase {
             )
         }
 
-        XCTAssertTrue(dragOperation.contains(.copy))
-        XCTAssertEqual(indexPath.item, 1)
-        XCTAssertEqual(operation, .before)
-        XCTAssertEqual(
-            mounted.view.dropIndicatorView.frame.minY,
-            mounted.view.dropIndicatorFrame(forInsertionIndex: 1)?.minY
-        )
+        XCTAssertTrue(dragOperation.isEmpty)
+        XCTAssertEqual(indexPath.item, 0)
+        XCTAssertEqual(operation, .on)
+        XCTAssertTrue(mounted.view.dropIndicatorView.isHidden)
     }
 
     func testAcceptDropUsesResolvedInsertionIndexInsteadOfStaleProposedIndex() throws {

@@ -1,6 +1,7 @@
 ## AppKit Editor Surface
 
 - Keep AppKit editor behavior coordinated through `BlockInputView` and `BlockInputBlockItem` delegates instead of letting child `NSTextView` instances mutate document structure directly.
+- Route local file drops through mounted text views for inline chip insertion; collection-view drops stay reserved for block reordering.
 - Keep live completion UI editor-owned; mounted text views should route completion keys through `BlockInputView`/`BlockInputBlockItem` delegates, while suggestions remain host-provided through `completionProvider`.
 - Keep completion overlay hosting explicit: `.overlay` customization should use `BlockInputCompletionPopupConfiguration.overlayProvider`, returning both the popup parent view and the frame in that parent's coordinate space.
 - Cover focus, selection, keyboard command, drag/drop, and visual-state changes with mounted AppKit tests when model-only tests could miss visible `NSTextView` or `NSCollectionView` behavior.

@@ -266,17 +266,6 @@ extension BlockInputView: NSCollectionViewDelegate {
             showDropIndicator(atInsertionIndex: indicatorIndex)
             return .move
         }
-        if canAcceptFileDrop(draggingInfo) {
-            let resolvedInsertionIndex = resolvedDropInsertionIndex(
-                from: draggingInfo,
-                proposedItemIndex: proposedDropIndexPath.pointee.item
-            )
-            let insertionIndex = frontMatterAwareFileDropInsertionIndex(resolvedInsertionIndex)
-            proposedDropIndexPath.pointee = NSIndexPath(forItem: insertionIndex, inSection: 0)
-            proposedDropOperation.pointee = .before
-            showDropIndicator(atInsertionIndex: insertionIndex)
-            return .copy
-        }
         hideDropIndicator()
         return []
     }
@@ -309,11 +298,6 @@ extension BlockInputView: NSCollectionViewDelegate {
             }
             return moveBlock(blockID: blockID, to: targetIndex) != nil
         }
-        let fileURLs = fileURLs(from: draggingInfo.draggingPasteboard)
-        if !fileURLs.isEmpty {
-            let insertionIndex = frontMatterAwareFileDropInsertionIndex(resolvedInsertionIndex)
-            return insertFileURLs(fileURLs, at: insertionIndex) != nil
-        }
         return false
     }
 
@@ -325,15 +309,6 @@ extension BlockInputView: NSCollectionViewDelegate {
             return false
         }
         return !(block(at: 0)?.kind == .frontMatter && targetIndex == 0)
-    }
-
-    private func frontMatterAwareFileDropInsertionIndex(_ insertionIndex: Int) -> Int {
-        let clampedIndex = clampedInsertionIndex(insertionIndex)
-        guard block(at: 0)?.kind == .frontMatter,
-              clampedIndex == 0 else {
-            return clampedIndex
-        }
-        return 1
     }
 
     func collectionDropTargetIndex(
@@ -378,18 +353,6 @@ extension BlockInputView: NSCollectionViewDelegate {
             return false
         }
         return true
-    }
-
-    func canAcceptFileDrop(_ draggingInfo: NSDraggingInfo) -> Bool {
-        !fileURLs(from: draggingInfo.draggingPasteboard).isEmpty
-    }
-
-    func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
-        let options: [NSPasteboard.ReadingOptionKey: Any] = [
-            .urlReadingFileURLsOnly: true
-        ]
-        let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL]
-        return urls?.filter(\.isFileURL) ?? []
     }
 
     func resolvedDropInsertionIndex(

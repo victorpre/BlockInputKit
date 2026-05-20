@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 public extension BlockInputView {
     /// Inserts file URLs as Markdown link paragraph blocks.
@@ -27,9 +27,8 @@ public extension BlockInputView {
 
     /// Inserts file URLs as Markdown link paragraph blocks at a document index.
     ///
-    /// This is used by the built-in collection view drop handling. The insertion
-    /// index is clamped to the current document, but never before leading
-    /// frontmatter because frontmatter is only canonical at index `0`.
+    /// The insertion index is clamped to the current document, but never before
+    /// leading frontmatter because frontmatter is only canonical at index `0`.
     @discardableResult
     func insertFileURLs(
         _ fileURLs: [URL],
@@ -114,5 +113,57 @@ public extension BlockInputView {
                 return document.insertBlocks(insertedBlocks, at: insertionIndex(document))
             }
         )
+    }
+}
+
+extension BlockInputView {
+    @discardableResult
+    func insertFileURLsInline(
+        _ fileURLs: [URL],
+        into blockID: BlockInputBlockID,
+        atUTF16Offset utf16Offset: Int,
+        item: BlockInputBlockItem
+    ) -> BlockInputSelection? {
+        let insertionText = Self.inlineFileLinkInsertionText(for: fileURLs)
+        guard !insertionText.isEmpty,
+              item.representedBlockID == blockID,
+              let index = index(of: blockID),
+              var block = block(at: index),
+              block.id == blockID,
+              BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
+            return nil
+        }
+        let beforeBlock = block
+        let beforeSelection = selection
+        let insertionOffset = min(max(utf16Offset, 0), block.utf16Length)
+        let mutableText = NSMutableString(string: block.text)
+        mutableText.insert(insertionText, at: insertionOffset)
+        block.text = mutableText as String
+        let afterOffset = insertionOffset + (insertionText as NSString).length
+        let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
+            blockID: blockID,
+            utf16Offset: afterOffset
+        ))
+        _ = applyGranularBlockReplacement(block, at: index, selection: afterSelection)
+        undoController?.registerBlockReplacementStructuralEdit(
+            actionName: "Insert Files",
+            beforeBlock: beforeBlock,
+            afterBlock: block,
+            selectionBefore: beforeSelection,
+            selectionAfter: afterSelection
+        )
+        return afterSelection
+    }
+
+    private static func inlineFileLinkInsertionText(for fileURLs: [URL]) -> String {
+        fileURLs.compactMap(inlineFileLinkMarkdownSource).joined(separator: " ")
+    }
+
+    private static func inlineFileLinkMarkdownSource(for url: URL) -> String? {
+        guard url.isFileURL else {
+            return nil
+        }
+        let displayName = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
+        return BlockInputLinkURL.markdownLink(label: displayName, destination: url.absoluteString)
     }
 }

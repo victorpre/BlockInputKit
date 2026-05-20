@@ -174,7 +174,7 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertFalse(view.canAcceptBlockReorderDrop(BlockInputDraggingInfo(blockID: nil)))
     }
 
-    func testValidateDropAcceptsFileURLsEvenWhenReorderingIsDisabled() {
+    func testCollectionValidateDropRejectsFileURLsWhenReorderingIsDisabled() {
         let view = configuredReorderView(
             blockIDs: ["first"],
             allowsBlockReordering: false
@@ -194,8 +194,8 @@ final class BlockInputViewReorderingTests: XCTestCase {
             )
         }
 
-        XCTAssertTrue(dragOperation.contains(.copy))
-        XCTAssertEqual(operation, .before)
+        XCTAssertTrue(dragOperation.isEmpty)
+        XCTAssertEqual(operation, .on)
     }
 
     func testValidateDropRejectsRemoteURLs() throws {
@@ -239,7 +239,7 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertEqual(publishedDocuments.last, view.document)
     }
 
-    func testAcceptDropInsertsFileURLsAtProposedIndex() {
+    func testCollectionAcceptDropRejectsFileURLs() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         var publishedDocuments: [BlockInputDocument] = []
@@ -258,16 +258,15 @@ final class BlockInputViewReorderingTests: XCTestCase {
             dropOperation: .before
         )
 
-        XCTAssertTrue(accepted)
+        XCTAssertFalse(accepted)
         XCTAssertEqual(view.document.blocks.map(\.text), [
             "first",
-            "[example.txt](<file:///tmp/example.txt>)",
             "second"
         ])
-        XCTAssertEqual(publishedDocuments.last, view.document)
+        XCTAssertTrue(publishedDocuments.isEmpty)
     }
 
-    func testAcceptFileDropPublishesGranularInsertionToStore() {
+    func testCollectionAcceptFileDropDoesNotPublishGranularInsertionToStore() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [
@@ -290,18 +289,13 @@ final class BlockInputViewReorderingTests: XCTestCase {
             dropOperation: .before
         )
 
-        XCTAssertTrue(accepted)
+        XCTAssertFalse(accepted)
         XCTAssertEqual(store.document.blocks.map(\.text), [
             "First",
-            "[example.txt](<file:///tmp/example.txt>)",
             "Second"
         ])
         XCTAssertEqual(store.replaceDocumentCount, 0)
-        XCTAssertEqual(store.insertedBlockBatches.count, 1)
-        XCTAssertEqual(store.insertedBlockBatches.first?.index, 1)
-        XCTAssertEqual(store.insertedBlockBatches.first?.blocks.map(\.text), [
-            "[example.txt](<file:///tmp/example.txt>)"
-        ])
+        XCTAssertTrue(store.insertedBlockBatches.isEmpty)
     }
 
     func testAcceptDropRefreshesFromConfiguredStoreBeforeMovingBlock() {

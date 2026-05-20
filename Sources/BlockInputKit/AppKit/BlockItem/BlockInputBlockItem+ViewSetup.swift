@@ -73,6 +73,8 @@ extension BlockInputBlockItem {
         textView.font = .preferredFont(forTextStyle: .body)
         textView.delegate = self
         textView.layoutManager?.delegate = hiddenDelimiterLayoutDelegate
+        textView.configureFileDropHandling()
+        textView.updateFileDropCaretColor(.controlAccentColor)
     }
 
     private func setupHorizontalRuleView() {

@@ -28,6 +28,15 @@ extension BlockInputView {
     func blockItem(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
+        didRequestInsertFileURLs fileURLs: [URL],
+        atUTF16Offset utf16Offset: Int
+    ) -> Bool {
+        insertFileURLsInline(fileURLs, into: blockID, atUTF16Offset: utf16Offset, item: item) != nil
+    }
+
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
         didClickLinkAt selectedRange: NSRange,
         event: NSEvent
     ) -> Bool {
