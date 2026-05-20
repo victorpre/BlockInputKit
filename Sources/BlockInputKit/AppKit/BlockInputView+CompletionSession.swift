@@ -1,6 +1,7 @@
 import AppKit
 
 struct BlockInputCompletionToken: Equatable {
+    var trigger: BlockInputCompletionTrigger
     var replacementRange: NSRange
     var query: String
     var rawQuery: String
@@ -46,6 +47,7 @@ extension BlockInputView {
         guard let token = completionToken(
             in: text,
             selectedRange: selectedRange,
+            blockID: blockID,
             blockKind: block.kind
         ) else {
             dismissCompletionPopup()
@@ -245,6 +247,7 @@ extension BlockInputView {
     private func completionToken(
         in text: String,
         selectedRange: NSRange,
+        blockID: BlockInputBlockID,
         blockKind: BlockInputBlockKind
     ) -> BlockInputCompletionToken? {
         guard selectedRange.length == 0,
@@ -255,7 +258,10 @@ extension BlockInputView {
         let caretOffset = min(max(selectedRange.location, 0), textLength)
         let tokenStart = completionTokenStart(before: caretOffset, in: text)
         guard tokenStart < caretOffset,
-              (text as NSString).substring(with: NSRange(location: tokenStart, length: 1)) == "@" else {
+              let trigger = completionTrigger(at: tokenStart, in: text) else {
+            return nil
+        }
+        guard trigger != .slashCommand || allowsSlashCommandToken(startingAt: tokenStart, blockID: blockID) else {
             return nil
         }
         let replacementRange = NSRange(location: tokenStart, length: caretOffset - tokenStart)
@@ -263,8 +269,9 @@ extension BlockInputView {
             return nil
         }
         let rawQuery = (text as NSString).substring(with: NSRange(location: tokenStart + 1, length: caretOffset - tokenStart - 1))
-        let fileQuery = BlockInputCompletionFileQuery.parsing(rawQuery)
+        let fileQuery = trigger == .mention ? BlockInputCompletionFileQuery.parsing(rawQuery) : nil
         return BlockInputCompletionToken(
+            trigger: trigger,
             replacementRange: replacementRange,
             query: fileQuery?.remainder ?? rawQuery,
             rawQuery: rawQuery,
@@ -284,6 +291,26 @@ extension BlockInputView {
             location = previousLocation
         }
         return 0
+    }
+
+    private func completionTrigger(at tokenStart: Int, in text: String) -> BlockInputCompletionTrigger? {
+        switch (text as NSString).substring(with: NSRange(location: tokenStart, length: 1)) {
+        case "@":
+            return .mention
+        case "/":
+            return .slashCommand
+        default:
+            return nil
+        }
+    }
+
+    private func allowsSlashCommandToken(startingAt tokenStart: Int, blockID: BlockInputBlockID) -> Bool {
+        switch slashCommandAvailability {
+        case .anywhere:
+            return true
+        case .documentStart:
+            return tokenStart == 0 && index(of: blockID) == 0
+        }
     }
 
     private static func isCompletionTokenBoundary(_ character: unichar) -> Bool {
@@ -310,7 +337,7 @@ extension BlockInputView {
     private func requestCompletionSuggestions(for session: BlockInputCompletionSession) {
         completionRequestTask?.cancel()
         guard let request = completionRequest(
-            trigger: .mention,
+            trigger: session.token.trigger,
             query: session.token.query,
             blockID: session.blockID,
             replacementRange: session.token.replacementRange,

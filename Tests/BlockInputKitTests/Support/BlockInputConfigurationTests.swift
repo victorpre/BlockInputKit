@@ -31,17 +31,17 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.document.blocks.map(\.id), [blockID])
         XCTAssertEqual(configuration.editorHorizontalInset, BlockInputConfiguration.defaultEditorHorizontalInset)
         XCTAssertEqual(configuration.editorVerticalInset, BlockInputConfiguration.defaultEditorVerticalInset)
+        XCTAssertEqual(configuration.slashCommandAvailability, .documentStart)
+        XCTAssertNil(configuration.slashCommandChipClickHandler)
     }
 
     @MainActor
     func testViewAppliesConfiguredIntegrationSurfaces() throws {
-        let provider = ConfigurationCompletionProvider()
         let undoController = BlockInputUndoController()
         let view = BlockInputView()
         let onDocumentMutation: (BlockInputDocumentChange) -> Void = { _ in }
         let onDocumentChange: (BlockInputDocument) -> Void = { _ in }
         let onFocusChange: (Bool) -> Void = { _ in }
-        let container = NSView()
 
         view.configure(BlockInputConfiguration(
             allowsBlockReordering: false,
@@ -49,13 +49,6 @@ final class BlockInputConfigurationTests: XCTestCase {
             editorVerticalInset: 14,
             dropIndicatorColor: .systemPink,
             undoController: undoController,
-            completionProvider: provider,
-            completionPopupConfiguration: BlockInputCompletionPopupConfiguration(
-                placement: .overlay,
-                overlayProvider: { context in
-                    BlockInputCompletionPopupOverlay(container: container, frame: context.defaultFrame)
-                }
-            ),
             onDocumentMutation: onDocumentMutation,
             onDocumentChange: onDocumentChange,
             documentChangeSnapshotDelay: 0.01,
@@ -72,7 +65,33 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(sectionInset.right, 0)
         XCTAssertEqual(view.dropIndicatorColor, .systemPink)
         XCTAssertTrue(view.undoController === undoController)
+        XCTAssertNotNil(view.onDocumentMutation)
+        XCTAssertNotNil(view.onDocumentChange)
+        XCTAssertEqual(view.documentChangeSnapshotDelay, 0.01)
+        XCTAssertNotNil(view.onFocusChange)
+    }
+
+    @MainActor
+    func testViewAppliesConfiguredCompletionSurfaces() {
+        let provider = ConfigurationCompletionProvider()
+        let view = BlockInputView()
+        let container = NSView()
+
+        view.configure(BlockInputConfiguration(
+            completionProvider: provider,
+            slashCommandAvailability: .anywhere,
+            slashCommandChipClickHandler: { _ in .hostHandled },
+            completionPopupConfiguration: BlockInputCompletionPopupConfiguration(
+                placement: .overlay,
+                overlayProvider: { context in
+                    BlockInputCompletionPopupOverlay(container: container, frame: context.defaultFrame)
+                }
+            )
+        ))
+
         XCTAssertTrue(view.completionProvider === provider)
+        XCTAssertEqual(view.slashCommandAvailability, .anywhere)
+        XCTAssertNotNil(view.slashCommandChipClickHandler)
         XCTAssertEqual(view.completionPopupPlacement, .overlay)
         let overlay = view.completionPopupConfiguration.overlayProvider?(BlockInputCompletionPopupOverlayContext(
             editorView: view,
@@ -81,10 +100,6 @@ final class BlockInputConfigurationTests: XCTestCase {
             popupSize: .zero
         ))
         XCTAssertTrue(overlay?.container === container)
-        XCTAssertNotNil(view.onDocumentMutation)
-        XCTAssertNotNil(view.onDocumentChange)
-        XCTAssertEqual(view.documentChangeSnapshotDelay, 0.01)
-        XCTAssertNotNil(view.onFocusChange)
     }
 
     func testCompletionPopupPlacementParameterBuildsPopupConfiguration() {

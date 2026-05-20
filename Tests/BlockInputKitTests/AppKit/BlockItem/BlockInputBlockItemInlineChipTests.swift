@@ -3,7 +3,7 @@ import XCTest
 @testable import BlockInputKit
 
 @MainActor
-final class BlockInputBlockItemFileLinkChipTests: XCTestCase {
+final class BlockInputBlockItemInlineChipTests: XCTestCase {
     func testInlineMarkdownRendersFileLinksAsChipsWhenSelectionIsOutsideSource() throws {
         let text = "Open [../README.md](<file:///tmp/README.md>) today"
         let item = BlockInputBlockItem.configuredForTesting(
@@ -41,6 +41,29 @@ final class BlockInputBlockItemFileLinkChipTests: XCTestCase {
         XCTAssertNil(textStorage.attribute(.kern, at: openingBracketOffset, effectiveRange: nil))
         XCTAssertNil(textStorage.attribute(.kern, at: destinationOffset, effectiveRange: nil))
         XCTAssertNil(textStorage.attribute(.kern, at: closingParenthesisOffset, effectiveRange: nil))
+    }
+
+    func testSlashCommandLinkRendersAsReusableChip() throws {
+        let text = "Run [/table](host-app://commands/table) today"
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: text),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+        let contentOffset = contentLocation("/table", in: text)
+        let openingBracketOffset = (text as NSString).range(of: "[").location
+        let trailingSpaceOffset = (text as NSString).range(of: ") today").location + 1
+
+        XCTAssertEqual(
+            (textStorage.attribute(.link, at: contentOffset, effectiveRange: nil) as? URL)?.absoluteString,
+            "host-app://commands/table"
+        )
+        XCTAssertNil(textStorage.attribute(.underlineStyle, at: contentOffset, effectiveRange: nil))
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentOffset, effectiveRange: nil) as? NSColor, .labelColor)
+        XCTAssertTrue(try font(at: contentOffset, in: textStorage).isFixedPitch)
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: openingBracketOffset, effectiveRange: nil) as? NSColor, .clear)
+        XCTAssertEqual(textStorage.attribute(.kern, at: trailingSpaceOffset, effectiveRange: nil) as? CGFloat, 5)
     }
 
     func testFileLinkChipStaysVisibleWhenCaretIsInsideSource() throws {

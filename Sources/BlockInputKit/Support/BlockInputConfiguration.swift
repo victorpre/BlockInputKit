@@ -67,6 +67,58 @@ public struct BlockInputCompletionPopupConfiguration {
     }
 }
 
+/// Slash-command chip click gesture routed to the host.
+public enum BlockInputSlashCommandChipClickKind: Equatable {
+    case plainClick
+    case commandClick
+}
+
+/// Host decision for a slash-command chip click.
+public enum BlockInputSlashCommandChipClickAction: Equatable {
+    /// Open the editor's existing link modal for this chip.
+    case showLinkModal
+    /// Open the chip URI through the editor URL opener.
+    case openURL
+    /// The host handled the click and the editor should not perform fallback behavior.
+    case hostHandled
+}
+
+/// Context sent when a slash-command chip is clicked.
+public struct BlockInputSlashCommandChipClickContext {
+    /// Visible chip label, including its leading `/`.
+    public var label: String
+    /// Host-owned slash-command URI.
+    public var uri: URL
+    /// Block that contains the clicked chip.
+    public var blockID: BlockInputBlockID
+    /// Full Markdown source range for the clicked chip.
+    public var sourceRange: NSRange
+    /// Editor view routing the click.
+    public var editorView: BlockInputView
+    /// Original AppKit mouse event.
+    public var event: NSEvent
+    /// Normalized click kind.
+    public var clickKind: BlockInputSlashCommandChipClickKind
+
+    public init(
+        label: String,
+        uri: URL,
+        blockID: BlockInputBlockID,
+        sourceRange: NSRange,
+        editorView: BlockInputView,
+        event: NSEvent,
+        clickKind: BlockInputSlashCommandChipClickKind
+    ) {
+        self.label = label
+        self.uri = uri
+        self.blockID = blockID
+        self.sourceRange = sourceRange
+        self.editorView = editorView
+        self.event = event
+        self.clickKind = clickKind
+    }
+}
+
 /// Runtime options and host integration points for a block input editor.
 public struct BlockInputConfiguration {
     /// Default visual horizontal inset for block content.
@@ -99,6 +151,11 @@ public struct BlockInputConfiguration {
     public var undoController: BlockInputUndoController?
     /// Host completion source for mentions and slash commands.
     public var completionProvider: (any BlockInputCompletionProvider)?
+    /// Where live slash-command completion is allowed to open.
+    public var slashCommandAvailability: BlockInputSlashCommandAvailability
+    /// Optional host router for slash-command chip clicks.
+    public var slashCommandChipClickHandler:
+        (@MainActor (BlockInputSlashCommandChipClickContext) -> BlockInputSlashCommandChipClickAction)?
     /// Built-in completion popup behavior, including caret anchoring and optional overlay hosting.
     public var completionPopupConfiguration: BlockInputCompletionPopupConfiguration
     /// Convenience access to `completionPopupConfiguration.placement`.
@@ -143,6 +200,9 @@ public struct BlockInputConfiguration {
         style: BlockInputStyle = .default,
         undoController: BlockInputUndoController? = nil,
         completionProvider: (any BlockInputCompletionProvider)? = nil,
+        slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
+        slashCommandChipClickHandler:
+            (@MainActor (BlockInputSlashCommandChipClickContext) -> BlockInputSlashCommandChipClickAction)? = nil,
         completionPopupPlacement: BlockInputCompletionPopupPlacement = .caret,
         completionPopupConfiguration: BlockInputCompletionPopupConfiguration? = nil,
         onDocumentMutation: ((BlockInputDocumentChange) -> Void)? = nil,
@@ -160,6 +220,8 @@ public struct BlockInputConfiguration {
         self.style = style
         self.undoController = undoController
         self.completionProvider = completionProvider
+        self.slashCommandAvailability = slashCommandAvailability
+        self.slashCommandChipClickHandler = slashCommandChipClickHandler
         self.completionPopupConfiguration = completionPopupConfiguration ?? BlockInputCompletionPopupConfiguration(
             placement: completionPopupPlacement
         )

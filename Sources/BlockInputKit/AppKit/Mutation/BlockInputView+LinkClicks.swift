@@ -1,0 +1,65 @@
+import AppKit
+
+extension BlockInputView {
+    func handleLinkClick(blockID: BlockInputBlockID, selectedRange: NSRange, event: NSEvent) -> Bool {
+        guard let context = linkContext(
+            blockID: blockID,
+            selectedRange: selectedRange,
+            event: event,
+            prefersClickedOffset: true
+        ),
+              case let .edit(linkRange) = context.mode,
+              let destination = linkRange.linkDestination else {
+            return false
+        }
+        if routeSlashCommandChipClick(
+            context: context,
+            linkRange: linkRange,
+            destination: destination,
+            blockID: blockID,
+            event: event
+        ) {
+            return true
+        }
+        if event.modifierFlags.contains(.command) {
+            return linkURLOpener(destination)
+        }
+        showLinkModal(context: context)
+        return true
+    }
+
+    private func routeSlashCommandChipClick(
+        context: BlockInputLinkContext,
+        linkRange: BlockInputInlineMarkdownRange,
+        destination: URL,
+        blockID: BlockInputBlockID,
+        event: NSEvent
+    ) -> Bool {
+        guard linkRange.inlineChipKind(in: context.sourceText) == .slashCommand,
+              let action = slashCommandChipClickHandler?(BlockInputSlashCommandChipClickContext(
+                label: linkText(in: context.sourceText, range: linkRange),
+                uri: destination,
+                blockID: blockID,
+                sourceRange: linkRange.fullRange,
+                editorView: self,
+                event: event,
+                clickKind: slashCommandChipClickKind(for: event)
+              )) else {
+            return false
+        }
+        switch action {
+        case .showLinkModal:
+            showLinkModal(context: context)
+            return true
+        case .openURL:
+            _ = linkURLOpener(destination)
+            return true
+        case .hostHandled:
+            return true
+        }
+    }
+
+    private func slashCommandChipClickKind(for event: NSEvent) -> BlockInputSlashCommandChipClickKind {
+        event.modifierFlags.contains(.command) ? .commandClick : .plainClick
+    }
+}

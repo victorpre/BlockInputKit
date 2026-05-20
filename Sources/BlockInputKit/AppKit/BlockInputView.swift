@@ -35,6 +35,9 @@ public final class BlockInputView: NSView {
     var fallbackUndoController = BlockInputUndoController()
     var undoController: BlockInputUndoController?
     var completionProvider: (any BlockInputCompletionProvider)?
+    var slashCommandAvailability = BlockInputSlashCommandAvailability.documentStart
+    var slashCommandChipClickHandler:
+        (@MainActor (BlockInputSlashCommandChipClickContext) -> BlockInputSlashCommandChipClickAction)?
     var completionPopupConfiguration = BlockInputCompletionPopupConfiguration()
     var completionPopupPlacement: BlockInputCompletionPopupPlacement {
         get { completionPopupConfiguration.placement }

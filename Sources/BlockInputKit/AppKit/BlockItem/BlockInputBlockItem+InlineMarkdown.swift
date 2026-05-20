@@ -1,6 +1,6 @@
 import AppKit
 
-private let fileLinkChipAdjacentWhitespaceKern: CGFloat = 5
+private let inlineChipAdjacentWhitespaceKern: CGFloat = 5
 
 extension BlockInputBlockItem {
     func applyInlineMarkdownAttributes(for block: BlockInputBlock, textStorage: NSTextStorage) {
@@ -15,13 +15,12 @@ extension BlockInputBlockItem {
         )
         let baseFont = Self.font(for: block.kind, style: style)
         for markdownRange in markdownRanges {
-            let rendersFileLinkChip = markdownRange.style == .link &&
-                markdownRange.linkDestination?.isFileURL == true
+            let rendersInlineChip = markdownRange.inlineChipKind(in: textStorage.string) != nil
             for contentRange in markdownRange.contentRange.subtractingSorted(inlineCodeRanges) {
                 let clampedContentRange = NSIntersectionRange(contentRange, fullRange)
                 if clampedContentRange.length > 0 {
-                    if rendersFileLinkChip {
-                        applyFileLinkChip(to: clampedContentRange, in: textStorage, baseFont: baseFont)
+                    if rendersInlineChip {
+                        applyInlineChip(to: clampedContentRange, in: textStorage, baseFont: baseFont)
                     } else {
                         apply(markdownRange.style, to: clampedContentRange, in: textStorage, baseFont: baseFont)
                     }
@@ -45,8 +44,8 @@ extension BlockInputBlockItem {
                     range: clampedDelimiterRange
                 )
             }
-            if rendersFileLinkChip {
-                applyFileLinkChipAdjacentWhitespaceSpacers(for: markdownRange, in: textStorage)
+            if rendersInlineChip {
+                applyInlineChipAdjacentWhitespaceSpacers(for: markdownRange, in: textStorage)
             }
         }
     }
@@ -107,7 +106,7 @@ extension BlockInputBlockItem {
         }
     }
 
-    private func applyFileLinkChip(
+    private func applyInlineChip(
         to range: NSRange,
         in textStorage: NSTextStorage,
         baseFont: NSFont
@@ -121,7 +120,7 @@ extension BlockInputBlockItem {
         )
     }
 
-    private func applyFileLinkChipAdjacentWhitespaceSpacers(
+    private func applyInlineChipAdjacentWhitespaceSpacers(
         for markdownRange: BlockInputInlineMarkdownRange,
         in textStorage: NSTextStorage
     ) {
@@ -132,18 +131,18 @@ extension BlockInputBlockItem {
         ].forEach { location in
             guard location >= 0,
                   location < text.length,
-                  Self.isFileLinkChipAdjacentSpacerCharacter(text.character(at: location)) else {
+                  Self.isInlineChipAdjacentSpacerCharacter(text.character(at: location)) else {
                 return
             }
             textStorage.addAttribute(
                 .kern,
-                value: fileLinkChipAdjacentWhitespaceKern,
+                value: inlineChipAdjacentWhitespaceKern,
                 range: NSRange(location: location, length: 1)
             )
         }
     }
 
-    private static func isFileLinkChipAdjacentSpacerCharacter(_ character: unichar) -> Bool {
+    private static func isInlineChipAdjacentSpacerCharacter(_ character: unichar) -> Bool {
         guard let scalar = UnicodeScalar(Int(character)) else {
             return false
         }

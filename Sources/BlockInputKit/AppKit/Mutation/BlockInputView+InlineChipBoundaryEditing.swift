@@ -39,14 +39,14 @@ extension BlockInputView {
         return true
     }
 
-    func resolvedFileLinkBoundaryTextChange(
+    func resolvedInlineChipBoundaryTextChange(
         item: BlockInputBlockItem,
         beforeBlock: BlockInputBlock,
         proposedText: String,
         selectionBefore: BlockInputSelection?
     ) -> (text: String, proposedOffset: Int) {
         let selectedRange = item.currentSelectedRange
-        guard let correction = fileLinkBoundaryInsertionCorrection(
+        guard let correction = inlineChipBoundaryInsertionCorrection(
             beforeBlock: beforeBlock,
             proposedText: proposedText,
             selectionBefore: selectionBefore
@@ -58,20 +58,20 @@ extension BlockInputView {
         return (correction.text, correction.cursorOffset)
     }
 
-    func fileLinkBoundaryAdjustedRange(_ range: NSRange, in block: BlockInputBlock) -> NSRange {
+    func inlineChipBoundaryAdjustedRange(_ range: NSRange, in block: BlockInputBlock) -> NSRange {
         guard range.length == 0,
               Self.blockKindSupportsLinkBoundaryEditing(block.kind),
-              let linkRange = Self.fileLinkRangeEndingAtContentBoundary(range.location, in: block.text) else {
+              let linkRange = Self.inlineChipRangeEndingAtContentBoundary(range.location, in: block.text) else {
             return range
         }
         return NSRange(location: NSMaxRange(linkRange.fullRange), length: 0)
     }
 
-    private func fileLinkBoundaryInsertionCorrection(
+    private func inlineChipBoundaryInsertionCorrection(
         beforeBlock: BlockInputBlock,
         proposedText: String,
         selectionBefore: BlockInputSelection?
-    ) -> FileLinkBoundaryInsertionCorrection? {
+    ) -> InlineChipBoundaryInsertionCorrection? {
         guard Self.blockKindSupportsLinkBoundaryEditing(beforeBlock.kind),
               case let .cursor(cursor) = selectionBefore,
               cursor.blockID == beforeBlock.id else {
@@ -92,13 +92,13 @@ extension BlockInputView {
         }
         let insertedText = proposedText.substring(with: NSRange(location: cursorOffset, length: insertionLength))
         guard !insertedText.isEmpty,
-              let linkRange = Self.fileLinkRangeEndingAtContentBoundary(cursorOffset, in: beforeBlock.text) else {
+              let linkRange = Self.inlineChipRangeEndingAtContentBoundary(cursorOffset, in: beforeBlock.text) else {
             return nil
         }
         let insertionOffset = NSMaxRange(linkRange.fullRange)
         let correctedText = NSMutableString(string: beforeBlock.text)
         correctedText.insert(insertedText, at: insertionOffset)
-        return FileLinkBoundaryInsertionCorrection(
+        return InlineChipBoundaryInsertionCorrection(
             text: correctedText as String,
             cursorOffset: insertionOffset + insertionLength
         )
@@ -108,15 +108,14 @@ extension BlockInputView {
         BlockInputBlockItem.supportsInlineMarkdownStyling(kind)
     }
 
-    private static func fileLinkRangeEndingAtContentBoundary(
+    private static func inlineChipRangeEndingAtContentBoundary(
         _ offset: Int,
         in text: String
     ) -> BlockInputInlineMarkdownRange? {
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
         return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
             .first { range in
-                range.style == .link &&
-                    range.linkDestination?.isFileURL == true &&
+                range.inlineChipKind(in: text) != nil &&
                     NSMaxRange(range.contentRange) == offset
             }
     }
@@ -137,7 +136,7 @@ extension BlockInputView {
     }
 }
 
-private struct FileLinkBoundaryInsertionCorrection {
+private struct InlineChipBoundaryInsertionCorrection {
     var text: String
     var cursorOffset: Int
 }

@@ -68,6 +68,30 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
         XCTAssertEqual(range.linkDestination?.absoluteString, "file:///tmp/a%20b(1).md")
     }
 
+    func testParsesSlashCommandChipLinksWithHostURIs() throws {
+        let text = "Run [/table](host-app://commands/table)"
+        let range = try XCTUnwrap(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text)
+            .first { $0.style == .link })
+
+        XCTAssertEqual(range.linkDestination?.absoluteString, "host-app://commands/table")
+        XCTAssertEqual(range.inlineChipKind(in: text), .slashCommand)
+        XCTAssertEqual(range.slashCommandChipLabel(in: text), "/table")
+    }
+
+    func testNonSlashCustomSchemeLinksStayUnsupported() {
+        let text = "Run [table](host-app://commands/table)"
+
+        XCTAssertTrue(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text).filter { $0.style == .link }.isEmpty)
+    }
+
+    func testFileLinksTakeChipPrecedenceOverSlashLabels() throws {
+        let text = "Open [/tmp/file.md](file:///tmp/file.md)"
+        let range = try XCTUnwrap(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text)
+            .first { $0.style == .link })
+
+        XCTAssertEqual(range.inlineChipKind(in: text), .fileLink)
+    }
+
     func testReportsUnsupportedLinkSourceRangesForCompletionExclusion() {
         let text = [
             "Open [@read](mailto:user@example.com)",

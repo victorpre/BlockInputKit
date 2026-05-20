@@ -68,6 +68,7 @@ Read the nearest `AGENTS.md` before editing. Current scopes:
 - Split large types into focused companions like `Type+Feature.swift`.
 - Cover AppKit focus/selection changes with mounted-view tests when model-only assertions could miss visible `NSTextView` state.
 - Document public completion popup configuration changes in `README.md`; overlay providers choose both popup parent view and frame in that parent's coordinate space.
+- Document slash-command behavior in `README.md` when changing availability, suggestion construction, chip rendering, or click handling; keep the demo on `.anywhere` availability unless the product requirement changes.
 
 ## Commits
 

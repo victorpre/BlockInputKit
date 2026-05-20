@@ -357,9 +357,9 @@ private final class BlockInputCompletionPopupRowView: NSView {
         titleField.stringValue = suggestion.title
         subtitleField.stringValue = suggestion.subtitle ?? ""
         detailField.stringValue = suggestion.detailText ?? ""
-        iconView.image = suggestion.iconSystemName.flatMap {
-            NSImage(systemSymbolName: $0, accessibilityDescription: suggestion.title)
-        } ?? NSImage(systemSymbolName: "text.cursor", accessibilityDescription: suggestion.title)
+        let iconSystemName = suggestion.iconSystemName ?? Self.fallbackIconSystemName(for: suggestion)
+        iconView.image = NSImage(systemSymbolName: iconSystemName, accessibilityDescription: suggestion.title) ??
+            NSImage(systemSymbolName: Self.fallbackIconSystemName(for: suggestion), accessibilityDescription: suggestion.title)
         setAccessibilityLabel(accessibilityLabel(for: suggestion))
         needsLayout = true
         needsDisplay = true
@@ -470,6 +470,15 @@ private final class BlockInputCompletionPopupRowView: NSView {
         isHighlighted = true
         onHighlight(index)
         needsDisplay = true
+    }
+
+    private static func fallbackIconSystemName(for suggestion: BlockInputCompletionSuggestion) -> String {
+        switch suggestion.trigger {
+        case .mention:
+            return "text.cursor"
+        case .slashCommand:
+            return "command"
+        }
     }
 
     private func accessibilityLabel(for suggestion: BlockInputCompletionSuggestion) -> String {

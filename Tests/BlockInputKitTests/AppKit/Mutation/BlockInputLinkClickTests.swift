@@ -191,6 +191,111 @@ final class BlockInputLinkClickTests: XCTestCase {
         XCTAssertEqual(modal.urlField.stringValue, "file:///tmp/demo.md")
     }
 
+    func testSlashCommandChipClickHandlerCanOpenModalOpenURLOrConsumeClick() throws {
+        let text = "Run [/table](host-app://commands/table)"
+        var actions: [BlockInputSlashCommandChipClickAction] = [.showLinkModal, .openURL, .hostHandled]
+        var contexts: [BlockInputSlashCommandChipClickContext] = []
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: text)
+            ]),
+            slashCommandChipClickHandler: { context in
+                contexts.append(context)
+                return actions.removeFirst()
+            }
+        ))
+        var openedURLs: [URL] = []
+        mounted.view.linkURLOpener = {
+            openedURLs.append($0)
+            return true
+        }
+        let textView = try textView(in: mounted.view)
+        let location = try windowLocation(forUTF16Offset: contentLocation("/table", in: text), in: textView)
+
+        XCTAssertTrue(mounted.view.handleLinkClick(
+            blockID: "block",
+            selectedRange: NSRange(location: contentLocation("/table", in: text), length: 0),
+            event: try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber)
+        ))
+        XCTAssertEqual(contexts.last?.label, "/table")
+        XCTAssertEqual(contexts.last?.uri.absoluteString, "host-app://commands/table")
+        XCTAssertEqual(contexts.last?.sourceRange, (text as NSString).range(of: "[/table](host-app://commands/table)"))
+        XCTAssertEqual(contexts.last?.clickKind, .plainClick)
+        XCTAssertNotNil(mounted.view.linkModalView)
+
+        mounted.view.dismissLinkModal(restoreFocus: false)
+        XCTAssertTrue(mounted.view.handleLinkClick(
+            blockID: "block",
+            selectedRange: NSRange(location: contentLocation("/table", in: text), length: 0),
+            event: try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber, modifierFlags: .command)
+        ))
+        XCTAssertEqual(openedURLs.map(\.absoluteString), ["host-app://commands/table"])
+        XCTAssertEqual(contexts.last?.clickKind, .commandClick)
+
+        XCTAssertTrue(mounted.view.handleLinkClick(
+            blockID: "block",
+            selectedRange: NSRange(location: contentLocation("/table", in: text), length: 0),
+            event: try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber)
+        ))
+        XCTAssertNil(mounted.view.linkModalView)
+        XCTAssertEqual(openedURLs.map(\.absoluteString), ["host-app://commands/table"])
+    }
+
+    func testSlashCommandOpenURLActionConsumesClickWhenOpenerFails() throws {
+        let text = "Run [/table](host-app://commands/table)"
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: text)
+            ]),
+            slashCommandChipClickHandler: { _ in .openURL }
+        ))
+        var openedURL: URL?
+        mounted.view.linkURLOpener = {
+            openedURL = $0
+            return false
+        }
+        let textView = try textView(in: mounted.view)
+        let location = try windowLocation(forUTF16Offset: contentLocation("/table", in: text), in: textView)
+
+        XCTAssertTrue(mounted.view.handleLinkClick(
+            blockID: "block",
+            selectedRange: NSRange(location: contentLocation("/table", in: text), length: 0),
+            event: try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber)
+        ))
+
+        XCTAssertEqual(openedURL?.absoluteString, "host-app://commands/table")
+        XCTAssertNil(mounted.view.linkModalView)
+    }
+
+    func testSlashCommandChipFallsBackToNormalLinkBehaviorWithoutHandler() throws {
+        let text = "Run [/table](host-app://commands/table)"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "block", text: text)
+        ])
+        var openedURL: URL?
+        mounted.view.linkURLOpener = {
+            openedURL = $0
+            return true
+        }
+        let textView = try textView(in: mounted.view)
+        let location = try windowLocation(forUTF16Offset: contentLocation("/table", in: text), in: textView)
+
+        XCTAssertTrue(mounted.view.handleLinkClick(
+            blockID: "block",
+            selectedRange: NSRange(location: contentLocation("/table", in: text), length: 0),
+            event: try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber)
+        ))
+        XCTAssertNotNil(mounted.view.linkModalView)
+
+        mounted.view.dismissLinkModal(restoreFocus: false)
+        XCTAssertTrue(mounted.view.handleLinkClick(
+            blockID: "block",
+            selectedRange: NSRange(location: contentLocation("/table", in: text), length: 0),
+            event: try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber, modifierFlags: .command)
+        ))
+        XCTAssertEqual(openedURL?.absoluteString, "host-app://commands/table")
+    }
+
     func testFileLinkFullSourceResolvesForChipClickButRegularLinkDoesNot() throws {
         let fileText = "Open [file](file:///tmp/demo.md) now"
         let regularText = "Open [docs](https://example.com) now"
@@ -237,5 +342,9 @@ final class BlockInputLinkClickTests: XCTestCase {
     private func textView(in view: BlockInputView) throws -> BlockInputTextView {
         let item = try XCTUnwrap(view.visibleBlockItemForTesting(at: 0))
         return try XCTUnwrap(item.testingTextView)
+    }
+
+    private func contentLocation(_ content: String, in text: String) -> Int {
+        (text as NSString).range(of: content).location
     }
 }

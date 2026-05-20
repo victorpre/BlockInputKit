@@ -55,6 +55,7 @@ let configuration = BlockInputConfiguration(
     ),
     undoController: undoController,
     completionProvider: completionProvider,
+    slashCommandAvailability: .documentStart,
     completionPopupConfiguration: BlockInputCompletionPopupConfiguration(placement: .caret),
     onDocumentMutation: { change in
         print("Applied edit:", change)
@@ -111,7 +112,9 @@ struct EditorScreen: View {
 - `style`: Configures base text, selection backgrounds, inline code, and fenced code block styling.
 - `undoController`: Shares text and structural undo coordination with the host.
 - `completionProvider`: Supplies mention and slash-command suggestions.
-- `completionPopupConfiguration`: Configures live mention completion placement. Use `.caret` for a caret-anchored popup, or `.overlay` for a hostable overlay. Overlay placement can provide both the destination parent view and the popup frame inside that parent.
+- `slashCommandAvailability`: Controls whether `/` completion opens only when `/` starts block index `0` at UTF-16 offset `0`, or after token boundaries anywhere.
+- `slashCommandChipClickHandler`: Lets the host route slash-command chip clicks to a modal, URL open, or host-owned action.
+- `completionPopupConfiguration`: Configures live completion placement. Use `.caret` for a caret-anchored popup, or `.overlay` for a hostable overlay. Overlay placement can provide both the destination parent view and the popup frame inside that parent.
 - `onDocumentMutation`: Receives granular edits as they are applied, including marker-only numbered-list updates for marker-adjusting stores.
 - `onDocumentChange`: Receives full document snapshots after editor mutations.
 - `documentChangeSnapshotDelay`: Coalesces full-document snapshot callbacks for large store-backed documents.
@@ -122,7 +125,7 @@ struct EditorScreen: View {
 
 ## Completion And File Mentions
 
-`completionProvider` remains the host suggestion API. When it is `nil`, typing `@` does not open a popup. When it is set, typing `@` in inline-markdown-capable text opens the built-in completion popup and sends a `BlockInputCompletionContext` to the provider.
+`completionProvider` remains the host suggestion API. When it is `nil`, typing `@` or `/` does not open a popup. When it is set, typing `@` in inline-markdown-capable text opens mention completion, and typing `/` opens slash-command completion according to `slashCommandAvailability`. The provider receives `BlockInputCompletionContext.trigger` as `.mention` or `.slashCommand`.
 
 `completionPopupConfiguration.overlayProvider` is optional. Hosts that use `.overlay` can return a `BlockInputCompletionPopupOverlay` containing both:
 
@@ -154,7 +157,7 @@ BlockInputCompletionPopupConfiguration(placement: .overlay) { context in
 The context includes:
 
 - `replacementRange`: The UTF-16 source range that accepting a suggestion should replace.
-- `rawQuery`: The text after `@` before path-prefix normalization.
+- `rawQuery`: The text after `@` or `/` before editor-owned normalization.
 - `fileQuery`: Optional parsed file intent for `.`, `..`, and `...` prefixes. These represent current, parent, and grandparent directory references, with `levelsUp` and `remainder` populated for host resolution. Absolute path queries are preserved in `rawQuery` for hosts that want to resolve `/...` directly.
 
 Hosts can return any `BlockInputCompletionSuggestion`. For file mentions in paragraphs or headings, use `BlockInputCompletionSuggestion.fileLink(fileURL:)` to insert a Markdown file link. The helper escapes link labels and destinations, writes the absolute `file://` destination, and defaults the visible label to the file name. Pass `label:` when a custom label should persist, such as a relative mention:
@@ -164,6 +167,18 @@ Hosts can return any `BlockInputCompletionSuggestion`. For file mentions in para
 ```
 
 File links always render as chips. The Markdown source is preserved for editing and export. File links use the same click behavior as other links: plain click opens the link modal, and Cmd-click opens through the editor URL opener hook.
+
+For slash commands, return suggestions when `context.trigger == .slashCommand`. `.documentStart` only opens when `/` starts block index `0` at UTF-16 offset `0`; `.anywhere` uses the same token boundaries as mentions. `BlockInputCompletionSuggestion.slashCommand(...)` builds Markdown with a host-owned URI and a visible label that starts with `/`:
+
+```swift
+BlockInputCompletionSuggestion.slashCommand(
+    title: "Insert table",
+    uri: "myapp://commands/table",
+    label: "table"
+)
+```
+
+Hosts may also provide custom `insertionText`. A link renders as a slash-command chip when its visible label starts with `/`; the URI scheme is host-owned. `file://` links keep file-chip behavior even when their visible label starts with `/`. Configure `slashCommandChipClickHandler` when slash chips should run host behavior, open their URI directly, or show the built-in link modal.
 
 Dragging local files onto supported text blocks inserts file chips at the drop caret. Paragraphs, headings, quotes, list items, and checklist items accept inline file drops; code, frontmatter, raw Markdown, horizontal rules, row whitespace, and unloaded progressive rows reject them.
 
@@ -213,7 +228,7 @@ Run the local demo:
 ./scripts/run-demo.sh
 ```
 
-The demo app provides file mention suggestions from `FileManager.default.currentDirectoryPath`, so suggestions are relative to the directory where the demo is launched. Dot-prefixed queries resolve against current, parent, or grandparent directories, and absolute path queries search from the nearest existing directory. Its toolbar includes a `Caret`/`Overlay` completion placement segmented control. Overlay mode uses `overlayProvider` to top-align the popup inside the editor without reserving extra space above it.
+The demo app provides file mention suggestions from `FileManager.default.currentDirectoryPath`, so suggestions are relative to the directory where the demo is launched. Dot-prefixed queries resolve against current, parent, or grandparent directories, and absolute path queries search from the nearest existing directory. It also provides a small fixed slash-command list with `.anywhere` availability so `/` completion can open after token boundaries in any supported text block. Its toolbar includes a `Caret`/`Overlay` completion placement segmented control. Overlay mode uses `overlayProvider` to top-align the popup inside the editor without reserving extra space above it.
 
 ## Validation
 

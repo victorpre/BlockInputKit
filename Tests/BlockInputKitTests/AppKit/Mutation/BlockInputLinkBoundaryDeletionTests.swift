@@ -38,6 +38,20 @@ final class BlockInputLinkBoundaryDeletionTests: XCTestCase {
         XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: "block", utf16Offset: 5)))
     }
 
+    func testBackspaceAtSlashCommandChipBoundaryRemovesWholeLink() throws {
+        let text = "Run [/table](host-app://commands/table) now"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "block", text: text)
+        ])
+        let textView = try activeTextView(in: mounted, text: text)
+        textView.setSelectedRange(NSRange(location: NSMaxRange((text as NSString).range(of: "/table")), length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["Run  now"])
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: "block", utf16Offset: 4)))
+    }
+
     func testDeleteForwardAtRegularLinkBoundaryRemovesWholeLink() throws {
         let text = "Open [docs](https://example.com) now"
         let mounted = makeMountedBlockInputView(blocks: [

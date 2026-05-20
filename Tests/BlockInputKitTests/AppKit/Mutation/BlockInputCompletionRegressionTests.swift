@@ -43,6 +43,28 @@ final class BlockInputCompletionRegressionTests: XCTestCase {
         )))
     }
 
+    func testTypingAtSlashCommandChipLabelBoundaryBreaksOutOfLinkSource() throws {
+        let text = "Run [/table](host-app://commands/table)"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "block", text: text)
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+        let labelEnd = NSMaxRange((text as NSString).range(of: "/table"))
+        textView.setSelectedRange(NSRange(location: labelEnd, length: 0))
+
+        textView.insertText(" now", replacementRange: textView.selectedRange())
+
+        let expectedText = "\(text) now"
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), [expectedText])
+        XCTAssertEqual(textView.string, expectedText)
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(
+            blockID: "block",
+            utf16Offset: (expectedText as NSString).length
+        )))
+    }
+
     func testReturnAtFileLinkLabelBoundaryBreaksOutOfLinkSource() throws {
         let text = "Open [default.profraw](file:///tmp/default.profraw)"
         let mounted = makeMountedBlockInputView(blocks: [
@@ -104,7 +126,7 @@ final class BlockInputCompletionRegressionTests: XCTestCase {
             "Sources/BlockInputKit/AppKit",
             "BlockInputView+BlockItemConfiguration.swift",
             "Sources/BlockInputKit/AppKit",
-            "BlockInputBlockItem+FileLinkChips.swift"
+            "BlockInputBlockItem+InlineChips.swift"
         ].joined(separator: "/")
         let provider = RegressionCompletionProvider(suggestions: [
             .fileLink(label: longLabel, fileURL: URL(fileURLWithPath: "/tmp/\(longLabel)"))

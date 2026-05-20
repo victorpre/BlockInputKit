@@ -8,13 +8,15 @@ enum BlockInputLinkURL {
     static let supportedSchemes: Set<String> = ["http", "https", "file"]
 
     /// Returns a URL only when the destination is non-empty, single-line, and uses a supported actionable scheme.
-    static func supportedURL(from string: String) -> URL? {
+    static func supportedURL(from string: String, allowsCustomSchemes: Bool = false) -> URL? {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
               !trimmed.contains(where: \.isNewline),
               let url = URL(string: trimmed),
-              let scheme = url.scheme?.lowercased(),
-              supportedSchemes.contains(scheme) else {
+              let scheme = url.scheme?.lowercased() else {
+            return nil
+        }
+        guard allowsCustomSchemes || supportedSchemes.contains(scheme) else {
             return nil
         }
         switch scheme {
@@ -27,7 +29,9 @@ enum BlockInputLinkURL {
                 return nil
             }
         default:
-            return nil
+            guard allowsCustomSchemes else {
+                return nil
+            }
         }
         return url
     }

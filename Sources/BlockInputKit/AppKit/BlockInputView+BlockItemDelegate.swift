@@ -40,7 +40,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             return
         }
         replaceCachedBlock(beforeBlock, at: index)
-        let resolvedChange = resolvedFileLinkBoundaryTextChange(
+        let resolvedChange = resolvedInlineChipBoundaryTextChange(
             item: item,
             beforeBlock: beforeBlock,
             proposedText: text,
@@ -166,7 +166,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             indentationLevel: block.indentationLevel,
             lineIndentationLevels: block.lineIndentationLevels
         )
-        let selectedRange = fileLinkBoundaryAdjustedRange(item.currentSelectedRange, in: currentBlock)
+        let selectedRange = inlineChipBoundaryAdjustedRange(item.currentSelectedRange, in: currentBlock)
         if block.kind.acceptsInlineReturn,
            !(selectedRange.length == 0 &&
              selectedRange.location == 0 &&

@@ -186,6 +186,27 @@ final class BlockInputViewFileDropTests: XCTestCase {
         )
     }
 
+    func testDroppingOnExistingSlashCommandChipSnapsAroundFullMarkdownSource() throws {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let initialText = "Run [/table](host-app://commands/table) now"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: blockID, text: initialText)
+        ])
+        let textView = try textView(in: mounted.view)
+        let existingLinkEnd = NSMaxRange((initialText as NSString).range(of: "[/table](host-app://commands/table)"))
+        let draggingInfo = BlockInputDraggingInfo(
+            fileURLs: [URL(fileURLWithPath: "/tmp/After.md")],
+            location: try windowLocation(forUTF16Offset: existingLinkEnd - 1, in: textView)
+        )
+
+        XCTAssertTrue(textView.performDragOperation(draggingInfo))
+
+        XCTAssertEqual(
+            mounted.view.document.blocks[0].text,
+            "Run [/table](host-app://commands/table)[After.md](file:///tmp/After.md) now"
+        )
+    }
+
     func testDroppingFileIntoUnsupportedBlockIsRejectedWithoutNativeTextInsertion() throws {
         let blockID = BlockInputBlockID(rawValue: "code")
         let mounted = makeMountedBlockInputView(blocks: [

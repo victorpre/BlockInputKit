@@ -143,8 +143,12 @@ extension BlockInputInlineMarkdownParsing {
     ) -> BlockInputInlineMarkdownRange? {
         let label = text.substring(with: sourceRanges.labelRange)
         let urlString = normalizedLinkDestination(text.substring(with: sourceRanges.urlRange).blockInputUnescapedLinkDestination)
+        let allowsCustomSchemes = label.blockInputUnescapedLinkLabel.hasPrefix("/")
         guard linkLabelIsSupported(label),
-              let destination = BlockInputLinkURL.supportedURL(from: urlString) else {
+              let destination = BlockInputLinkURL.supportedURL(
+                from: urlString,
+                allowsCustomSchemes: allowsCustomSchemes
+              ) else {
             return nil
         }
         return BlockInputInlineMarkdownRange(

@@ -3,6 +3,11 @@ import Foundation
 
 final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked Sendable {
     private let maxCandidateMatches = 500
+    private let slashCommands = [
+        DemoSlashCommand(title: "Heading", label: "heading", uri: "blockinputkit-demo://commands/heading"),
+        DemoSlashCommand(title: "Checklist", label: "checklist", uri: "blockinputkit-demo://commands/checklist"),
+        DemoSlashCommand(title: "Quote", label: "quote", uri: "blockinputkit-demo://commands/quote")
+    ]
     private let launchDirectory: URL
     private let fileManager: FileManager
 
@@ -15,9 +20,15 @@ final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked
     }
 
     func suggestions(for context: BlockInputCompletionContext) async -> [BlockInputCompletionSuggestion] {
-        guard context.trigger == .mention else {
-            return []
+        switch context.trigger {
+        case .mention:
+            return fileSuggestions(for: context)
+        case .slashCommand:
+            return slashCommandSuggestions(for: context)
         }
+    }
+
+    private func fileSuggestions(for context: BlockInputCompletionContext) -> [BlockInputCompletionSuggestion] {
         let scope = completionScope(for: context)
         let query = scope.query.lowercased()
         return fileCandidates(under: scope.baseDirectory, matching: query)
@@ -30,6 +41,25 @@ final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked
                     subtitle: candidate.url.deletingLastPathComponent().path,
                     fileURL: candidate.url,
                     detailText: candidate.isDirectory ? "Folder" : nil
+                )
+            }
+    }
+
+    private func slashCommandSuggestions(for context: BlockInputCompletionContext) -> [BlockInputCompletionSuggestion] {
+        let query = context.query.lowercased()
+        return slashCommands
+            .filter { command in
+                query.isEmpty ||
+                    command.title.lowercased().contains(query) ||
+                    command.label.lowercased().contains(query)
+            }
+            .map { command in
+                BlockInputCompletionSuggestion.slashCommand(
+                    id: command.uri,
+                    title: command.title,
+                    uri: command.uri,
+                    label: command.label,
+                    detailText: "Command"
                 )
             }
     }
@@ -148,6 +178,12 @@ private struct DemoFileCompletionScope {
     var query: String
     var fileQuery: BlockInputCompletionFileQuery?
     var usesAbsoluteLabels: Bool
+}
+
+private struct DemoSlashCommand {
+    var title: String
+    var label: String
+    var uri: String
 }
 
 private struct DemoFileCompletionCandidate {

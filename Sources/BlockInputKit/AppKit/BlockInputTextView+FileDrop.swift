@@ -90,28 +90,27 @@ extension BlockInputTextView {
     private func fileDropUTF16Offset(at localLocation: NSPoint, in text: String) -> Int {
         let initialOffset = characterIndexForInsertion(at: localLocation)
         let clampedOffset = min(max(initialOffset, 0), (text as NSString).length)
-        guard let chipRange = fileLinkChipRange(containing: clampedOffset, in: text) else {
+        guard let chipRange = inlineChipRange(containing: clampedOffset, in: text) else {
             return clampedOffset
         }
-        let chipMidX = fileLinkChipMidX(for: chipRange.contentRange) ?? {
+        let chipMidX = inlineChipMidX(for: chipRange.contentRange) ?? {
             let contentMidpoint = chipRange.contentRange.location + chipRange.contentRange.length / 2
             return clampedOffset <= contentMidpoint ? localLocation.x + 1 : localLocation.x - 1
         }()
         return localLocation.x < chipMidX ? chipRange.fullRange.location : NSMaxRange(chipRange.fullRange)
     }
 
-    private func fileLinkChipRange(containing offset: Int, in text: String) -> BlockInputInlineMarkdownRange? {
+    private func inlineChipRange(containing offset: Int, in text: String) -> BlockInputInlineMarkdownRange? {
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
         return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
             .first { range in
-                range.style == .link &&
-                    range.linkDestination?.isFileURL == true &&
+                range.inlineChipKind(in: text) != nil &&
                     range.fullRange.location <= offset &&
                     offset <= NSMaxRange(range.fullRange)
             }
     }
 
-    private func fileLinkChipMidX(for contentRange: NSRange) -> CGFloat? {
+    private func inlineChipMidX(for contentRange: NSRange) -> CGFloat? {
         guard let layoutManager,
               let textContainer,
               contentRange.length > 0 else {

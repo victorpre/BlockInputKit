@@ -6,6 +6,14 @@ public enum BlockInputCompletionTrigger: Equatable, Codable, Sendable {
     case slashCommand
 }
 
+/// Where live slash-command completion is allowed to open.
+public enum BlockInputSlashCommandAvailability: String, CaseIterable, Equatable, Codable, Sendable {
+    /// Only allow slash-command completion when `/` starts the first block.
+    case documentStart
+    /// Allow slash-command completion after token boundaries in any inline-capable text block.
+    case anywhere
+}
+
 /// Where the editor-owned completion popup should be shown.
 public enum BlockInputCompletionPopupPlacement: String, CaseIterable, Equatable, Codable, Sendable {
     /// Anchor the popup near the active text caret.
@@ -160,6 +168,30 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
             detailText: detailText
         )
     }
+
+    /// Builds a slash-command suggestion that inserts host-owned Markdown link source.
+    ///
+    /// The visible link label is normalized to begin with `/` so the inserted source renders as a slash-command chip.
+    public static func slashCommand(
+        id: String? = nil,
+        title: String,
+        subtitle: String? = nil,
+        uri: String,
+        label: String? = nil,
+        iconSystemName: String? = "command",
+        detailText: String? = nil
+    ) -> BlockInputCompletionSuggestion {
+        let chipLabel = Self.normalizedSlashCommandLabel(label ?? title)
+        return BlockInputCompletionSuggestion(
+            id: id ?? uri,
+            title: title,
+            subtitle: subtitle,
+            insertionText: "[\(Self.escapedMarkdownLinkLabel(chipLabel))](\(Self.escapedMarkdownLinkDestination(uri)))",
+            trigger: .slashCommand,
+            iconSystemName: iconSystemName,
+            detailText: detailText
+        )
+    }
 }
 
 /// Supplies mention and slash-command completions to the editor.
@@ -186,5 +218,9 @@ private extension BlockInputCompletionSuggestion {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "(", with: "\\(")
             .replacingOccurrences(of: ")", with: "\\)")
+    }
+
+    static func normalizedSlashCommandLabel(_ label: String) -> String {
+        label.hasPrefix("/") ? label : "/\(label)"
     }
 }

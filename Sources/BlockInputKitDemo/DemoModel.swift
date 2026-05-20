@@ -55,6 +55,7 @@ final class DemoModel: ObservableObject {
             allowsBlockReordering: allowsReordering,
             undoController: session.undoController,
             completionProvider: completionProvider,
+            slashCommandAvailability: .anywhere,
             completionPopupConfiguration: completionPopupConfiguration(),
             onDocumentMutation: { [weak self, itemID = session.id] change in
                 Task { @MainActor in

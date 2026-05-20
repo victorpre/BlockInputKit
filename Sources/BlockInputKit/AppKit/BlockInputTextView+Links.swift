@@ -2,7 +2,7 @@ import AppKit
 
 extension BlockInputTextView {
     override func draw(_ dirtyRect: NSRect) {
-        drawFileLinkChipBackgrounds(in: dirtyRect)
+        drawInlineChipBackgrounds(in: dirtyRect)
         super.draw(dirtyRect)
     }
 
@@ -50,21 +50,21 @@ extension BlockInputTextView {
         }
     }
 
-    func drawFileLinkChipBackgrounds(in dirtyRect: NSRect) {
+    func drawInlineChipBackgrounds(in dirtyRect: NSRect) {
         guard supportsInlineMarkdownLinkRendering,
               let layoutManager,
               let textContainer else {
             return
         }
         layoutManager.ensureLayout(for: textContainer)
-        for linkRange in linkRangesForCurrentText() where linkRange.linkDestination?.isFileURL == true {
+        for linkRange in linkRangesForCurrentText() where linkRange.inlineChipKind(in: string) != nil {
             let characterRange = string.linkCursorClampedRange(linkRange.contentRange)
             let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
                 .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
             guard glyphRange.length > 0 else {
                 continue
             }
-            drawFileLinkChipBackground(
+            drawInlineChipBackground(
                 glyphRange: glyphRange,
                 dirtyRect: dirtyRect,
                 layoutManager: layoutManager,
@@ -108,7 +108,7 @@ extension BlockInputTextView {
         return BlockInputBlockItem.supportsInlineMarkdownStyling(kind)
     }
 
-    private func drawFileLinkChipBackground(
+    private func drawInlineChipBackground(
         glyphRange: NSRange,
         dirtyRect: NSRect,
         layoutManager: NSLayoutManager,

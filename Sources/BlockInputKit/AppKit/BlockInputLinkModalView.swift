@@ -134,7 +134,7 @@ final class BlockInputLinkModalView: NSView, NSTextFieldDelegate {
     }
 
     @objc private func open(_ sender: Any?) {
-        guard BlockInputLinkURL.supportedURL(from: urlField.stringValue) != nil else {
+        guard currentURLIsSupported else {
             return
         }
         onOpen?(urlField.stringValue)
@@ -205,9 +205,16 @@ final class BlockInputLinkModalView: NSView, NSTextFieldDelegate {
 
     private func validateFields() {
         let hasText = !textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let hasSupportedURL = BlockInputLinkURL.supportedURL(from: urlField.stringValue) != nil
+        let hasSupportedURL = currentURLIsSupported
         saveButton.isEnabled = hasText && hasSupportedURL
         openButton.isEnabled = hasSupportedURL
+    }
+
+    private var currentURLIsSupported: Bool {
+        BlockInputLinkURL.supportedURL(
+            from: urlField.stringValue,
+            allowsCustomSchemes: textField.stringValue.hasPrefix("/")
+        ) != nil
     }
 
     private func configureButton(_ button: NSButton, systemSymbolName: String, action: Selector) {

@@ -130,24 +130,6 @@ extension BlockInputView {
         dismissLinkModal(restoreFocus: false)
     }
 
-    func handleLinkClick(blockID: BlockInputBlockID, selectedRange: NSRange, event: NSEvent) -> Bool {
-        guard let context = linkContext(
-            blockID: blockID,
-            selectedRange: selectedRange,
-            event: event,
-            prefersClickedOffset: true
-        ),
-              case let .edit(linkRange) = context.mode,
-              let destination = linkRange.linkDestination else {
-            return false
-        }
-        if event.modifierFlags.contains(.command) {
-            return linkURLOpener(destination)
-        }
-        showLinkModal(context: context)
-        return true
-    }
-
     /// Presents the single editor-owned link modal and binds its actions to the captured source context.
     func showLinkModal(context: BlockInputLinkContext) {
         guard let block = block(withID: context.blockID) else {
@@ -201,8 +183,13 @@ extension BlockInputView {
             _ = removeLink(context: context)
             dismissLinkModal(restoreFocus: false)
         }
-        modal.onOpen = { [weak self] urlString in
-            guard let self, let url = BlockInputLinkURL.supportedURL(from: urlString) else { return }
+        modal.onOpen = { [weak self, weak modal] urlString in
+            let allowsCustomSchemes = modal?.textField.stringValue.hasPrefix("/") == true
+            guard let self,
+                  let url = BlockInputLinkURL.supportedURL(
+                    from: urlString,
+                    allowsCustomSchemes: allowsCustomSchemes
+                  ) else { return }
             _ = linkURLOpener(url)
         }
         modal.onCancel = { [weak self] in
@@ -364,7 +351,10 @@ extension BlockInputView {
         actionName: String,
         selectsResultingText: Bool = true
     ) -> Bool {
-        guard let destination = BlockInputLinkURL.supportedURL(from: urlString),
+        guard let destination = BlockInputLinkURL.supportedURL(
+                from: urlString,
+                allowsCustomSchemes: text.hasPrefix("/")
+              ),
               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               let index = index(of: context.blockID),
               var block = block(at: index) else {
@@ -406,7 +396,7 @@ extension BlockInputView {
         .filter { $0.style == .link }
         .first { linkRange in
             if clampedRange.length == 0 {
-                if linkRange.linkDestination?.isFileURL == true {
+                if linkRange.inlineChipKind(in: text) != nil {
                     return linkRange.fullRange.location <= clampedRange.location &&
                         clampedRange.location < NSMaxRange(linkRange.fullRange)
                 }

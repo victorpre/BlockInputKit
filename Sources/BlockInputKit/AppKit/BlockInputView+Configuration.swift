@@ -100,10 +100,14 @@ extension BlockInputView {
     func configureCompletion(_ configuration: BlockInputConfiguration) {
         let previousCompletionProvider = completionProvider
         let previousCompletionPopupPlacement = completionPopupPlacement
+        let previousSlashCommandAvailability = slashCommandAvailability
         completionProvider = configuration.completionProvider
+        slashCommandAvailability = configuration.slashCommandAvailability
+        slashCommandChipClickHandler = configuration.slashCommandChipClickHandler
         completionPopupConfiguration = configuration.completionPopupConfiguration
         if completionProvider == nil ||
             previousCompletionPopupPlacement != completionPopupPlacement ||
+            previousSlashCommandAvailability != slashCommandAvailability ||
             !Self.sameCompletionProvider(previousCompletionProvider, completionProvider) {
             dismissCompletionPopup()
         } else {
