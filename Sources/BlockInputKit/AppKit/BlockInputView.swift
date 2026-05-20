@@ -115,6 +115,7 @@ public final class BlockInputView: NSView {
     }
 
     public override func keyDown(with event: NSEvent) {
+        if linkModalContainsCurrentResponder() { super.keyDown(with: event); return }
         if event.isCancelOperation, cancelMultiBlockSelection() { return }
         if let direction = event.blockInputDocumentBoundaryDirection, moveCaretToDocumentBoundary(direction) { return }
         if handleSelectionExpansionShortcut(event) { return }
@@ -129,6 +130,7 @@ public final class BlockInputView: NSView {
     }
 
     public override func doCommand(by selector: Selector) {
+        if linkModalContainsCurrentResponder() { super.doCommand(by: selector); return }
         if selector == #selector(cancelOperation(_:)), cancelMultiBlockSelection() {
             return
         }
@@ -142,6 +144,7 @@ public final class BlockInputView: NSView {
     }
 
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if linkModalContainsCurrentResponder() { return super.performKeyEquivalent(with: event) }
         if event.blockInputIsSelectAllShortcut, selectAllFromActiveSelection() { return true }
         if let undoShortcut = event.blockInputUndoShortcut, performUndoShortcut(undoShortcut) { return true }
         if let formattingShortcut = event.blockInputTextFormattingShortcut {

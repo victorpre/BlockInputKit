@@ -406,6 +406,10 @@ extension BlockInputView {
         .filter { $0.style == .link }
         .first { linkRange in
             if clampedRange.length == 0 {
+                if linkRange.linkDestination?.isFileURL == true {
+                    return linkRange.fullRange.location <= clampedRange.location &&
+                        clampedRange.location < NSMaxRange(linkRange.fullRange)
+                }
                 return linkRange.contentRange.containsOrTouches(clampedRange.location)
             }
             return linkRange.contentRange.intersectionLength(with: clampedRange) > 0 ||

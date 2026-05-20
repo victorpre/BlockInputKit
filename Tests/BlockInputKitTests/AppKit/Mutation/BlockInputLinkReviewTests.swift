@@ -112,6 +112,33 @@ final class BlockInputLinkReviewTests: XCTestCase {
         XCTAssertNil(mounted.view.linkModalView)
     }
 
+    func testLinkModalTextFieldsKeepOptionArrowWordNavigation() throws {
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "block", text: "Open [docs](https://example.com)")
+        ])
+        let context = try XCTUnwrap(mounted.view.linkContext(
+            blockID: "block",
+            selectedRange: NSRange(location: 7, length: 0),
+            event: nil,
+            prefersClickedOffset: false
+        ))
+        mounted.view.focus(blockID: "block", utf16Offset: 7)
+        let originalSelection = mounted.view.selection
+
+        mounted.view.showLinkModal(context: context)
+        let modal = try XCTUnwrap(mounted.view.linkModalView)
+
+        for field in [modal.textField, modal.urlField] {
+            XCTAssertTrue(mounted.window.makeFirstResponder(field))
+            XCTAssertFalse(modal.control(field, textView: NSTextView(), doCommandBy: #selector(NSResponder.moveWordLeft(_:))))
+            XCTAssertFalse(modal.control(field, textView: NSTextView(), doCommandBy: #selector(NSResponder.moveWordRight(_:))))
+            XCTAssertFalse(mounted.view.performKeyEquivalent(with: try optionLeftEvent()))
+            XCTAssertFalse(mounted.view.performKeyEquivalent(with: try optionRightEvent()))
+            XCTAssertIdentical(mounted.view.linkModalView, modal)
+            XCTAssertEqual(mounted.view.selection, originalSelection)
+        }
+    }
+
     private func textView(in view: BlockInputView) throws -> BlockInputTextView {
         let item = try XCTUnwrap(view.visibleBlockItemForTesting(at: 0))
         return try XCTUnwrap(item.testingTextView)

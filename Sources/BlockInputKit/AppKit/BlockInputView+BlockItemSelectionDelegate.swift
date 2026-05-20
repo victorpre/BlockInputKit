@@ -30,7 +30,6 @@ extension BlockInputView {
         )
         if let previousActiveBlockID,
            previousActiveBlockID != blockID {
-            // File-link chips depend on first-responder selection state; refresh only mounted items to avoid store scans.
             refreshSelectionDependentAttributesForVisibleItem(blockID: previousActiveBlockID)
         }
         refreshCompletionSession(item: item, blockID: blockID)

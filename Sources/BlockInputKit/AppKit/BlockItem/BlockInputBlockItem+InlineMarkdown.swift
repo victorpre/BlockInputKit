@@ -16,8 +16,7 @@ extension BlockInputBlockItem {
         let baseFont = Self.font(for: block.kind, style: style)
         for markdownRange in markdownRanges {
             let rendersFileLinkChip = markdownRange.style == .link &&
-                markdownRange.linkDestination?.isFileURL == true &&
-                !currentSelectionIntersectsFileLink(markdownRange)
+                markdownRange.linkDestination?.isFileURL == true
             for contentRange in markdownRange.contentRange.subtractingSorted(inlineCodeRanges) {
                 let clampedContentRange = NSIntersectionRange(contentRange, fullRange)
                 if clampedContentRange.length > 0 {
@@ -149,17 +148,6 @@ extension BlockInputBlockItem {
             return false
         }
         return CharacterSet.whitespaces.contains(scalar)
-    }
-
-    private func currentSelectionIntersectsFileLink(_ markdownRange: BlockInputInlineMarkdownRange) -> Bool {
-        guard textView.window?.firstResponder === textView else {
-            return false
-        }
-        let selectedRange = textView.selectedRange()
-        if selectedRange.length == 0 {
-            return markdownRange.fullRange.containsOrTouches(selectedRange.location)
-        }
-        return markdownRange.fullRange.intersectionLength(with: selectedRange) > 0
     }
 
     private func applyFontTrait(

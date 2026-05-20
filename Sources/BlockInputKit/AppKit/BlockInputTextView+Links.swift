@@ -58,9 +58,6 @@ extension BlockInputTextView {
         }
         layoutManager.ensureLayout(for: textContainer)
         for linkRange in linkRangesForCurrentText() where linkRange.linkDestination?.isFileURL == true {
-            guard shouldDrawFileLinkChip(for: linkRange) else {
-                continue
-            }
             let characterRange = string.linkCursorClampedRange(linkRange.contentRange)
             let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
                 .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
@@ -109,17 +106,6 @@ extension BlockInputTextView {
             return false
         }
         return BlockInputBlockItem.supportsInlineMarkdownStyling(kind)
-    }
-
-    private func shouldDrawFileLinkChip(for linkRange: BlockInputInlineMarkdownRange) -> Bool {
-        guard window?.firstResponder === self else {
-            return true
-        }
-        let selectedRange = selectedRange()
-        if selectedRange.length == 0 {
-            return !linkRange.fullRange.containsOrTouches(selectedRange.location)
-        }
-        return linkRange.fullRange.intersectionLength(with: selectedRange) == 0
     }
 
     private func drawFileLinkChipBackground(

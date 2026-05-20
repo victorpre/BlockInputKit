@@ -61,6 +61,76 @@ final class BlockInputCompletionRegressionTests: XCTestCase {
         )))
     }
 
+    func testAcceptedFileCompletionCanBeClickedImmediately() async throws {
+        let provider = RegressionCompletionProvider(suggestions: [
+            .fileLink(label: "README.md", fileURL: URL(fileURLWithPath: "/tmp/README.md"))
+        ])
+        let mounted = try await startCompletion(text: "See @read", provider: provider)
+
+        XCTAssertTrue(mounted.view.handleCompletionCommand(#selector(NSResponder.insertNewline(_:))))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let contentOffset = (textView.string as NSString).range(of: "README.md").location
+        let location = try windowLocation(forUTF16Offset: contentOffset, in: textView)
+
+        textView.mouseDown(with: try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber))
+        XCTAssertTrue(textView.completeTrackedMouseUp(with: try mouseUpEvent(
+            location: location,
+            windowNumber: mounted.window.windowNumber
+        )))
+
+        let modal = try XCTUnwrap(mounted.view.linkModalView)
+        XCTAssertEqual(modal.textField.stringValue, "README.md")
+        XCTAssertEqual(modal.urlField.stringValue, "file:///tmp/README.md")
+
+        mounted.view.dismissLinkModal(restoreFocus: false)
+        var openedURL: URL?
+        mounted.view.linkURLOpener = {
+            openedURL = $0
+            return true
+        }
+
+        textView.mouseDown(with: try mouseDownEvent(
+            location: location,
+            windowNumber: mounted.window.windowNumber,
+            modifierFlags: .command
+        ))
+
+        XCTAssertEqual(openedURL?.absoluteString, "file:///tmp/README.md")
+    }
+
+    func testAcceptedLongFileCompletionResizesMountedRow() async throws {
+        let longLabel = [
+            "Sources/BlockInputKit/AppKit",
+            "BlockInputView+BlockItemConfiguration.swift",
+            "Sources/BlockInputKit/AppKit",
+            "BlockInputBlockItem+FileLinkChips.swift"
+        ].joined(separator: "/")
+        let provider = RegressionCompletionProvider(suggestions: [
+            .fileLink(label: longLabel, fileURL: URL(fileURLWithPath: "/tmp/\(longLabel)"))
+        ])
+        let mounted = try await startCompletion(
+            blocks: [
+                BlockInputBlock(id: "block", text: "See @config"),
+                BlockInputBlock(id: "next", text: "Next block")
+            ],
+            provider: provider
+        )
+        let initialItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let initialNextItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1))
+        let initialHeight = initialItem.view.frame.height
+        let initialNextMinY = initialNextItem.view.frame.minY
+
+        XCTAssertTrue(mounted.view.handleCompletionCommand(#selector(NSResponder.insertNewline(_:))))
+        mounted.view.collectionView.layoutSubtreeIfNeeded()
+
+        let updatedItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let updatedNextItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1))
+        XCTAssertGreaterThan(updatedItem.view.frame.height, initialHeight)
+        XCTAssertGreaterThan(updatedNextItem.view.frame.minY, initialNextMinY)
+        XCTAssertGreaterThanOrEqual(updatedNextItem.view.frame.minY, updatedItem.view.frame.maxY)
+    }
+
     func testPopupMouseMonitorConsumesRowClickUntilMouseUp() async throws {
         let provider = RegressionCompletionProvider(suggestions: [
             .fileLink(label: "README.md", fileURL: URL(fileURLWithPath: "/tmp/README.md"))
@@ -86,6 +156,35 @@ final class BlockInputCompletionRegressionTests: XCTestCase {
 
         XCTAssertNil(mouseUpResult)
         XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [README.md](file:///tmp/README.md)"])
+        XCTAssertNil(mounted.view.completionPopupView)
+    }
+
+    func testPopupClickOnUnhighlightedRowAcceptsOnMouseUp() async throws {
+        let provider = RegressionCompletionProvider(suggestions: [
+            .fileLink(label: "First.md", fileURL: URL(fileURLWithPath: "/tmp/First.md")),
+            .fileLink(label: "Second.md", fileURL: URL(fileURLWithPath: "/tmp/Second.md"))
+        ])
+        let mounted = try await startCompletion(text: "See @read", provider: provider)
+        let popup = try XCTUnwrap(mounted.view.completionPopupView)
+        let row = try rowView(label: "Second.md", in: popup)
+        let rowWindowPoint = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+
+        let mouseDownResult = mounted.view.handleCompletionPopupMouseEvent(try mouseDownEvent(
+            location: rowWindowPoint,
+            windowNumber: mounted.window.windowNumber
+        ))
+
+        XCTAssertNil(mouseDownResult)
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See @read"])
+        XCTAssertNotNil(mounted.view.completionPopupView)
+
+        let mouseUpResult = mounted.view.handleCompletionPopupMouseEvent(try mouseUpEvent(
+            location: rowWindowPoint,
+            windowNumber: mounted.window.windowNumber
+        ))
+
+        XCTAssertNil(mouseUpResult)
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [Second.md](file:///tmp/Second.md)"])
         XCTAssertNil(mounted.view.completionPopupView)
     }
 
@@ -164,16 +263,24 @@ final class BlockInputCompletionRegressionTests: XCTestCase {
         text: String,
         provider: any BlockInputCompletionProvider
     ) async throws -> (view: BlockInputView, window: NSWindow) {
+        try await startCompletion(blocks: [
+            BlockInputBlock(id: "block", text: text)
+        ], provider: provider)
+    }
+
+    private func startCompletion(
+        blocks: [BlockInputBlock],
+        provider: any BlockInputCompletionProvider
+    ) async throws -> (view: BlockInputView, window: NSWindow) {
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
-            document: BlockInputDocument(blocks: [
-                BlockInputBlock(id: "block", text: text)
-            ]),
+            document: BlockInputDocument(blocks: blocks),
             completionProvider: provider
         ))
         let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
         let textView = try XCTUnwrap(item.testingTextView)
+        let text = blocks[0].text
         textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
-        mounted.view.refreshCompletionSession(item: item, blockID: "block")
+        mounted.view.refreshCompletionSession(item: item, blockID: blocks[0].id)
         await mounted.view.completionRequestTask?.value
         mounted.view.layoutSubtreeIfNeeded()
         return mounted

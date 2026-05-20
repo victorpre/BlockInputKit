@@ -23,12 +23,11 @@ final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked
         return fileCandidates(under: scope.baseDirectory, matching: query)
             .prefix(50)
             .map { candidate in
-                let label = label(for: candidate, scope: scope)
+                let title = label(for: candidate, scope: scope)
                 return BlockInputCompletionSuggestion.fileLink(
                     id: candidate.url.path,
-                    title: label,
+                    title: title,
                     subtitle: candidate.url.deletingLastPathComponent().path,
-                    label: label,
                     fileURL: candidate.url,
                     detailText: candidate.isDirectory ? "Folder" : nil
                 )

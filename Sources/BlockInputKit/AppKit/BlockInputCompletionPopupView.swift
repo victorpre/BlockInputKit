@@ -230,7 +230,8 @@ final class BlockInputCompletionPopupView: NSView {
     }
 
     private func row(at point: NSPoint) -> BlockInputCompletionPopupRowView? {
-        rowViews.reversed().first { row in
+        layoutSubtreeIfNeeded()
+        return rowViews.reversed().first { row in
             row.bounds.contains(row.convert(point, from: self))
         }
     }

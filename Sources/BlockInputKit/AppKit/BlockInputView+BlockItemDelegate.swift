@@ -209,6 +209,14 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         return deleteCurrentEmptyBlockForBackspaceOrDelete() != nil
     }
 
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestLinkBoundaryDeletion direction: BlockInputLinkBoundaryDeletionDirection
+    ) -> Bool {
+        deleteLinkAtBoundary(item: item, blockID: blockID, direction: direction)
+    }
+
     func blockItemDidRevealReorderHandle(_ item: BlockInputBlockItem) {
         hideReorderHandles(except: item)
     }

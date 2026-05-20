@@ -138,6 +138,28 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
             detailText: detailText
         )
     }
+
+    /// Builds a mention suggestion that inserts a Markdown file link labeled with the file name.
+    public static func fileLink(
+        id: String? = nil,
+        title: String? = nil,
+        subtitle: String? = nil,
+        fileURL: URL,
+        trigger: BlockInputCompletionTrigger = .mention,
+        iconSystemName: String? = "doc.text",
+        detailText: String? = nil
+    ) -> BlockInputCompletionSuggestion {
+        fileLink(
+            id: id,
+            title: title,
+            subtitle: subtitle,
+            label: Self.defaultFileLinkLabel(for: fileURL),
+            fileURL: fileURL,
+            trigger: trigger,
+            iconSystemName: iconSystemName,
+            detailText: detailText
+        )
+    }
 }
 
 /// Supplies mention and slash-command completions to the editor.
@@ -147,6 +169,11 @@ public protocol BlockInputCompletionProvider: AnyObject, Sendable {
 }
 
 private extension BlockInputCompletionSuggestion {
+    static func defaultFileLinkLabel(for fileURL: URL) -> String {
+        let name = fileURL.lastPathComponent
+        return name.isEmpty ? fileURL.path : name
+    }
+
     static func escapedMarkdownLinkLabel(_ label: String) -> String {
         label
             .replacingOccurrences(of: "\\", with: "\\\\")

@@ -130,6 +130,35 @@ final class BlockInputCompletionPopupTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See @../RE"])
     }
 
+    func testReturnAcceptsFileCompletionInHeadingAndPreservesKind() async throws {
+        let provider = PopupCompletionProvider(suggestions: [
+            .fileLink(label: "README.md", fileURL: URL(fileURLWithPath: "/tmp/README.md"))
+        ])
+        let mounted = try await startCompletion(
+            text: "See @read",
+            provider: provider,
+            kind: .heading(level: 2)
+        )
+
+        XCTAssertTrue(mounted.view.handleCompletionCommand(#selector(NSResponder.insertNewline(_:))))
+
+        let expectedText = "See [README.md](file:///tmp/README.md)"
+        let block = try XCTUnwrap(mounted.view.document.blocks.first)
+        XCTAssertEqual(block.kind, .heading(level: 2))
+        XCTAssertEqual(block.text, expectedText)
+        XCTAssertNil(mounted.view.completionPopupView)
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(
+            blockID: "block",
+            utf16Offset: (expectedText as NSString).length
+        )))
+        XCTAssertEqual(mounted.window.firstResponder, mounted.view.visibleBlockItemForTesting(at: 0)?.testingTextView)
+
+        _ = mounted.view.undoTextEditInActiveBlock()
+        let restoredBlock = try XCTUnwrap(mounted.view.document.blocks.first)
+        XCTAssertEqual(restoredBlock.kind, .heading(level: 2))
+        XCTAssertEqual(restoredBlock.text, "See @read")
+    }
+
     func testTabConsumesEmptyPopupAndEscapeDismissesPopup() async throws {
         let provider = PopupCompletionProvider(suggestions: [])
         let mounted = try await startCompletion(text: "@missing", provider: provider)

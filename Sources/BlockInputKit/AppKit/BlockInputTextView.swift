@@ -271,17 +271,7 @@ final class BlockInputTextView: NSTextView {
             }
             return blockItem.requestReturn()
         case #selector(deleteBackward(_:)), #selector(deleteForward(_:)):
-            if selectedRange().location == 0,
-               selectedRange().length == 0,
-               blockItem?.requestUnwrapBlock() == true {
-                return true
-            }
-            if selectedRange().location == 0,
-               selectedRange().length == 0,
-               blockItem?.requestMergeWithPreviousBlock() == true {
-                return true
-            }
-            return blockItem?.requestDeleteEmptyBlock() == true
+            return handleDeleteCommand(selector)
         case #selector(selectAll(_:)):
             blockItem?.requestSelectAll()
             return true
@@ -294,6 +284,25 @@ final class BlockInputTextView: NSTextView {
         default:
             return false
         }
+    }
+
+    private func handleDeleteCommand(_ selector: Selector) -> Bool {
+        let deletionDirection: BlockInputLinkBoundaryDeletionDirection =
+            selector == #selector(deleteBackward(_:)) ? .backward : .forward
+        if blockItem?.requestLinkBoundaryDeletion(deletionDirection) == true {
+            return true
+        }
+        if selectedRange().location == 0,
+           selectedRange().length == 0,
+           blockItem?.requestUnwrapBlock() == true {
+            return true
+        }
+        if selectedRange().location == 0,
+           selectedRange().length == 0,
+           blockItem?.requestMergeWithPreviousBlock() == true {
+            return true
+        }
+        return blockItem?.requestDeleteEmptyBlock() == true
     }
 
     private func handleBoundaryCommand(_ selector: Selector) -> Bool {

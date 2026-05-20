@@ -11,6 +11,7 @@ extension BlockInputView {
             }
             guard let self,
                   isEditorFirstResponder,
+                  !linkModalContainsCurrentResponder(),
                   handleSelectionExpansionKeyEvent(event) || handleHorizontalSelectionAdjustmentKeyEvent(event) else {
                 if event.isArrowKey {
                     BlockInputSelectionDebug.emit("monitor pass selection=\(String(describing: self?.selection))")

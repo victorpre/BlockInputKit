@@ -45,7 +45,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     private(set) weak var delegate: BlockInputBlockItemDelegate?
     private(set) var blockID: BlockInputBlockID?
     var renderedBlock: BlockInputBlock?
-    private var selectionBeforeTextChange: BlockInputSelection?
+    var selectionBeforeTextChange: BlockInputSelection?
     // Programmatic reuse/configuration can move NSTextView selection; do not
     // report that as user selection, especially on large store-backed docs.
     private var isConfiguringBlock = false
@@ -288,22 +288,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             selectionBefore: selectionBeforeTextChange
         )
         selectionBeforeTextChange = nil
-    }
-
-    func textView(
-        _ textView: NSTextView,
-        shouldChangeTextIn affectedCharRange: NSRange,
-        replacementString: String?
-    ) -> Bool {
-        guard let blockID else {
-            return true
-        }
-        // NSTextView reports the final selection before textDidChange, so capture
-        // the affected pre-edit range here for undo selection restoration.
-        selectionBeforeTextChange = affectedCharRange.length == 0
-            ? .cursor(BlockInputCursor(blockID: blockID, utf16Offset: affectedCharRange.location))
-            : .text(BlockInputTextRange(blockID: blockID, range: affectedCharRange))
-        return true
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {

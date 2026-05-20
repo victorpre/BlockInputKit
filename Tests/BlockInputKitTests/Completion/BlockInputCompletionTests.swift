@@ -37,6 +37,15 @@ final class BlockInputCompletionTests: XCTestCase {
         XCTAssertEqual(suggestion.detailText, "/tmp/Docs")
     }
 
+    func testFileLinkSuggestionDefaultsLabelToFileName() {
+        let suggestion = BlockInputCompletionSuggestion.fileLink(
+            fileURL: URL(fileURLWithPath: "/tmp/Docs/[Draft] (1).md")
+        )
+
+        XCTAssertEqual(suggestion.title, "[Draft] (1).md")
+        XCTAssertEqual(suggestion.insertionText, "[\\[Draft\\] (1).md](file:///tmp/Docs/%5BDraft%5D%20\\(1\\).md)")
+    }
+
     func testCompletionContextStoresReplacementRawQueryAndFileMetadata() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let fileQuery = BlockInputCompletionFileQuery(

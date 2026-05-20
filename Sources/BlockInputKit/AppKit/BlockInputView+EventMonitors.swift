@@ -14,7 +14,9 @@ extension BlockInputView {
     }
 
     func installCompletionPopupDismissalMonitor() {
-        removeCompletionPopupDismissalMonitor()
+        guard completionPopupMouseDownMonitor == nil else {
+            return
+        }
         completionPopupMouseDownMonitor = NSEvent.addLocalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .leftMouseUp, .rightMouseUp, .otherMouseUp]
         ) { [weak self] event -> NSEvent? in

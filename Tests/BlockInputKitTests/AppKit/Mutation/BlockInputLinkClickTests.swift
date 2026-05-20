@@ -191,6 +191,30 @@ final class BlockInputLinkClickTests: XCTestCase {
         XCTAssertEqual(modal.urlField.stringValue, "file:///tmp/demo.md")
     }
 
+    func testFileLinkFullSourceResolvesForChipClickButRegularLinkDoesNot() throws {
+        let fileText = "Open [file](file:///tmp/demo.md) now"
+        let regularText = "Open [docs](https://example.com) now"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "block", text: fileText)
+        ])
+        let fileOpeningBracket = (fileText as NSString).range(of: "[").location
+        let filePostBoundary = NSMaxRange((fileText as NSString).range(of: "[file](file:///tmp/demo.md)"))
+        let regularOpeningBracket = (regularText as NSString).range(of: "[").location
+
+        XCTAssertNotNil(mounted.view.linkRange(
+            in: fileText,
+            containing: NSRange(location: fileOpeningBracket, length: 0)
+        ))
+        XCTAssertNil(mounted.view.linkRange(
+            in: fileText,
+            containing: NSRange(location: filePostBoundary, length: 0)
+        ))
+        XCTAssertNil(mounted.view.linkRange(
+            in: regularText,
+            containing: NSRange(location: regularOpeningBracket, length: 0)
+        ))
+    }
+
     func testDraggingFromLinkTextDoesNotOpenModalOnMouseUp() throws {
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "block", text: "Open [docs](https://example.com)")

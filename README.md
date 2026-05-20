@@ -157,13 +157,13 @@ The context includes:
 - `rawQuery`: The text after `@` before path-prefix normalization.
 - `fileQuery`: Optional parsed file intent for `.`, `..`, and `...` prefixes. These represent current, parent, and grandparent directory references, with `levelsUp` and `remainder` populated for host resolution. Absolute path queries are preserved in `rawQuery` for hosts that want to resolve `/...` directly.
 
-Hosts can return any `BlockInputCompletionSuggestion`. For file mentions, use `BlockInputCompletionSuggestion.fileLink(label:fileURL:)` to insert a Markdown file link. The helper escapes link labels and destinations and writes the absolute `file://` destination while preserving the visible label, so a relative mention can persist as:
+Hosts can return any `BlockInputCompletionSuggestion`. For file mentions in paragraphs or headings, use `BlockInputCompletionSuggestion.fileLink(fileURL:)` to insert a Markdown file link. The helper escapes link labels and destinations, writes the absolute `file://` destination, and defaults the visible label to the file name. Pass `label:` when a custom label should persist, such as a relative mention:
 
 ```markdown
 [../README.md](file:///resolved/README.md)
 ```
 
-File links render as chips when the caret is outside the link source. The Markdown source is preserved for editing and export. File links use the same click behavior as other links: plain click opens the link modal, and Cmd-click opens through the editor URL opener hook.
+File links always render as chips. The Markdown source is preserved for editing and export. File links use the same click behavior as other links: plain click opens the link modal, and Cmd-click opens through the editor URL opener hook.
 
 ## Markdown Streaming
 

@@ -43,7 +43,7 @@ final class BlockInputBlockItemFileLinkChipTests: XCTestCase {
         XCTAssertNil(textStorage.attribute(.kern, at: closingParenthesisOffset, effectiveRange: nil))
     }
 
-    func testFileLinkChipBacksOffWhenSelectionIsInsideSource() throws {
+    func testFileLinkChipStaysVisibleWhenCaretIsInsideSource() throws {
         let text = "[README.md](file:///tmp/README.md) trailing"
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "paragraph", kind: .paragraph, text: text)
@@ -56,36 +56,69 @@ final class BlockInputBlockItemFileLinkChipTests: XCTestCase {
         item.updateSelectionDependentAttributesForCurrentSelection()
         let textStorage = try XCTUnwrap(textView.textStorage)
 
-        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentOffset, effectiveRange: nil) as? NSColor, .linkColor)
-        XCTAssertEqual(textStorage.attribute(.underlineStyle, at: contentOffset, effectiveRange: nil) as? Int, NSUnderlineStyle.single.rawValue)
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentOffset, effectiveRange: nil) as? NSColor, .labelColor)
+        XCTAssertNil(textStorage.attribute(.underlineStyle, at: contentOffset, effectiveRange: nil))
+        XCTAssertTrue(try font(at: contentOffset, in: textStorage).isFixedPitch)
     }
 
-    func testFileLinkChipReturnsWhenFocusMovesToAnotherBlock() throws {
+    func testFileLinkChipStaysVisibleWhenSelectionOverlapsSource() throws {
         let text = "[README.md](file:///tmp/README.md) trailing"
         let mounted = makeMountedBlockInputView(blocks: [
-            BlockInputBlock(id: "first", text: text),
-            BlockInputBlock(id: "second", text: "Next block")
+            BlockInputBlock(id: "paragraph", kind: .paragraph, text: text)
         ])
-        let firstItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
-        let secondItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1))
-        let firstTextView = try XCTUnwrap(firstItem.testingTextView)
-        let secondTextView = try XCTUnwrap(secondItem.testingTextView)
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
         let contentOffset = contentLocation("README.md", in: text)
 
-        mounted.window.makeFirstResponder(firstTextView)
-        firstTextView.setSelectedRange(NSRange(location: contentOffset, length: 0))
-        firstItem.updateSelectionDependentAttributesForCurrentSelection()
-        let textStorage = try XCTUnwrap(firstTextView.textStorage)
-
-        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentOffset, effectiveRange: nil) as? NSColor, .linkColor)
-        XCTAssertEqual(textStorage.attribute(.underlineStyle, at: contentOffset, effectiveRange: nil) as? Int, NSUnderlineStyle.single.rawValue)
-
-        mounted.window.makeFirstResponder(secondTextView)
-        secondTextView.setSelectedRange(NSRange(location: 0, length: 0))
+        mounted.window.makeFirstResponder(textView)
+        textView.setSelectedRange(NSRange(location: contentOffset, length: 4))
+        item.updateSelectionDependentAttributesForCurrentSelection()
+        let textStorage = try XCTUnwrap(textView.textStorage)
 
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentOffset, effectiveRange: nil) as? NSColor, .labelColor)
         XCTAssertNil(textStorage.attribute(.underlineStyle, at: contentOffset, effectiveRange: nil))
         XCTAssertTrue(try font(at: contentOffset, in: textStorage).isFixedPitch)
+    }
+
+    func testFileLinkChipStaysVisibleAtSourceBoundaries() throws {
+        let text = "[README.md](file:///tmp/README.md) trailing"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "paragraph", kind: .paragraph, text: text)
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let contentOffset = contentLocation("README.md", in: text)
+        let fullRange = (text as NSString).range(of: "[README.md](file:///tmp/README.md)")
+        let textStorage = try XCTUnwrap(textView.textStorage)
+
+        mounted.window.makeFirstResponder(textView)
+        for caretOffset in [fullRange.location, NSMaxRange(fullRange)] {
+            textView.setSelectedRange(NSRange(location: caretOffset, length: 0))
+            item.updateSelectionDependentAttributesForCurrentSelection()
+
+            XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentOffset, effectiveRange: nil) as? NSColor, .labelColor)
+            XCTAssertNil(textStorage.attribute(.underlineStyle, at: contentOffset, effectiveRange: nil))
+            XCTAssertTrue(try font(at: contentOffset, in: textStorage).isFixedPitch)
+        }
+    }
+
+    func testRegularLinkKeepsNormalLinkStyle() throws {
+        let text = "[README.md](https://example.com/README.md) trailing"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "paragraph", kind: .paragraph, text: text)
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let contentOffset = contentLocation("README.md", in: text)
+
+        mounted.window.makeFirstResponder(textView)
+        textView.setSelectedRange(NSRange(location: contentOffset, length: 0))
+        item.updateSelectionDependentAttributesForCurrentSelection()
+        let textStorage = try XCTUnwrap(textView.textStorage)
+
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentOffset, effectiveRange: nil) as? NSColor, .linkColor)
+        XCTAssertEqual(textStorage.attribute(.underlineStyle, at: contentOffset, effectiveRange: nil) as? Int, NSUnderlineStyle.single.rawValue)
+        XCTAssertFalse(try font(at: contentOffset, in: textStorage).isFixedPitch)
     }
 
     private func font(at location: Int, in textStorage: NSTextStorage) throws -> NSFont {

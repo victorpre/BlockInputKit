@@ -7,7 +7,6 @@ extension BlockInputBlockItem {
             updateTypingAttributesForCurrentSelection()
             return
         }
-        // Chip presentation backs off while editing link source, so file-link blocks need full attribute refreshes.
         applyTextAttributes(for: block)
     }
 

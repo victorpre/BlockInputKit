@@ -1,6 +1,44 @@
 import AppKit
 
 extension BlockInputView {
+    func deleteLinkAtBoundary(
+        item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        direction: BlockInputLinkBoundaryDeletionDirection
+    ) -> Bool {
+        guard let index = index(of: blockID),
+              let block = block(at: index),
+              block.id == blockID,
+              Self.blockKindSupportsLinkBoundaryEditing(block.kind),
+              let deletionRange = Self.linkRangeAdjacentToBoundary(
+                item.currentSelectedRange,
+                direction: direction,
+                in: block.text
+              ) else {
+            return false
+        }
+        let beforeText = block.text
+        let afterText = NSMutableString(string: beforeText)
+        afterText.deleteCharacters(in: deletionRange.fullRange)
+        var afterBlock = block
+        afterBlock.text = afterText as String
+        let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
+            blockID: blockID,
+            utf16Offset: deletionRange.fullRange.location
+        ))
+        undoController?.registerTextEdit(
+            blockID: blockID,
+            beforeText: beforeText,
+            afterText: afterBlock.text,
+            beforeLineIndentationLevels: block.lineIndentationLevels,
+            afterLineIndentationLevels: afterBlock.lineIndentationLevels,
+            selectionBefore: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: item.currentSelectedRange.location)),
+            selectionAfter: afterSelection
+        )
+        _ = applyGranularBlockReplacement(afterBlock, at: index, selection: afterSelection)
+        return true
+    }
+
     func resolvedFileLinkBoundaryTextChange(
         item: BlockInputBlockItem,
         beforeBlock: BlockInputBlock,
@@ -22,7 +60,7 @@ extension BlockInputView {
 
     func fileLinkBoundaryAdjustedRange(_ range: NSRange, in block: BlockInputBlock) -> NSRange {
         guard range.length == 0,
-              Self.blockKindSupportsFileLinkBoundaryCorrection(block.kind),
+              Self.blockKindSupportsLinkBoundaryEditing(block.kind),
               let linkRange = Self.fileLinkRangeEndingAtContentBoundary(range.location, in: block.text) else {
             return range
         }
@@ -34,7 +72,7 @@ extension BlockInputView {
         proposedText: String,
         selectionBefore: BlockInputSelection?
     ) -> FileLinkBoundaryInsertionCorrection? {
-        guard Self.blockKindSupportsFileLinkBoundaryCorrection(beforeBlock.kind),
+        guard Self.blockKindSupportsLinkBoundaryEditing(beforeBlock.kind),
               case let .cursor(cursor) = selectionBefore,
               cursor.blockID == beforeBlock.id else {
             return nil
@@ -66,7 +104,7 @@ extension BlockInputView {
         )
     }
 
-    private static func blockKindSupportsFileLinkBoundaryCorrection(_ kind: BlockInputBlockKind) -> Bool {
+    private static func blockKindSupportsLinkBoundaryEditing(_ kind: BlockInputBlockKind) -> Bool {
         BlockInputBlockItem.supportsInlineMarkdownStyling(kind)
     }
 
@@ -82,9 +120,35 @@ extension BlockInputView {
                     NSMaxRange(range.contentRange) == offset
             }
     }
+
+    private static func linkRangeAdjacentToBoundary(
+        _ selectedRange: NSRange,
+        direction: BlockInputLinkBoundaryDeletionDirection,
+        in text: String
+    ) -> BlockInputInlineMarkdownRange? {
+        guard selectedRange.length == 0 else {
+            return nil
+        }
+        let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
+        return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
+            .first { range in
+                range.style == .link && range.isAdjacent(to: selectedRange.location, direction: direction)
+            }
+    }
 }
 
 private struct FileLinkBoundaryInsertionCorrection {
     var text: String
     var cursorOffset: Int
+}
+
+private extension BlockInputInlineMarkdownRange {
+    func isAdjacent(to offset: Int, direction: BlockInputLinkBoundaryDeletionDirection) -> Bool {
+        switch direction {
+        case .backward:
+            offset == NSMaxRange(contentRange) || offset == NSMaxRange(fullRange)
+        case .forward:
+            offset == contentRange.location || offset == fullRange.location
+        }
+    }
 }

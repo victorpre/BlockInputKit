@@ -1,4 +1,14 @@
-import Foundation
+import AppKit
+
+extension BlockInputView {
+    func linkModalContainsCurrentResponder() -> Bool {
+        guard let modal = linkModalView,
+              let firstResponder = window?.firstResponder else {
+            return false
+        }
+        return modal.containsResponder(firstResponder)
+    }
+}
 
 extension BlockInputLinkContext {
     /// Returns true while the editor selection still overlaps the source region this context is allowed to edit.

@@ -19,6 +19,11 @@ enum BlockInputWordMovementDirection: Equatable {
     case rightward
 }
 
+enum BlockInputLinkBoundaryDeletionDirection: Equatable {
+    case backward
+    case forward
+}
+
 @MainActor
 protocol BlockInputBlockItemDelegate: AnyObject {
     func blockItemDidBeginEditing(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
@@ -33,6 +38,11 @@ protocol BlockInputBlockItemDelegate: AnyObject {
     func blockItemDidRequestReturn(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRequestMergeWithPreviousBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRequestDeleteEmptyBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestLinkBoundaryDeletion direction: BlockInputLinkBoundaryDeletionDirection
+    ) -> Bool
     func blockItemDidRequestUnwrapBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRevealReorderHandle(_ item: BlockInputBlockItem)
     func blockItemDidRequestSelectAll(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
