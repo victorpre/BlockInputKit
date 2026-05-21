@@ -31,6 +31,9 @@ enum BlockInputStreamingMarkdownImporter {
                let frontMatter = try await parseFrontMatter(startingWith: line, from: &reader) {
                 return frontMatter
             }
+            if let table = try await parseTable(startingWith: line, from: &reader) {
+                return table
+            }
             if let unsupported = try await parseUnsupportedBlock(startingWith: line, from: &reader) {
                 return unsupported
             }
@@ -116,6 +119,28 @@ enum BlockInputStreamingMarkdownImporter {
             return try await parseHTMLBlock(startingWith: line, from: &reader)
         }
         return nil
+    }
+
+    private static func parseTable<Reader: BlockInputMarkdownLineReader>(
+        startingWith line: String,
+        from reader: inout BlockInputBufferedMarkdownLineReader<Reader>
+    ) async throws -> BlockInputBlock? {
+        guard !BlockInputMarkdownImporter.isFootnoteDefinition(line),
+              !BlockInputMarkdownImporter.isHTMLBlockOpening(line),
+              let nextLine = try await reader.peekLine(),
+              line.contains("|"),
+              BlockInputMarkdownImporter.isTableDelimiterLine(nextLine) else {
+            return nil
+        }
+        var tableLines = [line, try await reader.readLine() ?? nextLine]
+        while let bodyLine = try await reader.peekLine(),
+              BlockInputTable.isContentLine(bodyLine) {
+            tableLines.append(try await reader.readLine() ?? bodyLine)
+        }
+        guard let table = BlockInputTable(markdown: tableLines.joined(separator: "\n")) else {
+            return try await rawBlock(tableLines, from: &reader)
+        }
+        return BlockInputBlock(kind: .table, text: table.markdown)
     }
 
     private static func parseRawRun<Reader: BlockInputMarkdownLineReader>(

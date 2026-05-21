@@ -54,9 +54,16 @@ enum BlockInputStreamingMarkdownSerializer {
             try await writeLines(BlockInputLineBreaks.lines(in: block.text), to: &writer) { offset, line in
                 "\(indent(for: block, lineOffset: offset))- [\(isChecked ? "x" : " ")] \(line)"
             }
-        case .rawMarkdown:
-            try await writer.writeMarkdown(block.text)
+        case .table, .rawMarkdown:
+            try await writer.writeMarkdown(sourceMarkdown(block))
         }
+    }
+
+    private static func sourceMarkdown(_ block: BlockInputBlock) -> String {
+        if block.kind == .table {
+            return BlockInputTable(markdown: block.text)?.markdown ?? block.text
+        }
+        return block.text
     }
 
     private static func writeLines<Writer: BlockInputMarkdownWriter>(
@@ -111,7 +118,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .rawMarkdown:
             return false
         }
     }

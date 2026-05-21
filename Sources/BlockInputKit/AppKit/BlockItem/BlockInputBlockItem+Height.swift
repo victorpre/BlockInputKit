@@ -191,7 +191,7 @@ extension BlockInputBlockItem {
             .sorted { first, second in
                 first.location < second.location
             }
-        case .code, .horizontalRule, .frontMatter, .rawMarkdown:
+        case .code, .horizontalRule, .frontMatter, .table, .rawMarkdown:
             return []
         }
     }

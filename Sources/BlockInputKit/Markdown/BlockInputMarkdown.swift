@@ -33,6 +33,9 @@ enum BlockInputMarkdownImporter {
            let parsed = parseFrontMatter(lines: lines, startIndex: startIndex) {
             return parsed
         }
+        if let parsed = parseTable(lines: lines, startIndex: startIndex) {
+            return parsed
+        }
         if let parsed = parseUnsupportedBlock(lines: lines, startIndex: startIndex) {
             return parsed
         }
@@ -102,6 +105,19 @@ enum BlockInputMarkdownImporter {
             return parseHTMLBlock(lines: lines, startIndex: startIndex)
         }
         return nil
+    }
+
+    private static func parseTable(
+        lines: [String],
+        startIndex: Int
+    ) -> (block: BlockInputBlock, nextIndex: Int)? {
+        let line = lines[startIndex]
+        guard !isFootnoteDefinition(line),
+              !isHTMLBlockOpening(line),
+              let parsed = BlockInputTable.parse(lines: lines, startIndex: startIndex) else {
+            return nil
+        }
+        return (BlockInputBlock(kind: .table, text: parsed.table.markdown), parsed.nextIndex)
     }
 
     private static func parseFrontMatter(
@@ -386,9 +402,16 @@ enum BlockInputMarkdownSerializer {
             return BlockInputLineBreaks.lines(in: block.text).enumerated().map { offset, line in
                 "\(indent(for: block, lineOffset: offset))- [\(isChecked ? "x" : " ")] \(line)"
             }.joined(separator: "\n")
-        case .rawMarkdown:
-            return block.text
+        case .table, .rawMarkdown:
+            return sourceMarkdown(block)
         }
+    }
+
+    private static func sourceMarkdown(_ block: BlockInputBlock) -> String {
+        if block.kind == .table {
+            return BlockInputTable(markdown: block.text)?.markdown ?? block.text
+        }
+        return block.text
     }
 
     private static func indent(for block: BlockInputBlock, lineOffset: Int) -> String {
@@ -423,7 +446,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .rawMarkdown:
             return false
         }
     }

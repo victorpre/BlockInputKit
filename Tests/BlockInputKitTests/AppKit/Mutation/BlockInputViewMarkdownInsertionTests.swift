@@ -83,6 +83,25 @@ final class BlockInputViewMarkdownInsertionTests: XCTestCase {
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: view.document.blocks[0].id, utf16Offset: 0)))
     }
 
+    func testInsertMarkdownParsesTableBlocks() {
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument()))
+
+        let selection = view.insertMarkdown("""
+        | First | Second |
+        | --- | --- |
+        | One | Two |
+        """)
+
+        XCTAssertEqual(view.document.blocks.map(\.kind), [.table])
+        XCTAssertEqual(view.document.blocks[0].text, """
+        | First | Second |
+        | ---   | ---    |
+        | One   | Two    |
+        """)
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: view.document.blocks[0].id, utf16Offset: 0)))
+    }
+
     func testInsertMarkdownBelowExplicitBlockIgnoresActiveBlock() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

@@ -45,6 +45,11 @@ public enum BlockInputBlockKind: Equatable, Codable, Sendable {
     case numberedListItem(start: Int)
     /// Checklist item with checked state stored in the block kind.
     case checklistItem(isChecked: Bool)
+    /// GFM-style pipe table stored as normalized Markdown source.
+    ///
+    /// Table blocks keep their full pipe-table Markdown in ``BlockInputBlock/text`` so
+    /// cell source ranges can be mapped back to the underlying document text.
+    case table
     /// Unsupported block-level Markdown source that should round-trip verbatim.
     ///
     /// The block's `text` stores the original Markdown source for this block.
@@ -64,6 +69,7 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
     }
     /// Text content owned by editable block kinds.
     ///
+    /// For ``BlockInputBlockKind/table``, this stores normalized pipe-table Markdown source.
     /// For ``BlockInputBlockKind/rawMarkdown``, this stores the original Markdown source.
     /// For ``BlockInputBlockKind/frontMatter``, this stores the delimiter-free raw YAML body
     /// without the required closing-delimiter separator line break.
@@ -123,6 +129,9 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
     /// Returns true when the block has no meaningful user-visible content.
     public var isEmpty: Bool {
         if kind == .horizontalRule {
+            return false
+        }
+        if kind == .table {
             return false
         }
         return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -358,14 +367,14 @@ extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .rawMarkdown:
             return false
         }
     }
 
     var canUnwrapToParagraph: Bool {
         switch self {
-        case .paragraph, .code, .rawMarkdown:
+        case .paragraph, .code, .table, .rawMarkdown:
             return false
         case .heading, .horizontalRule, .frontMatter, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
@@ -376,7 +385,7 @@ extension BlockInputBlockKind {
         switch self {
         case .heading, .code, .frontMatter, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .horizontalRule, .rawMarkdown:
+        case .paragraph, .horizontalRule, .table, .rawMarkdown:
             return false
         }
     }
@@ -385,7 +394,7 @@ extension BlockInputBlockKind {
         switch self {
         case .code, .frontMatter, .quote, .rawMarkdown:
             return true
-        case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem:
+        case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem, .table:
             return false
         }
     }
@@ -394,7 +403,7 @@ extension BlockInputBlockKind {
         switch self {
         case .code, .frontMatter, .quote:
             return true
-        case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem, .rawMarkdown:
+        case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem, .table, .rawMarkdown:
             return false
         }
     }
@@ -403,7 +412,7 @@ extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .rawMarkdown:
             return false
         }
     }

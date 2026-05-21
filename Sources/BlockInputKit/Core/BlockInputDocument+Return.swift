@@ -158,7 +158,7 @@ private extension BlockInputDocument {
             return .numberedListItem(start: start + 1)
         case .checklistItem:
             return .checklistItem(isChecked: false)
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .rawMarkdown:
             return kind
         }
     }
@@ -277,7 +277,7 @@ extension BlockInputBlock {
             return false
         }
         switch kind {
-        case .paragraph, .heading, .code, .quote, .bulletedListItem, .numberedListItem, .checklistItem, .rawMarkdown:
+        case .paragraph, .heading, .code, .quote, .bulletedListItem, .numberedListItem, .checklistItem, .table, .rawMarkdown:
             return true
         case .horizontalRule, .frontMatter:
             return false
@@ -304,7 +304,7 @@ extension BlockInputBlock {
                 kind: .checklistItem(isChecked: false),
                 indentationLevel: indentationLevel(forLine: 0)
             )
-        case .paragraph, .heading, .code, .quote, .rawMarkdown:
+        case .paragraph, .heading, .code, .quote, .table, .rawMarkdown:
             return BlockInputBlock(id: id, kind: .paragraph)
         case .horizontalRule, .frontMatter:
             return self

@@ -33,6 +33,15 @@ extension BlockInputDocument {
         proposedText: String,
         proposedUTF16Offset: Int
     ) -> TypingShortcut? {
+        if block.kind.allowsTableTypingShortcut,
+           let table = BlockInputTable(markdown: proposedText) {
+            let focusRange = table.firstBodyCellRange ?? table.firstHeaderCellRange
+            return TypingShortcut(
+                kind: .table,
+                text: table.markdown,
+                cursorOffset: focusRange?.location ?? 0
+            )
+        }
         guard block.kind == .paragraph || block.kind.isHeading || block.kind == .bulletedListItem else {
             return nil
         }
@@ -321,8 +330,17 @@ extension BlockInputBlockKind {
             return "\(start)."
         case .checklistItem(let isChecked):
             return isChecked ? "- [x]" : "- [ ]"
-        case .paragraph, .code, .rawMarkdown:
+        case .paragraph, .code, .table, .rawMarkdown:
             return nil
+        }
+    }
+
+    var allowsTableTypingShortcut: Bool {
+        switch self {
+        case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+            return true
+        case .code, .horizontalRule, .frontMatter, .table, .rawMarkdown:
+            return false
         }
     }
 }

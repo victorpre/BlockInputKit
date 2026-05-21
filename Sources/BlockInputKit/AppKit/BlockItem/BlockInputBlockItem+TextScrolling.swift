@@ -10,7 +10,7 @@ extension BlockInputBlockItem {
         case .code:
             configureCodeTextScrolling()
         case .paragraph, .heading, .horizontalRule, .frontMatter, .quote, .bulletedListItem, .numberedListItem, .checklistItem,
-             .rawMarkdown:
+             .table, .rawMarkdown:
             configureWrappingTextScrolling()
         }
     }

@@ -3,7 +3,7 @@ extension BlockInputBlockKind {
         switch self {
         case .quote, .bulletedListItem, .numberedListItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .checklistItem, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .checklistItem, .table, .rawMarkdown:
             return false
         }
     }
