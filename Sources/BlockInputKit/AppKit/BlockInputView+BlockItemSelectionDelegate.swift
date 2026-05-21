@@ -1,14 +1,14 @@
 import AppKit
 
 extension BlockInputView {
-    func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID) {
-        guard shouldTrackTextSelectionChange(from: item),
+    func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID, selectedRange: NSRange?) {
+        guard shouldTrackTextSelectionChange(from: item, selectedRange: selectedRange),
               let block = block(withID: blockID),
               block.kind != .horizontalRule else {
             return
         }
         let previousActiveBlockID = currentSelectionOwnerBlockID()
-        let range = item.currentSelectedRange
+        let range = selectedRange ?? item.currentSelectedRange
         let nativeExpansionDirection = nativeTextSelectionExpansionDirection(
             blockID: blockID,
             selectedRange: range,
@@ -60,12 +60,15 @@ extension BlockInputView {
 }
 
 private extension BlockInputView {
-    func shouldTrackTextSelectionChange(from item: BlockInputBlockItem) -> Bool {
-        guard !item.isDraggingBlockSelection,
-              window?.firstResponder !== self else {
+    func shouldTrackTextSelectionChange(from item: BlockInputBlockItem, selectedRange: NSRange?) -> Bool {
+        guard !item.isDraggingBlockSelection else {
+            return false
+        }
+        if window?.firstResponder === self, selectedRange == nil {
             return false
         }
         if case .blocks = selection,
+           selectedRange == nil,
            NSApp.currentEvent?.type != .leftMouseDown,
            NSApp.currentEvent?.type != .leftMouseDragged {
             return false

@@ -25,6 +25,34 @@ final class BlockInputTableItemTests: XCTestCase {
         XCTAssertEqual(item.testingTableView.visibleTableFrame.width, 240, accuracy: 1)
     }
 
+    func testTableSurfaceLeadingEdgeAlignsWithPlainTextGlyphColumn() throws {
+        let paragraph = configuredItem(block: BlockInputBlock(id: "paragraph", text: "Plain text"))
+        let paragraphTextView = try XCTUnwrap(paragraph.testingTextView)
+        let paragraphTextContainer = try XCTUnwrap(paragraphTextView.textContainer)
+        let paragraphGlyphLeading = paragraph.scrollView.frame.minX
+            + paragraphTextView.textContainerInset.width
+            + paragraphTextContainer.lineFragmentPadding
+        let table = configuredItem(block: Self.compactTable())
+        let expectedTableWidth = BlockInputBlockItem.measuredTextWidth(
+            for: table.view.bounds.width,
+            block: Self.compactTable(),
+            allowsReordering: true
+        )
+
+        XCTAssertEqual(table.testingTableView.frame.minX, paragraphGlyphLeading, accuracy: 0.5)
+        XCTAssertEqual(table.testingTableView.frame.width, expectedTableWidth, accuracy: 0.5)
+    }
+
+    func testTableSurfaceLeadingEdgeTracksCustomInsetWithoutReordering() {
+        let item = configuredItem(
+            block: Self.compactTable(),
+            allowsReordering: false,
+            editorHorizontalInset: 28
+        )
+
+        XCTAssertEqual(item.testingTableView.frame.minX, 28, accuracy: 0.5)
+    }
+
     func testWideTableScrollsInternallyAndPreservesHorizontalOffsetAcrossRelayout() throws {
         let item = configuredItem(block: Self.wideTable(), itemWidth: 340, textWidth: 260)
         let overflowScrollView = item.testingTableOverflowScrollView
@@ -161,11 +189,14 @@ final class BlockInputTableItemTests: XCTestCase {
         block: BlockInputBlock,
         itemWidth: CGFloat = 360,
         textWidth: CGFloat = 280,
+        allowsReordering: Bool = true,
+        editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         embeddedInVerticalScrollView: Bool = false
     ) -> BlockInputBlockItem {
         let item = BlockInputBlockItem.configuredForTesting(
             block: block,
-            allowsReordering: true,
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset,
             delegate: BlockInputView()
         )
         item.view.frame = NSRect(

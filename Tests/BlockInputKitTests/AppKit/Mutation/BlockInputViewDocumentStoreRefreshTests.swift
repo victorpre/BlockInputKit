@@ -157,7 +157,7 @@ final class BlockInputViewDocumentStoreRefreshTests: XCTestCase {
         ]))
         view.applySelection(nil, notify: false)
 
-        view.blockItem(item, didChangeSelectionIn: staleID)
+        view.blockItem(item, didChangeSelectionIn: staleID, selectedRange: nil)
 
         XCTAssertNil(view.selection)
     }

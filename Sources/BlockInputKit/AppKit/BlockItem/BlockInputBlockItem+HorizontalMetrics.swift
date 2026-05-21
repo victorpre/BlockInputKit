@@ -1,6 +1,9 @@
 import AppKit
 
 extension BlockInputBlockItem {
+    static let tableSurfaceLeadingInset: CGFloat = textContainerContentLeading
+    static let tableSurfaceTrailingInset: CGFloat = max((2 * textContainerLineFragmentPadding) - tableSurfaceLeadingInset, 0)
+
     static func horizontalContentTrailingInset(
         allowsReordering: Bool,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset

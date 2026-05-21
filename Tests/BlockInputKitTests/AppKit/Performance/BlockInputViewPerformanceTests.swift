@@ -47,7 +47,7 @@ final class BlockInputViewPerformanceTests: XCTestCase {
         textView.string = "Editable text"
         textView.setSelectedRange(NSRange(location: 13, length: 0))
         item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
-        view.blockItem(item, didChangeSelectionIn: blockID)
+        view.blockItem(item, didChangeSelectionIn: blockID, selectedRange: nil)
 
         XCTAssertEqual(store.documentReadCount, 0)
         XCTAssertEqual(store.replacedBlockIDs, [blockID])
@@ -108,7 +108,7 @@ final class BlockInputViewPerformanceTests: XCTestCase {
 
         textView.setSelectedRange(NSRange(location: 2, length: 4))
         view.blockItemDidBeginEditing(item, blockID: blockID)
-        view.blockItem(item, didChangeSelectionIn: blockID)
+        view.blockItem(item, didChangeSelectionIn: blockID, selectedRange: nil)
 
         XCTAssertEqual(store.documentReadCount, 0)
         XCTAssertEqual(store.replacedBlockIDs, [])

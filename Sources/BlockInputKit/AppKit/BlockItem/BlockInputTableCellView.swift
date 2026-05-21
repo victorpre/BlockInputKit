@@ -158,6 +158,9 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
         }
         tableView.clearRowSelection()
         tableView.delegate?.tableView(tableView, didBeginEditing: position)
+        if let sourceRange = tableView.sourceRange(for: textView, localRange: textView.selectedRange()) {
+            tableView.delegate?.tableView(tableView, didChangeSelectionIn: position, sourceRange: sourceRange)
+        }
     }
 
     func textDidEndEditing(_ notification: Notification) {

@@ -289,11 +289,14 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         guard !isConfiguringBlock else {
             return
         }
+        guard !(renderedBlock?.kind == .table && !tableView.isHidden) else {
+            return
+        }
         guard let blockID else {
             return
         }
         updateSelectionDependentAttributesForCurrentSelection()
-        delegate?.blockItem(self, didChangeSelectionIn: blockID)
+        delegate?.blockItem(self, didChangeSelectionIn: blockID, selectedRange: nil)
     }
 
     func textView(

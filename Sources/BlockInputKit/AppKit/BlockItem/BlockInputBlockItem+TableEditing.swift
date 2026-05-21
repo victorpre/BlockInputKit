@@ -69,7 +69,7 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
             return
         }
         updateSelectionDependentAttributesForCurrentSelection()
-        delegate?.blockItem(self, didChangeSelectionIn: blockID)
+        delegate?.blockItem(self, didChangeSelectionIn: blockID, selectedRange: sourceRange)
     }
 
     func tableView(

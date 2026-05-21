@@ -183,7 +183,7 @@ final class BlockInputSelectionResponderTests: XCTestCase {
             range: NSRange(location: 0, length: 12)
         )))
 
-        mounted.view.blockItem(secondItem, didChangeSelectionIn: secondID)
+        mounted.view.blockItem(secondItem, didChangeSelectionIn: secondID, selectedRange: nil)
         XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
     }
 
@@ -206,7 +206,7 @@ final class BlockInputSelectionResponderTests: XCTestCase {
             range: NSRange(location: 0, length: 12)
         )))
 
-        mounted.view.blockItem(firstItem, didChangeSelectionIn: firstID)
+        mounted.view.blockItem(firstItem, didChangeSelectionIn: firstID, selectedRange: nil)
         XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
     }
 
@@ -229,7 +229,7 @@ final class BlockInputSelectionResponderTests: XCTestCase {
             range: NSRange(location: 0, length: 6)
         )))
 
-        mounted.view.blockItem(secondItem, didChangeSelectionIn: secondID)
+        mounted.view.blockItem(secondItem, didChangeSelectionIn: secondID, selectedRange: nil)
         XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
             blockIDs: [firstID],
             trailingTextRange: BlockInputTextRange(blockID: secondID, range: NSRange(location: 0, length: 6))
@@ -255,7 +255,7 @@ final class BlockInputSelectionResponderTests: XCTestCase {
             range: NSRange(location: 6, length: 6)
         )))
 
-        mounted.view.blockItem(firstItem, didChangeSelectionIn: firstID)
+        mounted.view.blockItem(firstItem, didChangeSelectionIn: firstID, selectedRange: nil)
         XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
             blockIDs: [secondID],
             leadingTextRange: BlockInputTextRange(blockID: firstID, range: NSRange(location: 6, length: 6))

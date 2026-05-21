@@ -19,13 +19,17 @@ extension BlockInputView {
         }
         var afterBlock = beforeBlock
         afterBlock.text = afterTable.markdown
-        item.tableView.updateTableAfterCellEdit(afterTable)
         guard beforeBlock != afterBlock else {
+            item.tableView.updateTableAfterCellEdit(afterTable)
             return
         }
 
         let beforeSelection = change.selectionBefore ?? selection
         let didReplaceCachedBlock = replaceCachedBlock(afterBlock, at: index)
+        // Table cell selection normalization reads the store-backed block text, so update the store before refreshing
+        // the table view can emit selection changes using the edited table's fresh source ranges.
+        syncDocumentStore(.replaceBlock(afterBlock))
+        item.tableView.updateTableAfterCellEdit(afterTable)
         let afterSelection = tableCellSelection(blockID: blockID, table: afterTable, change: change)
         applySelection(afterSelection, notify: true)
         undoController?.registerTextEdit(
@@ -42,7 +46,6 @@ extension BlockInputView {
             resizeVisibleItem(item, for: afterBlock)
             invalidateLayoutForBlock(at: index, editedItem: item, block: afterBlock)
         }
-        syncDocumentStore(.replaceBlock(afterBlock))
         if !didReplaceCachedBlock && isDocumentCacheSynchronized {
             refreshDocumentFromStore()
         }

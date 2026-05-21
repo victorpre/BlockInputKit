@@ -218,8 +218,10 @@ extension BlockInputBlockItem {
 
     private func tableViewLayoutConstraints() -> [NSLayoutConstraint] {
         [
-            tableView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            // Table borders align to the same glyph column as text blocks; the
+            // trailing inset keeps rendered width in parity with offscreen text measurement.
+            tableView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: Self.tableSurfaceLeadingInset),
+            tableView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -Self.tableSurfaceTrailingInset),
             tableView.topAnchor.constraint(equalTo: scrollView.topAnchor),
             tableView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor)
         ]

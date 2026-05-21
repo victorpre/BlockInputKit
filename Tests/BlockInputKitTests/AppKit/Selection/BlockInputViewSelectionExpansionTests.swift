@@ -445,7 +445,7 @@ final class BlockInputViewSelectionExpansionTests: XCTestCase {
         mounted.window.makeFirstResponder(mounted.view)
         textView.setSelectedRange(NSRange(location: 0, length: 0))
 
-        mounted.view.blockItem(firstItem, didChangeSelectionIn: firstID)
+        mounted.view.blockItem(firstItem, didChangeSelectionIn: firstID, selectedRange: nil)
 
         XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
         XCTAssertEqual(itemSelectionBackgroundVisible(in: mounted.view, at: 0), true)
