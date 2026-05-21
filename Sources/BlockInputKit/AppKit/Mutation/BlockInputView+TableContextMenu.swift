@@ -105,6 +105,10 @@ extension BlockInputView {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = self
         item.representedObject = context
+        if title.hasPrefix("Delete") {
+            item.setAccessibilityLabel(title)
+            item.setAccessibilityHelp("\(title) from the current table.")
+        }
         return item
     }
 }

@@ -10,3 +10,6 @@
 - Keep code-block background and whole-block selection widths aligned; code surfaces hug content with the AppKit code-surface minimum instead of filling the full row.
 - Keep item height measurement cached or otherwise bounded to visible/layout-requested rows.
 - When shared row chrome metrics, default insets, or marker alignment change, record and verify the AppKit snapshot suite.
+- Keep table rendered and offscreen measurement in parity: column widths, row heights, padding, borders, header styling, alignments, wrapping, and horizontal scroller reserve must match.
+- Reset table cells, delegates, hover append controls, row-selection chrome, focus state, tracking areas, and horizontal scroll state during item reuse.
+- Keep table hover controls, row-selection chrome, link hit testing, and caret/selection anchors aligned to the horizontally scrolled table document and clipped to the visible viewport.

@@ -3,7 +3,9 @@ import Foundation
 /// Parsed representation of a normalized GFM-style pipe table.
 ///
 /// The model keeps cell source ranges relative to the normalized Markdown stored
-/// in a table block so editor cells can safely map local edits back to block text.
+/// in a table block so editor cells can safely map local edits, formatting, and
+/// links back to block text. Cells are single-line inline Markdown fragments;
+/// embedded newlines are collapsed before export.
 struct BlockInputTable: Equatable {
     enum Alignment: Equatable {
         case left

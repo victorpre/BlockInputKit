@@ -1,6 +1,9 @@
 import AppKit
 
 extension BlockInputTableView {
+    /// Shared rendered/offscreen table measurement path; keep this in parity
+    /// with `layoutTable()` so wrapped cell edits move following blocks
+    /// immediately and snapshot tests stay deterministic.
     static func layoutMetrics(
         for table: BlockInputTable,
         viewportWidth: CGFloat,
@@ -57,7 +60,8 @@ extension BlockInputTableView {
     }
 
     static func measuredUnwrappedTextWidth(_ text: String, isHeader: Bool, style: BlockInputStyle) -> CGFloat {
-        ceil((displayText(text) as NSString).size(withAttributes: [.font: font(isHeader: isHeader, style: style)]).width)
+        let attributed = attributedString(text, isHeader: isHeader, alignment: .left, style: style)
+        return ceil(measuredTextRect(for: attributed, width: 100_000).width)
     }
 
     static func measuredCellHeight(
@@ -68,17 +72,9 @@ extension BlockInputTableView {
         style: BlockInputStyle
     ) -> CGFloat {
         let attributed = attributedString(text, isHeader: isHeader, alignment: alignment, style: style)
-        let storage = NSTextStorage(attributedString: attributed)
-        let layoutManager = NSLayoutManager()
         let textWidth = max(width - cellHorizontalPadding * 2, 0)
-        let textContainer = NSTextContainer(size: NSSize(width: textWidth, height: CGFloat.greatestFiniteMagnitude))
-        textContainer.lineFragmentPadding = 0
-        textContainer.widthTracksTextView = false
-        storage.addLayoutManager(layoutManager)
-        layoutManager.addTextContainer(textContainer)
-        layoutManager.ensureLayout(for: textContainer)
         let minimumHeight = lineHeight(isHeader: isHeader, style: style)
-        return ceil(max(layoutManager.usedRect(for: textContainer).height, minimumHeight) + cellVerticalPadding * 2)
+        return ceil(max(measuredTextRect(for: attributed, width: textWidth).height, minimumHeight) + cellVerticalPadding * 2)
     }
 
     static func attributedString(
@@ -86,18 +82,44 @@ extension BlockInputTableView {
         isHeader: Bool,
         alignment: NSTextAlignment,
         style: BlockInputStyle,
-        usesPlaceholder: Bool = true
+        usesPlaceholder: Bool = true,
+        appliesInlineMarkdown: Bool = true
     ) -> NSAttributedString {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = alignment
-        return NSAttributedString(
-            string: usesPlaceholder ? displayText(text) : text,
+        let string = usesPlaceholder ? displayText(text) : text
+        let storage = NSTextStorage(
+            string: string,
             attributes: [
                 .font: font(isHeader: isHeader, style: style),
                 .foregroundColor: style.baseText.foregroundColor ?? NSColor.labelColor,
                 .paragraphStyle: paragraphStyle
             ]
         )
+        if appliesInlineMarkdown {
+            BlockInputBlockItem.applyInlineMarkdownAttributes(
+                for: BlockInputBlock(kind: .paragraph, text: string),
+                textStorage: storage,
+                style: style
+            )
+        }
+        return storage
+    }
+
+    private static func measuredTextRect(for attributed: NSAttributedString, width: CGFloat) -> NSRect {
+        let storage = NSTextStorage(attributedString: attributed)
+        let layoutManager = NSLayoutManager()
+        let delimiterGlyphs = BlockInputDelimiterGlyphs()
+        layoutManager.delegate = delimiterGlyphs
+        let textContainer = NSTextContainer(size: NSSize(width: width, height: CGFloat.greatestFiniteMagnitude))
+        textContainer.lineFragmentPadding = 0
+        textContainer.widthTracksTextView = false
+        storage.addLayoutManager(layoutManager)
+        layoutManager.addTextContainer(textContainer)
+        return withExtendedLifetime(delimiterGlyphs) {
+            layoutManager.ensureLayout(for: textContainer)
+            return layoutManager.usedRect(for: textContainer)
+        }
     }
 
     static func font(isHeader: Bool, style: BlockInputStyle) -> NSFont {

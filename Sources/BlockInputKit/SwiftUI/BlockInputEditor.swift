@@ -13,7 +13,8 @@ public struct BlockInputEditor: NSViewRepresentable {
 
     /// Creates a SwiftUI editor that synchronizes AppKit focus with a SwiftUI binding.
     ///
-    /// Setting the binding to `true` focuses the editor and restores the current selection.
+    /// Setting the binding to `true` focuses the editor and restores the current selection,
+    /// including source selections that map into a table cell.
     /// Setting it to `false` resigns editor focus without restoring a previous text selection.
     public init(
         configuration: BlockInputConfiguration = BlockInputConfiguration(),

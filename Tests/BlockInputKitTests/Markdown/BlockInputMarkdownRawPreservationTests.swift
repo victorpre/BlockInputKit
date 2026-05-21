@@ -44,50 +44,6 @@ final class BlockInputMarkdownRawPreservationTests: XCTestCase {
         XCTAssertEqual(parsed.markdown, source)
     }
 
-    func testMarkdownPreservesTableAsRawMarkdown() {
-        let source = """
-        | Name | Done |
-        | --- | :---: |
-        | Raw | yes |
-        """
-
-        let parsed = BlockInputDocument(markdown: source)
-
-        XCTAssertEqual(parsed.blocks.map(\.kind), [.rawMarkdown])
-        XCTAssertEqual(parsed.blocks[0].text, source)
-        XCTAssertEqual(parsed.markdown, source)
-    }
-
-    func testMarkdownPreservesTableWithTabSpacedDelimiterAsRawMarkdown() {
-        let source = "| Name | Done |\n|\t---\t|\t:---:\t|\n| Raw | yes |"
-
-        let parsed = BlockInputDocument(markdown: source)
-
-        XCTAssertEqual(parsed.blocks.map(\.kind), [.rawMarkdown])
-        XCTAssertEqual(parsed.blocks[0].text, source)
-        XCTAssertEqual(parsed.markdown, source)
-    }
-
-    func testMarkdownPreservesTableAfterParagraphWithoutAbsorbingRawSource() {
-        let source = """
-        Before
-        | Name | Done |
-        | --- | :---: |
-        | Raw | yes |
-        """
-
-        let parsed = BlockInputDocument(markdown: source)
-
-        XCTAssertEqual(parsed.blocks.map(\.kind), [.paragraph, .rawMarkdown])
-        XCTAssertEqual(parsed.blocks[0].text, "Before")
-        XCTAssertEqual(parsed.blocks[1].text, """
-        | Name | Done |
-        | --- | :---: |
-        | Raw | yes |
-        """)
-        XCTAssertEqual(parsed.markdown, source)
-    }
-
     func testMarkdownPreservesHTMLBlockAsRawMarkdown() {
         let source = """
         <section>

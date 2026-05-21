@@ -9,4 +9,6 @@
 - Preserve large-document scrolling assumptions: avoid full layout invalidation for plain scroll-origin changes, and keep item height measurement cached or otherwise bounded to visible/layout-requested rows.
 - Preserve progressive store assumptions: render only `loadedBlockCount` blocks, load only the next visible/preloaded batch from the loading row, keep complete save/export snapshots independent from editor row population, and append loaded batches without reloading the full collection.
 - For nested horizontal code-block scrolling, route mostly vertical wheel events to the editor scroll view, keep the editor clip-view `x` origin clamped to zero, and keep selection/caret chrome valid after horizontal panning.
+- For nested horizontal table scrolling, keep the table scroll view horizontal-only with `y = 0` clip-view protection; forward mostly vertical wheel sequences to the nearest vertical ancestor and keep horizontal-dominant events local.
+- Map public table cursor/text selections into a table cell only when the source range is wholly inside one cell; otherwise promote to whole-table/block selection.
 - Read the narrower `AGENTS.md` in `BlockItem`, `Mutation`, `Reordering`, and `Selection` before editing files in those scopes.

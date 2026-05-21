@@ -182,6 +182,27 @@ Hosts may also provide custom `insertionText`. A link renders as a slash-command
 
 Dragging local files onto supported text blocks inserts file chips at the drop caret. Paragraphs, headings, quotes, list items, and checklist items accept inline file drops; code, frontmatter, raw Markdown, horizontal rules, row whitespace, and unloaded progressive rows reject them.
 
+## Tables
+
+GFM-style pipe tables parse and render as `.table` blocks. A table requires a header row and delimiter row; body rows are optional. The block stores normalized Markdown in `BlockInputBlock.text`, including delimiter alignment, padded cells, escaped literal `|`, and single-line cell text. Newlines typed or pasted into a cell collapse to spaces on export.
+
+Typing or pasting a complete valid pipe table into an applicable non-table text block converts that whole block into a table. Markdown typed or pasted inside an existing table cell stays cell text and does not recursively create a table.
+
+Cells are editable text views. Bold, italic, underline, strikethrough, Insert Link, Remove Link, URL paste, plain link click, and Cmd-click URL opening use the same inline Markdown mutation and link paths as normal text blocks after the selected source range is proven to be inside one cell. Formatting is not applied to table delimiters, pipes, padding, separator rows, or ranges crossing cells. Mention/slash completion and local file-drop insertion are intentionally disabled inside table cells.
+
+Keyboard behavior inside cells:
+
+- `Tab` and `Shift+Tab` move left-to-right or right-to-left through cells, falling through at table boundaries.
+- `Return` and `Shift+Return` move vertically when another cell exists; at table boundaries they insert a paragraph below or above the table.
+- Backspace/Delete in an empty body cell selects that row first, then removes it on the next press. Removing the last body row leaves one empty body row. Empty header cells can select the header row, but the header row is not removed.
+- `Cmd+A` first selects the current cell contents, then the whole table block, then all blocks.
+
+Right-click menus show table actions directly below `Insert Link`: `Insert Table`, `Delete Row`, `Delete Column`, then `Delete Table`, omitting actions that do not apply. `Insert Table` adds a two-column table below paragraphs, headings, quotes, bulleted lists, numbered lists, and checklists. `Delete Row` is shown only for removable body rows, `Delete Column` only when more than one column exists, and `Delete Table` only inside tables.
+
+Whole-table and mixed selections copy/cut normalized table Markdown. Partial cell selections copy/cut only selected cell text. Public cursor/text selections whose UTF-16 source range is wholly inside one cell focus that cell; selections crossing cells or table syntax become whole-table/block selections. SwiftUI `BlockInputEditor(isFocused:)` restores focus into a table cell when the active selection maps to cell content.
+
+Columns measure content with padding, clamp from `120 pt` to `420 pt`, and wrap after the maximum width. Row height follows the tallest wrapped cell, so typing that wraps cell text resizes the table and moves following blocks immediately. Wide tables use an internal horizontal-only `NSScrollView` with overlay/autohiding scrollers, no vertical elasticity, `y = 0` clip-view protection, and Alveary-matched wheel routing: mostly vertical wheel sequences forward to the nearest vertical editor scroll view while horizontal-dominant events stay local.
+
 ## Markdown Streaming
 
 Use the async Markdown APIs when reading or writing files. File reads are UTF-8 line-by-line, and streaming writes emit chunks in block order without first converting the document to one full Markdown string. Streaming deserialization buffers only the current block and any lookahead needed to match snapshot import behavior; leading frontmatter is retained as a `frontMatter` block, and unsupported block-level constructs are retained as `rawMarkdown` blocks rather than discarded.

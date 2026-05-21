@@ -372,7 +372,11 @@ extension BlockInputView {
     }
 }
 
-/// One eligible source range to format inside a block.
+/// One inline-mutation target for shared formatting logic.
+///
+/// Normal text blocks carry a source range directly in `block.text`; table
+/// cells also carry their logical cell address and local cell range so the same
+/// formatter can update only cell content, never delimiters or neighboring cells.
 private struct TextFormattingSegment {
     var block: BlockInputBlock
     var range: NSRange

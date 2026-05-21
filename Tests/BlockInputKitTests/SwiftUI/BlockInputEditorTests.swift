@@ -59,6 +59,36 @@ final class BlockInputEditorTests: XCTestCase {
         XCTAssertFalse(mounted.view.isEditorFirstResponder)
     }
 
+    func testFocusBindingRestoresTableCellSelection() throws {
+        let blockID = BlockInputBlockID(rawValue: "table")
+        let table = BlockInputTable.normalized(
+            header: ["H1", "H2"],
+            bodyRows: [["one", "two"]],
+            alignments: [.left, .left]
+        )
+        let sourceRange = try XCTUnwrap(table.sourceRange(
+            forLocalRange: NSRange(location: 1, length: 1),
+            in: .init(row: .body(0), column: 0)
+        ))
+        var isFocused = true
+        let editor = BlockInputEditor(isFocused: Binding(
+            get: { isFocused },
+            set: { isFocused = $0 }
+        ))
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: blockID, kind: .table, text: table.markdown)
+        ])
+        mounted.view.applySelection(.text(BlockInputTextRange(blockID: blockID, range: sourceRange)), notify: false)
+        mounted.window.makeFirstResponder(nil)
+
+        editor.updateFocusState(on: mounted.view)
+
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let bodyCell = try XCTUnwrap(item.testingTableCellTextViews[safe: 2])
+        XCTAssertTrue(mounted.window.firstResponder === bodyCell)
+        XCTAssertEqual(bodyCell.selectedRange(), NSRange(location: 1, length: 1))
+    }
+
     func testMissingFocusBindingLeavesResponderStateUntouched() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let editor = BlockInputEditor()
@@ -204,5 +234,11 @@ final class BlockInputEditorTests: XCTestCase {
         await fulfillment(of: [lostFocus], timeout: 1)
         XCTAssertEqual(staleFocusValues, [true])
         XCTAssertEqual(currentFocusValues, [false])
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

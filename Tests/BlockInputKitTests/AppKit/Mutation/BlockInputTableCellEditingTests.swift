@@ -286,6 +286,7 @@ final class BlockInputTableCellEditingTests: XCTestCase {
         XCTAssertEqual(menu.items[insertLinkIndex + 1].title, "Delete Row")
         XCTAssertEqual(menu.items[insertLinkIndex + 2].title, "Delete Column")
         XCTAssertEqual(menu.items[insertLinkIndex + 3].title, "Delete Table")
+        XCTAssertEqual(menu.items[insertLinkIndex + 1].accessibilityLabel(), "Delete Row")
     }
 
     func testContextMenuOmitsUnavailableTableActions() throws {

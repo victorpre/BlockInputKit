@@ -24,10 +24,10 @@ protocol BlockInputTableViewDelegate: AnyObject {
 
 /// AppKit table surface used by table blocks.
 ///
-/// The view owns a horizontally scrollable table document and mirrors the
-/// offscreen measurement code so collection row heights remain stable when cell
-/// content wraps. Cells are intentionally simple rendering surfaces in this
-/// phase; editing adapters are layered on top of the same structure later.
+/// The view owns a horizontally scrollable table document, editable cell text
+/// views, row-selection chrome, and append controls. Its layout code mirrors
+/// offscreen measurement so collection row heights remain stable when cell
+/// content wraps.
 final class BlockInputTableView: NSView {
     static let minimumColumnWidth: CGFloat = 120
     static let maximumColumnWidth: CGFloat = 420
@@ -92,6 +92,7 @@ final class BlockInputTableView: NSView {
         hoveredAppendTarget = nil
         appendRowButton.isHidden = true
         appendColumnButton.isHidden = true
+        setAccessibilityLabel(Self.accessibilityLabel(for: table))
         rebuildCells(for: table, style: style)
         isHidden = false
         needsLayout = true
@@ -111,6 +112,7 @@ final class BlockInputTableView: NSView {
         scrollView.frame = .zero
         appendRowButton.isHidden = true
         appendColumnButton.isHidden = true
+        setAccessibilityLabel(nil)
         if let trackingArea {
             removeTrackingArea(trackingArea)
             self.trackingArea = nil
@@ -124,6 +126,7 @@ final class BlockInputTableView: NSView {
         self.table = table
         selectedRow = nil
         updateRowSelectionChrome()
+        activeCellView?.refreshInlineMarkdownAttributesAfterEdit()
         needsLayout = true
         documentView.needsLayout = true
     }
@@ -160,9 +163,12 @@ final class BlockInputTableView: NSView {
         isHidden = true
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
 
         chromeView.translatesAutoresizingMaskIntoConstraints = true
         chromeView.wantsLayer = true
+        chromeView.setAccessibilityElement(false)
         chromeView.layer?.cornerRadius = 6
         chromeView.layer?.masksToBounds = true
         chromeView.layer?.borderWidth = 1
@@ -175,12 +181,31 @@ final class BlockInputTableView: NSView {
         scrollView.drawsBackground = false
         scrollView.documentView = documentView
         scrollView.translatesAutoresizingMaskIntoConstraints = true
+        documentView.setAccessibilityElement(false)
         chromeView.addSubview(scrollView)
 
-        configureAppendButton(appendRowButton, action: #selector(appendRowButtonClicked(_:)))
-        configureAppendButton(appendColumnButton, action: #selector(appendColumnButtonClicked(_:)))
+        configureAppendButton(appendRowButton, action: #selector(appendRowButtonClicked(_:)), label: "Append Table Row")
+        configureAppendButton(appendColumnButton, action: #selector(appendColumnButtonClicked(_:)), label: "Append Table Column")
         addSubview(appendRowButton)
         addSubview(appendColumnButton)
+    }
+
+    override func accessibilityCustomActions() -> [NSAccessibilityCustomAction]? {
+        guard table != nil else {
+            return nil
+        }
+        return [
+            NSAccessibilityCustomAction(
+                name: "Append Table Row",
+                target: self,
+                selector: #selector(accessibilityAppendTableRow(_:))
+            ),
+            NSAccessibilityCustomAction(
+                name: "Append Table Column",
+                target: self,
+                selector: #selector(accessibilityAppendTableColumn(_:))
+            )
+        ]
     }
 
     private func rebuildCells(for table: BlockInputTable, style: BlockInputStyle) {
@@ -260,6 +285,23 @@ final class BlockInputTableView: NSView {
         }
     }
 
+    @objc private func accessibilityAppendTableRow(_ action: NSAccessibilityCustomAction) -> Bool {
+        appendRowButtonClicked(action)
+        return true
+    }
+
+    @objc private func accessibilityAppendTableColumn(_ action: NSAccessibilityCustomAction) -> Bool {
+        appendColumnButtonClicked(action)
+        return true
+    }
+
+    private static func accessibilityLabel(for table: BlockInputTable) -> String {
+        let rowCount = table.bodyRows.count + 1
+        let rowLabel = rowCount == 1 ? "row" : "rows"
+        let columnLabel = table.columnCount == 1 ? "column" : "columns"
+        return "Table, \(rowCount) \(rowLabel), \(table.columnCount) \(columnLabel)"
+    }
+
 }
 
 final class BlockInputTableChromeView: NSView {
@@ -280,7 +322,13 @@ final class BlockInputTableDocumentView: NSView {
     }
 }
 
-final class BlockInputTableAppendButton: NSButton {}
+/// Hover-visible plus button for appending one table row or column.
+final class BlockInputTableAppendButton: NSButton {
+    override func accessibilityPerformPress() -> Bool {
+        performClick(nil)
+        return true
+    }
+}
 
 struct BlockInputTableLayoutMetrics {
     var columnWidths: [CGFloat]

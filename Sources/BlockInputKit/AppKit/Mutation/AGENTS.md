@@ -15,6 +15,9 @@
 - Keep front-of-paragraph Backspace/Delete merges granular: replace the previous block and delete the current block.
 - When indenting ordered-list blocks, normalize only the affected list run and publish replacement mutations for every block whose visible marker changes.
 - For marker-adjusting document stores, publish numbered-list marker transactions instead of marker-only block replacements on hot large-document paths.
+- Keep table row, column, cell, and table-delete mutations on granular store sync and structural undo where a single block replacement, insertion, or deletion describes the edit.
+- Table-cell formatting and links should share normal inline mutation logic through source-range adapters; never apply formatting to table delimiters, separator rows, pipes, padding, or ranges crossing cells.
+- Table-cell hot edits should use `.replaceBlock` and must not read complete snapshots for store-backed documents.
 
 ## Shortcuts
 

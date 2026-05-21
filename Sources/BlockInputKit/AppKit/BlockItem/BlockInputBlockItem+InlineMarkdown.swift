@@ -4,6 +4,14 @@ private let inlineChipAdjacentWhitespaceKern: CGFloat = 5
 
 extension BlockInputBlockItem {
     func applyInlineMarkdownAttributes(for block: BlockInputBlock, textStorage: NSTextStorage) {
+        Self.applyInlineMarkdownAttributes(for: block, textStorage: textStorage, style: style)
+    }
+
+    static func applyInlineMarkdownAttributes(
+        for block: BlockInputBlock,
+        textStorage: NSTextStorage,
+        style: BlockInputStyle
+    ) {
         guard Self.supportsInlineMarkdownStyling(block.kind) else {
             return
         }
@@ -20,9 +28,9 @@ extension BlockInputBlockItem {
                 let clampedContentRange = NSIntersectionRange(contentRange, fullRange)
                 if clampedContentRange.length > 0 {
                     if rendersInlineChip {
-                        applyInlineChip(to: clampedContentRange, in: textStorage, baseFont: baseFont)
+                        Self.applyInlineChip(to: clampedContentRange, in: textStorage, baseFont: baseFont)
                     } else {
-                        apply(markdownRange.style, to: clampedContentRange, in: textStorage, baseFont: baseFont)
+                        Self.apply(markdownRange.style, to: clampedContentRange, in: textStorage, baseFont: baseFont)
                     }
                     if let destination = markdownRange.linkDestination {
                         textStorage.addAttribute(.link, value: destination, range: clampedContentRange)
@@ -45,7 +53,7 @@ extension BlockInputBlockItem {
                 )
             }
             if rendersInlineChip {
-                applyInlineChipAdjacentWhitespaceSpacers(for: markdownRange, in: textStorage)
+                Self.applyInlineChipAdjacentWhitespaceSpacers(for: markdownRange, in: textStorage)
             }
         }
     }
@@ -80,7 +88,7 @@ extension BlockInputBlockItem {
         }
     }
 
-    private func apply(
+    private static func apply(
         _ style: BlockInputInlineMarkdownStyle,
         to range: NSRange,
         in textStorage: NSTextStorage,
@@ -106,7 +114,7 @@ extension BlockInputBlockItem {
         }
     }
 
-    private func applyInlineChip(
+    private static func applyInlineChip(
         to range: NSRange,
         in textStorage: NSTextStorage,
         baseFont: NSFont
@@ -120,7 +128,7 @@ extension BlockInputBlockItem {
         )
     }
 
-    private func applyInlineChipAdjacentWhitespaceSpacers(
+    private static func applyInlineChipAdjacentWhitespaceSpacers(
         for markdownRange: BlockInputInlineMarkdownRange,
         in textStorage: NSTextStorage
     ) {
@@ -149,7 +157,7 @@ extension BlockInputBlockItem {
         return CharacterSet.whitespaces.contains(scalar)
     }
 
-    private func applyFontTrait(
+    private static func applyFontTrait(
         _ trait: NSFontTraitMask,
         to range: NSRange,
         in textStorage: NSTextStorage,

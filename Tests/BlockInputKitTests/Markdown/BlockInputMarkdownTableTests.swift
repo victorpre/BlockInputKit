@@ -23,6 +23,46 @@ final class BlockInputMarkdownTableTests: XCTestCase {
         XCTAssertEqual(document.markdown, document.blocks[0].text)
     }
 
+    func testMarkdownParsesTableWithTabSpacedDelimiter() {
+        let source = "| Name | Done |\n|\t---\t|\t:---:\t|\n| Raw | yes |"
+
+        let parsed = BlockInputDocument(markdown: source)
+
+        XCTAssertEqual(parsed.blocks.map(\.kind), [.table])
+        XCTAssertEqual(parsed.blocks[0].text, """
+        | Name | Done  |
+        | ---  | :---: |
+        | Raw  | yes   |
+        """)
+        XCTAssertEqual(parsed.markdown, parsed.blocks[0].text)
+    }
+
+    func testMarkdownParsesTableAfterParagraphWithoutAbsorbingNeighboringSource() {
+        let source = """
+        Before
+        | Name | Done |
+        | --- | :---: |
+        | Raw | yes |
+        """
+
+        let parsed = BlockInputDocument(markdown: source)
+
+        XCTAssertEqual(parsed.blocks.map(\.kind), [.paragraph, .table])
+        XCTAssertEqual(parsed.blocks[0].text, "Before")
+        XCTAssertEqual(parsed.blocks[1].text, """
+        | Name | Done  |
+        | ---  | :---: |
+        | Raw  | yes   |
+        """)
+        XCTAssertEqual(parsed.markdown, """
+        Before
+
+        | Name | Done  |
+        | ---  | :---: |
+        | Raw  | yes   |
+        """)
+    }
+
     func testTableModelPreservesAlignmentsEscapedPipesInlineCodeAndSourceRanges() throws {
         let table = try XCTUnwrap(BlockInputTable(markdown: """
         Label | Center | Right

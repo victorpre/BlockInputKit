@@ -10,13 +10,17 @@ struct BlockInputTableCellConfiguration {
     var blockItem: BlockInputBlockItem?
 }
 
-/// Border, background, and text editing host for one rendered table cell.
+/// Border, background, accessibility, row-selection chrome, and text editing
+/// host for one rendered table cell.
 final class BlockInputTableCellView: NSView, NSTextViewDelegate {
     let textView = BlockInputTableCellTextView()
+    private let hiddenDelimiterLayoutDelegate = BlockInputDelimiterGlyphs()
     private weak var tableView: BlockInputTableView?
     private var isConfiguring = false
     private var selectionBeforeTextChange: BlockInputSelection?
     private var isHeader = false
+    private var alignment: NSTextAlignment = .left
+    private var style = BlockInputStyle.default
     private var isRowSelected = false
     var position = BlockInputTable.CellPosition(row: .header, column: 0)
 
@@ -45,6 +49,8 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
         isConfiguring = true
         defer { isConfiguring = false }
         isHeader = configuration.isHeader
+        alignment = configuration.alignment
+        style = configuration.style
         position = configuration.position
         tableView = configuration.tableView
         textView.blockItem = configuration.blockItem
@@ -53,15 +59,33 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
             isHeader: configuration.isHeader,
             alignment: configuration.alignment,
             style: configuration.style,
-            usesPlaceholder: false
+            usesPlaceholder: false,
+            appliesInlineMarkdown: true
         ))
-        if let textStorage = textView.textStorage {
-            configuration.blockItem?.applyInlineMarkdownAttributes(
-                for: BlockInputBlock(kind: .paragraph, text: configuration.text),
-                textStorage: textStorage
-            )
-        }
+        updateAccessibility()
         updateColors()
+    }
+
+    func refreshInlineMarkdownAttributesAfterEdit() {
+        guard !isConfiguring,
+              !textView.hasMarkedText(),
+              let textStorage = textView.textStorage else {
+            return
+        }
+        let selectedRange = textView.selectedRange()
+        let refreshedText = BlockInputTableView.attributedString(
+            textView.string,
+            isHeader: isHeader,
+            alignment: alignment,
+            style: style,
+            usesPlaceholder: false,
+            appliesInlineMarkdown: true
+        )
+        isConfiguring = true
+        defer { isConfiguring = false }
+        textStorage.setAttributedString(refreshedText)
+        textView.setSelectedRange(Self.clampedRange(selectedRange, in: textView.string))
+        textView.needsDisplay = true
     }
 
     func updateColors() {
@@ -83,10 +107,12 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
         }
         isRowSelected = isSelected
         updateColors()
+        updateAccessibility()
     }
 
     private func setup() {
         wantsLayer = true
+        setAccessibilityElement(false)
         textView.isEditable = true
         textView.isSelectable = true
         textView.selectedTextAttributes = BlockInputBlockSelectionChrome.nativeSelectedTextAttributes
@@ -98,6 +124,7 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
         textView.isHorizontallyResizable = false
         textView.isVerticallyResizable = true
         textView.autoresizingMask = [.width]
+        textView.layoutManager?.delegate = hiddenDelimiterLayoutDelegate
         textView.isRichText = true
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticQuoteSubstitutionEnabled = false
@@ -105,6 +132,23 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
         textView.delegate = self
         addSubview(textView)
         updateColors()
+    }
+
+    private func updateAccessibility() {
+        let rowDescription: String
+        let rowNumber: Int
+        switch position.row {
+        case .header:
+            rowDescription = "header row"
+            rowNumber = 1
+        case .body(let rowIndex):
+            rowDescription = "body row"
+            rowNumber = rowIndex + 1
+        }
+        let selectedSuffix = isRowSelected ? ", row selected" : ""
+        textView.setAccessibilityLabel(
+            "Table cell, \(rowDescription) \(rowNumber), column \(position.column + 1)\(selectedSuffix)"
+        )
     }
 
     func textDidBeginEditing(_ notification: Notification) {
@@ -181,5 +225,12 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
             .replacingOccurrences(of: "\r\n", with: " ")
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: "\r", with: " ")
+    }
+
+    private static func clampedRange(_ range: NSRange, in text: String) -> NSRange {
+        let text = text as NSString
+        let location = min(max(range.location, 0), text.length)
+        let length = min(max(range.length, 0), max(text.length - location, 0))
+        return NSRange(location: location, length: length)
     }
 }

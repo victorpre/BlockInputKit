@@ -26,7 +26,7 @@ extension BlockInputTableView {
         super.mouseExited(with: event)
     }
 
-    func configureAppendButton(_ button: NSButton, action: Selector) {
+    func configureAppendButton(_ button: NSButton, action: Selector, label: String) {
         button.title = "+"
         button.bezelStyle = .circular
         button.isBordered = true
@@ -34,6 +34,9 @@ extension BlockInputTableView {
         button.target = self
         button.action = action
         button.isHidden = true
+        button.setAccessibilityElement(true)
+        button.setAccessibilityRole(.button)
+        button.setAccessibilityLabel(label)
     }
 
     func updateAppendControlVisibility(for localPoint: NSPoint) {
