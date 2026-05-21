@@ -59,6 +59,14 @@ extension BlockInputBlockItem {
         tableView.selectedRowForTesting
     }
 
+    var testingSelectedTableCellRange: BlockInputTableCellSelection? {
+        tableView.selectedCellRangeForTesting
+    }
+
+    var testingTableCellViews: [BlockInputTableCellView] {
+        view.descendants(of: BlockInputTableCellView.self)
+    }
+
     var testingAppendTableRowButton: NSButton {
         tableView.appendRowButtonForTesting
     }

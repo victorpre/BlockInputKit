@@ -5,6 +5,7 @@ protocol BlockInputTableViewDelegate: AnyObject {
     func tableView(_ tableView: BlockInputTableView, didBeginEditing position: BlockInputTable.CellPosition)
     func tableView(_ tableView: BlockInputTableView, didEndEditing position: BlockInputTable.CellPosition)
     func tableView(_ tableView: BlockInputTableView, didChangeSelectionIn position: BlockInputTable.CellPosition, sourceRange: NSRange)
+    func tableViewDidRequestWholeTableSelection(_ tableView: BlockInputTableView)
     func tableView(
         _ tableView: BlockInputTableView,
         didChangeText text: String,
@@ -34,6 +35,7 @@ final class BlockInputTableView: NSView {
     static let cellHorizontalPadding: CGFloat = 10
     static let cellVerticalPadding: CGFloat = 7
     static let fallbackViewportWidth: CGFloat = 520
+    static let cornerRadius: CGFloat = 6
 
     let chromeView = BlockInputTableChromeView()
     let scrollView = BlockInputTableOverflowScrollView()
@@ -46,8 +48,12 @@ final class BlockInputTableView: NSView {
     var hasAppliedInitialScrollPosition = false
     var configuredBlockID: BlockInputBlockID?
     var selectedRow: BlockInputTable.Row?
+    var selectedCellRange: BlockInputTableCellSelection?
+    var cellSelectionDragAnchor: BlockInputTable.CellPosition?
+    var isDraggingCellSelection = false
     var trackingArea: NSTrackingArea?
     var hoveredAppendTarget: AppendTarget?
+    var appendHoverAnchor: NSPoint?
     weak var delegate: BlockInputTableViewDelegate?
     weak var blockItem: BlockInputBlockItem?
 
@@ -89,7 +95,11 @@ final class BlockInputTableView: NSView {
         self.table = table
         self.style = style
         selectedRow = nil
+        selectedCellRange = nil
+        cellSelectionDragAnchor = nil
+        isDraggingCellSelection = false
         hoveredAppendTarget = nil
+        appendHoverAnchor = nil
         appendRowButton.isHidden = true
         appendColumnButton.isHidden = true
         setAccessibilityLabel(Self.accessibilityLabel(for: table))
@@ -104,7 +114,11 @@ final class BlockInputTableView: NSView {
         style = .default
         hasAppliedInitialScrollPosition = false
         selectedRow = nil
+        selectedCellRange = nil
+        cellSelectionDragAnchor = nil
+        isDraggingCellSelection = false
         hoveredAppendTarget = nil
+        appendHoverAnchor = nil
         cellRows.flatMap { $0 }.forEach { $0.removeFromSuperview() }
         cellRows = []
         documentView.frame = .zero
@@ -125,7 +139,8 @@ final class BlockInputTableView: NSView {
     func updateTableAfterCellEdit(_ table: BlockInputTable) {
         self.table = table
         selectedRow = nil
-        updateRowSelectionChrome()
+        selectedCellRange = nil
+        updateSelectionChrome()
         activeCellView?.refreshInlineMarkdownAttributesAfterEdit()
         needsLayout = true
         documentView.needsLayout = true
@@ -141,6 +156,10 @@ final class BlockInputTableView: NSView {
 
     var selectedRowForTesting: BlockInputTable.Row? {
         selectedRow
+    }
+
+    var selectedCellRangeForTesting: BlockInputTableCellSelection? {
+        selectedCellRange
     }
 
     var appendRowButtonForTesting: NSButton {
@@ -169,7 +188,7 @@ final class BlockInputTableView: NSView {
         chromeView.translatesAutoresizingMaskIntoConstraints = true
         chromeView.wantsLayer = true
         chromeView.setAccessibilityElement(false)
-        chromeView.layer?.cornerRadius = 6
+        chromeView.layer?.cornerRadius = Self.cornerRadius
         chromeView.layer?.masksToBounds = true
         chromeView.layer?.borderWidth = 1
         chromeView.updateColors()
@@ -279,10 +298,15 @@ final class BlockInputTableView: NSView {
         }
     }
 
-    func updateRowSelectionChrome() {
+    func updateSelectionChrome() {
         for row in cellRows.flatMap({ $0 }) {
             row.setRowSelected(row.position.row == selectedRow)
+            row.setCellSelected(selectedCellRange?.contains(row.position) == true)
         }
+    }
+
+    func updateRowSelectionChrome() {
+        updateSelectionChrome()
     }
 
     @objc private func accessibilityAppendTableRow(_ action: NSAccessibilityCustomAction) -> Bool {
@@ -346,3 +370,41 @@ enum AppendTarget {
 
 let appendControlSize: CGFloat = 18
 let appendHoverTolerance: CGFloat = 8
+
+/// Visual table-cell selection used while dragging across cells.
+struct BlockInputTableCellSelection: Equatable {
+    var anchor: BlockInputTable.CellPosition
+    var focus: BlockInputTable.CellPosition
+
+    var rowRange: ClosedRange<Int> {
+        let anchorRow = Self.displayRowIndex(for: anchor.row)
+        let focusRow = Self.displayRowIndex(for: focus.row)
+        return min(anchorRow, focusRow)...max(anchorRow, focusRow)
+    }
+
+    var columnRange: ClosedRange<Int> {
+        min(anchor.column, focus.column)...max(anchor.column, focus.column)
+    }
+
+    init(anchor: BlockInputTable.CellPosition, focus: BlockInputTable.CellPosition) {
+        self.anchor = anchor
+        self.focus = focus
+    }
+
+    func contains(_ position: BlockInputTable.CellPosition) -> Bool {
+        rowRange.contains(Self.displayRowIndex(for: position.row)) && columnRange.contains(position.column)
+    }
+
+    static func displayRowIndex(for row: BlockInputTable.Row) -> Int {
+        switch row {
+        case .header:
+            return 0
+        case .body(let rowIndex):
+            return rowIndex + 1
+        }
+    }
+
+    static func row(forDisplayRowIndex rowIndex: Int) -> BlockInputTable.Row {
+        rowIndex == 0 ? .header : .body(rowIndex - 1)
+    }
+}

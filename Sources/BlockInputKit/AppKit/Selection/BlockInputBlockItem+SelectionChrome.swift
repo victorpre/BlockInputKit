@@ -5,7 +5,7 @@ extension BlockInputBlockItem {
         blockSelectionChrome = chrome
         selectionBackgroundView.isHidden = !chrome.showsContentBackground
         selectionBackgroundView.fillColor = chrome.contentBackgroundColor(style: style)
-        selectionBackgroundView.cornerRadius = chrome.cornerRadius
+        selectionBackgroundView.cornerRadius = selectionChromeCornerRadius(for: chrome)
         updateSelectionChromeFrame()
     }
 
@@ -91,10 +91,23 @@ extension BlockInputBlockItem {
         return BlockInputSelectionBackgroundLayout(frame: frame, segmentFrames: [frame])
     }
 
+    private func selectionChromeCornerRadius(for chrome: BlockInputBlockSelectionChrome) -> CGFloat {
+        guard chrome.showsContentBackground,
+              renderedBlock?.kind == .table,
+              !tableView.isHidden else {
+            return chrome.cornerRadius
+        }
+        return BlockInputTableView.cornerRadius
+    }
+
     private func selectedWholeContentBackgroundFrame() -> NSRect {
         if case .code = renderedBlock?.kind,
            !codeBackgroundView.isHidden {
             return codeBackgroundView.frame.integral
+        }
+        if renderedBlock?.kind == .table,
+           !tableView.isHidden {
+            return tableView.convert(tableView.visibleTableFrame, to: view).integral
         }
         let leadingPadding: CGFloat = 0
         let trailingPadding: CGFloat = 6

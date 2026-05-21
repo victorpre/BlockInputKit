@@ -3,6 +3,14 @@ import AppKit
 extension BlockInputTextView {
     override func keyDown(with event: NSEvent) {
         if blockItem?.isTableCellTextView(self) == true {
+            if !hasMarkedText(),
+               handleTableCellCommandArrow(event) {
+                return
+            }
+            if !hasMarkedText(),
+               blockItem?.handleTableCellKeyDown(event, selectedRange: selectedRange()) == true {
+                return
+            }
             // Table cells keep native arrow and selection movement local to the cell.
             super.keyDown(with: event)
             return
@@ -64,6 +72,85 @@ extension BlockInputTextView {
 
     func requestMouseDownCancelSelectionFromOwningBlock() -> Bool {
         blockItem?.requestMouseDownCancelSelection() == true
+    }
+
+    func handleTableCellKeyEquivalent(_ event: NSEvent) -> Bool {
+        guard blockItem?.isTableCellTextView(self) == true,
+              !hasMarkedText() else {
+            return false
+        }
+        if handleTableCellCommandArrow(event) {
+            return true
+        }
+        return blockItem?.handleTableCellKeyDown(event, selectedRange: selectedRange()) == true
+    }
+
+    func handleTableCellSelectionArrow(_ event: NSEvent) -> Bool {
+        guard blockItem?.isTableCellTextView(self) == true,
+              !hasMarkedText(),
+              event.blockInputSelectionExpansionDirection != nil || event.horizontalSelectionAdjustmentDirection != nil else {
+            return false
+        }
+        return blockItem?.handleTableCellKeyDown(event, selectedRange: selectedRange()) == true
+    }
+
+    func handleTableCellSelectionCommand(_ selector: Selector) -> Bool {
+        switch selector {
+        case #selector(moveUpAndModifySelection(_:)),
+             #selector(moveDownAndModifySelection(_:)),
+             #selector(moveLeftAndModifySelection(_:)),
+             #selector(moveRightAndModifySelection(_:)):
+            return blockItem?.isTableCellTextView(self) == true
+                && blockItem?.handleTableCellCommand(selector, selectedRange: selectedRange()) == true
+        default:
+            return false
+        }
+    }
+
+    func handleTableCellCommandArrow(_ event: NSEvent) -> Bool {
+        guard event.tableCellCommandArrow else {
+            return false
+        }
+        if keyCodeMatches(event, keyCode: 123, character: "\u{F702}") {
+            moveToBeginningOfLine(nil)
+            return true
+        }
+        if keyCodeMatches(event, keyCode: 124, character: "\u{F703}") {
+            moveToEndOfLine(nil)
+            return true
+        }
+        if keyCodeMatches(event, keyCode: 126, character: "\u{F700}") {
+            moveToBeginningOfDocument(nil)
+            return true
+        }
+        if keyCodeMatches(event, keyCode: 125, character: "\u{F701}") {
+            moveToEndOfDocument(nil)
+            return true
+        }
+        return false
+    }
+
+    private func keyCodeMatches(_ event: NSEvent, keyCode: UInt16, character: String) -> Bool {
+        event.keyCode == keyCode || event.charactersIgnoringModifiers == character
+    }
+
+    func handleNonTableSelectionKeyEquivalent(_ event: NSEvent) -> Bool {
+        guard blockItem?.isTableCellTextView(self) != true else {
+            return false
+        }
+        if handleDocumentBoundaryShortcut(event) {
+            BlockInputSelectionDebug.emit("text equivalent consumed document boundary")
+            return true
+        }
+        if handleSelectionExpansionShortcut(event) {
+            BlockInputSelectionDebug.emit("text equivalent consumed")
+            return true
+        }
+        if handleHorizontalSelectionAdjustmentShortcut(event) {
+            BlockInputSelectionDebug.emit("text equivalent consumed horizontal")
+            return true
+        }
+        return false
     }
 
     func rememberBlockSelectionDragRange(_ range: NSRange) {

@@ -82,6 +82,7 @@ extension BlockInputTableView {
             return false
         }
         clearRowSelection()
+        clearCellSelection()
         window?.makeFirstResponder(cellView.textView)
         cellView.textView.setSelectedRange(localRange)
         cellView.textView.scrollRangeToVisible(localRange)
@@ -103,7 +104,8 @@ extension BlockInputTableView {
         }
         let clampedRange = cellView.textView.string.blockInputTableViewClampedRange(localRange)
         selectedRow = nil
-        updateRowSelectionChrome()
+        selectedCellRange = nil
+        updateSelectionChrome()
         window?.makeFirstResponder(cellView.textView)
         cellView.textView.setSelectedRange(clampedRange)
         cellView.textView.scrollRangeToVisible(clampedRange)
@@ -169,7 +171,8 @@ extension BlockInputTableView {
 
     func selectRow(_ row: BlockInputTable.Row) {
         selectedRow = row
-        updateRowSelectionChrome()
+        selectedCellRange = nil
+        updateSelectionChrome()
     }
 
     func isRowSelected(_ row: BlockInputTable.Row) -> Bool {
@@ -185,7 +188,8 @@ extension BlockInputTableView {
             return false
         }
         selectedRow = nil
-        updateRowSelectionChrome()
+        selectedCellRange = nil
+        updateSelectionChrome()
         activeCell.textView.setSelectedRange(fullRange)
         if let sourceSelection = sourceSelection(for: activeCell.textView, localRange: fullRange),
            case let .text(textRange) = sourceSelection {
@@ -199,7 +203,90 @@ extension BlockInputTableView {
             return
         }
         selectedRow = nil
-        updateRowSelectionChrome()
+        updateSelectionChrome()
+    }
+
+    func clearCellSelection() {
+        guard selectedCellRange != nil else {
+            return
+        }
+        selectedCellRange = nil
+        updateSelectionChrome()
+    }
+
+    func clearCellSelectionUnlessDragging() {
+        guard !isDraggingCellSelection else {
+            return
+        }
+        clearCellSelection()
+    }
+
+    func beginCellSelectionDrag(from textView: NSTextView) {
+        cellSelectionDragAnchor = cellView(containing: textView)?.position
+        isDraggingCellSelection = false
+    }
+
+    func updateCellSelectionDrag(from textView: NSTextView, windowLocation: NSPoint) -> Bool {
+        guard let anchor = cellSelectionDragAnchor,
+              let target = cellViewForSelection(atWindowLocation: windowLocation)?.position else {
+            return false
+        }
+        guard target != anchor || isDraggingCellSelection else {
+            return false
+        }
+        isDraggingCellSelection = true
+        selectedRow = nil
+        selectedCellRange = BlockInputTableCellSelection(anchor: anchor, focus: target)
+        updateSelectionChrome()
+        promoteWholeCellSelectionToTableSelectionIfNeeded()
+        return true
+    }
+
+    func finishCellSelectionDrag() -> Bool {
+        guard cellSelectionDragAnchor != nil || isDraggingCellSelection else {
+            return false
+        }
+        let consumed = isDraggingCellSelection
+        cellSelectionDragAnchor = nil
+        isDraggingCellSelection = false
+        return consumed
+    }
+
+    func adjustCellSelection(from textView: NSTextView, vertically direction: BlockInputVerticalMovementDirection) -> Bool {
+        let delta = direction == .upward ? -1 : 1
+        return adjustCellSelection(from: textView, rowDelta: delta, columnDelta: 0)
+    }
+
+    func adjustCellSelection(from textView: NSTextView, horizontally direction: BlockInputHorizontalMovementDirection) -> Bool {
+        let delta = direction == .leftward ? -1 : 1
+        return adjustCellSelection(from: textView, rowDelta: 0, columnDelta: delta)
+    }
+
+    var selectedWholeColumnDeletionPosition: BlockInputTable.CellPosition? {
+        guard let table,
+              let selectedCellRange,
+              selectedCellRange.rowRange == 0...table.bodyRows.count,
+              selectedCellRange.columnRange.lowerBound == selectedCellRange.columnRange.upperBound else {
+            return nil
+        }
+        return BlockInputTable.CellPosition(row: .header, column: selectedCellRange.columnRange.lowerBound)
+    }
+
+    var selectedWholeBodyRowDeletionPosition: BlockInputTable.CellPosition? {
+        guard let selectedCellRange,
+              isSelectedWholeRow(selectedCellRange),
+              selectedCellRange.rowRange.lowerBound > 0 else {
+            return nil
+        }
+        return BlockInputTable.CellPosition(row: .body(selectedCellRange.rowRange.lowerBound - 1), column: 0)
+    }
+
+    var hasSelectedWholeHeaderRow: Bool {
+        guard let selectedCellRange,
+              isSelectedWholeRow(selectedCellRange) else {
+            return false
+        }
+        return selectedCellRange.rowRange.lowerBound == 0
     }
 
     var activeCellView: BlockInputTableCellView? {
@@ -222,6 +309,83 @@ extension BlockInputTableView {
             let localPoint = cell.textView.convert(windowLocation, from: nil)
             return cell.textView.bounds.contains(localPoint)
         }
+    }
+
+    func cellViewForSelection(atWindowLocation windowLocation: NSPoint) -> BlockInputTableCellView? {
+        cellRows.flatMap { $0 }.first { cell in
+            let localPoint = cell.convert(windowLocation, from: nil)
+            return cell.bounds.contains(localPoint)
+        }
+    }
+
+    private func adjustCellSelection(from textView: NSTextView, rowDelta: Int, columnDelta: Int) -> Bool {
+        guard let table,
+              let activePosition = cellView(containing: textView)?.position else {
+            return false
+        }
+        guard let selection = selectedCellRange else {
+            selectedRow = nil
+            selectedCellRange = BlockInputTableCellSelection(anchor: activePosition, focus: activePosition)
+            updateSelectionChrome()
+            publishActiveCellSourceSelection(from: textView)
+            return true
+        }
+        let targetRowIndex = min(
+            max(BlockInputTableCellSelection.displayRowIndex(for: selection.focus.row) + rowDelta, 0),
+            table.bodyRows.count
+        )
+        let targetColumn = min(max(selection.focus.column + columnDelta, 0), max(table.columnCount - 1, 0))
+        selectedCellRange = BlockInputTableCellSelection(
+            anchor: selection.anchor,
+            focus: BlockInputTable.CellPosition(
+                row: BlockInputTableCellSelection.row(forDisplayRowIndex: targetRowIndex),
+                column: targetColumn
+            )
+        )
+        updateSelectionChrome()
+        if promoteWholeCellSelectionToTableSelectionIfNeeded() {
+            return true
+        }
+        publishActiveCellSourceSelection(from: textView)
+        return true
+    }
+
+    @discardableResult
+    private func promoteWholeCellSelectionToTableSelectionIfNeeded() -> Bool {
+        guard let selectedCellRange,
+              isSelectedWholeTable(selectedCellRange) else {
+            return false
+        }
+        self.selectedCellRange = nil
+        updateSelectionChrome()
+        delegate?.tableViewDidRequestWholeTableSelection(self)
+        return true
+    }
+
+    private func publishActiveCellSourceSelection(from textView: NSTextView) {
+        guard let cell = cellView(containing: textView),
+              let sourceRange = sourceRange(for: textView, localRange: textView.selectedRange()) else {
+            return
+        }
+        delegate?.tableView(self, didChangeSelectionIn: cell.position, sourceRange: sourceRange)
+    }
+
+    private func isSelectedWholeRow(_ selectedCellRange: BlockInputTableCellSelection) -> Bool {
+        guard let table,
+              table.columnCount > 0,
+              selectedCellRange.rowRange.lowerBound == selectedCellRange.rowRange.upperBound else {
+            return false
+        }
+        return selectedCellRange.columnRange == 0...(table.columnCount - 1)
+    }
+
+    private func isSelectedWholeTable(_ selectedCellRange: BlockInputTableCellSelection) -> Bool {
+        guard let table,
+              table.columnCount > 0 else {
+            return false
+        }
+        return selectedCellRange.rowRange == 0...table.bodyRows.count
+            && selectedCellRange.columnRange == 0...(table.columnCount - 1)
     }
 }
 

@@ -66,6 +66,12 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         blockID: BlockInputBlockID,
         didRequestTableColumnAppendFrom position: BlockInputTable.CellPosition?
     ) -> Bool
+    /// Requests the context-menu `Insert Row` mutation at a table cell; final-cell Tab uses this path.
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestTableBodyRowInsertionAt position: BlockInputTable.CellPosition
+    ) -> Bool
     func blockItem(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
@@ -83,6 +89,8 @@ protocol BlockInputBlockItemDelegate: AnyObject {
     ) -> Bool
     func blockItemDidRequestCopyActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRequestCutActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
+    func blockItemDidRequestDeleteActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
+    func blockItemDidRequestSelectTable(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID, selectedRange: NSRange?)
     func blockItemDidRequestReturn(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRequestMergeWithPreviousBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool

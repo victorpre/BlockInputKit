@@ -22,6 +22,7 @@ extension BlockInputTableView {
 
     override func mouseExited(with event: NSEvent) {
         hoveredAppendTarget = nil
+        appendHoverAnchor = nil
         updateAppendControlFrames()
         super.mouseExited(with: event)
     }
@@ -43,10 +44,15 @@ extension BlockInputTableView {
         guard !chromeView.frame.isEmpty,
               !documentView.frame.isEmpty else {
             hoveredAppendTarget = nil
+            appendHoverAnchor = nil
             updateAppendControlFrames()
             return
         }
-        let bottomY = chromeView.frame.minY + documentView.frame.height
+        if keepAppendControlVisibleForButtonHover(localPoint) {
+            updateAppendControlFrames()
+            return
+        }
+        let bottomY = chromeView.frame.maxY
         let rightX = rightTableEdgeXInBounds
         let isOverBottom = localPoint.x >= chromeView.frame.minX
             && localPoint.x <= chromeView.frame.maxX
@@ -56,21 +62,24 @@ extension BlockInputTableView {
             && localPoint.y >= chromeView.frame.minY
             && localPoint.y <= bottomY
         hoveredAppendTarget = isOverRight ? .column : (isOverBottom ? .row : nil)
+        appendHoverAnchor = appendControlAnchor(for: hoveredAppendTarget, localPoint: localPoint, bottomY: bottomY, rightX: rightX)
         updateAppendControlFrames()
     }
 
     func updateAppendControlFrames() {
         let buttonSize = NSSize(width: appendControlSize, height: appendControlSize)
-        let bottomY = chromeView.frame.minY + documentView.frame.height
+        let bottomY = chromeView.frame.maxY
+        let rowCenterX = appendHoverAnchor?.x ?? chromeView.frame.midX
+        let columnCenterY = appendHoverAnchor?.y ?? chromeView.frame.minY + max(documentView.frame.height, 0) / 2
         appendRowButton.frame = NSRect(
-            x: chromeView.frame.midX - buttonSize.width / 2,
+            x: rowCenterX - buttonSize.width / 2,
             y: bottomY - buttonSize.height / 2,
             width: buttonSize.width,
             height: buttonSize.height
         )
         appendColumnButton.frame = NSRect(
             x: rightTableEdgeXInBounds - buttonSize.width / 2,
-            y: chromeView.frame.minY + max(documentView.frame.height - buttonSize.height, 0) / 2,
+            y: columnCenterY - buttonSize.height / 2,
             width: buttonSize.width,
             height: buttonSize.height
         )
@@ -93,5 +102,39 @@ extension BlockInputTableView {
     var rightTableEdgeIsVisible: Bool {
         rightTableEdgeXInBounds >= chromeView.frame.minX - 0.5
             && rightTableEdgeXInBounds <= chromeView.frame.maxX + 0.5
+    }
+
+    private func keepAppendControlVisibleForButtonHover(_ localPoint: NSPoint) -> Bool {
+        switch hoveredAppendTarget {
+        case .row:
+            return appendRowButton.frame.insetBy(dx: -appendHoverTolerance, dy: -appendHoverTolerance).contains(localPoint)
+        case .column:
+            return appendColumnButton.frame.insetBy(dx: -appendHoverTolerance, dy: -appendHoverTolerance).contains(localPoint)
+                && rightTableEdgeIsVisible
+        case nil:
+            return false
+        }
+    }
+
+    private func appendControlAnchor(
+        for target: AppendTarget?,
+        localPoint: NSPoint,
+        bottomY: CGFloat,
+        rightX: CGFloat
+    ) -> NSPoint? {
+        switch target {
+        case .row:
+            return NSPoint(
+                x: min(max(localPoint.x, chromeView.frame.minX), chromeView.frame.maxX),
+                y: bottomY
+            )
+        case .column:
+            return NSPoint(
+                x: rightX,
+                y: min(max(localPoint.y, chromeView.frame.minY), bottomY)
+            )
+        case nil:
+            return nil
+        }
     }
 }

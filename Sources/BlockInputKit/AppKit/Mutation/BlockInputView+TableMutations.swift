@@ -1,6 +1,19 @@
 import AppKit
 
 extension BlockInputView {
+    func blockItemDidRequestSelectTable(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+        refreshDocumentFromStore()
+        guard block(withID: blockID)?.kind == .table else {
+            return
+        }
+        applySelection(.blocks([blockID]), notify: true)
+        if window != nil {
+            window?.makeFirstResponder(self)
+            selectOnlyVisibleBlockItem(item)
+            publishFocusChange(true)
+        }
+    }
+
     func blockItem(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
@@ -30,6 +43,14 @@ extension BlockInputView {
         didRequestTableColumnAppendFrom position: BlockInputTable.CellPosition?
     ) -> Bool {
         appendTableColumn(blockID: blockID)
+    }
+
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestTableBodyRowInsertionAt position: BlockInputTable.CellPosition
+    ) -> Bool {
+        insertTableBodyRow(blockID: blockID, position: position)
     }
 
     func blockItem(
@@ -66,15 +87,37 @@ extension BlockInputView {
             bodyRows: [["", ""]],
             alignments: [.left, .left]
         )
-        let block = BlockInputBlock(kind: .table, text: table.markdown)
+        if let existingBlock = block(at: index),
+           existingBlock.kind.allowsTableContextInsertion,
+           existingBlock.isEmpty {
+            let beforeSelection = selection
+            let replacement = BlockInputBlock(id: existingBlock.id, kind: .table, text: table.markdown)
+            guard let replacementSelection = tableSelection(
+                blockID: replacement.id,
+                table: table,
+                position: BlockInputTable.CellPosition(row: .header, column: 0)
+            ) else {
+                return false
+            }
+            _ = applyGranularBlockReplacement(replacement, at: index, selection: replacementSelection)
+            undoController?.registerBlockReplacementStructuralEdit(
+                actionName: "Insert Table",
+                beforeBlock: existingBlock,
+                afterBlock: replacement,
+                selectionBefore: beforeSelection,
+                selectionAfter: replacementSelection
+            )
+            return true
+        }
+        let insertedBlock = BlockInputBlock(kind: .table, text: table.markdown)
         guard let afterSelection = tableSelection(
-            blockID: block.id,
+            blockID: insertedBlock.id,
             table: table,
             position: BlockInputTable.CellPosition(row: .header, column: 0)
         ) else {
             return false
         }
-        return insertBlock(block, at: index + 1, actionName: "Insert Table", selectionAfter: afterSelection)
+        return insertBlock(insertedBlock, at: index + 1, actionName: "Insert Table", selectionAfter: afterSelection)
     }
 
     @discardableResult
@@ -118,6 +161,40 @@ extension BlockInputView {
         let updatedTable = table.appendingColumn()
         let focus = BlockInputTable.CellPosition(row: .header, column: table.columnCount)
         return replaceTableBlock(blockID: blockID, with: updatedTable, focus: focus, actionName: "Append Column")
+    }
+
+    @discardableResult
+    func insertTableBodyRow(blockID: BlockInputBlockID, position: BlockInputTable.CellPosition) -> Bool {
+        guard let beforeBlock = block(withID: blockID),
+              let table = BlockInputTable(markdown: beforeBlock.text) else {
+            return false
+        }
+        let insertionIndex: Int
+        switch position.row {
+        case .header:
+            insertionIndex = 0
+        case .body(let rowIndex):
+            insertionIndex = rowIndex + 1
+        }
+        guard let updatedTable = table.insertingBodyRow(at: insertionIndex) else {
+            return false
+        }
+        let focus = BlockInputTable.CellPosition(row: .body(insertionIndex), column: 0)
+        return replaceTableBlock(blockID: blockID, with: updatedTable, focus: focus, actionName: "Insert Row")
+    }
+
+    @discardableResult
+    func insertTableColumn(blockID: BlockInputBlockID, position: BlockInputTable.CellPosition) -> Bool {
+        guard let beforeBlock = block(withID: blockID),
+              let table = BlockInputTable(markdown: beforeBlock.text) else {
+            return false
+        }
+        let insertionColumn = position.column + 1
+        guard let updatedTable = table.insertingColumn(at: insertionColumn) else {
+            return false
+        }
+        let focus = BlockInputTable.CellPosition(row: position.row, column: insertionColumn)
+        return replaceTableBlock(blockID: blockID, with: updatedTable, focus: focus, actionName: "Insert Column")
     }
 
     @discardableResult

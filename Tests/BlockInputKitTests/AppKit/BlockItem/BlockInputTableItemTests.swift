@@ -53,6 +53,31 @@ final class BlockInputTableItemTests: XCTestCase {
         XCTAssertEqual(item.testingTableView.frame.minX, 28, accuracy: 0.5)
     }
 
+    func testTableSurfaceUsesExternalVerticalInset() {
+        let item = configuredItem(block: Self.compactTable())
+
+        XCTAssertEqual(item.testingTableView.frame.minY, BlockInputBlockItem.tableExternalVerticalInset, accuracy: 0.5)
+        XCTAssertEqual(
+            item.view.bounds.height - item.testingTableView.frame.maxY,
+            BlockInputBlockItem.tableExternalVerticalInset,
+            accuracy: 0.5
+        )
+    }
+
+    func testWholeTableSelectionChromeMatchesVisibleTableFrame() {
+        let item = configuredItem(block: Self.compactTable(), isSelected: true)
+        let expectedFrame = item.testingTableView
+            .convert(item.testingTableView.visibleTableFrame, to: item.view)
+            .integral
+
+        XCTAssertFalse(item.testingSelectionBackgroundView.isHidden)
+        XCTAssertEqual(item.testingSelectionBackgroundView.frame.minX, expectedFrame.minX, accuracy: 0.5)
+        XCTAssertEqual(item.testingSelectionBackgroundView.frame.minY, expectedFrame.minY, accuracy: 0.5)
+        XCTAssertEqual(item.testingSelectionBackgroundView.frame.width, expectedFrame.width, accuracy: 0.5)
+        XCTAssertEqual(item.testingSelectionBackgroundView.frame.height, expectedFrame.height, accuracy: 0.5)
+        XCTAssertEqual(item.testingSelectionBackgroundView.cornerRadius, BlockInputTableView.cornerRadius)
+    }
+
     func testWideTableScrollsInternallyAndPreservesHorizontalOffsetAcrossRelayout() throws {
         let item = configuredItem(block: Self.wideTable(), itemWidth: 340, textWidth: 260)
         let overflowScrollView = item.testingTableOverflowScrollView
@@ -85,6 +110,72 @@ final class BlockInputTableItemTests: XCTestCase {
 
         XCTAssertFalse(item.testingAppendTableColumnButton.isHidden)
         XCTAssertEqual(item.testingAppendTableColumnButton.frame.midX, tableFrame.maxX, accuracy: 1)
+    }
+
+    func testAppendRowHoverFollowsMouseAlongBottomBorder() throws {
+        let item = configuredItem(block: Self.compactTable())
+        let tableView = item.testingTableView
+        let tableFrame = tableView.visibleTableFrame
+        let bottomY = tableFrame.maxY
+        let firstPoint = NSPoint(x: tableFrame.minX + 24, y: bottomY)
+        let secondPoint = NSPoint(x: tableFrame.maxX - 18, y: bottomY)
+
+        tableView.updateAppendControlVisibility(for: firstPoint)
+        XCTAssertFalse(item.testingAppendTableRowButton.isHidden)
+        XCTAssertEqual(item.testingAppendTableRowButton.frame.midX, firstPoint.x, accuracy: 1)
+        XCTAssertEqual(item.testingAppendTableRowButton.frame.midY, bottomY, accuracy: 1)
+
+        tableView.updateAppendControlVisibility(for: secondPoint)
+        XCTAssertEqual(item.testingAppendTableRowButton.frame.midX, secondPoint.x, accuracy: 1)
+    }
+
+    func testAppendRowHoverUsesWideTableBottomBorderWithScrollbarReserve() {
+        let item = configuredItem(block: Self.wideTable(), itemWidth: 340, textWidth: 260)
+        let tableView = item.testingTableView
+        let tableFrame = tableView.visibleTableFrame
+        let point = NSPoint(x: tableFrame.midX, y: tableFrame.maxY)
+
+        tableView.updateAppendControlVisibility(for: point)
+
+        XCTAssertFalse(item.testingAppendTableRowButton.isHidden)
+        XCTAssertEqual(item.testingAppendTableRowButton.frame.midY, tableFrame.maxY, accuracy: 1)
+    }
+
+    func testAppendColumnHoverFollowsMouseAlongRightBorder() throws {
+        let item = configuredItem(block: Self.wideTable(), itemWidth: 340, textWidth: 260)
+        let tableView = item.testingTableView
+        let overflowScrollView = item.testingTableOverflowScrollView
+        let documentView = try XCTUnwrap(overflowScrollView.documentView)
+        let tableFrame = tableView.visibleTableFrame
+        let maximumX = max(0, documentView.frame.width - overflowScrollView.contentView.bounds.width)
+        overflowScrollView.contentView.scroll(to: NSPoint(x: maximumX, y: 0))
+        overflowScrollView.reflectScrolledClipView(overflowScrollView.contentView)
+
+        let topPoint = NSPoint(x: tableFrame.maxX, y: tableFrame.minY + 22)
+        let bottomPoint = NSPoint(x: tableFrame.maxX, y: tableFrame.maxY - 30)
+        tableView.updateAppendControlVisibility(for: topPoint)
+        XCTAssertFalse(item.testingAppendTableColumnButton.isHidden)
+        XCTAssertEqual(item.testingAppendTableColumnButton.frame.midY, topPoint.y, accuracy: 1)
+
+        tableView.updateAppendControlVisibility(for: bottomPoint)
+        XCTAssertEqual(item.testingAppendTableColumnButton.frame.midY, bottomPoint.y, accuracy: 1)
+    }
+
+    func testAppendControlHoverClearsOnReuse() {
+        let item = configuredItem(block: Self.compactTable())
+        let tableView = item.testingTableView
+        let tableFrame = tableView.visibleTableFrame
+        tableView.updateAppendControlVisibility(for: NSPoint(x: tableFrame.midX, y: tableFrame.maxY))
+        XCTAssertFalse(item.testingAppendTableRowButton.isHidden)
+
+        item.configure(
+            block: BlockInputBlock(id: "paragraph", text: "Plain text"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+
+        XCTAssertTrue(item.testingAppendTableRowButton.isHidden)
+        XCTAssertTrue(item.testingAppendTableColumnButton.isHidden)
     }
 
     func testHorizontalScrollbarReserveMatchesAlvearyOverflowBehavior() throws {
@@ -191,12 +282,14 @@ final class BlockInputTableItemTests: XCTestCase {
         textWidth: CGFloat = 280,
         allowsReordering: Bool = true,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
+        isSelected: Bool = false,
         embeddedInVerticalScrollView: Bool = false
     ) -> BlockInputBlockItem {
         let item = BlockInputBlockItem.configuredForTesting(
             block: block,
             allowsReordering: allowsReordering,
             editorHorizontalInset: editorHorizontalInset,
+            isSelected: isSelected,
             delegate: BlockInputView()
         )
         item.view.frame = NSRect(

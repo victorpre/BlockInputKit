@@ -16,6 +16,7 @@ extension BlockInputBlockItem {
             return max(
                 metrics.minimumHeight,
                 BlockInputTableView.height(for: table, width: availableTextWidth, style: style)
+                    + (tableExternalVerticalInset * 2)
             )
         }
         if case .code = block.kind {

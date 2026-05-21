@@ -22,6 +22,7 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
     private var alignment: NSTextAlignment = .left
     private var style = BlockInputStyle.default
     private var isRowSelected = false
+    private var isCellSelected = false
     var position = BlockInputTable.CellPosition(row: .header, column: 0)
 
     override init(frame frameRect: NSRect) {
@@ -90,7 +91,7 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
 
     func updateColors() {
         wantsLayer = true
-        if isRowSelected {
+        if isRowSelected || isCellSelected {
             layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.22).cgColor
         } else {
             layer?.backgroundColor = isHeader
@@ -108,6 +109,19 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
         isRowSelected = isSelected
         updateColors()
         updateAccessibility()
+    }
+
+    func setCellSelected(_ isSelected: Bool) {
+        guard isCellSelected != isSelected else {
+            return
+        }
+        isCellSelected = isSelected
+        updateColors()
+        updateAccessibility()
+    }
+
+    var isCellSelectedForTesting: Bool {
+        isCellSelected
     }
 
     private func setup() {
@@ -145,7 +159,14 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
             rowDescription = "body row"
             rowNumber = rowIndex + 1
         }
-        let selectedSuffix = isRowSelected ? ", row selected" : ""
+        let selectedSuffix: String
+        if isRowSelected {
+            selectedSuffix = ", row selected"
+        } else if isCellSelected {
+            selectedSuffix = ", selected"
+        } else {
+            selectedSuffix = ""
+        }
         textView.setAccessibilityLabel(
             "Table cell, \(rowDescription) \(rowNumber), column \(position.column + 1)\(selectedSuffix)"
         )
@@ -157,6 +178,7 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
             return
         }
         tableView.clearRowSelection()
+        tableView.clearCellSelection()
         tableView.delegate?.tableView(tableView, didBeginEditing: position)
         if let sourceRange = tableView.sourceRange(for: textView, localRange: textView.selectedRange()) {
             tableView.delegate?.tableView(tableView, didChangeSelectionIn: position, sourceRange: sourceRange)
@@ -194,6 +216,7 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
             return
         }
         tableView.clearRowSelection()
+        tableView.clearCellSelectionUnlessDragging()
         tableView.delegate?.tableView(tableView, didChangeSelectionIn: position, sourceRange: sourceRange)
     }
 

@@ -192,12 +192,14 @@ Cells are editable text views. Bold, italic, underline, strikethrough, Insert Li
 
 Keyboard behavior inside cells:
 
-- `Tab` and `Shift+Tab` move left-to-right or right-to-left through cells, falling through at table boundaries.
+- `Tab` and `Shift+Tab` move left-to-right or right-to-left through cells. `Tab` from the final cell inserts a body row below the current row through the same path as `Insert Row`; `Shift+Tab` falls through from the first cell.
 - `Return` and `Shift+Return` move vertically when another cell exists; at table boundaries they insert a paragraph below or above the table.
+- `Shift+Arrow` starts at the current cell and expands or collapses a rectangular cell selection by row or column. `Cmd+Arrow` stays inside the focused cell text, moving to the start or end of the line or cell.
 - Backspace/Delete in an empty body cell selects that row first, then removes it on the next press. Removing the last body row leaves one empty body row. Empty header cells can select the header row, but the header row is not removed.
+- Backspace/Delete on a selected whole body row or whole column removes that row or column. Selected header rows are consumed without deleting the header row.
 - `Cmd+A` first selects the current cell contents, then the whole table block, then all blocks.
 
-Right-click menus show table actions directly below `Insert Link`: `Insert Table`, `Delete Row`, `Delete Column`, then `Delete Table`, omitting actions that do not apply. `Insert Table` adds a two-column table below paragraphs, headings, quotes, bulleted lists, numbered lists, and checklists. `Delete Row` is shown only for removable body rows, `Delete Column` only when more than one column exists, and `Delete Table` only inside tables.
+Right-click menus show table actions directly below `Insert Link`: `Insert Table`, `Insert Row`, `Insert Column`, `Delete Row`, `Delete Column`, then `Delete Table`, omitting actions that do not apply. `Insert Table` adds a two-column table below paragraphs, headings, quotes, bulleted lists, numbered lists, and checklists, and converts an empty applicable block into the table instead of appending another block. `Insert Row` and `Insert Column` appear inside tables, `Delete Row` is shown only for removable body rows, `Delete Column` only when more than one column exists, and `Delete Table` only inside tables.
 
 Whole-table and mixed selections copy/cut normalized table Markdown. Partial cell selections copy/cut only selected cell text. Public cursor/text selections whose UTF-16 source range is wholly inside one cell focus that cell; selections crossing cells or table syntax become whole-table/block selections. SwiftUI `BlockInputEditor(isFocused:)` restores focus into a table cell when the active selection maps to cell content.
 

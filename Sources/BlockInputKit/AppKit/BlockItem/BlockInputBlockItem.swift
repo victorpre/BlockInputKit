@@ -30,6 +30,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let horizontalRuleInnerInset: CGFloat = defaultTextLeading + 4
     static let frontMatterDividerHeight: CGFloat = 1
     static let frontMatterDividerVerticalInset: CGFloat = 10
+    static let tableExternalVerticalInset: CGFloat = 6
 
     let handleView = BlockInputDragHandleView()
     let kindLabel = BlockInputMarkerView()

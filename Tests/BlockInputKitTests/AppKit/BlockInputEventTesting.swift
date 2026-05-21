@@ -156,6 +156,14 @@ func commandDownEvent() throws -> NSEvent {
     try keyEquivalentEvent(keyCode: 125, characters: "\u{F701}", modifierFlags: .command)
 }
 
+func commandLeftEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 123, characters: "\u{F702}", modifierFlags: .command)
+}
+
+func commandRightEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 124, characters: "\u{F703}", modifierFlags: .command)
+}
+
 func commandShiftDownEvent() throws -> NSEvent {
     try keyEquivalentEvent(keyCode: 125, characters: "\u{F701}", modifierFlags: [.command, .shift])
 }

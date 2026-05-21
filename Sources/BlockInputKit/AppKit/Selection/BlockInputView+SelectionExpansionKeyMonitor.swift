@@ -12,7 +12,9 @@ extension BlockInputView {
             guard let self,
                   isEditorFirstResponder,
                   !linkModalContainsCurrentResponder(),
-                  handleSelectionExpansionKeyEvent(event) || handleHorizontalSelectionAdjustmentKeyEvent(event) else {
+                  handleFocusedTableCellSelectionKeyEvent(event)
+                    || handleSelectionExpansionKeyEvent(event)
+                    || handleHorizontalSelectionAdjustmentKeyEvent(event) else {
                 if event.isArrowKey {
                     BlockInputSelectionDebug.emit("monitor pass selection=\(String(describing: self?.selection))")
                 }
@@ -21,5 +23,40 @@ extension BlockInputView {
             BlockInputSelectionDebug.emit("monitor consumed selection=\(String(describing: selection))")
             return nil
         }
+    }
+
+    func handleFocusedTableCellSelectionKeyEvent(_ event: NSEvent) -> Bool {
+        guard let textView = window?.firstResponder as? BlockInputTextView else {
+            return false
+        }
+        return textView.handleTableCellSelectionArrow(event)
+    }
+
+    func handleFocusedTableCellCommandArrowKeyEvent(_ event: NSEvent) -> Bool {
+        guard let textView = window?.firstResponder as? BlockInputTextView else {
+            return false
+        }
+        return textView.handleTableCellCommandArrow(event)
+    }
+
+    func handleEditorArrowKeyEvent(_ event: NSEvent) -> Bool {
+        if handleFocusedTableCellCommandArrowKeyEvent(event) {
+            return true
+        }
+        if let direction = event.blockInputDocumentBoundaryDirection,
+           moveCaretToDocumentBoundary(direction) {
+            return true
+        }
+        if handleFocusedTableCellSelectionKeyEvent(event) {
+            return true
+        }
+        return handleSelectionExpansionShortcut(event)
+    }
+
+    func handleFocusedTableCellSelectionCommand(_ selector: Selector) -> Bool {
+        guard let textView = window?.firstResponder as? BlockInputTextView else {
+            return false
+        }
+        return textView.handleTableCellSelectionCommand(selector)
     }
 }

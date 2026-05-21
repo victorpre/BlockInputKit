@@ -35,6 +35,41 @@ extension BlockInputView {
         }
     }
 
+    /// Deletes the selected whole blocks.
+    @discardableResult
+    public func deleteSelectedBlocksForBackspaceOrDelete() -> BlockInputSelection? {
+        refreshDocumentFromStore()
+        if case let .mixed(selection) = selection {
+            return deleteMixedSelection(selection)
+        }
+        guard case let .blocks(blockIDs) = selection,
+              !blockIDs.isEmpty else {
+            return nil
+        }
+        if blockIDs.count == 1,
+           let blockID = blockIDs.first,
+           block(withID: blockID)?.kind == .table {
+            return deleteTable(blockID: blockID) ? selection : nil
+        }
+        return performStructuralEdit(
+            named: blockIDs.count == 1 ? "Delete Block" : "Delete Blocks",
+            storeSyncAction: { beforeDocument, afterDocument, _ in
+                if beforeDocument.blocks.count == 1,
+                   let replacementBlock = afterDocument.blocks.first {
+                    return .replaceBlock(replacementBlock)
+                }
+                if beforeDocument.blocks.count == blockIDs.count,
+                   afterDocument.blocks.count == 1 {
+                    return .replaceDocument
+                }
+                return .deleteBlocks(blockIDs)
+            },
+            edit: { document in
+                document.deleteBlocks(blockIDs: blockIDs)
+            }
+        )
+    }
+
     private func performTextViewEditAction(_ action: Selector) -> Bool {
         switch selection {
         case let .cursor(cursor):
@@ -97,6 +132,17 @@ extension BlockInputView {
             return true
         }
         return false
+    }
+
+    private func deleteMixedSelection(_ selection: BlockInputMixedSelection) -> BlockInputSelection? {
+        performStructuralEdit(
+            named: "Delete Selection",
+            storeSyncAction: { _, _, _ in .replaceDocument },
+            edit: { document in
+                let cursor = document.deleteMixedSelection(selection)
+                return cursor.map(BlockInputSelection.cursor)
+            }
+        )
     }
 
     private func blocksForMarkdownCopy(blockIDs: [BlockInputBlockID]) -> [BlockInputBlock] {

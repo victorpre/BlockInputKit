@@ -5,6 +5,29 @@ import AppKit
 /// It inherits the standard block text-view command, menu, paste, and link-click
 /// routing, while table adapters map its local ranges back to table source text.
 final class BlockInputTableCellTextView: BlockInputTextView {
+    override func mouseDown(with event: NSEvent) {
+        if shouldTrackTableCellSelectionDrag(for: event) {
+            blockItem?.beginTableCellSelectionDrag(from: self)
+        } else {
+            _ = blockItem?.finishTableCellSelectionDrag()
+        }
+        super.mouseDown(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if blockItem?.updateTableCellSelectionDrag(from: self, with: event) == true {
+            return
+        }
+        super.mouseDragged(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if blockItem?.finishTableCellSelectionDrag() == true {
+            return
+        }
+        super.mouseUp(with: event)
+    }
+
     func localInsertionRange(atWindowLocation windowLocation: NSPoint) -> NSRange {
         let localLocation = convert(windowLocation, from: nil)
         let offset = characterIndexForInsertion(at: localLocation)
@@ -59,6 +82,15 @@ final class BlockInputTableCellTextView: BlockInputTextView {
         }
         let origin = window.convertPoint(fromScreen: rect.origin)
         return NSRect(origin: origin, size: rect.size)
+    }
+
+    private func shouldTrackTableCellSelectionDrag(for event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        return event.clickCount == 1
+            && !modifiers.contains(.command)
+            && !modifiers.contains(.option)
+            && !modifiers.contains(.control)
+            && !modifiers.contains(.shift)
     }
 }
 

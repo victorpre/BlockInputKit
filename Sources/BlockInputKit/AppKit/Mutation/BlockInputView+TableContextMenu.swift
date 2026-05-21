@@ -23,6 +23,7 @@ extension BlockInputView {
         }
         let position = tableMenuCellPosition(table: table, blockID: blockID, selectedRange: selectedRange, event: event)
         var items: [NSMenuItem] = []
+        items.append(contentsOf: tableInsertionMenuItems(blockID: blockID, position: position))
         if let position,
            case .body = position.row,
            table.bodyRows.count > 1 {
@@ -54,6 +55,24 @@ extension BlockInputView {
             return
         }
         _ = insertTable(after: context.blockID)
+    }
+
+    @objc(blockInputInsertTableRowFromMenu:)
+    func blockInputInsertTableRowFromMenu(_ sender: Any?) {
+        guard let context = (sender as? NSMenuItem)?.representedObject as? BlockInputTableMenuContext,
+              let position = context.position else {
+            return
+        }
+        _ = insertTableBodyRow(blockID: context.blockID, position: position)
+    }
+
+    @objc(blockInputInsertTableColumnFromMenu:)
+    func blockInputInsertTableColumnFromMenu(_ sender: Any?) {
+        guard let context = (sender as? NSMenuItem)?.representedObject as? BlockInputTableMenuContext,
+              let position = context.position else {
+            return
+        }
+        _ = insertTableColumn(blockID: context.blockID, position: position)
     }
 
     @objc(blockInputDeleteTableRowFromMenu:)
@@ -111,9 +130,30 @@ extension BlockInputView {
         }
         return item
     }
+
+    private func tableInsertionMenuItems(
+        blockID: BlockInputBlockID,
+        position: BlockInputTable.CellPosition?
+    ) -> [NSMenuItem] {
+        guard let position else {
+            return []
+        }
+        return [
+            tableMenuItem(
+                title: "Insert Row",
+                action: #selector(blockInputInsertTableRowFromMenu(_:)),
+                context: BlockInputTableMenuContext(blockID: blockID, position: position)
+            ),
+            tableMenuItem(
+                title: "Insert Column",
+                action: #selector(blockInputInsertTableColumnFromMenu(_:)),
+                context: BlockInputTableMenuContext(blockID: blockID, position: position)
+            )
+        ]
+    }
 }
 
-private extension BlockInputBlockKind {
+extension BlockInputBlockKind {
     var allowsTableContextInsertion: Bool {
         switch self {
         case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem:

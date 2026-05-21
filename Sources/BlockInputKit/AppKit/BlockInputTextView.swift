@@ -148,19 +148,11 @@ class BlockInputTextView: NSTextView {
             _ = blockItem?.requestTextFormattingShortcut(formattingShortcut)
             return true
         }
-        if blockItem?.isTableCellTextView(self) != true {
-            if handleDocumentBoundaryShortcut(event) {
-                BlockInputSelectionDebug.emit("text equivalent consumed document boundary")
-                return true
-            }
-            if handleSelectionExpansionShortcut(event) {
-                BlockInputSelectionDebug.emit("text equivalent consumed")
-                return true
-            }
-            if handleHorizontalSelectionAdjustmentShortcut(event) {
-                BlockInputSelectionDebug.emit("text equivalent consumed horizontal")
-                return true
-            }
+        if handleTableCellKeyEquivalent(event) {
+            return true
+        }
+        if handleNonTableSelectionKeyEquivalent(event) {
+            return true
         }
         if event.blockInputIsCopyShortcut,
            copySelectedPlainText() {

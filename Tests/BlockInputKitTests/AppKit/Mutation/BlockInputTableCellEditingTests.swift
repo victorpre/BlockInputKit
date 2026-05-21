@@ -142,24 +142,23 @@ final class BlockInputTableCellEditingTests: XCTestCase {
         XCTAssertTrue(mounted.window.firstResponder === firstBodyCell)
     }
 
-    func testArrowCommandsInsideCellStayOnNativeCellSelection() throws {
+    func testShiftArrowCommandInsideCellRoutesToTableCellSelection() throws {
         let mounted = makeMountedBlockInputView(blocks: [
             Self.tableBlock(),
             BlockInputBlock(id: "after", text: "After")
         ])
         let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
         let cell = try bodyCell(in: item, row: 0, column: 0)
-        let table = try XCTUnwrap(BlockInputTable(markdown: mounted.view.document.blocks[0].text))
         XCTAssertTrue(mounted.window.makeFirstResponder(cell))
 
         cell.setSelectedRange(NSRange(location: 0, length: 0))
         cell.doCommand(by: #selector(NSResponder.moveRightAndModifySelection(_:)))
 
-        XCTAssertEqual(cell.selectedRange(), NSRange(location: 0, length: 1))
         XCTAssertEqual(
-            mounted.view.selection,
-            table.selection(blockID: "table", position: .init(row: .body(0), column: 0), localRange: NSRange(location: 0, length: 1))
+            item.testingSelectedTableCellRange,
+            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 0))
         )
+        XCTAssertNotEqual(mounted.view.selection, .blocks(["table"]))
 
         cell.doCommand(by: #selector(NSResponder.moveDown(_:)))
 
@@ -283,10 +282,12 @@ final class BlockInputTableCellEditingTests: XCTestCase {
         )))
         let insertLinkIndex = try XCTUnwrap(menu.items.firstIndex { $0.title == "Insert Link" })
 
-        XCTAssertEqual(menu.items[insertLinkIndex + 1].title, "Delete Row")
-        XCTAssertEqual(menu.items[insertLinkIndex + 2].title, "Delete Column")
-        XCTAssertEqual(menu.items[insertLinkIndex + 3].title, "Delete Table")
-        XCTAssertEqual(menu.items[insertLinkIndex + 1].accessibilityLabel(), "Delete Row")
+        XCTAssertEqual(menu.items[insertLinkIndex + 1].title, "Insert Row")
+        XCTAssertEqual(menu.items[insertLinkIndex + 2].title, "Insert Column")
+        XCTAssertEqual(menu.items[insertLinkIndex + 3].title, "Delete Row")
+        XCTAssertEqual(menu.items[insertLinkIndex + 4].title, "Delete Column")
+        XCTAssertEqual(menu.items[insertLinkIndex + 5].title, "Delete Table")
+        XCTAssertEqual(menu.items[insertLinkIndex + 3].accessibilityLabel(), "Delete Row")
     }
 
     func testContextMenuOmitsUnavailableTableActions() throws {
@@ -302,6 +303,8 @@ final class BlockInputTableCellEditingTests: XCTestCase {
 
         XCTAssertNil(menu.item(withTitle: "Delete Row"))
         XCTAssertNil(menu.item(withTitle: "Delete Column"))
+        XCTAssertNotNil(menu.item(withTitle: "Insert Row"))
+        XCTAssertNotNil(menu.item(withTitle: "Insert Column"))
         XCTAssertNotNil(menu.item(withTitle: "Delete Table"))
     }
 

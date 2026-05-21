@@ -149,6 +149,17 @@ extension NSEvent {
         return verticalMovementDirection
     }
 
+    var tableCellCommandArrow: Bool {
+        let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers.contains(.command),
+              !modifiers.contains(.shift),
+              !modifiers.contains(.option),
+              !modifiers.contains(.control) else {
+            return false
+        }
+        return isArrowKey
+    }
+
     var plainVerticalMovementDirection: BlockInputVerticalMovementDirection? {
         let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard !modifiers.contains(.command),

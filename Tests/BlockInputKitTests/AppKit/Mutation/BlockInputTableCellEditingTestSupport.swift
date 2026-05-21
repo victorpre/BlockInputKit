@@ -47,3 +47,24 @@ func tableEditingTextView(in view: BlockInputView) throws -> BlockInputTextView 
     let item = try XCTUnwrap(view.visibleBlockItemForTesting(at: 0))
     return item.textView
 }
+
+@MainActor
+func tableCell(
+    in item: BlockInputBlockItem,
+    row: Int,
+    column: Int,
+    columnCount: Int
+) throws -> BlockInputTableCellTextView {
+    let index = row * columnCount + column
+    return try XCTUnwrap(item.testingTableCellTextViews.indices.contains(index) ? item.testingTableCellTextViews[index] : nil)
+}
+
+@MainActor
+func bodyCell(
+    in item: BlockInputBlockItem,
+    row: Int,
+    column: Int,
+    columnCount: Int = 2
+) throws -> BlockInputTableCellTextView {
+    try tableCell(in: item, row: row + 1, column: column, columnCount: columnCount)
+}

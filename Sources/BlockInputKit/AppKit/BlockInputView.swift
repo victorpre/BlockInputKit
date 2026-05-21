@@ -120,8 +120,7 @@ public final class BlockInputView: NSView {
     public override func keyDown(with event: NSEvent) {
         if linkModalContainsCurrentResponder() { super.keyDown(with: event); return }
         if event.isCancelOperation, cancelMultiBlockSelection() { return }
-        if let direction = event.blockInputDocumentBoundaryDirection, moveCaretToDocumentBoundary(direction) { return }
-        if handleSelectionExpansionShortcut(event) { return }
+        if handleEditorArrowKeyEvent(event) { return }
         if handleWordMovementShortcut(event) { return }
         if let direction = event.plainVerticalMovementDirection, collapseMultiBlockSelection(direction: direction) { return }
         if let direction = event.verticalMovementDirection, moveSelectedBlockVertically(direction) { return }
@@ -139,6 +138,7 @@ public final class BlockInputView: NSView {
         }
         if selector == #selector(moveUp(_:)), collapseMultiBlockSelection(direction: .upward) { return }
         if selector == #selector(moveDown(_:)), collapseMultiBlockSelection(direction: .downward) { return }
+        if handleFocusedTableCellSelectionCommand(selector) { return }
         if handleDocumentBoundaryCommand(selector) ||
             handleSelectionExpansionCommand(selector) ||
             handleHorizontalSelectionAdjustmentCommand(selector) ||
@@ -154,8 +154,7 @@ public final class BlockInputView: NSView {
             _ = performTextFormattingShortcut(formattingShortcut)
             return true
         }
-        if let direction = event.blockInputDocumentBoundaryDirection, moveCaretToDocumentBoundary(direction) { return true }
-        if handleSelectionExpansionShortcut(event) { return true }
+        if handleEditorArrowKeyEvent(event) { return true }
         if handleWordMovementShortcut(event) { return true }
         if event.blockInputIsCopyShortcut,
            copyActiveSelection() {
@@ -293,47 +292,6 @@ public final class BlockInputView: NSView {
                     return document.deleteBlock(at: deletionIndex)
                 }
                 return document.deleteBlock(blockID: blockID)
-            }
-        )
-    }
-
-    /// Deletes the selected whole blocks.
-    @discardableResult
-    public func deleteSelectedBlocksForBackspaceOrDelete() -> BlockInputSelection? {
-        refreshDocumentFromStore()
-        if case let .mixed(selection) = selection {
-            return deleteMixedSelection(selection)
-        }
-        guard case let .blocks(blockIDs) = selection,
-              !blockIDs.isEmpty else {
-            return nil
-        }
-        return performStructuralEdit(
-            named: blockIDs.count == 1 ? "Delete Block" : "Delete Blocks",
-            storeSyncAction: { beforeDocument, afterDocument, _ in
-                if beforeDocument.blocks.count == 1,
-                   let replacementBlock = afterDocument.blocks.first {
-                    return .replaceBlock(replacementBlock)
-                }
-                if beforeDocument.blocks.count == blockIDs.count,
-                   afterDocument.blocks.count == 1 {
-                    return .replaceDocument
-                }
-                return .deleteBlocks(blockIDs)
-            },
-            edit: { document in
-                document.deleteBlocks(blockIDs: blockIDs)
-            }
-        )
-    }
-
-    private func deleteMixedSelection(_ selection: BlockInputMixedSelection) -> BlockInputSelection? {
-        performStructuralEdit(
-            named: "Delete Selection",
-            storeSyncAction: { _, _, _ in .replaceDocument },
-            edit: { document in
-                let cursor = document.deleteMixedSelection(selection)
-                return cursor.map(BlockInputSelection.cursor)
             }
         )
     }

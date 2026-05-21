@@ -66,11 +66,11 @@ final class BlockInputTableOverflowScrollView: NSScrollView {
 
     @objc
     private func contentBoundsDidChange() {
-        guard contentView.bounds.origin.y != 0 else {
-            return
+        if contentView.bounds.origin.y != 0 {
+            contentView.scroll(to: NSPoint(x: contentView.bounds.origin.x, y: 0))
+            reflectScrolledClipView(contentView)
         }
-        contentView.scroll(to: NSPoint(x: contentView.bounds.origin.x, y: 0))
-        reflectScrolledClipView(contentView)
+        tableViewAncestor?.updateAppendControlFrames()
     }
 
     private func shouldForwardVerticalScroll(_ event: NSEvent) -> Bool {
@@ -104,9 +104,19 @@ final class BlockInputTableOverflowScrollView: NSScrollView {
         var candidate = superview
         while let view = candidate {
             if let scrollView = view as? NSScrollView,
-               scrollView !== self,
-               scrollView.hasVerticalScroller {
+               scrollView !== self {
                 return scrollView
+            }
+            candidate = view.superview
+        }
+        return nil
+    }
+
+    private var tableViewAncestor: BlockInputTableView? {
+        var candidate = superview
+        while let view = candidate {
+            if let tableView = view as? BlockInputTableView {
+                return tableView
             }
             candidate = view.superview
         }

@@ -27,6 +27,9 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
     }
 
     func handleTableCellCommand(_ selector: Selector, selectedRange: NSRange) -> Bool {
+        if handleTableCellSelectionCommand(selector) {
+            return true
+        }
         switch selector {
         case #selector(insertTab(_:)):
             return moveTableFocus(.forward)
@@ -37,7 +40,7 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
         case #selector(insertNewlineIgnoringFieldEditor(_:)):
             return moveTableFocusVertically(.above)
         case #selector(deleteBackward(_:)), #selector(deleteForward(_:)):
-            return handleTableCellDelete(selectedRange: selectedRange)
+            return handleTableCellDeleteCommand(selectedRange: selectedRange)
         case #selector(selectAll(_:)):
             requestSelectAll()
             return true
@@ -46,6 +49,73 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
         default:
             return false
         }
+    }
+
+    private func handleTableCellDeleteCommand(selectedRange: NSRange) -> Bool {
+        if deleteActiveTableSelectionIfNeeded() {
+            return true
+        }
+        if deleteSelectedTableCellsIfNeeded() {
+            return true
+        }
+        return handleTableCellDelete(selectedRange: selectedRange)
+    }
+
+    private func handleTableCellSelectionCommand(_ selector: Selector) -> Bool {
+        switch selector {
+        case #selector(moveUpAndModifySelection(_:)):
+            return adjustTableCellSelectionVertically(.upward)
+        case #selector(moveDownAndModifySelection(_:)):
+            return adjustTableCellSelectionVertically(.downward)
+        case #selector(moveLeftAndModifySelection(_:)):
+            return adjustTableCellSelectionHorizontally(.leftward)
+        case #selector(moveRightAndModifySelection(_:)):
+            return adjustTableCellSelectionHorizontally(.rightward)
+        default:
+            return false
+        }
+    }
+
+    func handleTableCellKeyDown(_ event: NSEvent, selectedRange: NSRange) -> Bool {
+        if let direction = event.blockInputSelectionExpansionDirection {
+            return adjustTableCellSelectionVertically(direction)
+        }
+        if let direction = event.horizontalSelectionAdjustmentDirection {
+            return adjustTableCellSelectionHorizontally(direction)
+        }
+        guard event.isBackspaceOrDelete else {
+            return false
+        }
+        let selector = event.keyCode == 117 || event.charactersIgnoringModifiers == "\u{F728}"
+            ? #selector(deleteForward(_:))
+            : #selector(deleteBackward(_:))
+        return handleTableCellCommand(selector, selectedRange: selectedRange)
+    }
+
+    func beginTableCellSelectionDrag(from textView: NSTextView) {
+        tableView.beginCellSelectionDrag(from: textView)
+    }
+
+    func updateTableCellSelectionDrag(from textView: NSTextView, with event: NSEvent) -> Bool {
+        tableView.updateCellSelectionDrag(from: textView, windowLocation: event.locationInWindow)
+    }
+
+    func finishTableCellSelectionDrag() -> Bool {
+        tableView.finishCellSelectionDrag()
+    }
+
+    private func adjustTableCellSelectionVertically(_ direction: BlockInputVerticalMovementDirection) -> Bool {
+        guard let activeCellView = tableView.activeCellView else {
+            return false
+        }
+        return tableView.adjustCellSelection(from: activeCellView.textView, vertically: direction)
+    }
+
+    private func adjustTableCellSelectionHorizontally(_ direction: BlockInputHorizontalMovementDirection) -> Bool {
+        guard let activeCellView = tableView.activeCellView else {
+            return false
+        }
+        return tableView.adjustCellSelection(from: activeCellView.textView, horizontally: direction)
     }
 
     func tableView(_ tableView: BlockInputTableView, didBeginEditing position: BlockInputTable.CellPosition) {
@@ -70,6 +140,14 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
         }
         updateSelectionDependentAttributesForCurrentSelection()
         delegate?.blockItem(self, didChangeSelectionIn: blockID, selectedRange: sourceRange)
+    }
+
+    func tableViewDidRequestWholeTableSelection(_ tableView: BlockInputTableView) {
+        guard let blockID else {
+            return
+        }
+        updateSelectionDependentAttributesForCurrentSelection()
+        delegate?.blockItemDidRequestSelectTable(self, blockID: blockID)
     }
 
     func tableView(
@@ -126,7 +204,11 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
             ? tableView.nextCellPosition(after: position)
             : tableView.previousCellPosition(before: position)
         guard let target else {
-            return false
+            guard direction == .forward else {
+                return false
+            }
+            // Final-cell Tab inserts below the current row, matching the context-menu Insert Row behavior.
+            return delegate?.blockItem(self, blockID: blockID, didRequestTableBodyRowInsertionAt: position) ?? false
         }
         return delegate?.blockItem(self, blockID: blockID, didRequestTableFocus: target) ?? false
     }
@@ -157,6 +239,28 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
         }
         tableView.selectRow(position.row)
         return true
+    }
+
+    private func deleteActiveTableSelectionIfNeeded() -> Bool {
+        guard let blockID else {
+            return false
+        }
+        return delegate?.blockItemDidRequestDeleteActiveSelection(self, blockID: blockID) ?? false
+    }
+
+    private func deleteSelectedTableCellsIfNeeded() -> Bool {
+        guard let blockID else {
+            return false
+        }
+        if let position = tableView.selectedWholeColumnDeletionPosition {
+            _ = delegate?.blockItem(self, blockID: blockID, didRequestTableColumnDeletionAt: position)
+            return true
+        }
+        if let position = tableView.selectedWholeBodyRowDeletionPosition {
+            _ = delegate?.blockItem(self, blockID: blockID, didRequestTableBodyRowDeletionAt: position)
+            return true
+        }
+        return tableView.hasSelectedWholeHeaderRow
     }
 }
 

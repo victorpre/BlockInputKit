@@ -315,6 +315,14 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         }
     }
 
+    func blockItemDidRequestDeleteActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
+        guard selection == .blocks([blockID]),
+              block(withID: blockID)?.kind == .table else {
+            return false
+        }
+        return deleteSelectedBlocksForBackspaceOrDelete() != nil
+    }
+
     func blockItem(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
