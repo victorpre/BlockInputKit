@@ -30,7 +30,7 @@ extension BlockInputView {
         prefersClickedOffset: Bool
     ) -> BlockInputLinkContext? {
         guard let block = block(withID: blockID),
-              BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
+              supportsInlineLinkMutation(in: block, range: selectedRange) else {
             return nil
         }
         let item = visibleItem(for: blockID, refreshConfiguration: false)
@@ -59,6 +59,9 @@ extension BlockInputView {
         let linkLookupRange = prefersClickedOffset && clickedOffset != nil
             ? NSRange(location: clickedOffset ?? range.location, length: 0)
             : range
+        guard supportsInlineLinkMutation(in: block, range: linkLookupRange) else {
+            return nil
+        }
         if let linkRange = linkRange(in: block.text, containing: linkLookupRange) {
             return linkEditContext(
                 blockID: blockID,
@@ -152,11 +155,11 @@ extension BlockInputView {
         switch context.mode {
         case .create(let range):
             mode = .create
-            text = range.length > 0 ? (block.text as NSString).substring(with: block.text.blockInputLinkClampedRange(range)) : ""
+            text = range.length > 0 ? linkCreationText(in: block, range: range) : ""
             urlString = ""
         case .edit(let linkRange):
             mode = .edit
-            text = linkText(in: block.text, range: linkRange)
+            text = linkText(in: block, range: linkRange)
             urlString = linkRange.linkDestination?.absoluteString ?? ""
         }
         modal.configure(mode: mode, text: text, urlString: urlString)
@@ -268,7 +271,7 @@ extension BlockInputView {
         case .edit(let linkRange):
             return applyLinkEdit(
                 context: context,
-                text: linkText(in: block.text, range: linkRange),
+                text: linkText(in: block, range: linkRange),
                 urlString: urlString,
                 actionName: "Edit Link",
                 selectsResultingText: false
@@ -276,7 +279,7 @@ extension BlockInputView {
         case .create(let range):
             let label: String
             if range.length > 0 {
-                label = (block.text as NSString).substring(with: block.text.blockInputLinkClampedRange(range))
+                label = linkCreationText(in: block, range: range)
             } else {
                 label = urlString
             }
@@ -324,7 +327,7 @@ extension BlockInputView {
               var block = block(at: index) else {
             return false
         }
-        let text = linkText(in: block.text, range: linkRange)
+        let text = linkText(in: block, range: linkRange)
         let replacement = BlockInputLinkReplacement(
             text: text,
             selectedUTF16Length: (text as NSString).length,
@@ -358,6 +361,10 @@ extension BlockInputView {
         (text as NSString).substring(with: text.blockInputLinkClampedRange(range.contentRange)).blockInputUnescapedLinkLabel
     }
 
+    func linkText(in block: BlockInputBlock, range: BlockInputInlineMarkdownRange) -> String {
+        linkText(in: block, sourceRange: range.contentRange).blockInputUnescapedLinkLabel
+    }
+
     private func replaceLinkSource(
         context: BlockInputLinkContext,
         block: inout BlockInputBlock,
@@ -380,26 +387,20 @@ extension BlockInputView {
             }
             replacementRange = block.text.blockInputLinkClampedRange(existingLinkRange.fullRange)
         }
+        if block.kind == .table {
+            return replaceTableCellLinkSource(BlockInputTableCellLinkReplacement(
+                block: block,
+                beforeBlock: beforeBlock,
+                beforeSelection: beforeSelection,
+                index: index,
+                replacementRange: replacementRange,
+                replacement: replacement
+            ))
+        }
         let mutableText = NSMutableString(string: block.text)
         mutableText.replaceCharacters(in: replacementRange, with: replacement.text)
         block.text = mutableText as String
-        let contentOffset: Int
-        if replacement.actionName == "Remove Link" {
-            contentOffset = replacementRange.location
-        } else {
-            contentOffset = replacementRange.location + 1
-        }
-        let afterSelection: BlockInputSelection
-        if replacement.selectsResultingText {
-            afterSelection = .text(BlockInputTextRange(
-                blockID: block.id,
-                range: NSRange(location: contentOffset, length: replacement.selectedUTF16Length)
-            ))
-        } else {
-            // Pasted URL links should behave like normal paste: the caret lands after the inserted Markdown.
-            let cursorOffset = replacementRange.location + (replacement.text as NSString).length
-            afterSelection = .cursor(BlockInputCursor(blockID: block.id, utf16Offset: cursorOffset))
-        }
+        let afterSelection = linkReplacementSelection(block: block, replacementRange: replacementRange, replacement: replacement)
         _ = applyGranularBlockReplacement(block, at: index, selection: afterSelection)
         undoController?.registerBlockReplacementStructuralEdit(
             actionName: replacement.actionName,
@@ -409,6 +410,36 @@ extension BlockInputView {
             selectionAfter: afterSelection
         )
         return true
+    }
+
+    private func linkReplacementSelection(
+        block: BlockInputBlock,
+        replacementRange: NSRange,
+        replacement: BlockInputLinkReplacement
+    ) -> BlockInputSelection {
+        if replacement.selectsResultingText {
+            let contentOffset = replacement.actionName == "Remove Link" ? replacementRange.location : replacementRange.location + 1
+            return .text(BlockInputTextRange(
+                blockID: block.id,
+                range: NSRange(location: contentOffset, length: replacement.selectedUTF16Length)
+            ))
+        }
+        let cursorOffset = replacementRange.location + (replacement.text as NSString).length
+        return .cursor(BlockInputCursor(blockID: block.id, utf16Offset: cursorOffset))
+    }
+
+    private func supportsInlineLinkMutation(in block: BlockInputBlock, range: NSRange) -> Bool {
+        if BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) {
+            return true
+        }
+        guard block.kind == .table,
+              let table = BlockInputTable(markdown: block.text) else {
+            return false
+        }
+        guard let position = table.cellPosition(containingSourceRange: range) else {
+            return false
+        }
+        return table.localRange(forSourceRange: range, in: position) != nil
     }
 
     private func linkInsertionRange(
@@ -423,10 +454,25 @@ extension BlockInputView {
         }
         return NSRange(location: clickedOffset, length: 0)
     }
+
+    private func linkCreationText(in block: BlockInputBlock, range: NSRange) -> String {
+        linkText(in: block, sourceRange: range)
+    }
+
+    private func linkText(in block: BlockInputBlock, sourceRange: NSRange) -> String {
+        if block.kind == .table,
+           let table = BlockInputTable(markdown: block.text),
+           let position = table.cellPosition(containingSourceRange: sourceRange),
+           let localRange = table.localRange(forSourceRange: sourceRange, in: position),
+           let cell = table.cell(at: position) {
+            return (cell.text as NSString).substring(with: cell.text.blockInputLinkClampedRange(localRange))
+        }
+        return (block.text as NSString).substring(with: block.text.blockInputLinkClampedRange(sourceRange))
+    }
 }
 
 /// Replacement payload used by link mutations to keep source text and resulting selection decisions together.
-private struct BlockInputLinkReplacement {
+struct BlockInputLinkReplacement {
     var text: String
     var selectedUTF16Length: Int
     var selectsResultingText: Bool

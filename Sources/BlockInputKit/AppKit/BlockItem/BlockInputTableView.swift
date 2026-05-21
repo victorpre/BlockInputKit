@@ -1,5 +1,25 @@
 import AppKit
 
+@MainActor
+protocol BlockInputTableViewDelegate: AnyObject {
+    func tableView(_ tableView: BlockInputTableView, didBeginEditing position: BlockInputTable.CellPosition)
+    func tableView(_ tableView: BlockInputTableView, didEndEditing position: BlockInputTable.CellPosition)
+    func tableView(_ tableView: BlockInputTableView, didChangeSelectionIn position: BlockInputTable.CellPosition, sourceRange: NSRange)
+    func tableView(
+        _ tableView: BlockInputTableView,
+        didChangeText text: String,
+        in position: BlockInputTable.CellPosition,
+        selectedLocalRange: NSRange,
+        selectionBefore: BlockInputSelection?
+    )
+    func tableView(
+        _ tableView: BlockInputTableView,
+        shouldChangeTextIn position: BlockInputTable.CellPosition,
+        affectedLocalRange: NSRange,
+        replacementString: String?
+    ) -> Bool
+}
+
 /// AppKit table surface used by table blocks.
 ///
 /// The view owns a horizontally scrollable table document and mirrors the
@@ -20,6 +40,9 @@ final class BlockInputTableView: NSView {
     private var table: BlockInputTable?
     private var style = BlockInputStyle.default
     private var hasAppliedInitialScrollPosition = false
+    private var configuredBlockID: BlockInputBlockID?
+    weak var delegate: BlockInputTableViewDelegate?
+    weak var blockItem: BlockInputBlockItem?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -52,9 +75,12 @@ final class BlockInputTableView: NSView {
             resetForReuse()
             return
         }
+        if configuredBlockID != block.id {
+            hasAppliedInitialScrollPosition = false
+            configuredBlockID = block.id
+        }
         self.table = table
         self.style = style
-        hasAppliedInitialScrollPosition = false
         rebuildCells(for: table, style: style)
         isHidden = false
         needsLayout = true
@@ -62,6 +88,7 @@ final class BlockInputTableView: NSView {
 
     func resetForReuse() {
         table = nil
+        configuredBlockID = nil
         style = .default
         hasAppliedInitialScrollPosition = false
         cellRows.flatMap { $0 }.forEach { $0.removeFromSuperview() }
@@ -74,12 +101,104 @@ final class BlockInputTableView: NSView {
         isHidden = true
     }
 
+    func updateTableAfterCellEdit(_ table: BlockInputTable) {
+        self.table = table
+        needsLayout = true
+        documentView.needsLayout = true
+    }
+
     var visibleTableFrame: NSRect {
         chromeView.frame
     }
 
     var overflowScrollViewForTesting: NSScrollView {
         scrollView
+    }
+
+    var activeCellSelectedSourceRange: NSRange? {
+        guard let activeCell = activeCellView else {
+            return nil
+        }
+        return sourceRange(for: activeCell.textView, localRange: activeCell.textView.selectedRange())
+    }
+
+    func isTableCellTextView(_ textView: NSTextView) -> Bool {
+        cellView(containing: textView) != nil
+    }
+
+    func sourceRange(for textView: NSTextView, localRange: NSRange) -> NSRange? {
+        guard let table,
+              let cellView = cellView(containing: textView) else {
+            return nil
+        }
+        return table.sourceRange(forLocalRange: localRange, in: cellView.position)
+    }
+
+    func sourceSelection(for textView: NSTextView, localRange: NSRange) -> BlockInputSelection? {
+        guard let configuredBlockID,
+              let sourceRange = sourceRange(for: textView, localRange: localRange) else {
+            return nil
+        }
+        if sourceRange.length == 0 {
+            return .cursor(BlockInputCursor(blockID: configuredBlockID, utf16Offset: sourceRange.location))
+        }
+        return .text(BlockInputTextRange(blockID: configuredBlockID, range: sourceRange))
+    }
+
+    func sourceInlineMarkdownRange(
+        for textView: NSTextView,
+        localRange: BlockInputInlineMarkdownRange
+    ) -> BlockInputInlineMarkdownRange? {
+        guard let sourceFullRange = sourceRange(for: textView, localRange: localRange.fullRange),
+              let sourceContentRange = sourceRange(for: textView, localRange: localRange.contentRange) else {
+            return nil
+        }
+        let delimiterRanges = localRange.delimiterRanges.compactMap { sourceRange(for: textView, localRange: $0) }
+        guard delimiterRanges.count == localRange.delimiterRanges.count else {
+            return nil
+        }
+        return BlockInputInlineMarkdownRange(
+            style: localRange.style,
+            fullRange: sourceFullRange,
+            contentRange: sourceContentRange,
+            delimiterRanges: delimiterRanges,
+            linkDestination: localRange.linkDestination
+        )
+    }
+
+    func sourceOffset(atWindowLocation windowLocation: NSPoint) -> Int? {
+        guard let cellView = cellView(atWindowLocation: windowLocation) else {
+            return nil
+        }
+        let localRange = cellView.textView.localInsertionRange(atWindowLocation: windowLocation)
+        guard let sourceRange = sourceRange(for: cellView.textView, localRange: localRange) else {
+            return nil
+        }
+        return sourceRange.location
+    }
+
+    func anchorWindowRect(forSourceRange range: NSRange) -> NSRect? {
+        guard let table,
+              let position = table.cellPosition(containingSourceRange: range),
+              let localRange = table.localRange(forSourceRange: range, in: position),
+              let cellView = cellView(at: position) else {
+            return nil
+        }
+        return cellView.textView.anchorWindowRect(forLocalRange: localRange)
+    }
+
+    @discardableResult
+    func focusSourceRange(_ range: NSRange) -> Bool {
+        guard let table,
+              let position = table.cellPosition(containingSourceRange: range),
+              let localRange = table.localRange(forSourceRange: range, in: position),
+              let cellView = cellView(at: position) else {
+            return false
+        }
+        window?.makeFirstResponder(cellView.textView)
+        cellView.textView.setSelectedRange(localRange)
+        cellView.textView.scrollRangeToVisible(localRange)
+        return true
     }
 
     static func height(for table: BlockInputTable, width: CGFloat, style: BlockInputStyle = .default) -> CGFloat {
@@ -118,16 +237,25 @@ final class BlockInputTableView: NSView {
         cellRows = rowModels.enumerated().map { rowIndex, row in
             (0..<table.columnCount).map { columnIndex in
                 let cell = BlockInputTableCellView()
-                cell.configure(
+                cell.configure(BlockInputTableCellConfiguration(
                     text: row[columnIndex].text,
                     isHeader: rowIndex == 0,
                     alignment: Self.textAlignment(for: table.alignments[columnIndex]),
-                    style: style
-                )
+                    style: style,
+                    position: Self.cellPosition(rowIndex: rowIndex, columnIndex: columnIndex),
+                    tableView: self,
+                    blockItem: blockItem
+                ))
                 documentView.addSubview(cell)
                 return cell
             }
         }
+    }
+
+    private static func cellPosition(rowIndex: Int, columnIndex: Int) -> BlockInputTable.CellPosition {
+        rowIndex == 0
+            ? .init(row: .header, column: columnIndex)
+            : .init(row: .body(rowIndex - 1), column: columnIndex)
     }
 
     private func layoutTable() {
@@ -252,7 +380,7 @@ final class BlockInputTableView: NSView {
         return ceil(max(layoutManager.usedRect(for: textContainer).height, lineHeight(isHeader: isHeader, style: style)) + cellVerticalPadding * 2)
     }
 
-    fileprivate static func attributedString(
+    static func attributedString(
         _ text: String,
         isHeader: Bool,
         alignment: NSTextAlignment,
@@ -306,67 +434,27 @@ final class BlockInputTableView: NSView {
         }
         return ceil(NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy))
     }
-}
 
-private final class BlockInputTableCellView: NSView {
-    private let textView = NSTextView()
-    private var isHeader = false
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        setup()
+    private var activeCellView: BlockInputTableCellView? {
+        guard let responder = window?.firstResponder as? NSTextView else {
+            return nil
+        }
+        return cellView(containing: responder)
     }
 
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setup()
+    private func cellView(containing textView: NSTextView) -> BlockInputTableCellView? {
+        cellRows.flatMap { $0 }.first { $0.textView === textView }
     }
 
-    override var isFlipped: Bool {
-        true
+    private func cellView(at position: BlockInputTable.CellPosition) -> BlockInputTableCellView? {
+        cellRows.flatMap { $0 }.first { $0.position == position }
     }
 
-    override func layout() {
-        super.layout()
-        textView.frame = bounds.insetBy(dx: BlockInputTableView.cellHorizontalPadding, dy: BlockInputTableView.cellVerticalPadding)
-        textView.textContainer?.containerSize = NSSize(width: textView.frame.width, height: CGFloat.greatestFiniteMagnitude)
-        textView.layoutSubtreeIfNeeded()
-    }
-
-    func configure(text: String, isHeader: Bool, alignment: NSTextAlignment, style: BlockInputStyle) {
-        self.isHeader = isHeader
-        textView.textStorage?.setAttributedString(BlockInputTableView.attributedString(
-            text,
-            isHeader: isHeader,
-            alignment: alignment,
-            style: style
-        ))
-        updateColors()
-    }
-
-    func updateColors() {
-        wantsLayer = true
-        layer?.backgroundColor = isHeader
-            ? NSColor.separatorColor.withAlphaComponent(0.08).cgColor
-            : NSColor.textBackgroundColor.withAlphaComponent(0.01).cgColor
-        layer?.borderColor = NSColor.separatorColor.cgColor
-        layer?.borderWidth = 0.5
-    }
-
-    private func setup() {
-        wantsLayer = true
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.drawsBackground = false
-        textView.backgroundColor = .clear
-        textView.textContainerInset = .zero
-        textView.textContainer?.lineFragmentPadding = 0
-        textView.textContainer?.widthTracksTextView = true
-        textView.isHorizontallyResizable = false
-        textView.isVerticallyResizable = true
-        textView.autoresizingMask = [.width]
-        addSubview(textView)
-        updateColors()
+    private func cellView(atWindowLocation windowLocation: NSPoint) -> BlockInputTableCellView? {
+        cellRows.flatMap { $0 }.first { cell in
+            let localPoint = cell.textView.convert(windowLocation, from: nil)
+            return cell.textView.bounds.contains(localPoint)
+        }
     }
 }
 

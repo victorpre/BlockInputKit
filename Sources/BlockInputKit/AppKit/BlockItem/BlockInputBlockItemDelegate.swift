@@ -24,6 +24,13 @@ enum BlockInputLinkBoundaryDeletionDirection: Equatable {
     case forward
 }
 
+struct BlockInputTableCellTextChange {
+    var text: String
+    var position: BlockInputTable.CellPosition
+    var selectedLocalRange: NSRange
+    var selectionBefore: BlockInputSelection?
+}
+
 @MainActor
 protocol BlockInputBlockItemDelegate: AnyObject {
     func blockItemDidBeginEditing(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
@@ -33,6 +40,11 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         blockID: BlockInputBlockID,
         didChangeText text: String,
         selectionBefore: BlockInputSelection?
+    )
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didChangeTableCellText change: BlockInputTableCellTextChange
     )
     func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID)
     func blockItemDidRequestReturn(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool

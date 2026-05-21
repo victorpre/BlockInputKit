@@ -70,6 +70,10 @@ extension BlockInputBlockItem {
     }
 
     func utf16Offset(atWindowLocation windowLocation: NSPoint) -> Int {
+        if !tableView.isHidden,
+           let offset = tableView.sourceOffset(atWindowLocation: windowLocation) {
+            return offset
+        }
         let textLength = (textView.string as NSString).length
         let localLocation = textView.convert(windowLocation, from: nil)
         let offset = textView.characterIndexForInsertion(at: localLocation)
@@ -78,6 +82,10 @@ extension BlockInputBlockItem {
 
     /// Returns a window-coordinate caret anchor for popovers that originate at a collapsed text offset.
     func anchorWindowRect(forUTF16Offset offset: Int) -> NSRect {
+        if !tableView.isHidden,
+           let tableAnchor = tableView.anchorWindowRect(forSourceRange: NSRange(location: offset, length: 0)) {
+            return tableAnchor
+        }
         let clampedOffset = min(max(offset, 0), (textView.string as NSString).length)
         guard let window = textView.window else {
             return .zero
@@ -92,6 +100,10 @@ extension BlockInputBlockItem {
 
     /// Returns a window-coordinate anchor over visible glyphs, falling back to a caret anchor when layout has no glyphs.
     func anchorWindowRect(forUTF16Range range: NSRange) -> NSRect {
+        if !tableView.isHidden,
+           let tableAnchor = tableView.anchorWindowRect(forSourceRange: range) {
+            return tableAnchor
+        }
         guard range.length > 0,
               let layoutManager = textView.layoutManager,
               let textContainer = textView.textContainer else {

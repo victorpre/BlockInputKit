@@ -8,7 +8,7 @@ extension BlockInputView {
         }
         let segments = context.segments
         let style = TextFormattingStyle(shortcut)
-        let shouldRemove = segments.allSatisfy { style.formattedRange(in: $0.block.text, selectedRange: $0.range) != nil }
+        let shouldRemove = segments.allSatisfy { $0.formattedRange(for: style) != nil }
         let result = formattedBlocks(from: segments, style: style, removesFormatting: shouldRemove, originalSelection: context.selection)
         guard !result.changedBlocks.isEmpty else {
             return false
@@ -57,7 +57,7 @@ extension BlockInputView {
         return BlockInputTextFormattingMenuAction.all.map { action in
             let style = TextFormattingStyle(action.shortcut)
             let isFormatted = context.segments.allSatisfy {
-                style.formattedRange(in: $0.block.text, selectedRange: $0.range) != nil
+                $0.formattedRange(for: style) != nil
             }
             return BlockInputTextFormattingMenuItemState(
                 action: action,
@@ -184,6 +184,21 @@ extension BlockInputView {
         range: NSRange,
         trimsHiddenDelimiters: Bool
     ) -> TextFormattingSegment? {
+        if block.kind == .table {
+            guard trimsHiddenDelimiters,
+                  let table = BlockInputTable(markdown: block.text),
+                  let tableRange = table.formattingSourceRange(containing: range),
+                  let cell = table.cell(at: tableRange.position) else {
+                return nil
+            }
+            return TextFormattingSegment(
+                block: block,
+                range: tableRange.sourceRange,
+                tableCellPosition: tableRange.position,
+                tableLocalRange: tableRange.localRange,
+                tableCellText: cell.text
+            )
+        }
         guard BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
             return nil
         }
@@ -262,6 +277,14 @@ extension BlockInputView {
     ) -> FormattedBlock {
         var text = block.text
         var adjustedRanges: [BlockInputBlockID: NSRange] = [:]
+        if block.kind == .table {
+            return formattedTableBlock(
+                block,
+                segments: segments,
+                style: style,
+                removesFormatting: removesFormatting
+            )
+        }
         for segment in segments.sorted(by: { $0.range.location > $1.range.location }) {
             let edit = removesFormatting
                 ? style.removingFormatting(in: text, selectedRange: segment.range)
@@ -275,6 +298,42 @@ extension BlockInputView {
         }
         var afterBlock = block
         afterBlock.text = text
+        return FormattedBlock(block: afterBlock, adjustedRanges: adjustedRanges)
+    }
+
+    private func formattedTableBlock(
+        _ block: BlockInputBlock,
+        segments: [TextFormattingSegment],
+        style: TextFormattingStyle,
+        removesFormatting: Bool
+    ) -> FormattedBlock {
+        guard var table = BlockInputTable(markdown: block.text) else {
+            return FormattedBlock(block: block, adjustedRanges: [:])
+        }
+        var adjustedRanges: [BlockInputBlockID: NSRange] = [:]
+        let sortedSegments = segments.sorted {
+            ($0.tableLocalRange?.location ?? $0.range.location) > ($1.tableLocalRange?.location ?? $1.range.location)
+        }
+        for segment in sortedSegments {
+            guard let position = segment.tableCellPosition,
+                  let cell = table.cell(at: position),
+                  let localRange = segment.tableLocalRange else {
+                adjustedRanges[segment.block.id] = segment.range
+                continue
+            }
+            let edit = removesFormatting
+                ? style.removingFormatting(in: cell.text, selectedRange: localRange)
+                : style.addingFormatting(in: cell.text, selectedRange: localRange)
+            guard let edit,
+                  let updatedTable = table.replacingCellText(row: position.row, column: position.column, text: edit.text) else {
+                adjustedRanges[segment.block.id] = segment.range
+                continue
+            }
+            table = updatedTable
+            adjustedRanges[segment.block.id] = table.sourceRange(forLocalRange: edit.selectedRange, in: position) ?? segment.range
+        }
+        var afterBlock = block
+        afterBlock.text = table.markdown
         return FormattedBlock(block: afterBlock, adjustedRanges: adjustedRanges)
     }
 
@@ -317,6 +376,31 @@ extension BlockInputView {
 private struct TextFormattingSegment {
     var block: BlockInputBlock
     var range: NSRange
+    var tableCellPosition: BlockInputTable.CellPosition?
+    var tableLocalRange: NSRange?
+    var tableCellText: String?
+
+    init(
+        block: BlockInputBlock,
+        range: NSRange,
+        tableCellPosition: BlockInputTable.CellPosition? = nil,
+        tableLocalRange: NSRange? = nil,
+        tableCellText: String? = nil
+    ) {
+        self.block = block
+        self.range = range
+        self.tableCellPosition = tableCellPosition
+        self.tableLocalRange = tableLocalRange
+        self.tableCellText = tableCellText
+    }
+
+    func formattedRange(for style: TextFormattingStyle) -> FormattingRange? {
+        if let tableCellText,
+           let tableLocalRange {
+            return style.formattedRange(in: tableCellText, selectedRange: tableLocalRange)
+        }
+        return style.formattedRange(in: block.text, selectedRange: range)
+    }
 }
 
 /// Batched formatting output used to apply edits and register one undo operation.

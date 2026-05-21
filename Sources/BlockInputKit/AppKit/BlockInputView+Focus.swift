@@ -278,6 +278,7 @@ extension BlockInputView {
     }
 
     func applySelection(_ selection: BlockInputSelection?, notify: Bool) {
+        let selection = normalizedTableSelection(selection)
         BlockInputSelectionDebug.emit("apply selection=\(String(describing: selection)) notify=\(notify)")
         dismissLinkModalIfSelectionMovedOutside(selection)
         self.selection = selection

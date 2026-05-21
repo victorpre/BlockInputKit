@@ -51,6 +51,10 @@ extension BlockInputBlockItem {
         tableView.overflowScrollViewForTesting
     }
 
+    var testingTableCellTextViews: [BlockInputTableCellTextView] {
+        view.descendants(of: BlockInputTableCellTextView.self)
+    }
+
     var testingHandleView: BlockInputDragHandleView? {
         view.firstDescendant(of: BlockInputDragHandleView.self)
     }
@@ -132,5 +136,16 @@ private extension NSView {
             }
         }
         return nil
+    }
+
+    func descendants<View: NSView>(of type: View.Type) -> [View] {
+        var matches: [View] = []
+        if let view = self as? View {
+            matches.append(view)
+        }
+        for subview in subviews {
+            matches.append(contentsOf: subview.descendants(of: type))
+        }
+        return matches
     }
 }

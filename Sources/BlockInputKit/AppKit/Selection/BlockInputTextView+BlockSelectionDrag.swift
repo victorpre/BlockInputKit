@@ -12,6 +12,9 @@ extension BlockInputTextView {
     ///
     /// Modified clicks and multi-clicks are standard `NSTextView` selection gestures and must remain native.
     func shouldTrackBlockSelectionDrag(for event: NSEvent) -> Bool {
+        guard blockItem?.isTableCellTextView(self) != true else {
+            return false
+        }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         return event.clickCount == 1
             && !modifiers.contains(.command)

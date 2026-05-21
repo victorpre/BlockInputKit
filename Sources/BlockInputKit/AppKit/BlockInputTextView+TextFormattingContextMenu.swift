@@ -34,7 +34,7 @@ extension BlockInputTextView {
     }
 
     func textFormattingMenuItems(for event: NSEvent) -> [NSMenuItem] {
-        let selectedRange = selectedRange()
+        let selectedRange = blockInputSourceSelectedRange()
         guard selectedRange.length > 0,
               window?.firstResponder === self else {
             return blockItem?.textFormattingContextMenuItems(for: event) ?? []
@@ -45,7 +45,7 @@ extension BlockInputTextView {
     }
 
     func linkContextMenuItems(for event: NSEvent) -> [NSMenuItem] {
-        return blockItem?.linkContextMenuItems(for: event, selectedRange: selectedRange()) ?? []
+        return blockItem?.linkContextMenuItems(for: event, selectedRange: blockInputSourceSelectedRange()) ?? []
     }
 
     private func requestTextFormattingShortcutFromContextMenu(_ shortcut: BlockInputTextFormattingShortcut) -> Bool {

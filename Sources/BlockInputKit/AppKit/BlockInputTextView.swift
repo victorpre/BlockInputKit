@@ -1,20 +1,12 @@
 import AppKit
 
 /// Text view wrapper that forwards block-aware commands and cross-block drag selection to its owning block item.
-///
-/// AppKit owns native text selection inside one `NSTextView`; this subclass captures enough range and anchor information
-/// during plain mouse drags for `BlockInputView` to promote the drag into the editor-level mixed selection model.
-///
-/// Modified clicks and multi-clicks stay on AppKit's native path so standard word, paragraph, and extended text-field
-/// gestures keep working. Plain drags use editor-owned selection chrome to avoid gray native selection paint layering
-/// over mixed block-selection endpoints.
-final class BlockInputTextView: NSTextView {
+class BlockInputTextView: NSTextView {
     weak var blockItem: BlockInputBlockItem?
     var isDraggingBlockSelection = false
     var blockSelectionDragMonitor: Any?
     var blockSelectionDragTimer: Timer?
-    // Cross-block drags carry a logical text range while the native NSTextView selection stays collapsed. This keeps
-    // AppKit's inactive gray selection paint out of editor-owned partial selection chrome during mouse tracking.
+    // Cross-block drags carry a logical range while native selection stays collapsed to avoid stale gray selection paint.
     var blockSelectionDragSelectedRange: NSRange?
     var blockSelectionLocalDragRange: NSRange?
     var blockSelectionDragAnchorOffset: Int?
@@ -94,6 +86,11 @@ final class BlockInputTextView: NSTextView {
         if isUsingNativeMouseSelection {
             super.mouseUp(with: event)
             isUsingNativeMouseSelection = false
+            return
+        }
+        if blockItem?.isTableCellTextView(self) == true,
+           selectedRange().length == 0,
+           requestLinkClickIfNeeded(with: event) {
             return
         }
         if completeTrackedMouseUp(with: event) {
@@ -187,7 +184,7 @@ final class BlockInputTextView: NSTextView {
     override func paste(_ sender: Any?) {
         // Supported URL paste is the only custom path; invalid or unsupported pasteboard contents fall through to AppKit.
         if let urlString = BlockInputLinkURL.supportedURLString(),
-           blockItem?.requestPasteURL(urlString, selectedRange: selectedRange()) == true {
+           blockItem?.requestPasteURL(urlString, selectedRange: blockInputSourceSelectedRange()) == true {
             return
         }
         super.paste(sender)
@@ -297,6 +294,9 @@ final class BlockInputTextView: NSTextView {
     }
 
     private func handleBlockCommand(_ selector: Selector) -> Bool {
+        if blockItem?.isTableCellTextView(self) == true {
+            return blockItem?.handleTableCellCommand(selector, selectedRange: selectedRange()) ?? false
+        }
         switch selector {
         case #selector(insertNewline(_:)):
             guard let blockItem else {
@@ -394,7 +394,12 @@ final class BlockInputTextView: NSTextView {
     private func copySelectedPlainText() -> Bool {
         let range = selectedRange()
         let copiedText: String?
-        if var block = blockItem?.renderedBlock {
+        if blockItem?.isTableCellTextView(self) == true {
+            let clampedRange = string.clampedRange(range)
+            copiedText = clampedRange.length > 0
+                ? (string as NSString).substring(with: clampedRange)
+                : nil
+        } else if var block = blockItem?.renderedBlock {
             block.text = string
             copiedText = block.markdownAwareCopiedText(in: range)
         } else {
@@ -483,7 +488,6 @@ private extension BlockInputTextView {
         return nil
     }
 }
-
 private extension String {
     func clampedRange(_ range: NSRange) -> NSRange {
         let text = self as NSString

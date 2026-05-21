@@ -36,9 +36,14 @@ extension BlockInputTextView {
         }
         let location = convert(event.locationInWindow, from: nil)
         let offset = blockSelectionDragAnchorOffset ?? characterIndexForInsertion(at: location)
-        let clickedLinkRange = blockSelectionClickLinkRange ?? linkHitResult(for: event)?.range
+        let localRange = NSRange(location: offset, length: 0)
+        let selectedRange = blockItem?.sourceSelectedRange(for: self, localRange: localRange) ?? localRange
+        let localClickedLinkRange = blockSelectionClickLinkRange ?? linkHitResult(for: event)?.range
+        let clickedLinkRange = localClickedLinkRange.flatMap {
+            blockItem?.sourceInlineMarkdownRange(for: self, localRange: $0) ?? $0
+        }
         return blockItem?.requestLinkClick(
-            selectedRange: NSRange(location: offset, length: 0),
+            selectedRange: selectedRange,
             clickedLinkRange: clickedLinkRange,
             event: event
         ) == true
@@ -282,10 +287,7 @@ extension BlockInputTextView {
     }
 
     private var supportsInlineMarkdownLinkRendering: Bool {
-        guard let kind = blockItem?.renderedBlock?.kind else {
-            return false
-        }
-        return BlockInputBlockItem.supportsInlineMarkdownStyling(kind)
+        blockItem?.supportsInlineMarkdownLinkRendering(for: self) == true
     }
 
     private func inlineChipBackgroundRects(

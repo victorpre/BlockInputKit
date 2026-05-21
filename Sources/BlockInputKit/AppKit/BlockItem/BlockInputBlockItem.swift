@@ -82,7 +82,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     private var isHorizontalRule = false
 
     var currentSelectedRange: NSRange {
-        textView.selectedRange()
+        tableView.activeCellSelectedSourceRange ?? textView.selectedRange()
     }
 
     var currentText: String {
@@ -181,6 +181,8 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         horizontalRuleView.blockItem = self
         horizontalRuleView.accentColor = accentColor
         textView.blockItem = self
+        tableView.blockItem = self
+        tableView.delegate = self
         textView.updateFileDropCaretColor(accentColor)
         let text = block.kind == .horizontalRule ? "" : block.text
         if textView.string != text {
@@ -215,27 +217,16 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         updateSelectionChromeFrame()
     }
 
-    func focusText(atUTF16Offset offset: Int) {
-        view.window?.makeFirstResponder(textView)
-        textView.setSelectedRange(NSRange(
-            location: min(max(offset, 0), (textView.string as NSString).length),
-            length: 0
-        ))
-        textView.scrollRangeToVisible(textView.selectedRange())
-        updateSelectionDependentAttributesForCurrentSelection()
-    }
-
-    func focusText(inUTF16Range range: NSRange) {
-        view.window?.makeFirstResponder(textView)
-        textView.setSelectedRange(range)
-        textView.scrollRangeToVisible(range)
-        updateSelectionDependentAttributesForCurrentSelection()
-    }
-
-    func setSelectedRange(_ range: NSRange) {
-        textView.setSelectedRange(range)
-        textView.scrollRangeToVisible(range)
-        updateSelectionDependentAttributesForCurrentSelection()
+    func updateTableCellEditState(for block: BlockInputBlock) {
+        let wasConfiguringBlock = isConfiguringBlock
+        isConfiguringBlock = true
+        defer { isConfiguringBlock = wasConfiguringBlock }
+        renderedBlock = block
+        if textView.string != block.text {
+            textView.string = block.text
+        }
+        tableView.needsLayout = true
+        updateSelectionChromeFrame()
     }
 
     func collapseNativeSelectionIfNeeded(at offset: Int? = nil) {
@@ -476,6 +467,8 @@ extension BlockInputBlockItem {
         scrollView.blockItem = nil
         horizontalRuleView.blockItem = nil
         horizontalRuleView.resetForReuse()
+        tableView.blockItem = nil
+        tableView.delegate = nil
         renderedCodeColorScheme = nil
         textView.cancelBlockSelectionDrag()
         textView.blockItem = nil

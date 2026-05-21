@@ -363,7 +363,7 @@ struct BlockInputTable: Equatable {
             .trimmingCharacters(in: .whitespaces)
     }
 
-    private static func escapeCellText(_ text: String) -> String {
+    static func escapeCellText(_ text: String) -> String {
         var output = ""
         var index = text.startIndex
         var codeDelimiterLength = 0

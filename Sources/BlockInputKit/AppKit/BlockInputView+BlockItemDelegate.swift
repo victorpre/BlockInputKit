@@ -123,7 +123,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         publishDocumentChange()
     }
 
-    private func shouldInvalidateLayoutForTextChange(
+    func shouldInvalidateLayoutForTextChange(
         item: BlockInputBlockItem,
         beforeBlock: BlockInputBlock,
         afterBlock: BlockInputBlock
