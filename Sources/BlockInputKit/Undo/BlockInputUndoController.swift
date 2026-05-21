@@ -2,7 +2,9 @@ import Foundation
 
 /// Result of an undo or redo operation, including the selection to restore.
 public struct BlockInputUndoResult: Equatable, Sendable {
+    /// Selection that should be restored after applying the undo or redo result.
     public var selection: BlockInputSelection?
+    /// Human-readable action name for menu titles and history UI.
     public var actionName: String
     var replacedBlock: BlockInputBlock?
     var replacedBlocks: [BlockInputBlock]?
@@ -47,6 +49,7 @@ public final class BlockInputUndoController {
     private var undoOrder: [BlockInputHistoryOperation] = []
     private var redoOrder: [BlockInputHistoryOperation] = []
 
+    /// Creates an empty undo controller.
     public init() {}
 
     func canUndoTextEdit(in blockID: BlockInputBlockID) -> Bool {

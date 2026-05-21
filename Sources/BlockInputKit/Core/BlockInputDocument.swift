@@ -11,6 +11,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         }
     }
 
+    /// Creates a document from ordered blocks, normalizing empty input to one paragraph.
     public init(blocks: [BlockInputBlock] = [.emptyParagraph()]) {
         self.blocks = blocks.isEmpty ? [.emptyParagraph()] : blocks
     }

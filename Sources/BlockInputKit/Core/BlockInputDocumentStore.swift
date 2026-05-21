@@ -100,11 +100,13 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, Block
         indexesByID = Self.indexesByID(for: document)
     }
 
+    /// Returns a detached complete document snapshot.
     @MainActor
     public func completeDocumentSnapshot(limit: Int) async throws -> BlockInputDocument {
         document.detachedStorage()
     }
 
+    /// Returns the effective block at `index`, including any pending marker overrides.
     public func block(at index: Int) -> BlockInputBlock? {
         lock.lock()
         defer { lock.unlock() }
@@ -114,6 +116,7 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, Block
         return effectiveBlock(storedDocument.blocks[index], at: index)
     }
 
+    /// Replaces the complete in-memory document and clears pending marker overrides.
     public func replaceDocument(_ document: BlockInputDocument) {
         lock.lock()
         defer { lock.unlock() }
@@ -122,6 +125,7 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, Block
         rebuildIndexes()
     }
 
+    /// Returns the effective block with `id`, including any pending marker overrides.
     public func block(withID id: BlockInputBlockID) -> BlockInputBlock? {
         lock.lock()
         defer { lock.unlock() }
@@ -131,12 +135,14 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, Block
         return effectiveBlock(storedDocument.blocks[index], at: index)
     }
 
+    /// Returns the ordered index for a block ID.
     public func index(of id: BlockInputBlockID) -> Int? {
         lock.lock()
         defer { lock.unlock() }
         return unlockedIndex(of: id)
     }
 
+    /// Replaces an existing block while preserving store indexes and marker state.
     public func replaceBlock(_ block: BlockInputBlock) {
         lock.lock()
         defer { lock.unlock() }
@@ -147,6 +153,7 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, Block
         removeMarkerOverride(for: block.id)
     }
 
+    /// Inserts blocks at an ordered index while preserving leading frontmatter.
     public func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
         lock.lock()
         defer { lock.unlock() }
@@ -167,6 +174,7 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, Block
         }
     }
 
+    /// Deletes blocks by stable ID.
     public func deleteBlocks(withIDs ids: [BlockInputBlockID]) {
         lock.lock()
         defer { lock.unlock() }
@@ -194,6 +202,7 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, Block
         indexesNeedRebuild = true
     }
 
+    /// Moves a block and normalizes affected numbered-list markers.
     public func moveBlock(withID id: BlockInputBlockID, to index: Int) {
         lock.lock()
         defer { lock.unlock() }
@@ -216,6 +225,7 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, Block
         updateIndexesAfterMove(from: sourceIndex, to: finalTargetIndex)
     }
 
+    /// Moves a block without normalizing numbered-list markers.
     public func moveBlockWithoutNormalizing(withID id: BlockInputBlockID, to index: Int) {
         lock.lock()
         defer { lock.unlock() }
@@ -249,6 +259,7 @@ public final class BlockInputMemoryDocumentStore: BlockInputDocumentStore, Block
         updateIndexesAfterMove(from: sourceIndex, to: finalTargetIndex)
     }
 
+    /// Applies deferred numbered-list marker adjustments to effective block reads.
     public func applyNumberedListMarkerTransaction(_ transaction: BlockInputNumberedListMarkerTransaction) {
         lock.lock()
         defer { lock.unlock() }

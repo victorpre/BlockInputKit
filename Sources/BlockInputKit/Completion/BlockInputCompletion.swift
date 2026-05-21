@@ -2,7 +2,9 @@ import Foundation
 
 /// Completion mode requested by a block editor.
 public enum BlockInputCompletionTrigger: Equatable, Codable, Sendable {
+    /// Mention completion triggered by inline mention text.
     case mention
+    /// Slash-command completion triggered by inline slash-command text.
     case slashCommand
 }
 
@@ -26,8 +28,11 @@ public enum BlockInputCompletionPopupPlacement: String, CaseIterable, Equatable,
 public struct BlockInputCompletionFileQuery: Equatable, Sendable {
     /// Directory shorthand typed before the path query.
     public enum DirectoryReference: String, Equatable, Codable, Sendable {
+        /// Query resolves from the current directory shorthand.
         case current
+        /// Query resolves from the parent directory shorthand.
         case parent
+        /// Query resolves from the grandparent directory shorthand.
         case grandparent
     }
 
@@ -38,6 +43,7 @@ public struct BlockInputCompletionFileQuery: Equatable, Sendable {
     /// Query text after the directory shorthand.
     public var remainder: String
 
+    /// Creates parsed file-query intent for a mention completion request.
     public init(
         directoryReference: DirectoryReference?,
         levelsUp: Int,
@@ -68,6 +74,7 @@ public struct BlockInputCompletionContext: Equatable, Sendable {
     /// Parsed file path intent for mention completions, when available.
     public var fileQuery: BlockInputCompletionFileQuery?
 
+    /// Creates host completion lookup context for the active editor request.
     public init(
         trigger: BlockInputCompletionTrigger,
         query: String,
@@ -106,6 +113,7 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
     /// Optional trailing detail shown by built-in completion UI.
     public var detailText: String?
 
+    /// Creates a host-provided completion suggestion.
     public init(
         id: String,
         title: String,

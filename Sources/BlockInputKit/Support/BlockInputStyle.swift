@@ -14,6 +14,7 @@ public struct BlockInputStyle: @unchecked Sendable {
     /// Styling for fenced code block surfaces.
     public var codeBlock: BlockInputCodeBlockStyle
 
+    /// Creates editor styling with optional overrides for built-in visual defaults.
     public init(
         baseText: BlockInputTextStyle = BlockInputTextStyle(),
         selectionBackgroundColor: NSColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.72),
@@ -34,6 +35,7 @@ public struct BlockInputTextStyle: @unchecked Sendable {
     /// Base foreground color. When nil, the editor uses the system label color.
     public var foregroundColor: NSColor?
 
+    /// Creates normal text styling overrides.
     public init(font: NSFont? = nil, foregroundColor: NSColor? = nil) {
         self.font = font
         self.foregroundColor = foregroundColor
@@ -49,6 +51,7 @@ public struct BlockInputInlineCodeStyle: @unchecked Sendable {
     /// Inline code background color. When nil, inline code uses the built-in subtle background color.
     public var backgroundColor: NSColor?
 
+    /// Creates inline code styling overrides.
     public init(font: NSFont? = nil, foregroundColor: NSColor? = nil, backgroundColor: NSColor? = nil) {
         self.font = font
         self.foregroundColor = foregroundColor
@@ -67,6 +70,7 @@ public struct BlockInputCodeBlockStyle: @unchecked Sendable {
     /// Fenced code block corner radius. When nil, code blocks use the built-in radius.
     public var cornerRadius: CGFloat?
 
+    /// Creates fenced code block styling overrides.
     public init(
         font: NSFont? = nil,
         foregroundColor: NSColor? = nil,

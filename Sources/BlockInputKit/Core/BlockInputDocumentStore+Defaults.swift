@@ -63,25 +63,31 @@ public final class BlockInputDocumentStoreObservation: @unchecked Sendable {
 }
 
 public extension BlockInputDocumentStore {
+    /// Default total count for complete stores.
     var totalBlockCount: Int? {
         isComplete ? loadedBlockCount : nil
     }
 
+    /// Default completion state for non-progressive stores.
     var isComplete: Bool {
         true
     }
 
+    /// Default loading state for non-progressive stores.
     var isLoading: Bool {
         false
     }
 
+    /// Default no-op observation for stores that do not emit incremental changes.
     func observeChanges(_ observer: @escaping @MainActor (BlockInputDocumentStoreChange) -> Void) -> BlockInputDocumentStoreObservation {
         BlockInputDocumentStoreObservation()
     }
 
+    /// Default no-op batch load for complete stores.
     @MainActor
     func loadNextBlockBatch(limit: Int) async throws {}
 
+    /// Loads remaining blocks by repeatedly requesting batches until the store is complete.
     @MainActor
     func loadAllRemainingBlocks(limit: Int) async throws {
         while !isComplete {
@@ -94,12 +100,14 @@ public extension BlockInputDocumentStore {
         }
     }
 
+    /// Builds a complete document snapshot from the loaded store contents.
     @MainActor
     func completeDocumentSnapshot(limit: Int) async throws -> BlockInputDocument {
         try await loadAllRemainingBlocks(limit: limit)
         return BlockInputDocument(blocks: (0..<loadedBlockCount).compactMap { block(at: $0) })
     }
 
+    /// Default block replacement implemented by rebuilding a complete document snapshot.
     func replaceBlock(_ block: BlockInputBlock) {
         guard isComplete else {
             return
@@ -115,6 +123,7 @@ public extension BlockInputDocumentStore {
         replaceDocument(updatedDocument)
     }
 
+    /// Default block insertion implemented by rebuilding a complete document snapshot.
     func insertBlocks(_ blocks: [BlockInputBlock], at index: Int) {
         guard isComplete else {
             return
@@ -126,6 +135,7 @@ public extension BlockInputDocumentStore {
         replaceDocument(updatedDocument)
     }
 
+    /// Default deletion implemented by rebuilding a complete document snapshot.
     func deleteBlocks(withIDs ids: [BlockInputBlockID]) {
         guard isComplete else {
             return
@@ -143,6 +153,7 @@ public extension BlockInputDocumentStore {
         replaceDocument(updatedDocument)
     }
 
+    /// Default move implemented by rebuilding a complete document snapshot.
     func moveBlock(withID id: BlockInputBlockID, to index: Int) {
         guard isComplete else {
             return

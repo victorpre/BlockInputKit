@@ -5,10 +5,12 @@ public struct BlockInputBlockID: Hashable, Codable, Sendable, RawRepresentable, 
     /// Host-storable identifier value.
     public var rawValue: String
 
+    /// Creates a block identifier from a host-storable raw value.
     public init(rawValue: String) {
         self.rawValue = rawValue
     }
 
+    /// Creates a block identifier from a string literal.
     public init(stringLiteral value: String) {
         self.rawValue = value
     }
@@ -87,6 +89,7 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
         }
     }
 
+    /// Creates a normalized block with stable identity, kind, text, and indentation metadata.
     public init(
         id: BlockInputBlockID = .unique(),
         kind: BlockInputBlockKind = .paragraph,
@@ -102,6 +105,7 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
         normalizeForKind()
     }
 
+    /// Decodes and normalizes a stored block.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(BlockInputBlockID.self, forKey: .id)

@@ -10,6 +10,7 @@ public struct BlockInputCompletionPopupOverlay {
     /// Popup frame in `container` coordinates.
     public var frame: NSRect
 
+    /// Creates overlay placement with an owning container and popup frame.
     public init(container: NSView, frame: NSRect) {
         self.container = container
         self.frame = frame
@@ -27,6 +28,7 @@ public struct BlockInputCompletionPopupOverlayContext {
     /// Measured popup size before host adjustment.
     public var popupSize: NSSize
 
+    /// Creates host overlay-placement context for a completion popup request.
     public init(
         editorView: BlockInputView,
         defaultContainer: NSView,
@@ -58,6 +60,7 @@ public struct BlockInputCompletionPopupConfiguration {
     /// editor.
     public var overlayProvider: (@MainActor (BlockInputCompletionPopupOverlayContext) -> BlockInputCompletionPopupOverlay?)?
 
+    /// Creates built-in completion popup behavior.
     public init(
         placement: BlockInputCompletionPopupPlacement = .caret,
         overlayProvider: (@MainActor (BlockInputCompletionPopupOverlayContext) -> BlockInputCompletionPopupOverlay?)? = nil
@@ -69,7 +72,9 @@ public struct BlockInputCompletionPopupConfiguration {
 
 /// Slash-command chip click gesture routed to the host.
 public enum BlockInputSlashCommandChipClickKind: Equatable {
+    /// A primary mouse click without the Command modifier.
     case plainClick
+    /// A primary mouse click with the Command modifier.
     case commandClick
 }
 
@@ -100,6 +105,7 @@ public struct BlockInputSlashCommandChipClickContext {
     /// Normalized click kind.
     public var clickKind: BlockInputSlashCommandChipClickKind
 
+    /// Creates host click context for a slash-command chip.
     public init(
         label: String,
         uri: URL,

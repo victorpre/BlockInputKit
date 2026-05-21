@@ -240,6 +240,7 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
         }
     }
 
+    /// Moves a loaded block without normalizing numbered-list markers.
     public func moveBlockWithoutNormalizing(withID id: BlockInputBlockID, to index: Int) {
         locked {
             if !markerTransactions.isEmpty {
@@ -249,6 +250,7 @@ public final class BlockInputProgressiveMemoryDocumentStore: BlockInputDocumentS
         moveBlock(withID: id, to: index)
     }
 
+    /// Applies deferred numbered-list marker adjustments to effective block reads.
     public func applyNumberedListMarkerTransaction(_ transaction: BlockInputNumberedListMarkerTransaction) {
         locked {
             guard !transaction.isEmpty else {
