@@ -340,7 +340,24 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         guard let blockID else {
             return
         }
+        if tableView.selectAllInActiveCellIfNeeded() {
+            return
+        }
         delegate?.blockItemDidRequestSelectAll(self, blockID: blockID)
+    }
+
+    func requestCopyActiveSelection() -> Bool {
+        guard let blockID else {
+            return false
+        }
+        return delegate?.blockItemDidRequestCopyActiveSelection(self, blockID: blockID) ?? false
+    }
+
+    func requestCutActiveSelection() -> Bool {
+        guard let blockID else {
+            return false
+        }
+        return delegate?.blockItemDidRequestCutActiveSelection(self, blockID: blockID) ?? false
     }
 
     func requestUndoShortcut(_ shortcut: BlockInputUndoShortcut) -> Bool {

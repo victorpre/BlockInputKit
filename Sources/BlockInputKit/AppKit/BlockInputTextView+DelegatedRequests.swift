@@ -2,6 +2,11 @@ import AppKit
 
 extension BlockInputTextView {
     override func keyDown(with event: NSEvent) {
+        if blockItem?.isTableCellTextView(self) == true {
+            // Table cells keep native arrow and selection movement local to the cell.
+            super.keyDown(with: event)
+            return
+        }
         if blockItem?.requestCompletionKeyDown(event) == true {
             return
         }

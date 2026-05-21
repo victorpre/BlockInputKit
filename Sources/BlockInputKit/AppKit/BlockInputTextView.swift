@@ -148,17 +148,19 @@ class BlockInputTextView: NSTextView {
             _ = blockItem?.requestTextFormattingShortcut(formattingShortcut)
             return true
         }
-        if handleDocumentBoundaryShortcut(event) {
-            BlockInputSelectionDebug.emit("text equivalent consumed document boundary")
-            return true
-        }
-        if handleSelectionExpansionShortcut(event) {
-            BlockInputSelectionDebug.emit("text equivalent consumed")
-            return true
-        }
-        if handleHorizontalSelectionAdjustmentShortcut(event) {
-            BlockInputSelectionDebug.emit("text equivalent consumed horizontal")
-            return true
+        if blockItem?.isTableCellTextView(self) != true {
+            if handleDocumentBoundaryShortcut(event) {
+                BlockInputSelectionDebug.emit("text equivalent consumed document boundary")
+                return true
+            }
+            if handleSelectionExpansionShortcut(event) {
+                BlockInputSelectionDebug.emit("text equivalent consumed")
+                return true
+            }
+            if handleHorizontalSelectionAdjustmentShortcut(event) {
+                BlockInputSelectionDebug.emit("text equivalent consumed horizontal")
+                return true
+            }
         }
         if event.blockInputIsCopyShortcut,
            copySelectedPlainText() {
@@ -225,6 +227,10 @@ class BlockInputTextView: NSTextView {
     }
 
     override func cut(_ sender: Any?) {
+        if blockItem?.isTableCellTextView(self) == true,
+           blockItem?.requestCutActiveSelection() == true {
+            return
+        }
         guard copySelectedPlainText() else {
             super.cut(sender)
             return
@@ -234,6 +240,14 @@ class BlockInputTextView: NSTextView {
 
     override func doCommand(by selector: Selector) {
         BlockInputSelectionDebug.emit("text command selector=\(selector) range=\(selectedRange())")
+        if blockItem?.isTableCellTextView(self) == true {
+            if blockItem?.handleTableCellCommand(selector, selectedRange: selectedRange()) == true {
+                BlockInputSelectionDebug.emit("text command consumed table selector=\(selector)")
+                return
+            }
+            super.doCommand(by: selector)
+            return
+        }
         if blockItem?.requestCompletionCommand(selector) == true {
             BlockInputSelectionDebug.emit("text command consumed completion selector=\(selector)")
             return
@@ -252,51 +266,54 @@ class BlockInputTextView: NSTextView {
     }
 
     override func moveWordLeft(_ sender: Any?) {
-        if requestWordMovementFromOwningBlock(.leftward) {
+        if blockItem?.isTableCellTextView(self) != true,
+           requestWordMovementFromOwningBlock(.leftward) {
             return
         }
         super.moveWordLeft(sender)
     }
 
     override func moveWordRight(_ sender: Any?) {
-        if requestWordMovementFromOwningBlock(.rightward) {
+        if blockItem?.isTableCellTextView(self) != true,
+           requestWordMovementFromOwningBlock(.rightward) {
             return
         }
         super.moveWordRight(sender)
     }
 
     override func moveWordBackward(_ sender: Any?) {
-        if requestWordMovementFromOwningBlock(.leftward) {
+        if blockItem?.isTableCellTextView(self) != true,
+           requestWordMovementFromOwningBlock(.leftward) {
             return
         }
         super.moveWordBackward(sender)
     }
 
     override func moveWordForward(_ sender: Any?) {
-        if requestWordMovementFromOwningBlock(.rightward) {
+        if blockItem?.isTableCellTextView(self) != true,
+           requestWordMovementFromOwningBlock(.rightward) {
             return
         }
         super.moveWordForward(sender)
     }
 
     override func moveToBeginningOfDocument(_ sender: Any?) {
-        if requestDocumentBoundaryFromOwningBlock(.upward) {
+        if blockItem?.isTableCellTextView(self) != true,
+           requestDocumentBoundaryFromOwningBlock(.upward) {
             return
         }
         super.moveToBeginningOfDocument(sender)
     }
 
     override func moveToEndOfDocument(_ sender: Any?) {
-        if requestDocumentBoundaryFromOwningBlock(.downward) {
+        if blockItem?.isTableCellTextView(self) != true,
+           requestDocumentBoundaryFromOwningBlock(.downward) {
             return
         }
         super.moveToEndOfDocument(sender)
     }
 
     private func handleBlockCommand(_ selector: Selector) -> Bool {
-        if blockItem?.isTableCellTextView(self) == true {
-            return blockItem?.handleTableCellCommand(selector, selectedRange: selectedRange()) ?? false
-        }
         switch selector {
         case #selector(insertNewline(_:)):
             guard let blockItem else {
@@ -391,31 +408,6 @@ class BlockInputTextView: NSTextView {
         return false
     }
 
-    private func copySelectedPlainText() -> Bool {
-        let range = selectedRange()
-        let copiedText: String?
-        if blockItem?.isTableCellTextView(self) == true {
-            let clampedRange = string.clampedRange(range)
-            copiedText = clampedRange.length > 0
-                ? (string as NSString).substring(with: clampedRange)
-                : nil
-        } else if var block = blockItem?.renderedBlock {
-            block.text = string
-            copiedText = block.markdownAwareCopiedText(in: range)
-        } else {
-            let clampedRange = string.clampedRange(range)
-            copiedText = clampedRange.length > 0
-                ? (string as NSString).substring(with: clampedRange)
-                : nil
-        }
-        guard let copiedText, !copiedText.isEmpty else {
-            return false
-        }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(copiedText, forType: .string)
-        return true
-    }
-
 }
 
 private extension BlockInputTextView {
@@ -486,13 +478,5 @@ private extension BlockInputTextView {
             candidate = view.superview
         }
         return nil
-    }
-}
-private extension String {
-    func clampedRange(_ range: NSRange) -> NSRange {
-        let text = self as NSString
-        let location = min(max(range.location, 0), text.length)
-        let length = min(max(range.length, 0), max(text.length - location, 0))
-        return NSRange(location: location, length: length)
     }
 }

@@ -259,7 +259,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         if item.currentText != block.text {
             configureBlockItem(item, block: block)
         }
-        let nextSelection = document.selectAll(currentBlockID: blockID, currentSelection: selection)
+        let nextSelection = tableAwareSelectAll(currentBlockID: blockID)
         applySelection(nextSelection, notify: true)
         if case let .text(range) = nextSelection,
            range.blockID == blockID {
@@ -272,12 +272,21 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     func selectAllFromActiveSelection() -> Bool {
         refreshDocumentFromStore()
         guard let blockID = activeBlockID,
-              let nextSelection = document.selectAll(currentBlockID: blockID, currentSelection: selection) else {
+              let nextSelection = tableAwareSelectAll(currentBlockID: blockID) else {
             return false
         }
         applySelection(nextSelection, notify: true)
         restoreVisibleSelection()
         return true
+    }
+
+    private func tableAwareSelectAll(currentBlockID blockID: BlockInputBlockID) -> BlockInputSelection? {
+        if block(withID: blockID)?.kind == .table,
+           selection == .blocks([blockID]) {
+            let allBlockIDs = (0..<blockCount).compactMap { block(at: $0)?.id }
+            return .blocks(allBlockIDs)
+        }
+        return document.selectAll(currentBlockID: blockID, currentSelection: selection)
     }
 
     func blockItem(
@@ -286,6 +295,24 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         didRequestUndoShortcut shortcut: BlockInputUndoShortcut
     ) -> Bool {
         performUndoShortcut(shortcut, preferredBlockID: blockID)
+    }
+
+    func blockItemDidRequestCopyActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
+        switch selection {
+        case .blocks, .mixed:
+            return copyActiveSelection()
+        case .cursor, .text, nil:
+            return false
+        }
+    }
+
+    func blockItemDidRequestCutActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
+        switch selection {
+        case .blocks, .mixed:
+            return cutActiveSelection()
+        case .cursor, .text, nil:
+            return false
+        }
     }
 
     func blockItem(

@@ -55,6 +55,18 @@ extension BlockInputBlockItem {
         view.descendants(of: BlockInputTableCellTextView.self)
     }
 
+    var testingSelectedTableRow: BlockInputTable.Row? {
+        tableView.selectedRowForTesting
+    }
+
+    var testingAppendTableRowButton: NSButton {
+        tableView.appendRowButtonForTesting
+    }
+
+    var testingAppendTableColumnButton: NSButton {
+        tableView.appendColumnButtonForTesting
+    }
+
     var testingHandleView: BlockInputDragHandleView? {
         view.firstDescendant(of: BlockInputDragHandleView.self)
     }

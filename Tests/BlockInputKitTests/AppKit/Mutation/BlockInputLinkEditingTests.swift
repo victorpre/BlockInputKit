@@ -43,7 +43,8 @@ final class BlockInputLinkEditingTests: XCTestCase {
         )))
 
         let insertIndex = try XCTUnwrap(menu.items.firstIndex { $0.title == "Insert Link" })
-        XCTAssertEqual(menu.items[insertIndex + 1].title, "Remove Link")
+        XCTAssertEqual(menu.items[insertIndex + 1].title, "Insert Table")
+        XCTAssertEqual(menu.items[insertIndex + 2].title, "Remove Link")
 
         try performMenuItem(titled: "Remove Link", in: menu)
 

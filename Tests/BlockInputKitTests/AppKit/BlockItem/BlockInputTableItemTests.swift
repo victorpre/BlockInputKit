@@ -62,9 +62,7 @@ final class BlockInputTableItemTests: XCTestCase {
     func testHorizontalScrollbarReserveMatchesAlvearyOverflowBehavior() throws {
         let item = configuredItem(block: Self.wideTable(), itemWidth: 340, textWidth: 260)
         let documentView = try XCTUnwrap(item.testingTableOverflowScrollView.documentView)
-        let expectedReserve = NSScroller.preferredScrollerStyle == .legacy
-            ? ceil(NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy))
-            : 0
+        let expectedReserve = ceil(NSScroller.scrollerWidth(for: .regular, scrollerStyle: .overlay))
 
         XCTAssertEqual(item.testingTableView.visibleTableFrame.height, documentView.frame.height + expectedReserve, accuracy: 1)
     }

@@ -17,6 +17,7 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
     private var isConfiguring = false
     private var selectionBeforeTextChange: BlockInputSelection?
     private var isHeader = false
+    private var isRowSelected = false
     var position = BlockInputTable.CellPosition(row: .header, column: 0)
 
     override init(frame frameRect: NSRect) {
@@ -51,7 +52,8 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
             configuration.text,
             isHeader: configuration.isHeader,
             alignment: configuration.alignment,
-            style: configuration.style
+            style: configuration.style,
+            usesPlaceholder: false
         ))
         if let textStorage = textView.textStorage {
             configuration.blockItem?.applyInlineMarkdownAttributes(
@@ -64,11 +66,23 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
 
     func updateColors() {
         wantsLayer = true
-        layer?.backgroundColor = isHeader
-            ? NSColor.separatorColor.withAlphaComponent(0.08).cgColor
-            : NSColor.textBackgroundColor.withAlphaComponent(0.01).cgColor
+        if isRowSelected {
+            layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.22).cgColor
+        } else {
+            layer?.backgroundColor = isHeader
+                ? NSColor.separatorColor.withAlphaComponent(0.08).cgColor
+                : NSColor.textBackgroundColor.withAlphaComponent(0.01).cgColor
+        }
         layer?.borderColor = NSColor.separatorColor.cgColor
         layer?.borderWidth = 0.5
+    }
+
+    func setRowSelected(_ isSelected: Bool) {
+        guard isRowSelected != isSelected else {
+            return
+        }
+        isRowSelected = isSelected
+        updateColors()
     }
 
     private func setup() {
@@ -98,6 +112,7 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
               let tableView else {
             return
         }
+        tableView.clearRowSelection()
         tableView.delegate?.tableView(tableView, didBeginEditing: position)
     }
 
@@ -131,6 +146,7 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
               let sourceRange = tableView.sourceRange(for: textView, localRange: textView.selectedRange()) else {
             return
         }
+        tableView.clearRowSelection()
         tableView.delegate?.tableView(tableView, didChangeSelectionIn: position, sourceRange: sourceRange)
     }
 
@@ -142,6 +158,12 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
         guard !isConfiguring else {
             return true
         }
+        if let replacementString,
+           replacementString.rangeOfCharacter(from: .newlines) != nil {
+            let singleLineReplacement = Self.singleLineCellReplacement(replacementString)
+            textView.insertText(singleLineReplacement, replacementRange: affectedCharRange)
+            return false
+        }
         guard let tableView else {
             return true
         }
@@ -152,5 +174,12 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
             affectedLocalRange: affectedCharRange,
             replacementString: replacementString
         ) ?? true
+    }
+
+    private static func singleLineCellReplacement(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\r\n", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
     }
 }

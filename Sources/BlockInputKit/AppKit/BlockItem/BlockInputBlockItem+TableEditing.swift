@@ -28,6 +28,19 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
 
     func handleTableCellCommand(_ selector: Selector, selectedRange: NSRange) -> Bool {
         switch selector {
+        case #selector(insertTab(_:)):
+            return moveTableFocus(.forward)
+        case #selector(insertBacktab(_:)):
+            return moveTableFocus(.backward)
+        case #selector(insertNewline(_:)):
+            return moveTableFocusVertically(.below)
+        case #selector(insertNewlineIgnoringFieldEditor(_:)):
+            return moveTableFocusVertically(.above)
+        case #selector(deleteBackward(_:)), #selector(deleteForward(_:)):
+            return handleTableCellDelete(selectedRange: selectedRange)
+        case #selector(selectAll(_:)):
+            requestSelectAll()
+            return true
         case #selector(cancelOperation(_:)):
             return requestCancelSelection()
         default:
@@ -89,4 +102,65 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
     ) -> Bool {
         true
     }
+
+    func tableViewDidRequestAppendBodyRow(_ tableView: BlockInputTableView, from position: BlockInputTable.CellPosition?) {
+        guard let blockID else {
+            return
+        }
+        _ = delegate?.blockItem(self, blockID: blockID, didRequestTableBodyRowAppendFrom: position)
+    }
+
+    func tableViewDidRequestAppendColumn(_ tableView: BlockInputTableView, from position: BlockInputTable.CellPosition?) {
+        guard let blockID else {
+            return
+        }
+        _ = delegate?.blockItem(self, blockID: blockID, didRequestTableColumnAppendFrom: position)
+    }
+
+    private func moveTableFocus(_ direction: TableCellLinearMovement) -> Bool {
+        guard let blockID,
+              let position = tableView.activeCellPosition else {
+            return false
+        }
+        let target = direction == .forward
+            ? tableView.nextCellPosition(after: position)
+            : tableView.previousCellPosition(before: position)
+        guard let target else {
+            return false
+        }
+        return delegate?.blockItem(self, blockID: blockID, didRequestTableFocus: target) ?? false
+    }
+
+    private func moveTableFocusVertically(_ placement: BlockInputTableBoundaryPlacement) -> Bool {
+        guard let blockID,
+              let position = tableView.activeCellPosition else {
+            return false
+        }
+        if let target = tableView.verticalCellPosition(from: position, placement: placement) {
+            return delegate?.blockItem(self, blockID: blockID, didRequestTableFocus: target) ?? false
+        }
+        return delegate?.blockItem(self, blockID: blockID, didRequestParagraphAdjacentToTable: placement) ?? false
+    }
+
+    private func handleTableCellDelete(selectedRange: NSRange) -> Bool {
+        guard selectedRange.length == 0,
+              let blockID,
+              let position = tableView.activeCellPosition,
+              tableView.activeCellText?.isEmpty == true else {
+            return false
+        }
+        if tableView.isRowSelected(position.row) {
+            guard case .body = position.row else {
+                return true
+            }
+            return delegate?.blockItem(self, blockID: blockID, didRequestTableBodyRowDeletionAt: position) ?? false
+        }
+        tableView.selectRow(position.row)
+        return true
+    }
+}
+
+private enum TableCellLinearMovement {
+    case forward
+    case backward
 }

@@ -31,6 +31,11 @@ struct BlockInputTableCellTextChange {
     var selectionBefore: BlockInputSelection?
 }
 
+enum BlockInputTableBoundaryPlacement {
+    case above
+    case below
+}
+
 @MainActor
 protocol BlockInputBlockItemDelegate: AnyObject {
     func blockItemDidBeginEditing(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
@@ -46,6 +51,38 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         blockID: BlockInputBlockID,
         didChangeTableCellText change: BlockInputTableCellTextChange
     )
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestTableFocus position: BlockInputTable.CellPosition
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestTableBodyRowAppendFrom position: BlockInputTable.CellPosition?
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestTableColumnAppendFrom position: BlockInputTable.CellPosition?
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestTableBodyRowDeletionAt position: BlockInputTable.CellPosition
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestTableColumnDeletionAt position: BlockInputTable.CellPosition
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestParagraphAdjacentToTable placement: BlockInputTableBoundaryPlacement
+    ) -> Bool
+    func blockItemDidRequestCopyActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
+    func blockItemDidRequestCutActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID)
     func blockItemDidRequestReturn(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRequestMergeWithPreviousBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
