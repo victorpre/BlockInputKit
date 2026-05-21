@@ -41,7 +41,11 @@ extension BlockInputBlockItem {
     }
 
     /// Routes link clicks through the editor so plain-click editing and command-click opening share validation.
-    func requestLinkClick(selectedRange: NSRange, event: NSEvent) -> Bool {
+    func requestLinkClick(
+        selectedRange: NSRange,
+        clickedLinkRange: BlockInputInlineMarkdownRange?,
+        event: NSEvent
+    ) -> Bool {
         guard let blockID else {
             return false
         }
@@ -49,7 +53,12 @@ extension BlockInputBlockItem {
             self,
             blockID: blockID,
             didClickLinkAt: selectedRange,
+            clickedLinkRange: clickedLinkRange,
             event: event
         ) ?? false
+    }
+
+    func inlineChipRange(atWindowLocation windowLocation: NSPoint) -> BlockInputInlineMarkdownRange? {
+        textView.inlineChipRange(atWindowLocation: windowLocation)
     }
 }

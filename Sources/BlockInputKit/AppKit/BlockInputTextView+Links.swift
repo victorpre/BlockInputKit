@@ -1,5 +1,15 @@
 import AppKit
 
+/// Visual hit-test result for an inline Markdown link.
+///
+/// The window-space geometry is captured at mouse-down so mouse-up handling can survive tiny pointer drift, focus
+/// changes, and AppKit's occasional remapping of insertion offsets near hidden Markdown source.
+struct BlockInputLinkHitResult {
+    let range: BlockInputInlineMarkdownRange
+    let windowRects: [NSRect]
+    let windowLocation: NSPoint
+}
+
 extension BlockInputTextView {
     override func draw(_ dirtyRect: NSRect) {
         drawInlineChipBackgrounds(in: dirtyRect)
@@ -16,18 +26,164 @@ extension BlockInputTextView {
     /// Routes a completed plain click to link editing after native drag and text selection handling have had first chance.
     func requestLinkClickIfNeeded(with event: NSEvent) -> Bool {
         let disallowedModifiers = NSEvent.ModifierFlags([.option, .control, .shift])
-        guard event.clickCount == 1,
+        let isCompletedTrackedLinkClick = event.type == .leftMouseUp && blockSelectionClickLinkRange != nil
+        let isSingleClick = event.clickCount == 1 || isCompletedTrackedLinkClick
+        guard isSingleClick,
               !isDraggingBlockSelection,
               !isUsingNativeMouseSelection,
               event.modifierFlags.isDisjoint(with: disallowedModifiers) else {
             return false
         }
         let location = convert(event.locationInWindow, from: nil)
-        let offset = characterIndexForInsertion(at: location)
-        return blockItem?.requestLinkClick(selectedRange: NSRange(location: offset, length: 0), event: event) == true
+        let offset = blockSelectionDragAnchorOffset ?? characterIndexForInsertion(at: location)
+        let clickedLinkRange = blockSelectionClickLinkRange ?? linkHitResult(for: event)?.range
+        return blockItem?.requestLinkClick(
+            selectedRange: NSRange(location: offset, length: 0),
+            clickedLinkRange: clickedLinkRange,
+            event: event
+        ) == true
     }
 
-    /// Adds pointing-hand cursor rects over visible link labels only; hidden Markdown delimiters are intentionally ignored.
+    func inlineChipRange(atWindowLocation windowLocation: NSPoint) -> BlockInputInlineMarkdownRange? {
+        guard supportsInlineMarkdownLinkRendering,
+              let layoutManager,
+              let textContainer else {
+            return nil
+        }
+        layoutManager.ensureLayout(for: textContainer)
+        return inlineChipHitResult(
+            atWindowLocation: windowLocation,
+            layoutManager: layoutManager,
+            textContainer: textContainer
+        )?.range
+    }
+
+    func linkHitResult(for event: NSEvent) -> BlockInputLinkHitResult? {
+        for windowLocation in linkEventWindowLocations(event) {
+            if let hit = linkHitResult(atWindowLocation: windowLocation) {
+                return hit
+            }
+        }
+        return nil
+    }
+
+    func linkHitResult(atWindowLocation windowLocation: NSPoint) -> BlockInputLinkHitResult? {
+        guard supportsInlineMarkdownLinkRendering,
+              let layoutManager,
+              let textContainer else {
+            return nil
+        }
+        let location = convert(windowLocation, from: nil)
+        layoutManager.ensureLayout(for: textContainer)
+        if let chipHit = inlineChipHitResult(
+            atWindowLocation: windowLocation,
+            layoutManager: layoutManager,
+            textContainer: textContainer
+        ) {
+            return chipHit
+        }
+        if let regularHit = regularLinkHitResult(
+            atWindowLocation: windowLocation,
+            layoutManager: layoutManager,
+            textContainer: textContainer
+        ) {
+            return regularHit
+        }
+        let offset = characterIndexForInsertion(at: location)
+        for linkRange in linkRangesForCurrentText() where linkRange.inlineChipKind(in: string) == nil {
+            guard linkRange.contentRange.containsOrTouches(offset) else {
+                continue
+            }
+            let characterRange = string.linkCursorClampedRange(linkRange.contentRange)
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
+                .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
+            guard glyphRange.length > 0 else {
+                continue
+            }
+            return BlockInputLinkHitResult(
+                range: linkRange,
+                windowRects: linkCursorRects(
+                    glyphRange: glyphRange,
+                    layoutManager: layoutManager,
+                    textContainer: textContainer
+                ).map { convert($0, to: nil) },
+                windowLocation: windowLocation
+            )
+        }
+        return nil
+    }
+
+    func linkEventWindowLocations(_ event: NSEvent) -> [NSPoint] {
+        guard let window,
+              event.window === window || event.windowNumber == window.windowNumber else {
+            return [event.locationInWindow]
+        }
+        let livePoint = window.mouseLocationOutsideOfEventStream
+        guard livePoint != event.locationInWindow else {
+            return [event.locationInWindow]
+        }
+        return [event.locationInWindow, livePoint]
+    }
+
+    private func regularLinkHitResult(
+        atWindowLocation windowLocation: NSPoint,
+        layoutManager: NSLayoutManager,
+        textContainer: NSTextContainer
+    ) -> BlockInputLinkHitResult? {
+        let location = convert(windowLocation, from: nil)
+        for linkRange in linkRangesForCurrentText() where linkRange.inlineChipKind(in: string) == nil {
+            let characterRange = string.linkCursorClampedRange(linkRange.contentRange)
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
+                .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
+            guard glyphRange.length > 0 else {
+                continue
+            }
+            let cursorRects = linkCursorRects(
+                glyphRange: glyphRange,
+                layoutManager: layoutManager,
+                textContainer: textContainer
+            )
+            if cursorRects.contains(where: { $0.contains(location) }) {
+                return BlockInputLinkHitResult(
+                    range: linkRange,
+                    windowRects: cursorRects.map { convert($0, to: nil) },
+                    windowLocation: windowLocation
+                )
+            }
+        }
+        return nil
+    }
+
+    private func inlineChipHitResult(
+        atWindowLocation windowLocation: NSPoint,
+        layoutManager: NSLayoutManager,
+        textContainer: NSTextContainer
+    ) -> BlockInputLinkHitResult? {
+        let location = convert(windowLocation, from: nil)
+        for linkRange in linkRangesForCurrentText() where linkRange.inlineChipKind(in: string) != nil {
+            let characterRange = string.linkCursorClampedRange(linkRange.contentRange)
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
+                .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
+            guard glyphRange.length > 0 else {
+                continue
+            }
+            let backgroundRects = inlineChipBackgroundRects(
+                glyphRange: glyphRange,
+                layoutManager: layoutManager,
+                textContainer: textContainer
+            )
+            if backgroundRects.contains(where: { $0.contains(location) }) {
+                return BlockInputLinkHitResult(
+                    range: linkRange,
+                    windowRects: backgroundRects.map { convert($0, to: nil) },
+                    windowLocation: windowLocation
+                )
+            }
+        }
+        return nil
+    }
+
+    /// Adds pointing-hand cursor rects over visible links; chips use their padded visual rects.
     func addLinkCursorRects() {
         guard supportsInlineMarkdownLinkRendering,
               let layoutManager,
@@ -46,7 +202,23 @@ extension BlockInputTextView {
             guard glyphRange.length > 0 else {
                 continue
             }
-            addLinkCursorRects(for: glyphRange, layoutManager: layoutManager, textContainer: textContainer)
+            if linkRange.inlineChipKind(in: string) != nil {
+                for cursorRect in inlineChipBackgroundRects(
+                    glyphRange: glyphRange,
+                    layoutManager: layoutManager,
+                    textContainer: textContainer
+                ) {
+                    addCursorRect(cursorRect, cursor: .pointingHand)
+                }
+            } else {
+                for cursorRect in linkCursorRects(
+                    glyphRange: glyphRange,
+                    layoutManager: layoutManager,
+                    textContainer: textContainer
+                ) {
+                    addCursorRect(cursorRect, cursor: .pointingHand)
+                }
+            }
         }
     }
 
@@ -64,33 +236,41 @@ extension BlockInputTextView {
             guard glyphRange.length > 0 else {
                 continue
             }
-            drawInlineChipBackground(
+            for drawRect in inlineChipBackgroundRects(
                 glyphRange: glyphRange,
-                dirtyRect: dirtyRect,
                 layoutManager: layoutManager,
                 textContainer: textContainer
-            )
+            ) where drawRect.intersects(dirtyRect) {
+                drawInlineChipBackground(in: drawRect)
+            }
         }
     }
 
-    private func addLinkCursorRects(
-        for glyphRange: NSRange,
+    private func linkCursorRects(
+        glyphRange: NSRange,
         layoutManager: NSLayoutManager,
         textContainer: NSTextContainer
-    ) {
+    ) -> [NSRect] {
+        var cursorRects: [NSRect] = []
         var glyphIndex = glyphRange.location
         while glyphIndex < NSMaxRange(glyphRange) {
             var lineGlyphRange = NSRange()
-            _ = layoutManager.lineFragmentUsedRect(forGlyphAt: glyphIndex, effectiveRange: &lineGlyphRange)
+            let lineFragmentRect = layoutManager.lineFragmentUsedRect(forGlyphAt: glyphIndex, effectiveRange: &lineGlyphRange)
             let lineLinkGlyphRange = NSIntersectionRange(glyphRange, lineGlyphRange)
             if lineLinkGlyphRange.length > 0 {
-                let cursorRect = layoutManager.boundingRect(forGlyphRange: lineLinkGlyphRange, in: textContainer)
-                    .offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
-                    .insetBy(dx: -1, dy: -1)
-                addCursorRect(cursorRect, cursor: .pointingHand)
+                let labelRect = layoutManager.boundingRect(forGlyphRange: lineLinkGlyphRange, in: textContainer)
+                let cursorRect = NSRect(
+                    x: labelRect.minX + textContainerOrigin.x,
+                    y: lineFragmentRect.minY + textContainerOrigin.y,
+                    width: labelRect.width,
+                    height: lineFragmentRect.height
+                )
+                .insetBy(dx: -1, dy: -1)
+                cursorRects.append(cursorRect)
             }
             glyphIndex = max(glyphIndex + 1, NSMaxRange(lineGlyphRange))
         }
+        return cursorRects
     }
 
     private func linkRangesForCurrentText() -> [BlockInputInlineMarkdownRange] {
@@ -108,35 +288,36 @@ extension BlockInputTextView {
         return BlockInputBlockItem.supportsInlineMarkdownStyling(kind)
     }
 
-    private func drawInlineChipBackground(
+    private func inlineChipBackgroundRects(
         glyphRange: NSRange,
-        dirtyRect: NSRect,
         layoutManager: NSLayoutManager,
         textContainer: NSTextContainer
-    ) {
+    ) -> [NSRect] {
         let drawingOffset = textContainerOrigin
         let selectedGlyphRange = NSRange(location: NSNotFound, length: 0)
+        var rects: [NSRect] = []
         layoutManager.enumerateEnclosingRects(
             forGlyphRange: glyphRange,
             withinSelectedGlyphRange: selectedGlyphRange,
             in: textContainer
         ) { enclosingRect, _ in
-            let drawRect = NSRect(
+            rects.append(NSRect(
                 x: enclosingRect.minX + drawingOffset.x - 2,
                 y: enclosingRect.minY + drawingOffset.y - 2,
                 width: enclosingRect.width + 4,
                 height: enclosingRect.height + 4
-            )
-            guard drawRect.intersects(dirtyRect) else {
-                return
-            }
-            NSColor.controlAccentColor.withAlphaComponent(0.11).setFill()
-            NSBezierPath(roundedRect: drawRect, xRadius: 6, yRadius: 6).fill()
-            NSColor.controlAccentColor.withAlphaComponent(0.18).setStroke()
-            let stroke = NSBezierPath(roundedRect: drawRect.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
-            stroke.lineWidth = 1
-            stroke.stroke()
+            ))
         }
+        return rects
+    }
+
+    private func drawInlineChipBackground(in rect: NSRect) {
+        NSColor.controlAccentColor.withAlphaComponent(0.11).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
+        NSColor.controlAccentColor.withAlphaComponent(0.18).setStroke()
+        let stroke = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
+        stroke.lineWidth = 1
+        stroke.stroke()
     }
 }
 

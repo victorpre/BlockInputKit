@@ -25,6 +25,7 @@ extension BlockInputView {
     func linkContext(
         blockID: BlockInputBlockID,
         selectedRange: NSRange,
+        clickedLinkRange: BlockInputInlineMarkdownRange? = nil,
         event: NSEvent?,
         prefersClickedOffset: Bool
     ) -> BlockInputLinkContext? {
@@ -33,6 +34,15 @@ extension BlockInputView {
             return nil
         }
         let item = visibleItem(for: blockID, refreshConfiguration: false)
+        if let clickedContext = clickedLinkContext(
+            blockID: blockID,
+            block: block,
+            item: item,
+            clickedLinkRange: clickedLinkRange,
+            event: event
+        ) {
+            return clickedContext
+        }
         let clickedOffset: Int?
         if let event,
            let item {
@@ -50,13 +60,12 @@ extension BlockInputView {
             ? NSRange(location: clickedOffset ?? range.location, length: 0)
             : range
         if let linkRange = linkRange(in: block.text, containing: linkLookupRange) {
-            let anchorRect = item?.anchorWindowRect(forUTF16Range: linkRange.contentRange) ?? .zero
-            return BlockInputLinkContext(
+            return linkEditContext(
                 blockID: blockID,
-                mode: .edit(linkRange),
-                sourceRange: range,
-                sourceText: block.text,
-                anchorWindowRect: anchorRect
+                block: block,
+                item: item,
+                linkRange: linkRange,
+                sourceRange: range
             )
         }
         let anchorRect = item?.anchorWindowRect(forUTF16Range: range) ?? .zero
@@ -135,8 +144,8 @@ extension BlockInputView {
         guard let block = block(withID: context.blockID) else {
             return
         }
-        dismissLinkModal(restoreFocus: false)
-        let modal = BlockInputLinkModalView()
+        removeLinkModalDismissalMonitors()
+        let modal = linkModalView ?? BlockInputLinkModalView()
         let mode: BlockInputLinkModalMode
         let text: String
         let urlString: String
@@ -154,7 +163,10 @@ extension BlockInputView {
         configureLinkModalActions(modal, context: context, mode: mode)
         linkModalView = modal
         linkModalContext = context
-        addSubview(modal)
+        linkModalRetargetMouseDownWindowLocation = nil
+        if modal.superview == nil {
+            addSubview(modal)
+        }
         positionLinkModal(modal, anchoredTo: context.anchorWindowRect)
         installLinkModalDismissalMonitors()
         modal.focusInitialField()
@@ -208,6 +220,7 @@ extension BlockInputView {
         linkModalView?.removeFromSuperview()
         linkModalView = nil
         linkModalContext = nil
+        linkModalRetargetMouseDownWindowLocation = nil
         guard restoreFocus,
               let context,
               let block = block(withID: context.blockID) else {
@@ -227,72 +240,6 @@ extension BlockInputView {
             applySelection(.text(BlockInputTextRange(blockID: context.blockID, range: clampedRange)), notify: true)
             restoreVisibleSelection()
         }
-    }
-
-    func dismissLinkModalIfSelectionMovedOutside(_ newSelection: BlockInputSelection?) {
-        guard let context = linkModalContext,
-              !context.contains(selection: newSelection) else {
-            return
-        }
-        dismissLinkModal(restoreFocus: false)
-    }
-
-    func dismissLinkModalIfFocusMovedOutside() {
-        guard let modal = linkModalView else {
-            return
-        }
-        guard let firstResponder = window?.firstResponder else {
-            dismissLinkModal(restoreFocus: false)
-            return
-        }
-        guard !modal.containsResponder(firstResponder) else {
-            return
-        }
-        dismissLinkModal(restoreFocus: false)
-    }
-
-    /// Closes the editor-owned link modal when a mouse interaction would move focus outside it.
-    func dismissLinkModalIfMouseDownMovedFocusOutside(_ event: NSEvent) {
-        guard let modal = linkModalView,
-              event.windowNumber == window?.windowNumber else {
-            return
-        }
-        let locationInModal = modal.convert(event.locationInWindow, from: nil)
-        guard !modal.bounds.contains(locationInModal) else {
-            return
-        }
-        dismissLinkModal(restoreFocus: false)
-    }
-
-    func installLinkModalDismissalMonitors() {
-        removeLinkModalDismissalMonitors()
-        linkModalMouseDownMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-        ) { [weak self] event in
-            self?.dismissLinkModalIfMouseDownMovedFocusOutside(event)
-            return event
-        }
-        if let window {
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(blockInputLinkModalWindowDidResignKey(_:)),
-                name: NSWindow.didResignKeyNotification,
-                object: window
-            )
-        }
-    }
-
-    func removeLinkModalDismissalMonitors() {
-        if let linkModalMouseDownMonitor {
-            NSEvent.removeMonitor(linkModalMouseDownMonitor)
-            self.linkModalMouseDownMonitor = nil
-        }
-        NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: nil)
-    }
-
-    @objc(blockInputLinkModalWindowDidResignKey:)
-    func blockInputLinkModalWindowDidResignKey(_ notification: Notification) {
-        dismissLinkModal(restoreFocus: false)
     }
 
     /// Positions the modal near the clicked link or caret while keeping it inside the editor bounds.

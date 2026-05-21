@@ -38,8 +38,9 @@ extension BlockInputView {
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
         didClickLinkAt selectedRange: NSRange,
+        clickedLinkRange: BlockInputInlineMarkdownRange?,
         event: NSEvent
     ) -> Bool {
-        handleLinkClick(blockID: blockID, selectedRange: selectedRange, event: event)
+        handleLinkClick(blockID: blockID, selectedRange: selectedRange, clickedLinkRange: clickedLinkRange, event: event)
     }
 }

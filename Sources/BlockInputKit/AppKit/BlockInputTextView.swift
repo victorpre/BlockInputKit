@@ -18,12 +18,21 @@ final class BlockInputTextView: NSTextView {
     var blockSelectionDragSelectedRange: NSRange?
     var blockSelectionLocalDragRange: NSRange?
     var blockSelectionDragAnchorOffset: Int?
+    var blockSelectionClickLinkRange: BlockInputInlineMarkdownRange?
+    var blockSelectionMouseDownWindowLocation: NSPoint?
     let fileDropCaretView = NSView()
     // Native modified-click and multi-click gestures can re-enter mouseDragged/mouseUp during AppKit tracking. Keep that
     // separate from the custom plain-drag state so native selection restoration cannot be consumed as a block drag.
     var isUsingNativeMouseSelection = false
     private var isForwardingVerticalScrollSequence = false
     private var verticalScrollSequenceToken = UUID()
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        guard let event else {
+            return false
+        }
+        return linkHitResult(for: event) != nil
+    }
 
     override func mouseDown(with event: NSEvent) {
         _ = requestMouseDownCancelSelectionFromOwningBlock()
@@ -43,18 +52,26 @@ final class BlockInputTextView: NSTextView {
         blockItem?.beginBlockSelectionDrag()
         isDraggingBlockSelection = false
         let anchorOffset = blockSelectionDragAnchorOffset(for: event)
+        let linkHit = linkHitResult(for: event)
         blockSelectionDragAnchorOffset = anchorOffset
+        blockSelectionClickLinkRange = linkHit?.range
+        blockSelectionMouseDownWindowLocation = linkHit?.windowLocation ?? event.locationInWindow
         blockSelectionDragSelectedRange = NSRange(location: anchorOffset, length: 0)
         blockSelectionLocalDragRange = nil
         installBlockSelectionDragMonitor()
         installBlockSelectionDragTimer()
         window?.makeFirstResponder(self)
-        setSelectedRange(NSRange(location: anchorOffset, length: 0))
+        if linkHit == nil {
+            setSelectedRange(NSRange(location: anchorOffset, length: 0))
+        }
     }
 
     override func mouseDragged(with event: NSEvent) {
         if isUsingNativeMouseSelection {
             super.mouseDragged(with: event)
+            return
+        }
+        if shouldKeepPendingLinkClick(for: event) {
             return
         }
         let localDragRange = blockSelectionDragRange(for: event)
@@ -229,6 +246,7 @@ final class BlockInputTextView: NSTextView {
             handleSelectionExpansionCommand(selector) ||
             handleHorizontalSelectionAdjustmentCommand(selector) ||
             handleWordMovementCommand(selector) ||
+            handleLinkBoundaryMovementCommand(selector) ||
             handleBoundaryCommand(selector) {
             BlockInputSelectionDebug.emit("text command consumed selector=\(selector)")
             return
@@ -393,7 +411,10 @@ final class BlockInputTextView: NSTextView {
         return true
     }
 
-    private func shouldForwardVerticalScroll(_ event: NSEvent) -> Bool {
+}
+
+private extension BlockInputTextView {
+    func shouldForwardVerticalScroll(_ event: NSEvent) -> Bool {
         guard !event.modifierFlags.contains(.shift) else {
             return false
         }
@@ -401,12 +422,12 @@ final class BlockInputTextView: NSTextView {
         return deltaY > 0 && deltaY >= abs(horizontalRawScrollDelta(for: event))
     }
 
-    private func shouldForwardHorizontalScroll(_ event: NSEvent) -> Bool {
+    func shouldForwardHorizontalScroll(_ event: NSEvent) -> Bool {
         abs(horizontalRawScrollDelta(for: event)) > abs(verticalScrollDelta(for: event)) ||
             shouldBreakVerticalSequenceForHorizontalScroll(event)
     }
 
-    private func forwardHorizontalScroll(_ event: NSEvent) -> Bool {
+    func forwardHorizontalScroll(_ event: NSEvent) -> Bool {
         guard let horizontalScrollView = enclosingScrollView,
               horizontalScrollView.hasHorizontalScroller else {
             return false
@@ -415,20 +436,20 @@ final class BlockInputTextView: NSTextView {
         return true
     }
 
-    private func shouldBreakVerticalSequenceForHorizontalScroll(_ event: NSEvent) -> Bool {
+    func shouldBreakVerticalSequenceForHorizontalScroll(_ event: NSEvent) -> Bool {
         event.modifierFlags.contains(.shift) &&
             (abs(verticalScrollDelta(for: event)) > 0 || abs(horizontalRawScrollDelta(for: event)) > 0)
     }
 
-    private func horizontalRawScrollDelta(for event: NSEvent) -> CGFloat {
+    func horizontalRawScrollDelta(for event: NSEvent) -> CGFloat {
         event.scrollingDeltaX != 0 ? event.scrollingDeltaX : event.deltaX
     }
 
-    private func verticalScrollDelta(for event: NSEvent) -> CGFloat {
+    func verticalScrollDelta(for event: NSEvent) -> CGFloat {
         event.scrollingDeltaY != 0 ? event.scrollingDeltaY : event.deltaY
     }
 
-    private func updateVerticalScrollSequenceState(after event: NSEvent) {
+    func updateVerticalScrollSequenceState(after event: NSEvent) {
         if event.phase.contains(.ended) || event.phase.contains(.cancelled) ||
             event.momentumPhase.contains(.ended) || event.momentumPhase.contains(.cancelled) {
             isForwardingVerticalScrollSequence = false
@@ -436,7 +457,7 @@ final class BlockInputTextView: NSTextView {
         }
     }
 
-    private func schedulePhaseLessVerticalScrollSequenceResetIfNeeded(for event: NSEvent) {
+    func schedulePhaseLessVerticalScrollSequenceResetIfNeeded(for event: NSEvent) {
         guard event.phase == [], event.momentumPhase == [] else {
             return
         }
@@ -450,7 +471,7 @@ final class BlockInputTextView: NSTextView {
         }
     }
 
-    private var verticalAncestorScrollView: NSScrollView? {
+    var verticalAncestorScrollView: NSScrollView? {
         var candidate = superview
         while let view = candidate {
             if let scrollView = view as? NSScrollView,

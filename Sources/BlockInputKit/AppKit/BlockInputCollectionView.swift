@@ -1,6 +1,6 @@
 import AppKit
 
-/// Collection view hook that clears editor drag state when AppKit ends a drag outside delegate callbacks.
+/// Collection view hook that preserves editor-owned drag state and first-click inline link routing.
 final class BlockInputCollectionView: NSCollectionView {
     weak var blockInputView: BlockInputView?
     private weak var blockSelectionDragItem: BlockInputBlockItem?
@@ -10,7 +10,18 @@ final class BlockInputCollectionView: NSCollectionView {
         blockInputView?.scheduleProgressivePreloadCheck()
     }
 
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        guard let event else {
+            return false
+        }
+        return blockInputView?.linkClickTarget(for: event) != nil
+    }
+
     override func mouseDown(with event: NSEvent) {
+        if let target = blockInputView?.linkClickTarget(for: event) {
+            target.item.textView.mouseDown(with: event)
+            return
+        }
         blockSelectionDragItem = itemForBlockSelectionDrag(at: event.locationInWindow)
         blockSelectionDragItem?.beginBlockSelectionDrag()
         super.mouseDown(with: event)

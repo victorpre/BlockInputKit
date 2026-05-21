@@ -94,6 +94,7 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
         didClickLinkAt selectedRange: NSRange,
+        clickedLinkRange: BlockInputInlineMarkdownRange?,
         event: NSEvent
     ) -> Bool
     func blockItem(

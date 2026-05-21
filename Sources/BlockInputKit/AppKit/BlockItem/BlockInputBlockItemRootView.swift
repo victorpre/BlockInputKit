@@ -1,8 +1,23 @@
 import AppKit
 
-/// Root view that owns row-level cursor rects for the drag handle's expanded hit target.
+/// Root view that owns row-level cursor rects and preserves first-click inline link routing.
 final class BlockInputBlockItemRootView: NSView {
     weak var blockItem: BlockInputBlockItem?
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        guard let event else {
+            return false
+        }
+        return blockItem?.textView.linkHitResult(for: event) != nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if blockItem?.textView.linkHitResult(for: event) != nil {
+            blockItem?.textView.mouseDown(with: event)
+            return
+        }
+        super.mouseDown(with: event)
+    }
 
     override func resetCursorRects() {
         super.resetCursorRects()

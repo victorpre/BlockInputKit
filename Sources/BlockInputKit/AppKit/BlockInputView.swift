@@ -75,13 +75,13 @@ public final class BlockInputView: NSView {
     var linkModalContext: BlockInputLinkContext?
     // Local monitors are needed because a child modal view does not receive every outside mouse-down by responder routing.
     nonisolated(unsafe) var linkModalMouseDownMonitor: Any?
+    var linkModalRetargetMouseDownWindowLocation: NSPoint?
     var completionSession: BlockInputCompletionSession?
     var completionRequestTask: Task<Void, Never>?
     var completionPopupView: BlockInputCompletionPopupView?
     let completionPopupEventCaptureView = BlockInputCompletionEventCaptureView()
     nonisolated(unsafe) var completionPopupMouseDownMonitor: Any?
     var completionPopupConsumesNextMouseUp = false
-
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setupCollectionView()

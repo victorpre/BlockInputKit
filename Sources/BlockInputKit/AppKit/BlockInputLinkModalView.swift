@@ -80,7 +80,9 @@ final class BlockInputLinkModalView: NSView, NSTextFieldDelegate {
     func configure(mode: BlockInputLinkModalMode, text: String, urlString: String) {
         self.mode = mode
         textField.stringValue = text
+        textField.currentEditor()?.string = text
         urlField.stringValue = urlString
+        urlField.currentEditor()?.string = urlString
         openButton.isHidden = false
         removeButton.isHidden = mode == .create
         validateFields()

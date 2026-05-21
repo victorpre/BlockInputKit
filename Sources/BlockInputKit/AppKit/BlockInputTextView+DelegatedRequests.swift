@@ -22,6 +22,10 @@ extension BlockInputTextView {
             BlockInputSelectionDebug.emit("text key consumed horizontal")
             return
         }
+        if handleLinkBoundaryMovementShortcut(event) {
+            BlockInputSelectionDebug.emit("text key consumed link boundary")
+            return
+        }
         super.keyDown(with: event)
     }
 

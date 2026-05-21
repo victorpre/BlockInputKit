@@ -1,10 +1,16 @@
 import AppKit
 
 extension BlockInputView {
-    func handleLinkClick(blockID: BlockInputBlockID, selectedRange: NSRange, event: NSEvent) -> Bool {
+    func handleLinkClick(
+        blockID: BlockInputBlockID,
+        selectedRange: NSRange,
+        clickedLinkRange: BlockInputInlineMarkdownRange? = nil,
+        event: NSEvent
+    ) -> Bool {
         guard let context = linkContext(
             blockID: blockID,
             selectedRange: selectedRange,
+            clickedLinkRange: clickedLinkRange,
             event: event,
             prefersClickedOffset: true
         ),
@@ -22,7 +28,11 @@ extension BlockInputView {
             return true
         }
         if event.modifierFlags.contains(.command) {
-            return linkURLOpener(destination)
+            let didOpen = linkURLOpener(destination)
+            if didOpen {
+                dismissLinkModal(restoreFocus: false)
+            }
+            return didOpen
         }
         showLinkModal(context: context)
         return true
@@ -53,8 +63,10 @@ extension BlockInputView {
             return true
         case .openURL:
             _ = linkURLOpener(destination)
+            dismissLinkModal(restoreFocus: false)
             return true
         case .hostHandled:
+            dismissLinkModal(restoreFocus: false)
             return true
         }
     }

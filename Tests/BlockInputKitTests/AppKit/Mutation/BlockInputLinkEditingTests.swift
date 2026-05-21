@@ -303,6 +303,36 @@ final class BlockInputLinkEditingTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks[0].text, originalText)
     }
 
+    func testRightArrowAfterEscapeFromEditModalStaysAfterInlineChip() throws {
+        let text = "Open [AGENTS.md](file:///tmp/AGENTS.md) after"
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: blockID, text: text)
+        ])
+        let textView = try textView(in: mounted.view)
+        let labelRange = (text as NSString).range(of: "AGENTS.md")
+        let linkRange = try XCTUnwrap(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text).first)
+        let context = try XCTUnwrap(mounted.view.linkContext(
+            blockID: blockID,
+            selectedRange: NSRange(location: labelRange.location, length: 0),
+            event: nil,
+            prefersClickedOffset: false
+        ))
+
+        mounted.view.showLinkModal(context: context)
+        let modal = try XCTUnwrap(mounted.view.linkModalView)
+        XCTAssertTrue(modal.control(modal.textField, textView: NSTextView(), doCommandBy: #selector(NSResponder.cancelOperation(_:))))
+        XCTAssertEqual(textView.selectedRange(), labelRange)
+
+        textView.keyDown(with: try plainRightEvent())
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(labelRange), length: 0))
+
+        textView.keyDown(with: try plainRightEvent())
+        let expectedRange = NSRange(location: NSMaxRange(linkRange.fullRange), length: 0)
+        XCTAssertEqual(textView.selectedRange(), expectedRange)
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: expectedRange.location)))
+    }
+
     func testEscapeFromStaleEditModalClampsRestoredSelection() throws {
         let blockID = BlockInputBlockID(rawValue: "block")
         let mounted = makeMountedBlockInputView(blocks: [

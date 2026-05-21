@@ -28,9 +28,16 @@ func mouseDraggedEvent(location: NSPoint, windowNumber: Int) throws -> NSEvent {
 func mouseUpEvent(
     location: NSPoint,
     windowNumber: Int,
-    modifierFlags: NSEvent.ModifierFlags = []
+    modifierFlags: NSEvent.ModifierFlags = [],
+    clickCount: Int = 1
 ) throws -> NSEvent {
-    try mouseEvent(type: .leftMouseUp, location: location, windowNumber: windowNumber, modifierFlags: modifierFlags)
+    try mouseEvent(
+        type: .leftMouseUp,
+        location: location,
+        windowNumber: windowNumber,
+        modifierFlags: modifierFlags,
+        clickCount: clickCount
+    )
 }
 
 func rightMouseDownEvent(location: NSPoint = .zero, windowNumber: Int) throws -> NSEvent {
@@ -183,6 +190,10 @@ func plainUpEvent() throws -> NSEvent {
 
 func plainDownEvent() throws -> NSEvent {
     try keyDownEvent(keyCode: 125, characters: "\u{F701}")
+}
+
+func plainRightEvent() throws -> NSEvent {
+    try keyDownEvent(keyCode: 124, characters: "\u{F703}")
 }
 
 func shiftNumericPadUpEvent() throws -> NSEvent {

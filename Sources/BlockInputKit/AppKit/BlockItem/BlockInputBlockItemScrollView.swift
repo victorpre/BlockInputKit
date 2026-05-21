@@ -10,16 +10,33 @@ final class BlockInputBlockItemScrollView: NSScrollView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
+        contentView = BlockInputBlockItemClipView()
         configureBoundsObservation()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
+        contentView = BlockInputBlockItemClipView()
         configureBoundsObservation()
     }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        guard let event else {
+            return false
+        }
+        return blockItem?.textView.linkHitResult(for: event) != nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if blockItem?.textView.linkHitResult(for: event) != nil {
+            blockItem?.textView.mouseDown(with: event)
+            return
+        }
+        super.mouseDown(with: event)
     }
 
     override func scrollWheel(with event: NSEvent) {
@@ -165,5 +182,25 @@ final class BlockInputBlockItemScrollView: NSScrollView {
             candidate = view.superview
         }
         return nil
+    }
+}
+
+/// Clip view that preserves first-click link delivery when AppKit targets the scroll viewport instead of the text view.
+private final class BlockInputBlockItemClipView: NSClipView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        guard let event,
+              let scrollView = superview as? BlockInputBlockItemScrollView else {
+            return false
+        }
+        return scrollView.blockItem?.textView.linkHitResult(for: event) != nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let scrollView = superview as? BlockInputBlockItemScrollView,
+              scrollView.blockItem?.textView.linkHitResult(for: event) != nil else {
+            super.mouseDown(with: event)
+            return
+        }
+        scrollView.blockItem?.textView.mouseDown(with: event)
     }
 }

@@ -1,5 +1,7 @@
 import AppKit
 
+private let blockInputLinkClickMovementTolerance: CGFloat = 8
+
 /// Custom plain-drag selection tracking for `BlockInputTextView`.
 ///
 /// The real AppKit event stream does not guarantee that a drag ending inside one text view calls `mouseUp(with:)` on that
@@ -56,6 +58,9 @@ extension BlockInputTextView {
             }
             if event.type == .leftMouseDragged,
                let blockItem {
+                if shouldKeepPendingLinkClick(for: event) {
+                    return nil
+                }
                 let localDragRange = blockSelectionDragRange(for: event)
                 blockSelectionDragSelectedRange = localDragRange
                 blockSelectionLocalDragRange = localDragRange
@@ -111,6 +116,9 @@ extension BlockInputTextView {
         ) else {
             return
         }
+        if shouldKeepPendingLinkClick(for: event) {
+            return
+        }
         let localDragRange = blockSelectionDragRange(for: event)
         blockSelectionDragSelectedRange = localDragRange
         blockSelectionLocalDragRange = localDragRange
@@ -125,6 +133,9 @@ extension BlockInputTextView {
 
     func updateTrackedSelectionForCurrentMouseEvent(_ event: NSEvent) {
         guard let blockItem else {
+            return
+        }
+        if shouldKeepPendingLinkClick(for: event) {
             return
         }
         let localDragRange = blockSelectionDragRange(for: event)
@@ -147,7 +158,7 @@ extension BlockInputTextView {
             return false
         }
         let finalLocalRange = blockSelectionDragRange(for: event)
-        if shouldRequestLinkClick(forFinalLocalRange: finalLocalRange),
+        if shouldRequestLinkClick(forFinalLocalRange: finalLocalRange, event: event),
            requestLinkClickIfNeeded(with: event) {
             finishBlockSelectionDrag()
             return true
@@ -156,18 +167,45 @@ extension BlockInputTextView {
         return completeTrackedBlockSelectionMouseUp()
     }
 
-    private func shouldRequestLinkClick(forFinalLocalRange range: NSRange) -> Bool {
+    private func shouldRequestLinkClick(forFinalLocalRange range: NSRange, event: NSEvent) -> Bool {
         // A plain click can mouse down and mouse up on neighboring insertion offsets without a drag event, especially
         // near glyph boundaries. Treat that as a click so link activation does not feel intermittent.
+        let mouseUpStayedNearMouseDownLink = mouseUpStayedNearMouseDownLink(event)
+        if mouseUpStayedNearMouseDownLink {
+            return !isDraggingBlockSelection
+        }
         if blockSelectionLocalDragRange == nil {
             return !isDraggingBlockSelection
-                && range.length <= 1
                 && (blockSelectionDragSelectedRange?.length ?? 0) == 0
+                && range.length <= 1
         }
         return !isDraggingBlockSelection
             && range.length == 0
             && (blockSelectionDragSelectedRange?.length ?? 0) == 0
             && (blockSelectionLocalDragRange?.length ?? 0) == 0
+    }
+
+    private func mouseUpStayedNearMouseDownLink(_ event: NSEvent) -> Bool {
+        eventStayedNearMouseDownLink(event)
+    }
+
+    func shouldKeepPendingLinkClick(for event: NSEvent) -> Bool {
+        blockSelectionClickLinkRange != nil &&
+            event.type == .leftMouseDragged &&
+            eventStayedNearMouseDownLink(event)
+    }
+
+    private func eventStayedNearMouseDownLink(_ event: NSEvent) -> Bool {
+        guard blockSelectionClickLinkRange != nil,
+              let mouseDownLocation = blockSelectionMouseDownWindowLocation else {
+            return false
+        }
+        return linkEventWindowLocations(event).contains { windowLocation in
+            hypot(
+                windowLocation.x - mouseDownLocation.x,
+                windowLocation.y - mouseDownLocation.y
+            ) <= blockInputLinkClickMovementTolerance
+        }
     }
 
     /// Commits an editor-tracked mouse drag, whether it ended via `mouseUp(with:)` or the local event monitor.
@@ -212,6 +250,8 @@ extension BlockInputTextView {
         blockSelectionDragSelectedRange = nil
         blockSelectionLocalDragRange = nil
         blockSelectionDragAnchorOffset = nil
+        blockSelectionClickLinkRange = nil
+        blockSelectionMouseDownWindowLocation = nil
         if shouldCollapseNativeSelection {
             blockItem?.collapseNativeSelectionIfNeeded(at: collapseOffset)
             blockItem?.suppressNativeSelectionDisplayForPartialChrome()
