@@ -11,6 +11,13 @@ extension BlockInputBlockItem {
         let frontMatterReserve = block.kind == .frontMatter
             ? (frontMatterDividerVerticalInset * 2) + frontMatterDividerHeight
             : 0
+        if block.kind == .table,
+           let table = BlockInputTable(markdown: block.text) {
+            return max(
+                metrics.minimumHeight,
+                BlockInputTableView.height(for: table, width: availableTextWidth, style: style)
+            )
+        }
         if case .code = block.kind {
             return codeBlockHeight(text: text, availableTextWidth: availableTextWidth, font: font, metrics: metrics)
         }

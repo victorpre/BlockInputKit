@@ -461,6 +461,12 @@ private extension BlockInputDocument {
         BlockInputBlock(id: "frontmatter", kind: .frontMatter, text: "title: Demo\npublished: true\nbad line"),
         BlockInputBlock(id: "heading", kind: .heading(level: 1), text: "BlockInputKit demo"),
         BlockInputBlock(id: "paragraph", kind: .paragraph, text: "Each visible block owns its own AppKit text input."),
+        BlockInputBlock(id: "table", kind: .table, text: """
+        | Feature | Status |
+        | --- | :---: |
+        | Tables | Rendering |
+        | Horizontal overflow | Stable |
+        """),
         BlockInputBlock(id: "quote", kind: .quote, text: "Focus, selection, return, delete, and Cmd+A coordinate across blocks."),
         BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let editor = BlockInputView()\neditor.focusEditor()"),
         BlockInputBlock(

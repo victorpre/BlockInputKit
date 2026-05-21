@@ -11,6 +11,7 @@ extension BlockInputBlockItem {
         setupChecklistButton()
         setupCodeBackgroundView()
         setupTextView()
+        setupTableView()
         setupHorizontalRuleView()
         setupFrontMatterDividerView()
         setupQuoteBarView()
@@ -77,6 +78,10 @@ extension BlockInputBlockItem {
         textView.updateFileDropCaretColor(.controlAccentColor)
     }
 
+    private func setupTableView() {
+        tableView.isHidden = true
+    }
+
     private func setupHorizontalRuleView() {
         horizontalRuleView.blockItem = self
     }
@@ -102,7 +107,7 @@ extension BlockInputBlockItem {
         view.addSubview(codeBackgroundView)
         selectionBackgroundView.translatesAutoresizingMaskIntoConstraints = true
         view.addSubview(selectionBackgroundView)
-        for subview in [kindLabel, checklistButton, quoteBarView, scrollView, horizontalRuleView, frontMatterDividerView, handleView] {
+        for subview in [kindLabel, checklistButton, quoteBarView, scrollView, tableView, horizontalRuleView, frontMatterDividerView, handleView] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
@@ -208,7 +213,16 @@ extension BlockInputBlockItem {
             horizontalRuleTrailingConstraint,
             horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             horizontalRuleView.heightAnchor.constraint(equalToConstant: 9)
-        ] + frontMatterDividerLayoutConstraints()
+        ] + tableViewLayoutConstraints() + frontMatterDividerLayoutConstraints()
+    }
+
+    private func tableViewLayoutConstraints() -> [NSLayoutConstraint] {
+        [
+            tableView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            tableView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            tableView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor)
+        ]
     }
 
     private func frontMatterDividerLayoutConstraints() -> [NSLayoutConstraint] {

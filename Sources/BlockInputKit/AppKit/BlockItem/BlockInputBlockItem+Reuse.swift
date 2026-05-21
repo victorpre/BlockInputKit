@@ -16,6 +16,7 @@ extension BlockInputBlockItem {
         allowsReordering = true
         editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
         scrollView.isHidden = false
+        tableView.resetForReuse()
         codeBackgroundView.isHidden = true
         codeBackgroundView.alphaValue = 0
         scrollViewLeadingConstraint?.constant = Self.defaultTextLeading

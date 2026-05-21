@@ -37,6 +37,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     let quoteBarView = NSView()
     let scrollView = BlockInputBlockItemScrollView()
     let codeBackgroundView = NSView()
+    let tableView = BlockInputTableView()
     let horizontalRuleView = BlockInputHorizontalRuleView()
     let frontMatterDividerView = BlockInputFrontMatterDividerView()
     let selectionBackgroundView = BlockInputSelectionBackgroundView()
@@ -112,6 +113,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         super.viewDidLayout()
         refreshCodeAppearanceIfNeeded()
         updateTextViewDocumentFrame()
+        tableView.needsLayout = true
         updateCodeBackgroundFrame()
         updateSelectionChromeFrame()
         updateHoverTrackingArea()

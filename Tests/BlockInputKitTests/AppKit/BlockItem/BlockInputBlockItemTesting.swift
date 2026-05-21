@@ -43,6 +43,14 @@ extension BlockInputBlockItem {
         codeBackgroundView
     }
 
+    var testingTableView: BlockInputTableView {
+        tableView
+    }
+
+    var testingTableOverflowScrollView: NSScrollView {
+        tableView.overflowScrollViewForTesting
+    }
+
     var testingHandleView: BlockInputDragHandleView? {
         view.firstDescendant(of: BlockInputDragHandleView.self)
     }

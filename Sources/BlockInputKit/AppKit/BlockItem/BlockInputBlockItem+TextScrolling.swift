@@ -9,8 +9,10 @@ extension BlockInputBlockItem {
         switch block.kind {
         case .code:
             configureCodeTextScrolling()
+        case .table:
+            configureWrappingTextScrolling()
         case .paragraph, .heading, .horizontalRule, .frontMatter, .quote, .bulletedListItem, .numberedListItem, .checklistItem,
-             .table, .rawMarkdown:
+             .rawMarkdown:
             configureWrappingTextScrolling()
         }
     }
@@ -66,6 +68,9 @@ extension BlockInputBlockItem {
 
     func updateTextViewDocumentFrame() {
         let contentBounds = scrollView.contentView.bounds
+        guard !(renderedBlock?.kind == .table && !tableView.isHidden) else {
+            return
+        }
         guard contentBounds.width > 0, contentBounds.height > 0 else {
             return
         }

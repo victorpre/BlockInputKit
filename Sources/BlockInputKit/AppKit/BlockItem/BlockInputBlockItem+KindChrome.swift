@@ -5,15 +5,21 @@ extension BlockInputBlockItem {
         let kind = block.kind
         let isHorizontalRule = kind == .horizontalRule
         let isFrontMatter = kind == .frontMatter
+        let usesTableSurface = kind == .table && BlockInputTable(markdown: block.text) != nil
         let contentIndent = Self.contentIndent(for: block)
         let perLineContentIndent = Self.perLineContentIndent(for: block)
         let verticalMetrics = Self.verticalMetrics(for: block)
         textView.textContainerInset = textContainerInset(for: kind, metrics: verticalMetrics)
-        textView.isEditable = !isHorizontalRule
-        textView.isSelectable = !isHorizontalRule
+        textView.isEditable = !isHorizontalRule && !usesTableSurface
+        textView.isSelectable = !isHorizontalRule && !usesTableSurface
         configureTextScrolling(for: block)
         applyTextAttributes(for: block)
-        scrollView.isHidden = isHorizontalRule
+        scrollView.isHidden = isHorizontalRule || usesTableSurface
+        if usesTableSurface {
+            tableView.configure(block: block, style: style)
+        } else {
+            tableView.resetForReuse()
+        }
         configureCodeBackground(for: block)
         scrollViewTopConstraint?.constant = 0
         configureFrontMatterDivider(isVisible: isFrontMatter)

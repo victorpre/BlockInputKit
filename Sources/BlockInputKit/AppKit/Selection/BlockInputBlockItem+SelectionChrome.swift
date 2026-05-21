@@ -69,7 +69,8 @@ extension BlockInputBlockItem {
 
     func restoreNativeSelectionDisplay() {
         textView.selectedTextAttributes = BlockInputBlockSelectionChrome.nativeSelectedTextAttributes
-        textView.isSelectable = renderedBlock?.kind != .horizontalRule
+        let usesTableSurface = renderedBlock?.kind == .table && !tableView.isHidden
+        textView.isSelectable = renderedBlock?.kind != .horizontalRule && !usesTableSurface
         textView.needsDisplay = true
     }
 
@@ -125,6 +126,10 @@ extension BlockInputBlockItem {
             let minX = min(textGlyphLeadingX(), frontMatterDividerView.frame.minX)
             let maxX = max(textGlyphTrailingX(), frontMatterDividerView.frame.maxX)
             return NSRect(x: minX, y: 0, width: max(1, maxX - minX), height: view.bounds.height)
+        }
+        if renderedBlock?.kind == .table, !tableView.isHidden {
+            let tableFrame = tableView.convert(tableView.visibleTableFrame, to: view)
+            return NSRect(x: tableFrame.minX, y: 0, width: max(1, tableFrame.width), height: view.bounds.height)
         }
         var minX = min(textGlyphLeadingX(), standardTextSelectionLeadingX())
         var maxX = textGlyphTrailingX()
