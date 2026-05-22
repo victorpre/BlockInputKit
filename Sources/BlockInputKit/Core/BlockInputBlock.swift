@@ -431,4 +431,15 @@ extension BlockInputBlockKind {
             return false
         }
     }
+
+    var isImage: Bool {
+        if case .image = self {
+            return true
+        }
+        return false
+    }
+
+    var isSelectableStandaloneBlock: Bool {
+        self == .horizontalRule || isImage
+    }
 }

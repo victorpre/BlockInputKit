@@ -6,6 +6,12 @@ extension BlockInputBlockItem {
         let isHorizontalRule = kind == .horizontalRule
         let isFrontMatter = kind == .frontMatter
         let usesTableSurface = kind == .table && BlockInputTable(markdown: block.text) != nil
+        let usesImageSurface: Bool
+        if case .image = kind {
+            usesImageSurface = true
+        } else {
+            usesImageSurface = false
+        }
         let contentIndent = Self.contentIndent(for: block)
         let perLineContentIndent = Self.perLineContentIndent(for: block)
         let verticalMetrics = Self.verticalMetrics(for: block)
@@ -14,12 +20,14 @@ extension BlockInputBlockItem {
         textView.isSelectable = !isHorizontalRule && !usesTableSurface
         configureTextScrolling(for: block)
         applyTextAttributes(for: block)
-        scrollView.isHidden = isHorizontalRule || usesTableSurface
+        scrollView.isHidden = isHorizontalRule || usesTableSurface || usesImageSurface
         if usesTableSurface {
             tableView.configure(block: block, style: style)
         } else {
             tableView.resetForReuse()
         }
+        imageBlockView.isHidden = !usesImageSurface
+        configureImageBlockIfNeeded(for: block)
         configureCodeBackground(for: block)
         scrollViewTopConstraint?.constant = 0
         configureFrontMatterDivider(isVisible: isFrontMatter)

@@ -361,10 +361,12 @@ extension BlockInputView: BlockInputBlockItemDelegate {
 
     func blockItemDidRequestSelectHorizontalRule(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
         refreshDocumentFromStore()
-        guard block(withID: blockID)?.kind == .horizontalRule else {
+        let selectedIndex = collectionView.indexPath(for: item)?.item
+        let selectedKind = selectedIndex.flatMap { block(at: $0)?.kind } ?? block(withID: blockID)?.kind
+        guard selectedKind == .horizontalRule || selectedKind?.isImage == true else {
             return
         }
-        selectedHorizontalRuleIndex = collectionView.indexPath(for: item)?.item
+        selectedHorizontalRuleIndex = selectedIndex
         hideDropIndicator()
         blockSelectionExpansion = nil
         applySelection(.blocks([blockID]), notify: true)

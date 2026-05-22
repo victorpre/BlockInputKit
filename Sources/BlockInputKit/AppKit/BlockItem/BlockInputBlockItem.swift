@@ -31,6 +31,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let frontMatterDividerHeight: CGFloat = 1
     static let frontMatterDividerVerticalInset: CGFloat = 10
     static let tableExternalVerticalInset: CGFloat = 6
+    static let imageExternalVerticalInset: CGFloat = 6
 
     let handleView = BlockInputDragHandleView()
     let kindLabel = BlockInputMarkerView()
@@ -39,6 +40,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     let scrollView = BlockInputBlockItemScrollView()
     let codeBackgroundView = NSView()
     let tableView = BlockInputTableView()
+    let imageBlockView = BlockInputImageBlockView()
     let horizontalRuleView = BlockInputHorizontalRuleView()
     let frontMatterDividerView = BlockInputFrontMatterDividerView()
     let selectionBackgroundView = BlockInputSelectionBackgroundView()
@@ -58,6 +60,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var isUpdatingBlockSelectionDrag = false
     var renderedCodeColorScheme: BlockInputSyntaxColorScheme?
     var style = BlockInputStyle.default
+    var imageLoadingContext = BlockInputImageBlockLoadingContext()
     var allowsReordering = true
     var editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
     var handleLeadingConstraint: NSLayoutConstraint?
@@ -80,7 +83,13 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var frontMatterDividerLeadingConstraint: NSLayoutConstraint?
     var frontMatterDividerTrailingConstraint: NSLayoutConstraint?
     var frontMatterDividerBottomConstraint: NSLayoutConstraint?
+    var imageBlockLeadingConstraint: NSLayoutConstraint?
+    var imageBlockTrailingConstraint: NSLayoutConstraint?
+    var imageBlockTopConstraint: NSLayoutConstraint?
+    var imageBlockBottomConstraint: NSLayoutConstraint?
+    var imageLoadTask: Task<Void, Never>?
     private var isHorizontalRule = false
+    private var isImageBlock = false
 
     var currentSelectedRange: NSRange {
         tableView.activeCellSelectedSourceRange ?? textView.selectedRange()
@@ -133,16 +142,16 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard isHorizontalRule else {
+        guard isHorizontalRule || isImageBlock else {
             super.mouseDown(with: event)
             return
         }
         beginBlockSelectionDrag()
-        requestSelectHorizontalRule()
+        requestSelectCurrentBlock()
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard isHorizontalRule,
+        guard isHorizontalRule || isImageBlock,
               updateBlockSelectionDrag(with: event) else {
             super.mouseDragged(with: event)
             return
@@ -150,7 +159,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     override func mouseUp(with event: NSEvent) {
-        guard isHorizontalRule else {
+        guard isHorizontalRule || isImageBlock else {
             super.mouseUp(with: event)
             return
         }
@@ -163,6 +172,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         accentColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
+        imageLoadingContext: BlockInputImageBlockLoadingContext = BlockInputImageBlockLoadingContext(),
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) {
@@ -174,9 +184,15 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.allowsReordering = allowsReordering
         self.editorHorizontalInset = editorHorizontalInset
         self.style = style
+        self.imageLoadingContext = imageLoadingContext
         selectionBeforeTextChange = nil
         textView.hideFileDropCaret()
         isHorizontalRule = block.kind == .horizontalRule
+        if case .image = block.kind {
+            isImageBlock = true
+        } else {
+            isImageBlock = false
+        }
         handleView.blockItem = self
         scrollView.blockItem = self
         horizontalRuleView.blockItem = self
@@ -372,6 +388,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     func requestSelectHorizontalRule() {
+        requestSelectCurrentBlock()
+    }
+
+    func requestSelectCurrentBlock() {
         guard let blockID else {
             return
         }
@@ -483,6 +503,7 @@ extension BlockInputBlockItem {
         delegate = nil
         selectionBeforeTextChange = nil
         isHorizontalRule = false
+        isImageBlock = false
         setBlockSelection(false)
         handleView.blockItem = nil
         scrollView.blockItem = nil

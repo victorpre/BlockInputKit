@@ -12,6 +12,7 @@ extension BlockInputBlockItem {
         setupCodeBackgroundView()
         setupTextView()
         setupTableView()
+        setupImageBlockView()
         setupHorizontalRuleView()
         setupFrontMatterDividerView()
         setupQuoteBarView()
@@ -82,6 +83,10 @@ extension BlockInputBlockItem {
         tableView.isHidden = true
     }
 
+    private func setupImageBlockView() {
+        imageBlockView.isHidden = true
+    }
+
     private func setupHorizontalRuleView() {
         horizontalRuleView.blockItem = self
     }
@@ -107,7 +112,10 @@ extension BlockInputBlockItem {
         view.addSubview(codeBackgroundView)
         selectionBackgroundView.translatesAutoresizingMaskIntoConstraints = true
         view.addSubview(selectionBackgroundView)
-        for subview in [kindLabel, checklistButton, quoteBarView, scrollView, tableView, horizontalRuleView, frontMatterDividerView, handleView] {
+        for subview in [
+            kindLabel, checklistButton, quoteBarView, scrollView, tableView, imageBlockView, horizontalRuleView,
+            frontMatterDividerView, handleView
+        ] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
@@ -213,7 +221,19 @@ extension BlockInputBlockItem {
             horizontalRuleTrailingConstraint,
             horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             horizontalRuleView.heightAnchor.constraint(equalToConstant: 9)
-        ] + tableViewLayoutConstraints() + frontMatterDividerLayoutConstraints()
+        ] + tableViewLayoutConstraints() + imageBlockViewLayoutConstraints() + frontMatterDividerLayoutConstraints()
+    }
+
+    private func imageBlockViewLayoutConstraints() -> [NSLayoutConstraint] {
+        let leading = imageBlockView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor)
+        imageBlockLeadingConstraint = leading
+        let trailing = imageBlockView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor)
+        imageBlockTrailingConstraint = trailing
+        let top = imageBlockView.topAnchor.constraint(equalTo: view.topAnchor, constant: Self.imageExternalVerticalInset)
+        imageBlockTopConstraint = top
+        let bottom = imageBlockView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Self.imageExternalVerticalInset)
+        imageBlockBottomConstraint = bottom
+        return [leading, trailing, top, bottom]
     }
 
     private func tableViewLayoutConstraints() -> [NSLayoutConstraint] {

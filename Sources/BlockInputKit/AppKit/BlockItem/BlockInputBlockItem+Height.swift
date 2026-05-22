@@ -19,6 +19,13 @@ extension BlockInputBlockItem {
                     + (tableExternalVerticalInset * 2)
             )
         }
+        if case let .image(image) = block.kind {
+            return imageHeight(
+                for: image,
+                textWidth: availableTextWidth,
+                defaultAspectRatio: style.imageBlock.placeholderAspectRatio ?? 16.0 / 9.0
+            )
+        }
         if case .code = block.kind {
             return codeBlockHeight(text: text, availableTextWidth: availableTextWidth, font: font, metrics: metrics)
         }

@@ -28,7 +28,7 @@ extension BlockInputView {
         editorHorizontalInset = configuration.editorHorizontalInset
         editorVerticalInset = configuration.editorVerticalInset
         dropIndicatorColor = configuration.dropIndicatorColor
-        style = configuration.style
+        configureImageLoading(configuration)
         configureUndoController(
             previousDocumentStore: previousDocumentStore,
             previousDocument: previousDocument,
@@ -81,6 +81,20 @@ extension BlockInputView {
             }
             undoController = fallbackUndoController
         }
+    }
+
+    private func configureImageLoading(_ configuration: BlockInputConfiguration) {
+        style = configuration.style
+        if style.imageBlock.placeholderAspectRatio == nil {
+            style.imageBlock.placeholderAspectRatio = configuration.defaultImagePlaceholderAspectRatio
+        }
+        imageLoader = configuration.imageLoader
+        imageDiskCache = configuration.imageDiskCache
+        imageBaseURL = configuration.imageBaseURL
+        allowsRemoteImageLoading = configuration.allowsRemoteImageLoading
+        maximumImageSourceBytes = configuration.maximumImageSourceBytes
+        maximumImagePixelDimension = configuration.maximumImagePixelDimension
+        defaultImagePlaceholderAspectRatio = configuration.defaultImagePlaceholderAspectRatio
     }
 
     func shouldResetFallbackUndoController(

@@ -22,6 +22,13 @@ public final class BlockInputView: NSView {
     public internal(set) var dropIndicatorColor = NSColor.controlAccentColor
     /// Visual styling used for text, code, and selection chrome.
     public internal(set) var style = BlockInputStyle.default
+    var imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader()
+    var imageDiskCache: (any BlockInputImageDiskCaching)?
+    var imageBaseURL: URL?
+    var allowsRemoteImageLoading = true
+    var maximumImageSourceBytes = 20 * 1024 * 1024
+    var maximumImagePixelDimension = 8_192
+    var defaultImagePlaceholderAspectRatio: CGFloat = 16.0 / 9.0
 
     private let scrollView = BlockInputDocumentScrollView()
     let collectionView = BlockInputCollectionView()
@@ -261,22 +268,25 @@ public final class BlockInputView: NSView {
         return afterSelection
     }
 
-    /// Deletes a selected horizontal rule block after the rule itself has focus-like selection.
+    /// Deletes a selected non-text media block after the row itself has focus-like selection.
     @discardableResult
     public func deleteSelectedHorizontalRuleForBackspaceOrDelete() -> BlockInputSelection? {
         refreshDocumentFromStore()
         guard case let .blocks(blockIDs) = selection,
               blockIDs.count == 1,
-              let blockID = blockIDs.first,
-              block(withID: blockID)?.kind == .horizontalRule else {
+              let blockID = blockIDs.first else {
             return nil
         }
         let deletionIndex = selectedHorizontalRuleIndex.flatMap { index -> Int? in
             guard block(at: index)?.id == blockID,
-                  block(at: index)?.kind == .horizontalRule else {
+                  block(at: index)?.kind.isSelectableStandaloneBlock == true else {
                 return nil
             }
             return index
+        }
+        let selectedKind = deletionIndex.flatMap { block(at: $0)?.kind } ?? block(withID: blockID)?.kind
+        guard selectedKind?.isSelectableStandaloneBlock == true else {
+            return nil
         }
         return performStructuralEdit(
             named: "Delete Block",

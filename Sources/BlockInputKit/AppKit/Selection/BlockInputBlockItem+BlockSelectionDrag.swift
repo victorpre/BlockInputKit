@@ -30,8 +30,8 @@ extension BlockInputBlockItem {
         }
         isDraggingBlockSelection = false
         if wasDraggingBlockSelection {
-            if renderedBlock?.kind == .horizontalRule {
-                requestSelectHorizontalRule()
+            if renderedBlock?.kind == .horizontalRule || renderedBlock?.kind.isImage == true {
+                requestSelectCurrentBlock()
             } else {
                 view.window?.makeFirstResponder(textView)
             }

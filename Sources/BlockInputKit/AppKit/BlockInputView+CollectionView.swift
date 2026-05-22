@@ -36,15 +36,7 @@ extension BlockInputView: NSCollectionViewDataSource {
             blockItem.clearConfiguration()
             return blockItem
         }
-        blockItem.configure(
-            block: block,
-            allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset,
-            accentColor: dropIndicatorColor,
-            style: style,
-            isSelected: isBlockSelected(block.id),
-            delegate: self
-        )
+        configureBlockItem(blockItem, block: block)
         return blockItem
     }
 }

@@ -6,8 +6,20 @@ extension BlockInputView {
             editorHorizontalInset: editorHorizontalInset,
             accentColor: dropIndicatorColor,
             style: style,
+            imageLoadingContext: imageLoadingContext,
             isSelected: isBlockSelected(block.id),
             delegate: self
+        )
+    }
+
+    var imageLoadingContext: BlockInputImageBlockLoadingContext {
+        BlockInputImageBlockLoadingContext(
+            loader: imageLoader,
+            diskCache: imageDiskCache,
+            baseURL: imageBaseURL,
+            allowsRemoteLoading: allowsRemoteImageLoading,
+            maximumSourceBytes: maximumImageSourceBytes,
+            maximumPixelDimension: maximumImagePixelDimension
         )
     }
 }

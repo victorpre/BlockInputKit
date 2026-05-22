@@ -10,6 +10,8 @@ extension BlockInputBlockItem {
         textView.font = Self.font(for: .paragraph)
         textView.hideFileDropCaret()
         style = .default
+        imageLoadTask?.cancel()
+        imageLoadTask = nil
     }
 
     func resetLayoutForReuse() {
@@ -17,6 +19,7 @@ extension BlockInputBlockItem {
         editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
         scrollView.isHidden = false
         tableView.resetForReuse()
+        imageBlockView.resetForReuse()
         codeBackgroundView.isHidden = true
         codeBackgroundView.alphaValue = 0
         scrollViewLeadingConstraint?.constant = Self.defaultTextLeading
@@ -37,6 +40,8 @@ extension BlockInputBlockItem {
         frontMatterDividerLeadingConstraint?.constant = Self.horizontalRuleInnerInset
         frontMatterDividerTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: true)
         frontMatterDividerBottomConstraint?.constant = -Self.frontMatterDividerVerticalInset
+        imageBlockTopConstraint?.constant = Self.imageExternalVerticalInset
+        imageBlockBottomConstraint?.constant = -Self.imageExternalVerticalInset
     }
 
     func resetChromeForReuse() {

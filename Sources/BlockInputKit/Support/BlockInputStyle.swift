@@ -13,18 +13,55 @@ public struct BlockInputStyle: @unchecked Sendable {
     public var inlineCode: BlockInputInlineCodeStyle
     /// Styling for fenced code block surfaces.
     public var codeBlock: BlockInputCodeBlockStyle
+    /// Styling for image block surfaces.
+    public var imageBlock: BlockInputImageBlockStyle
 
     /// Creates editor styling with optional overrides for built-in visual defaults.
     public init(
         baseText: BlockInputTextStyle = BlockInputTextStyle(),
         selectionBackgroundColor: NSColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.72),
         inlineCode: BlockInputInlineCodeStyle = BlockInputInlineCodeStyle(),
-        codeBlock: BlockInputCodeBlockStyle = BlockInputCodeBlockStyle()
+        codeBlock: BlockInputCodeBlockStyle = BlockInputCodeBlockStyle(),
+        imageBlock: BlockInputImageBlockStyle = BlockInputImageBlockStyle()
     ) {
         self.baseText = baseText
         self.selectionBackgroundColor = selectionBackgroundColor
         self.inlineCode = inlineCode
         self.codeBlock = codeBlock
+        self.imageBlock = imageBlock
+    }
+}
+
+/// Background, border, and corner styling for image block surfaces.
+public struct BlockInputImageBlockStyle: @unchecked Sendable {
+    /// Placeholder aspect ratio used for image blocks whose width and height are still unknown.
+    public var placeholderAspectRatio: CGFloat? {
+        didSet {
+            placeholderAspectRatio = placeholderAspectRatio.flatMap(Self.validAspectRatio)
+        }
+    }
+    /// Placeholder fill color shown before an image has loaded.
+    public var placeholderColor: NSColor?
+    /// Border color for placeholder, loaded, and failed image surfaces.
+    public var borderColor: NSColor?
+    /// Surface corner radius. When nil, images use the built-in radius.
+    public var cornerRadius: CGFloat?
+
+    /// Creates image block styling overrides.
+    public init(
+        placeholderAspectRatio: CGFloat? = nil,
+        placeholderColor: NSColor? = nil,
+        borderColor: NSColor? = nil,
+        cornerRadius: CGFloat? = nil
+    ) {
+        self.placeholderAspectRatio = placeholderAspectRatio.flatMap(Self.validAspectRatio)
+        self.placeholderColor = placeholderColor
+        self.borderColor = borderColor
+        self.cornerRadius = cornerRadius
+    }
+
+    private static func validAspectRatio(_ value: CGFloat) -> CGFloat? {
+        value > 0 ? value : nil
     }
 }
 
