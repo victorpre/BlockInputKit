@@ -109,7 +109,14 @@ struct EditorScreen: View {
 - `editorHorizontalInset`: Controls the leading and trailing block content inset.
 - `editorVerticalInset`: Controls the top and bottom editor content inset.
 - `dropIndicatorColor`: Colors drag insertion and selected horizontal-rule affordances.
-- `style`: Configures base text, selection backgrounds, inline code, and fenced code block styling.
+- `style`: Configures base text, selection backgrounds, inline code, fenced code block styling, and image block surfaces.
+- `imageLoader`: Loads image bytes and dimensions for image blocks. The default loader uses in-memory caching and optional remote disk caching.
+- `imageDiskCache`: Optional remote image disk cache used by the default image loader. Hosts can provide a custom `BlockInputImageDiskCaching` implementation.
+- `imageBaseURL`: Base URL used to resolve relative image sources before loading.
+- `allowsRemoteImageLoading`: Enables or disables `http` and `https` image loads.
+- `maximumImageSourceBytes`: Maximum source image payload accepted by the default loader.
+- `maximumImagePixelDimension`: Maximum decoded width or height accepted by the default loader.
+- `defaultImagePlaceholderAspectRatio`: Placeholder aspect ratio used before image dimensions are known.
 - `undoController`: Shares text and structural undo coordination with the host.
 - `completionProvider`: Supplies mention and slash-command suggestions.
 - `slashCommandAvailability`: Controls whether `/` completion opens only when `/` starts block index `0` at UTF-16 offset `0`, or after token boundaries anywhere.
@@ -180,7 +187,22 @@ BlockInputCompletionSuggestion.slashCommand(
 
 Hosts may also provide custom `insertionText`. A link renders as a slash-command chip when its visible label starts with `/`; the URI scheme is host-owned. `file://` links keep file-chip behavior even when their visible label starts with `/`. Configure `slashCommandChipClickHandler` when slash chips should run host behavior, open their URI directly, or show the built-in link modal.
 
-Dragging local files onto supported text blocks inserts file chips at the drop caret. Paragraphs, headings, quotes, list items, and checklist items accept inline file drops; code, frontmatter, raw Markdown, horizontal rules, row whitespace, and unloaded progressive rows reject them.
+Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block instead of file chips. Paragraphs, headings, quotes, list items, and checklist items accept inline file drops; code, frontmatter, raw Markdown, horizontal rules, row whitespace, and unloaded progressive rows reject them.
+
+## Images
+
+Markdown image syntax and HTML image tags parse as standalone `.image` blocks:
+
+```markdown
+![Alt Text](https://example.com/image.png)
+<img src="https://example.com/image.png" alt="Alt Text" width="320" height="180" />
+```
+
+If image Markdown or HTML is typed, pasted, or parsed in the middle of supported text, the editor splits the source into a text block before the image, an image block, and a text block after the image. Right-click `Insert Image` uses the same split behavior. Dropping a local image file into a text block inserts the image below that block.
+
+Image blocks reserve a semi-transparent placeholder before loading, with 6 points of vertical spacing above and below the block. Remote images are loaded through `BlockInputImageLoading`; the default loader caches loaded images in memory and can use `BlockInputImageDiskCaching` for remote disk cache entries. Local images are memory-cached only by the default loader.
+
+Image blocks with known width and height can be resized from the right or bottom edge. Resizing persists `width` and `height` on `BlockInputImage` and exports the block as an HTML `<img>` tag. Images without known dimensions do not expose resize handles.
 
 ## Tables
 
