@@ -94,6 +94,25 @@ final class BlockInputViewImageInsertionTests: XCTestCase {
         XCTAssertEqual(modal.frame.size, NSSize(width: 300, height: 148))
     }
 
+    func testResizingImagePersistsDimensionsAndExportsAsHTML() throws {
+        let imageID = BlockInputBlockID(rawValue: "image")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: imageID, kind: .image(BlockInputImage(source: "https://example.com/image.png", width: 320, height: 180)))
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+
+        mounted.view.blockItem(item, blockID: imageID, didResizeImageToWidth: 400, height: 225)
+
+        XCTAssertEqual(
+            mounted.view.document.blocks[0].kind,
+            .image(BlockInputImage(source: "https://example.com/image.png", width: 400, height: 225, sourceStyle: .html))
+        )
+        XCTAssertEqual(
+            mounted.view.document.markdown,
+            "<img src=\"https://example.com/image.png\" width=\"400\" height=\"225\" />"
+        )
+    }
+
     private func temporaryImageURL() -> URL {
         URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("dropped")

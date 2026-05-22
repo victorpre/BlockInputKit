@@ -53,6 +53,13 @@ extension BlockInputBlockItem {
         imageBlockView.configurePlaceholder(style: style)
         imageBlockView.toolTip = image.altText.isEmpty ? image.source : image.altText
         imageBlockView.setAccessibilityLabel(image.altText.isEmpty ? image.source : image.altText)
+        imageBlockView.resizeDimensions = image.resizeDimensions
+        imageBlockView.onResize = { [weak self] width, height in
+            guard let self else {
+                return
+            }
+            self.delegate?.blockItem(self, blockID: block.id, didResizeImageToWidth: width, height: height)
+        }
         guard let resolvedURL = image.resolvedURL(relativeTo: imageLoadingContext.baseURL),
               allowsLoading(resolvedURL) else {
             imageBlockView.configureFailure(style: style)
@@ -93,7 +100,11 @@ extension BlockInputBlockItem {
                         self?.imageBlockView.configureFailure(style: self?.style ?? .default)
                         return
                     }
-                    self?.imageBlockView.configureLoadedImage(nsImage, style: self?.style ?? .default)
+                    self?.imageBlockView.configureLoadedImage(
+                        nsImage,
+                        style: self?.style ?? .default,
+                        resizeDimensions: request.image.resizeDimensions
+                    )
                 }
             } catch {
                 await MainActor.run {
@@ -112,5 +123,14 @@ extension BlockInputBlockItem {
             return true
         }
         return imageLoadingContext.allowsRemoteLoading
+    }
+}
+
+private extension BlockInputImage {
+    var resizeDimensions: BlockInputImageDimensions? {
+        guard let width, let height else {
+            return nil
+        }
+        return BlockInputImageDimensions(width: width, height: height)
     }
 }

@@ -41,6 +41,54 @@ final class BlockInputImageBlockRenderingTests: XCTestCase {
         XCTAssertNotNil(imageView.layer?.backgroundColor)
     }
 
+    func testImageResizeIsDisabledUntilDimensionsAreKnown() throws {
+        let unknown = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(kind: .image(BlockInputImage(source: "https://example.com/image.png"))),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let known = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(kind: .image(BlockInputImage(source: "https://example.com/image.png", width: 320, height: 180))),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+
+        XCTAssertNil(unknown.testingImageBlockView.resizeDimensions)
+        XCTAssertEqual(known.testingImageBlockView.resizeDimensions, BlockInputImageDimensions(width: 320, height: 180))
+    }
+
+    func testImageResizeStartsFromRenderedWidthForOversizedImage() throws {
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(kind: .image(BlockInputImage(source: "https://example.com/image.png", width: 4000, height: 3000)))
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let imageView = item.testingImageBlockView
+        var resizedDimensions: BlockInputImageDimensions?
+        imageView.onResize = { width, height in
+            resizedDimensions = BlockInputImageDimensions(width: width, height: height)
+        }
+        let scale = min(imageView.bounds.width / 4000, imageView.bounds.height / 3000)
+        let renderedStart = BlockInputImageDimensions(
+            width: Int((4000 * scale).rounded()),
+            height: Int((3000 * scale).rounded())
+        )
+        let startLocation = imageView.convert(
+            NSPoint(x: imageView.bounds.maxX - 1, y: imageView.bounds.midY),
+            to: nil
+        )
+
+        imageView.mouseDown(with: try mouseDownEvent(location: startLocation, windowNumber: mounted.window.windowNumber))
+        imageView.mouseDragged(with: try mouseDraggedEvent(
+            location: NSPoint(x: startLocation.x - 100, y: startLocation.y),
+            windowNumber: mounted.window.windowNumber
+        ))
+
+        XCTAssertEqual(
+            resizedDimensions,
+            BlockInputImageDimensions(width: renderedStart.width - 100, height: renderedStart.height)
+        )
+    }
+
     func testImageBlockDisplaysLoadedImage() async throws {
         let imageURL = try temporaryGIFURL()
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(

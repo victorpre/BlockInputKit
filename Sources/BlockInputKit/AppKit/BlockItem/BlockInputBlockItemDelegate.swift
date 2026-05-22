@@ -166,6 +166,7 @@ protocol BlockInputBlockItemDelegate: AnyObject {
     ) -> [BlockInputTextFormattingMenuItemState]
     func blockItemDidRequestSelectHorizontalRule(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
+    func blockItem(_ item: BlockInputBlockItem, blockID: BlockInputBlockID, didResizeImageToWidth width: Int, height: Int)
     func blockItemDidBeginReordering(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestIndent(
         _ item: BlockInputBlockItem,

@@ -47,4 +47,27 @@ extension BlockInputView {
     ) -> Bool {
         handleLinkClick(blockID: blockID, selectedRange: selectedRange, clickedLinkRange: clickedLinkRange, event: event)
     }
+
+    func blockItem(_ item: BlockInputBlockItem, blockID: BlockInputBlockID, didResizeImageToWidth width: Int, height: Int) {
+        guard let index = index(of: blockID),
+              var block = block(at: index),
+              case var .image(image) = block.kind else {
+            return
+        }
+        let beforeBlock = block
+        let beforeSelection = selection
+        image.width = width
+        image.height = height
+        image.sourceStyle = .html
+        block.kind = .image(image)
+        let afterSelection = BlockInputSelection.blocks([blockID])
+        _ = applyGranularBlockReplacement(block, at: index, selection: afterSelection)
+        undoController?.registerBlockReplacementStructuralEdit(
+            actionName: "Resize Image",
+            beforeBlock: beforeBlock,
+            afterBlock: block,
+            selectionBefore: beforeSelection,
+            selectionAfter: afterSelection
+        )
+    }
 }
