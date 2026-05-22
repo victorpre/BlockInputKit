@@ -8,7 +8,7 @@ enum DemoNoteID: String, CaseIterable, Sendable {
     var title: String {
         switch self {
         case .mixed:
-            "Mixed"
+            "Overview"
         case .large:
             "100K"
         }

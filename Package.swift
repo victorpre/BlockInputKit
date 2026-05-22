@@ -44,6 +44,9 @@ let package = Package(
         .executableTarget(
             name: "BlockInputKitDemo",
             dependencies: ["BlockInputKit"],
+            resources: [
+                .process("Resources")
+            ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]

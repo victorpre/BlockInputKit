@@ -6,16 +6,7 @@ enum DemoData {
     static let progressiveLoadBatchLimit = 5_000
 
     static func mixedDocument() -> BlockInputDocument {
-        BlockInputDocument(blocks: [
-            BlockInputBlock(kind: .heading(level: 1), text: "BlockInputKit demo"),
-            BlockInputBlock(kind: .paragraph, text: "Each visible block owns its own AppKit text input."),
-            BlockInputBlock(kind: .quote, text: "Focus, selection, return, delete, and Cmd+A are coordinated across blocks."),
-            BlockInputBlock(kind: .horizontalRule),
-            BlockInputBlock(kind: .code(language: "swift"), text: "let editor = BlockInputView()\neditor.focusEditor()"),
-            BlockInputBlock(kind: .bulletedListItem, text: "Hover rows to reveal reorder handles"),
-            BlockInputBlock(kind: .numberedListItem(start: 1), text: "Switch between raw Markdown and rendered blocks"),
-            BlockInputBlock(kind: .checklistItem(isChecked: false), text: "Checklist data round-trips through Markdown")
-        ])
+        BlockInputDocument(blocks: overviewIntroBlocks + overviewListBlocks + overviewMediaBlocks)
     }
 
     static func largeDocument(count: Int = 100_000) -> BlockInputDocument {
@@ -43,5 +34,69 @@ enum DemoData {
         default:
             return BlockInputBlock(id: id, kind: .code(language: "swift"), text: "let index = \(index)")
         }
+    }
+
+    private static var overviewIntroBlocks: [BlockInputBlock] {
+        [
+            BlockInputBlock(kind: .frontMatter, text: "title: BlockInputKit Overview\nstatus: demo"),
+            BlockInputBlock(kind: .heading(level: 1), text: "BlockInputKit overview"),
+            BlockInputBlock(kind: .paragraph, text: """
+            Native AppKit block editing with Markdown import/export, selection, undo, reordering, files, images, and tables.
+            """),
+            BlockInputBlock(kind: .heading(level: 2), text: "Text blocks"),
+            BlockInputBlock(kind: .heading(level: 3), text: "Headings level 3"),
+            BlockInputBlock(kind: .heading(level: 4), text: "Headings level 4"),
+            BlockInputBlock(kind: .heading(level: 5), text: "Headings level 5"),
+            BlockInputBlock(kind: .heading(level: 6), text: "Headings level 6"),
+            BlockInputBlock(kind: .paragraph, text: """
+            Inline items include **bold**, *italic*, <u>underline</u>, ~~strikethrough~~, `inline code`, \
+            [a normal link](https://github.com/afollestad/BlockInputKit), [README.md](file:///tmp/README.md), \
+            and [/quote](blockinputkit-demo://commands/quote).
+            """),
+            BlockInputBlock(kind: .quote, text: "Focus, selection, return, delete, and Cmd+A coordinate across blocks."),
+            BlockInputBlock(kind: .code(language: "swift"), text: """
+            let editor = BlockInputView()
+            editor.configure(BlockInputConfiguration(document: document))
+            editor.focusEditor()
+            """),
+            BlockInputBlock(kind: .horizontalRule)
+        ]
+    }
+
+    private static var overviewListBlocks: [BlockInputBlock] {
+        [
+            BlockInputBlock(kind: .heading(level: 2), text: "Lists and tasks"),
+            BlockInputBlock(
+                kind: .bulletedListItem,
+                text: "Bulleted list item\nNested bullet item\nDeep nested bullet item",
+                lineIndentationLevels: [0, 1, 2]
+            ),
+            BlockInputBlock(
+                kind: .numberedListItem(start: 1),
+                text: "Numbered list item\nNested numbered item\nDeep nested numbered item",
+                lineIndentationLevels: [0, 1, 2]
+            ),
+            BlockInputBlock(kind: .checklistItem(isChecked: false), text: "Unchecked checklist item"),
+            BlockInputBlock(kind: .checklistItem(isChecked: true), text: "Checked checklist item"),
+            BlockInputBlock(kind: .heading(level: 2), text: "Tables")
+        ]
+    }
+
+    private static var overviewMediaBlocks: [BlockInputBlock] {
+        [
+            BlockInputBlock(kind: .table, text: """
+            | Feature area | Renderer | Editing behavior | Notes for the demo |
+            | --- | :---: | --- | --- |
+            | Tables | Structured | Cell text, rows, columns, and selection | Wide content scrolls horizontally inside the editor |
+            | Images | Standalone | Resize handles and Markdown export | This demo uses a bundled local resource |
+            """),
+            BlockInputBlock(kind: .heading(level: 2), text: "Images"),
+            BlockInputBlock(kind: .image(BlockInputImage(
+                source: "willriver_falls.jpg",
+                altText: "Willriver Falls",
+                width: 480,
+                height: 320
+            )))
+        ]
     }
 }

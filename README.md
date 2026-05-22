@@ -330,7 +330,9 @@ Run the local demo:
 ./scripts/run-demo.sh
 ```
 
-The demo includes file mention suggestions, slash commands with `.anywhere` availability, and a `Caret`/`Overlay` completion placement control.
+The default `Overview` note is a compact feature tour with common block types, inline items, tables, and bundled image media.
+The `100K` note remains the large-document performance sample.
+The demo also includes file mention suggestions, slash commands with `.anywhere` availability, and a `Caret`/`Overlay` completion placement control.
 
 ## Validation
 
