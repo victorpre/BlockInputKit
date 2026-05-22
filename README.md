@@ -1,15 +1,17 @@
 # BlockInputKit
 
-BlockInputKit is a native Swift library for macOS apps that need structured block editing with AppKit-backed text inputs.
+_Not affiliated with Block, Inc. in any way._
 
-The package is SPM-first and designed around real editable blocks: each block owns text content and editing state, while the root editor coordinates focus, selection, reordering, document changes, and undo.
+BlockInputKit is a native Swift library for macOS apps that need structured block editing. Block editing makes every piece of content its own block, within a document containing a set of reorderable blocks. Each paragraph is a block, checklists and tables are blocks, etc.
+
+![BlockInputKit Demo](docs/blockinputkit.png)
 
 ## Installation
 
-Add BlockInputKit as a Swift Package dependency:
+Add BlockInputKit as a pinned Swift Package dependency:
 
 ```swift
-.package(url: "https://github.com/afollestad/BlockInputKit.git", branch: "main")
+.package(url: "https://github.com/afollestad/BlockInputKit.git", exact: "x.y.z")
 ```
 
 Then add the library product to your macOS target:
@@ -18,10 +20,9 @@ Then add the library product to your macOS target:
 .product(name: "BlockInputKit", package: "BlockInputKit")
 ```
 
-## Editor Setup
+## Basic Configuration
 
 ```swift
-import AppKit
 import BlockInputKit
 
 let document = BlockInputDocument(blocks: [
@@ -29,58 +30,10 @@ let document = BlockInputDocument(blocks: [
     BlockInputBlock(kind: .quote, text: "Each block owns its own text input.")
 ])
 
-let store = BlockInputMemoryDocumentStore(document: document)
-let undoController = BlockInputUndoController()
-let completionProvider: (any BlockInputCompletionProvider)? = nil
-
-let configuration = BlockInputConfiguration(
-    documentStore: store,
-    allowsBlockReordering: true,
-    editorHorizontalInset: 20,
-    editorVerticalInset: 8,
-    dropIndicatorColor: .systemTeal,
-    style: BlockInputStyle(
-        baseText: BlockInputTextStyle(
-            font: .systemFont(ofSize: 16),
-            foregroundColor: .labelColor
-        ),
-        selectionBackgroundColor: .selectedContentBackgroundColor.withAlphaComponent(0.72),
-        inlineCode: BlockInputInlineCodeStyle(
-            backgroundColor: .quaternaryLabelColor
-        ),
-        codeBlock: BlockInputCodeBlockStyle(
-            font: .monospacedSystemFont(ofSize: 13, weight: .regular),
-            cornerRadius: 6
-        )
-    ),
-    undoController: undoController,
-    completionProvider: completionProvider,
-    slashCommandAvailability: .documentStart,
-    completionPopupConfiguration: BlockInputCompletionPopupConfiguration(placement: .caret),
-    onDocumentMutation: { change in
-        print("Applied edit:", change)
-    },
-    onDocumentChange: { updatedDocument in
-        // Full snapshots are useful for persistence, export, and small documents.
-        print(updatedDocument.markdown)
-    },
-    onSelectionChange: { selection in
-        print("Selection:", String(describing: selection))
-    },
-    onFocusChange: { focused in
-        print("Focused:", focused)
-    }
-)
+let configuration = BlockInputConfiguration(document: document)
 ```
 
-## AppKit
-
-```swift
-let editor = BlockInputView()
-editor.configure(configuration)
-```
-
-## SwiftUI
+## SwiftUI Hosting
 
 ```swift
 import BlockInputKit
@@ -99,10 +52,54 @@ struct EditorScreen: View {
 }
 ```
 
-## Commands
+## AppKit Hosting
 
-Use semantic commands when toolbar buttons, menu items, or host UI need to drive the editor through the same paths as
-keyboard shortcuts and editor-owned context menus:
+Use `BlockInputView` when the host needs direct editor access:
+
+```swift
+let editor = BlockInputView()
+editor.configure(configuration)
+```
+
+## Configuration
+
+Start with `BlockInputConfiguration(document:)` for in-memory editing. Use a store when the host owns persistence or wants granular mutation handling:
+
+```swift
+let store = BlockInputMemoryDocumentStore(document: document)
+
+let configuration = BlockInputConfiguration(
+    documentStore: store,
+    onDocumentMutation: { change in
+        print("Applied edit:", change)
+    },
+    onDocumentChange: { updatedDocument in
+        print(updatedDocument.markdown)
+    }
+)
+```
+
+### Layout And Style
+
+Use layout and style options when the editor needs to match the host surface:
+
+```swift
+let configuration = BlockInputConfiguration(
+    document: document,
+    allowsBlockReordering: true,
+    editorHorizontalInset: 20,
+    editorVerticalInset: 8,
+    style: BlockInputStyle(
+        imageBlock: BlockInputImageBlockStyle(cornerRadius: 8)
+    )
+)
+```
+
+`dropIndicatorColor`, selection colors, inline code, code block, and image block styling are also configurable.
+
+### Commands
+
+Semantic commands let toolbar buttons, menu items, and host UI use the same paths as keyboard shortcuts and editor menus:
 
 ```swift
 editor.performCommand(.bold)
@@ -117,7 +114,7 @@ if editor.canPerformCommand(.insertTable) {
 }
 ```
 
-SwiftUI hosts can keep a dispatcher and pass it through configuration:
+SwiftUI hosts can keep a dispatcher in state and pass it through configuration:
 
 ```swift
 @State private var commandDispatcher = BlockInputEditorCommandDispatcher()
@@ -131,91 +128,74 @@ Button("Bold") {
 }
 ```
 
-`BlockInputEditorCommand` covers undo, redo, select all, clipboard, inline formatting, link insertion/removal, image
-insertion/deletion, and table insertion/row/column/table actions. Link and image insert commands mutate directly when
-valid URL data is supplied with `.automatic`; omit the URL/source, or use `.modal`, to open the built-in modal prefilled
-with any supplied text.
+`BlockInputEditorCommand` covers undo, redo, select all, clipboard actions, inline formatting, links, images, and table insertion/row/column/table actions.
 
-## Configuration Options
+### Callbacks
 
-`BlockInputConfiguration` accepts these host integration options:
+Use callbacks for host state, persistence, and focus wiring:
 
-- `document`: Initial in-memory document when no custom store is supplied.
-- `documentStore`: Host-owned source of truth for block reads and mutations.
-- `allowsBlockReordering`: Enables or disables drag reordering.
-- `editorHorizontalInset`: Controls the leading and trailing block content inset.
-- `editorVerticalInset`: Controls the top and bottom editor content inset.
-- `dropIndicatorColor`: Colors drag insertion and selected horizontal-rule affordances.
-- `style`: Configures base text, selection backgrounds, inline code, fenced code block styling, and image block surfaces.
-- `imageLoader`: Loads image bytes and dimensions for image blocks. The default loader uses in-memory caching and optional remote disk caching.
-- `imageDiskCache`: Optional remote image disk cache used by the default image loader. Hosts can provide a custom `BlockInputImageDiskCaching` implementation.
-- `imageBaseURL`: Base URL used to resolve relative image sources before loading.
-- `fileBaseURL`: Base URL used to resolve relative file-link chip destinations before opening.
-- `allowsRemoteImageLoading`: Enables or disables `http` and `https` image loads.
-- `maximumImageSourceBytes`: Maximum source image payload accepted by the default loader.
-- `maximumImagePixelDimension`: Maximum decoded width or height accepted by the default loader.
-- `defaultImagePlaceholderAspectRatio`: Placeholder aspect ratio used before image dimensions are known.
-- `commandDispatcher`: Optional command bridge for SwiftUI or other hosts without direct `BlockInputView` access.
-- `undoController`: Shares text and structural undo coordination with the host.
-- `completionProvider`: Supplies mention and slash-command suggestions.
-- `fileDropHandler`: Async hook that can accept, cancel, or replace dropped file and image references before insertion.
-- `slashCommandAvailability`: Controls whether `/` completion opens only when `/` starts block index `0` at UTF-16 offset `0`, or after token boundaries anywhere.
-- `slashCommandChipClickHandler`: Lets the host route slash-command chip clicks to a modal, URL open, or host-owned action.
-- `completionPopupConfiguration`: Configures live completion placement. Use `.caret` for a caret-anchored popup, or `.overlay` for a hostable overlay. Overlay placement can provide both the destination parent view and the popup frame inside that parent.
-- `onDocumentMutation`: Receives granular edits as they are applied, including marker-only numbered-list updates for marker-adjusting stores.
-- `onDocumentChange`: Receives full document snapshots after editor mutations.
-- `documentChangeSnapshotDelay`: Coalesces full-document snapshot callbacks for large store-backed documents.
-- `onSelectionChange`: Observes cursor, text, and block selection changes.
-- `onFocusChange`: Observes AppKit focus changes.
+- `onDocumentMutation`: receives granular edits as they are applied.
+- `onDocumentChange`: receives coalesced full-document snapshots.
+- `documentChangeSnapshotDelay`: tunes snapshot coalescing for large documents.
+- `onSelectionChange`: observes cursor, text, and block selection changes.
+- `onFocusChange`: observes editor focus changes.
+- `undoController`: shares text and structural undo coordination with the host.
 
-`BlockInputEditor` is the SwiftUI wrapper around `BlockInputView`; pass `isFocused` when SwiftUI state should drive or observe editor focus.
+## Completion
 
-## Completion And File Mentions
+Set `completionProvider` to support `@` mentions and `/` slash commands. When it is `nil`, typing `@` or `/` does not open a popup.
 
-`completionProvider` remains the host suggestion API. When it is `nil`, typing `@` or `/` does not open a popup. When it is set, typing `@` in inline-markdown-capable text opens mention completion, and typing `/` opens slash-command completion according to `slashCommandAvailability`. The provider receives `BlockInputCompletionContext.trigger` as `.mention` or `.slashCommand`.
+The provider receives a `BlockInputCompletionContext` with:
 
-`completionPopupConfiguration.overlayProvider` is optional. Hosts that use `.overlay` can return a `BlockInputCompletionPopupOverlay` containing both:
+- `trigger`: `.mention` or `.slashCommand`.
+- `replacementRange`: the UTF-16 source range replaced when a suggestion is accepted.
+- `rawQuery`: the text after `@` or `/`.
+- `fileQuery`: parsed file intent for `.`, `..`, and `...` prefixes.
 
-- `container`: the stable parent `NSView` that should own the popup.
-- `frame`: the popup frame in that container's coordinate space.
+### Popup Placement
 
-The provider receives a `BlockInputCompletionPopupOverlayContext` with the editor view, default container, default frame, and popup size. This lets hosts rehost the popup into a larger surface and align it to another view, such as bottom-aligning it inside a transcript viewport. The returned frame must be in the returned container's coordinate space, so choose the container and frame together. When no overlay provider is supplied, the editor falls back to the window content view, then the editor superview, then itself, and anchors the popup above the editor. The older `completionPopupPlacement` initializer parameter remains available as a convenience for setting `completionPopupConfiguration.placement`.
+`completionPopupConfiguration` controls popup placement:
 
-For example, a host can place the overlay at the top of the editor by choosing the editor as the popup container and returning a frame in editor coordinates:
+```swift
+let configuration = BlockInputConfiguration(
+    document: document,
+    completionProvider: provider,
+    completionPopupConfiguration: BlockInputCompletionPopupConfiguration(placement: .caret)
+)
+```
+
+Use `.overlay` when the host needs to choose the popup parent view and frame. The overlay provider returns both together, and the frame must be in that container's coordinate space:
 
 ```swift
 BlockInputCompletionPopupConfiguration(placement: .overlay) { context in
     let container = context.editorView
-    let editorFrame = container.bounds
-    let popupHeight = context.popupSize.height
-    let y = container.isFlipped
-        ? editorFrame.minY + 12
-        : editorFrame.maxY - popupHeight - 12
-    let frame = NSRect(
-        x: editorFrame.minX,
-        y: y,
-        width: editorFrame.width,
-        height: popupHeight
-    )
+    var frame = context.editorFrame(in: container)
+    frame.origin.y += 12
+    frame.size.height = context.popupSize.height
+
     return BlockInputCompletionPopupOverlay(container: container, frame: frame)
 }
 ```
 
-The context includes:
+### File Mentions
 
-- `replacementRange`: The UTF-16 source range that accepting a suggestion should replace.
-- `rawQuery`: The text after `@` or `/` before editor-owned normalization.
-- `fileQuery`: Optional parsed file intent for `.`, `..`, and `...` prefixes. These represent current, parent, and grandparent directory references, with `levelsUp` and `remainder` populated for host resolution. Absolute path queries are preserved in `rawQuery` for hosts that want to resolve `/...` directly.
+For file mentions in paragraphs or headings, return a file-link suggestion:
 
-Hosts can return any `BlockInputCompletionSuggestion`. For file mentions in paragraphs or headings, use `BlockInputCompletionSuggestion.fileLink(fileURL:)` to insert a Markdown file link. The helper escapes link labels and destinations, writes the absolute `file://` destination, and defaults the visible label to the file name. Pass `label:` when a custom label should persist, such as a relative mention:
-
-```markdown
-[../README.md](file:///resolved/README.md)
+```swift
+BlockInputCompletionSuggestion.fileLink(fileURL: readmeURL)
 ```
 
-File links always render as chips. The Markdown source is preserved for editing and export. File links use the same click behavior as other links: plain click opens the link modal, and Cmd-click opens through the editor URL opener hook.
+The helper inserts a Markdown file link and renders it as a chip:
 
-For slash commands, return suggestions when `context.trigger == .slashCommand`. `.documentStart` only opens when `/` starts block index `0` at UTF-16 offset `0`; `.anywhere` uses the same token boundaries as mentions. `BlockInputCompletionSuggestion.slashCommand(...)` builds Markdown with a host-owned URI and a visible label that starts with `/`:
+```markdown
+[README.md](file:///resolved/README.md)
+```
+
+Plain click opens the link modal. Cmd-click opens through the editor URL opener hook.
+
+### Slash Commands
+
+Return slash-command suggestions when `context.trigger == .slashCommand`:
 
 ```swift
 BlockInputCompletionSuggestion.slashCommand(
@@ -225,11 +205,13 @@ BlockInputCompletionSuggestion.slashCommand(
 )
 ```
 
-Hosts may also provide custom `insertionText`. A link renders as a slash-command chip when its visible label starts with `/`; the URI scheme is host-owned. `file://` links keep file-chip behavior even when their visible label starts with `/`. Configure `slashCommandChipClickHandler` when slash chips should run host behavior, open their URI directly, or show the built-in link modal.
+`slashCommandAvailability` controls where `/` opens completion. Use `.documentStart` for only the start of the first block, or `.anywhere` for token-boundary slash commands in supported text blocks. Configure `slashCommandChipClickHandler` when slash chips should run host behavior, open their URI, or show the built-in link modal.
 
-Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block instead of file chips. Paragraphs, headings, quotes, list items, and checklist items accept inline file drops; code, frontmatter, raw Markdown, horizontal rules, row whitespace, and unloaded progressive rows reject them.
+## File Drops
 
-Use `fileDropHandler` when the host needs to copy dropped files into project storage, rewrite destinations, or reject a drop before the editor mutates. The handler receives the dropped files, their default references, the drop placement, and a document snapshot. Return `.useDefault` for built-in insertion, `.cancel` to leave the document unchanged, or `.insert(...)` with replacement references. References with `kind: .fileLink` become inline file chips for text drops and file-link blocks for bottom-space drops. References with `kind: .image` become image blocks, so image drops do not need a separate hook.
+Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block.
+
+Use `fileDropHandler` to copy files into project storage, rewrite destinations, or reject a drop before mutation:
 
 ```swift
 let projectURL = URL(filePath: "/Users/me/Project", directoryHint: .isDirectory)
@@ -256,6 +238,8 @@ let configuration = BlockInputConfiguration(
 )
 ```
 
+Return `.useDefault` for built-in insertion, `.cancel` to leave the document unchanged, or `.insert(...)` with replacement references.
+
 ## Images
 
 Markdown image syntax and HTML image tags parse as standalone `.image` blocks:
@@ -265,40 +249,45 @@ Markdown image syntax and HTML image tags parse as standalone `.image` blocks:
 <img src="https://example.com/image.png" alt="Alt Text" width="320" height="180" />
 ```
 
-If image Markdown or HTML is typed, pasted, or parsed in the middle of supported text, the editor splits the source into a text block before the image, an image block, and a text block after the image. Right-click `Insert Image` uses the same split behavior. Dropping a local image file into a text block inserts the image below that block.
+Images typed, pasted, parsed, or inserted in the middle of supported text split the source into text before, image block, and text after. Dropped local images insert below the target text block.
 
-Image blocks reserve a semi-transparent placeholder before loading, with 6 points of vertical spacing above and below the block. Remote images are loaded through `BlockInputImageLoading`; the default loader caches loaded images in memory and can use `BlockInputImageDiskCaching` for remote disk cache entries. Local images are memory-cached only by the default loader.
+Remote images load through `BlockInputImageLoading`. The default loader memory-caches loaded images, can use `BlockInputImageDiskCaching` for remote disk cache entries, and respects source byte and pixel limits.
 
-Image blocks with known width and height can be resized from the right or bottom edge. Resizing persists `width` and `height` on `BlockInputImage` and exports the block as an HTML `<img>` tag. Images without known dimensions do not expose resize handles.
+Image blocks with known dimensions can be resized from the right or bottom edge. Resizing persists `width` and `height` on `BlockInputImage` and exports as an HTML `<img>` tag.
 
 ## Tables
 
-GFM-style pipe tables parse and render as `.table` blocks. A table requires a header row and delimiter row; body rows are optional. The block stores normalized Markdown in `BlockInputBlock.text`, including delimiter alignment, padded cells, escaped literal `|`, and single-line cell text. Newlines typed or pasted into a cell collapse to spaces on export.
+### Parsing
 
-Typing or pasting a complete valid pipe table into an applicable non-table text block converts that whole block into a table. Markdown typed or pasted inside an existing table cell stays cell text and does not recursively create a table.
+GFM-style pipe tables parse and render as `.table` blocks. A table requires a header row and delimiter row; body rows are optional.
 
-Cells are editable text views. Bold, italic, underline, strikethrough, Insert Link, Remove Link, URL paste, plain link click, and Cmd-click URL opening use the same inline Markdown mutation and link paths as normal text blocks after the selected source range is proven to be inside one cell. Formatting is not applied to table delimiters, pipes, padding, separator rows, or ranges crossing cells. Mention/slash completion and local file-drop insertion are intentionally disabled inside table cells.
+Typing or pasting a complete valid pipe table into an applicable text block converts that block into a table. Markdown typed or pasted inside an existing table cell stays cell text.
 
-Keyboard behavior inside cells:
+### Editing
 
-- `Tab` and `Shift+Tab` move left-to-right or right-to-left through cells. `Tab` from the final cell inserts a body row below the current row through the same path as `Insert Row`; `Shift+Tab` falls through from the first cell.
-- `Return` and `Shift+Return` move vertically when another cell exists; at table boundaries they insert a paragraph below or above the table.
-- `Shift+Arrow` starts at the current cell and expands or collapses a rectangular cell selection by row or column. `Cmd+Arrow` stays inside the focused cell text, moving to the start or end of the line or cell.
-- Backspace/Delete in an empty body cell selects that row first, then removes it on the next press. Removing the last body row leaves one empty body row. Empty header cells can select the header row, but the header row is not removed.
-- Backspace/Delete on a selected whole body row or whole column removes that row or column. Selected header rows are consumed without deleting the header row.
-- `Cmd+A` first selects the current cell contents, then the whole table block, then all blocks.
+Cells are editable text views. Inline formatting, link insertion/removal, URL paste, plain link click, and Cmd-click URL opening use the same paths as normal text blocks when the selected source range is inside one cell.
 
-Right-click menus show table actions directly below `Insert Link`: `Insert Table`, `Insert Row`, `Insert Column`, `Delete Row`, `Delete Column`, then `Delete Table`, omitting actions that do not apply. `Insert Table` adds a two-column table below paragraphs, headings, quotes, bulleted lists, numbered lists, and checklists, and converts an empty applicable block into the table instead of appending another block. `Insert Row` and `Insert Column` appear inside tables, `Delete Row` is shown only for removable body rows, `Delete Column` only when more than one column exists, and `Delete Table` only inside tables.
+Mention/slash completion and local file-drop insertion are disabled inside table cells. Formatting is not applied to delimiters, pipes, padding, separator rows, or ranges crossing cells.
 
-Whole-table and mixed selections copy/cut normalized table Markdown. Partial cell selections copy/cut only selected cell text. Public cursor/text selections whose UTF-16 source range is wholly inside one cell focus that cell; selections crossing cells or table syntax become whole-table/block selections. SwiftUI `BlockInputEditor(isFocused:)` restores focus into a table cell when the active selection maps to cell content.
+### Keyboard And Menus
 
-Columns measure content with padding, clamp from `120 pt` to `420 pt`, and wrap after the maximum width. Row height follows the tallest wrapped cell, so typing that wraps cell text resizes the table and moves following blocks immediately. Wide tables use an internal horizontal-only `NSScrollView` with overlay/autohiding scrollers, no vertical elasticity, `y = 0` clip-view protection, and Alveary-matched wheel routing: mostly vertical wheel sequences forward to the nearest vertical editor scroll view while horizontal-dominant events stay local.
+- `Tab` and `Shift+Tab` move horizontally through cells.
+- `Return` and `Shift+Return` move vertically when another cell exists, or insert a paragraph outside the table at boundaries.
+- `Shift+Arrow` expands or collapses rectangular cell selection.
+- Backspace/Delete in empty body cells selects, then removes, the row.
+- `Cmd+A` selects cell contents, then the table block, then all blocks.
 
-## Markdown Streaming
+Right-click menus expose table actions when they apply: `Insert Table`, `Insert Row`, `Insert Column`, `Delete Row`, `Delete Column`, and `Delete Table`.
 
-Use the async Markdown APIs when reading or writing files. File reads are UTF-8 line-by-line, and streaming writes emit chunks in block order without first converting the document to one full Markdown string. Streaming deserialization buffers only the current block and any lookahead needed to match snapshot import behavior; leading frontmatter is retained as a `frontMatter` block, and unsupported block-level constructs are retained as `rawMarkdown` blocks rather than discarded.
+### Selection And Layout
 
-Rendered text blocks visually style inline Markdown while preserving the source text for editing and export. Paragraphs, headings, quotes, list items, and checklist items support `*italic text*`, `_italic text_`, `**bold text**`, `***bold italic text***`, `<u>underlined text</u>`, `<ins>underlined text</ins>`, `~~struck text~~`, and inline code spans. Supported spans can also be nested, such as `**_bold italic text_**`, `**<u>bold underlined text</u>**`, and `~~*struck italic text*~~`.
+Whole-table and mixed selections copy or cut normalized table Markdown. Partial cell selections copy or cut only selected cell text. SwiftUI focus restoration can return to a table cell when the active selection maps to cell content.
+
+Columns measure content with padding, clamp from `120 pt` to `420 pt`, and wrap after the maximum width. Wide tables use horizontal-only scrolling while vertical wheel gestures continue scrolling the editor.
+
+## Markdown
+
+Use async Markdown APIs when reading or writing files:
 
 ```swift
 let url = URL(filePath: "/tmp/note.md")
@@ -309,19 +298,18 @@ let parsed = await BlockInputDocument.parsingMarkdown("# Heading")
 let markdown = await parsed.markdownSnapshot()
 ```
 
-Custom storage can implement the streaming protocols directly:
+Custom storage can implement streaming protocols directly:
 
 ```swift
 struct DatabaseLineReader: BlockInputMarkdownLineReader {
     mutating func readMarkdownLine() async throws -> String? {
-        // Return the next logical line without its trailing line ending, or nil at EOF.
         nil
     }
 }
 
 struct ChunkWriter: BlockInputMarkdownWriter {
     mutating func writeMarkdown(_ chunk: String) async throws {
-        // Persist this chunk immediately; do not buffer the whole document.
+        // Persist this chunk immediately.
     }
 }
 
@@ -332,6 +320,8 @@ var writer = ChunkWriter()
 try await streamed.writeMarkdown(to: &writer)
 ```
 
+Rendered text blocks visually style inline Markdown while preserving source text for editing and export. Unsupported block-level constructs are retained as `rawMarkdown` blocks.
+
 ## Demo
 
 Run the local demo:
@@ -340,7 +330,7 @@ Run the local demo:
 ./scripts/run-demo.sh
 ```
 
-The demo app provides file mention suggestions from `FileManager.default.currentDirectoryPath`, so suggestions are relative to the directory where the demo is launched. Dot-prefixed queries resolve against current, parent, or grandparent directories, and absolute path queries search from the nearest existing directory. It also provides a small fixed slash-command list with `.anywhere` availability so `/` completion can open after token boundaries in any supported text block. Its toolbar includes a `Caret`/`Overlay` completion placement segmented control. Overlay mode uses `overlayProvider` to top-align the popup inside the editor without reserving extra space above it.
+The demo includes file mention suggestions, slash commands with `.anywhere` availability, and a `Caret`/`Overlay` completion placement control.
 
 ## Validation
 
@@ -354,7 +344,7 @@ Linting uses the repo SwiftLint configuration in `.swiftlint.yml`; keep project 
 
 ## Snapshot Tests
 
-Verify the representative AppKit snapshot suite:
+Verify the representative snapshot suite:
 
 ```sh
 ./scripts/snapshots.sh verify
