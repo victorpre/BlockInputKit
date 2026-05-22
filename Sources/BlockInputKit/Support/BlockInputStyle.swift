@@ -42,7 +42,9 @@ public struct BlockInputImageBlockStyle: @unchecked Sendable {
     }
     /// Placeholder fill color shown before an image has loaded.
     public var placeholderColor: NSColor?
-    /// Border color for placeholder, loaded, and failed image surfaces.
+    /// Optional border color for placeholder, loaded, and failed image surfaces.
+    ///
+    /// When nil, image surfaces do not draw a border.
     public var borderColor: NSColor?
     /// Surface corner radius. When nil, images use the built-in radius.
     public var cornerRadius: CGFloat?

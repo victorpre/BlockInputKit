@@ -84,6 +84,7 @@ extension BlockInputBlockItem {
     }
 
     private func setupImageBlockView() {
+        imageBlockView.blockItem = self
         imageBlockView.isHidden = true
     }
 
@@ -225,15 +226,23 @@ extension BlockInputBlockItem {
     }
 
     private func imageBlockViewLayoutConstraints() -> [NSLayoutConstraint] {
-        let leading = imageBlockView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor)
+        let leading = imageBlockView.leadingAnchor.constraint(
+            equalTo: scrollView.leadingAnchor,
+            constant: Self.imageSurfaceHorizontalInset
+        )
         imageBlockLeadingConstraint = leading
-        let trailing = imageBlockView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor)
+        let trailing = imageBlockView.trailingAnchor.constraint(
+            lessThanOrEqualTo: scrollView.trailingAnchor,
+            constant: -Self.imageSurfaceHorizontalInset
+        )
         imageBlockTrailingConstraint = trailing
+        let width = imageBlockView.widthAnchor.constraint(equalToConstant: 120)
+        imageBlockWidthConstraint = width
         let top = imageBlockView.topAnchor.constraint(equalTo: view.topAnchor, constant: Self.imageExternalVerticalInset)
         imageBlockTopConstraint = top
         let bottom = imageBlockView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Self.imageExternalVerticalInset)
         imageBlockBottomConstraint = bottom
-        return [leading, trailing, top, bottom]
+        return [leading, trailing, width, top, bottom]
     }
 
     private func tableViewLayoutConstraints() -> [NSLayoutConstraint] {

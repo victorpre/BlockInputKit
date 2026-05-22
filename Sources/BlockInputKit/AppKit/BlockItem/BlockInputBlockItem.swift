@@ -31,6 +31,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let frontMatterDividerHeight: CGFloat = 1
     static let frontMatterDividerVerticalInset: CGFloat = 10
     static let tableExternalVerticalInset: CGFloat = 6
+    static let imageSurfaceHorizontalInset: CGFloat = textContainerContentLeading
     static let imageExternalVerticalInset: CGFloat = 6
 
     let handleView = BlockInputDragHandleView()
@@ -85,6 +86,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var frontMatterDividerBottomConstraint: NSLayoutConstraint?
     var imageBlockLeadingConstraint: NSLayoutConstraint?
     var imageBlockTrailingConstraint: NSLayoutConstraint?
+    var imageBlockWidthConstraint: NSLayoutConstraint?
     var imageBlockTopConstraint: NSLayoutConstraint?
     var imageBlockBottomConstraint: NSLayoutConstraint?
     var imageLoadTask: Task<Void, Never>?
@@ -129,6 +131,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         updateHoverTrackingArea()
         updateMarkerLineYOffsets()
         updateQuoteBarVerticalExtent()
+        if let renderedBlock {
+            updateImageBlockLayout(for: renderedBlock)
+        }
         view.window?.invalidateCursorRects(for: view)
     }
 

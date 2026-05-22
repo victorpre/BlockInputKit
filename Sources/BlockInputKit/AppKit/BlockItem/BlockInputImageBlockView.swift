@@ -4,8 +4,13 @@ final class BlockInputImageBlockView: NSView {
     private let imageView = NSImageView()
     private let statusLabel = NSTextField(labelWithString: "")
     private var resizeStart: ResizeState?
+    private var loadedCacheKey: String?
+    private var surfaceBorderColor: NSColor?
+    private var selectionBorderColor: NSColor?
+    weak var blockItem: BlockInputBlockItem?
     var onResize: ((Int, Int) -> Void)?
     var resizeDimensions: BlockInputImageDimensions?
+    var maximumResizeWidth = Int.max
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -19,33 +24,56 @@ final class BlockInputImageBlockView: NSView {
 
     func configurePlaceholder(style: BlockInputStyle) {
         isHidden = false
+        loadedCacheKey = nil
         imageView.image = nil
         imageView.isHidden = true
         statusLabel.stringValue = ""
         statusLabel.isHidden = true
-        applySurfaceStyle(style)
+        applyPlaceholderStyle(style)
     }
 
-    func configureLoadedImage(_ image: NSImage, style: BlockInputStyle, resizeDimensions: BlockInputImageDimensions?) {
+    func configureLoadedImage(_ image: NSImage, cacheKey: String, style: BlockInputStyle, resizeDimensions: BlockInputImageDimensions?) {
         isHidden = false
+        loadedCacheKey = cacheKey
         imageView.image = image
         self.resizeDimensions = resizeDimensions
         imageView.isHidden = false
         statusLabel.stringValue = ""
         statusLabel.isHidden = true
-        applySurfaceStyle(style)
+        applyLoadedStyle(style)
+    }
+
+    func reuseLoadedImage(cacheKey: String, style: BlockInputStyle, resizeDimensions: BlockInputImageDimensions?) -> Bool {
+        guard loadedCacheKey == cacheKey,
+              imageView.image != nil else {
+            return false
+        }
+        isHidden = false
+        self.resizeDimensions = resizeDimensions
+        imageView.isHidden = false
+        statusLabel.stringValue = ""
+        statusLabel.isHidden = true
+        applyLoadedStyle(style)
+        return true
+    }
+
+    func setSelectionBorderColor(_ color: NSColor?) {
+        selectionBorderColor = color
+        updateBorderLayer()
     }
 
     func configureFailure(style: BlockInputStyle) {
         isHidden = false
+        loadedCacheKey = nil
         imageView.image = nil
         imageView.isHidden = true
         statusLabel.stringValue = "Image failed to load"
         statusLabel.isHidden = false
-        applySurfaceStyle(style)
+        applyPlaceholderStyle(style)
     }
 
     func resetForReuse() {
+        loadedCacheKey = nil
         imageView.image = nil
         imageView.isHidden = true
         statusLabel.stringValue = ""
@@ -53,9 +81,13 @@ final class BlockInputImageBlockView: NSView {
         isHidden = true
         toolTip = nil
         setAccessibilityLabel(nil)
+        surfaceBorderColor = nil
+        selectionBorderColor = nil
         resizeDimensions = nil
+        maximumResizeWidth = Int.max
         resizeStart = nil
         onResize = nil
+        updateBorderLayer()
     }
 
     override func resetCursorRects() {
@@ -67,34 +99,53 @@ final class BlockInputImageBlockView: NSView {
         addCursorRect(NSRect(x: 0, y: 0, width: bounds.width, height: 8), cursor: .resizeUpDown)
     }
 
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard !isHidden,
+              alphaValue > 0,
+              bounds.contains(point) else {
+            return nil
+        }
+        // Keep mouse handling on the image surface instead of its image/label children so resize and selection share
+        // one path for both loaded and placeholder states.
+        return self
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        blockItem?.view.menu(for: event)
+    }
+
     override func mouseDown(with event: NSEvent) {
         guard let dimensions = resizeDimensions,
               let edge = resizeEdge(at: convert(event.locationInWindow, from: nil)) else {
-            super.mouseDown(with: event)
+            blockItem?.beginBlockSelectionDrag()
+            blockItem?.requestSelectCurrentBlock()
             return
         }
-        resizeStart = ResizeState(edge: edge, origin: event.locationInWindow, dimensions: displayedResizeDimensions(for: dimensions))
+        let displayedDimensions = displayedResizeDimensions(for: dimensions)
+        resizeStart = ResizeState(
+            edge: edge,
+            origin: event.locationInWindow,
+            dimensions: displayedDimensions,
+            aspectRatio: CGFloat(displayedDimensions.width) / CGFloat(displayedDimensions.height)
+        )
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard let resizeStart else {
-            super.mouseDragged(with: event)
+            _ = blockItem?.updateBlockSelectionDrag(with: event)
             return
         }
-        let deltaX = event.locationInWindow.x - resizeStart.origin.x
-        let deltaY = event.locationInWindow.y - resizeStart.origin.y
-        let width = resizeStart.edge == .right
-            ? min(resizeStart.dimensions.width + Int(deltaX.rounded()), maximumResizeWidth)
-            : resizeStart.dimensions.width
-        let height = resizeStart.edge == .bottom ? resizeStart.dimensions.height - Int(deltaY.rounded()) : resizeStart.dimensions.height
-        let resized = BlockInputImageDimensions(width: max(24, width), height: max(24, height))
+        let resized = resizedDimensions(for: event, resizeStart: resizeStart)
+        guard resized != resizeDimensions else {
+            return
+        }
         resizeDimensions = resized
         onResize?(resized.width, resized.height)
     }
 
     override func mouseUp(with event: NSEvent) {
         resizeStart = nil
-        super.mouseUp(with: event)
+        blockItem?.finishBlockSelectionDrag()
     }
 
     private func setup() {
@@ -123,10 +174,15 @@ final class BlockInputImageBlockView: NSView {
         ])
     }
 
-    private func applySurfaceStyle(_ style: BlockInputStyle) {
+    private func applyPlaceholderStyle(_ style: BlockInputStyle) {
         layer?.backgroundColor = (style.imageBlock.placeholderColor ?? NSColor.quaternaryLabelColor.withAlphaComponent(0.28)).cgColor
-        layer?.borderColor = (style.imageBlock.borderColor ?? NSColor.separatorColor.withAlphaComponent(0.6)).cgColor
-        layer?.borderWidth = 1
+        applyBorderStyle(style)
+        layer?.cornerRadius = style.imageBlock.cornerRadius ?? 6
+    }
+
+    private func applyLoadedStyle(_ style: BlockInputStyle) {
+        layer?.backgroundColor = NSColor.clear.cgColor
+        applyBorderStyle(style)
         layer?.cornerRadius = style.imageBlock.cornerRadius ?? 6
     }
 
@@ -148,12 +204,22 @@ final class BlockInputImageBlockView: NSView {
         return nil
     }
 
-    private var maximumResizeWidth: Int {
-        guard bounds.width.isFinite,
-              bounds.width > 0 else {
-            return Int.max
+    private func applyBorderStyle(_ style: BlockInputStyle) {
+        surfaceBorderColor = style.imageBlock.borderColor
+        updateBorderLayer()
+    }
+
+    private func updateBorderLayer() {
+        if let selectionBorderColor {
+            layer?.borderColor = selectionBorderColor.cgColor
+            layer?.borderWidth = 2
+        } else if let surfaceBorderColor {
+            layer?.borderColor = surfaceBorderColor.cgColor
+            layer?.borderWidth = 1
+        } else {
+            layer?.borderColor = nil
+            layer?.borderWidth = 0
         }
-        return max(24, Int(bounds.width.rounded()))
     }
 
     private func displayedResizeDimensions(for dimensions: BlockInputImageDimensions) -> BlockInputImageDimensions {
@@ -177,12 +243,56 @@ final class BlockInputImageBlockView: NSView {
             height: max(1, Int((height * scale).rounded()))
         )
     }
+
+    private func resizedDimensions(for event: NSEvent, resizeStart: ResizeState) -> BlockInputImageDimensions {
+        let minimumDimension: CGFloat = 24
+        let aspectRatio = max(resizeStart.aspectRatio, 0.01)
+        let maximumWidth = max(minimumDimension, CGFloat(maximumResizeWidth))
+        let deltaX = event.locationInWindow.x - resizeStart.origin.x
+        let deltaY = event.locationInWindow.y - resizeStart.origin.y
+        let proposedSize: NSSize
+        switch resizeStart.edge {
+        case .right:
+            let width = CGFloat(resizeStart.dimensions.width) + deltaX
+            proposedSize = NSSize(width: width, height: width / aspectRatio)
+        case .bottom:
+            let height = CGFloat(resizeStart.dimensions.height) - deltaY
+            proposedSize = NSSize(width: height * aspectRatio, height: height)
+        }
+        let clampedSize = clampedProportionalSize(
+            proposedSize,
+            aspectRatio: aspectRatio,
+            minimumDimension: minimumDimension,
+            maximumWidth: maximumWidth
+        )
+        return BlockInputImageDimensions(
+            width: Int(clampedSize.width.rounded()),
+            height: Int(clampedSize.height.rounded())
+        )
+    }
+
+    private func clampedProportionalSize(
+        _ size: NSSize,
+        aspectRatio: CGFloat,
+        minimumDimension: CGFloat,
+        maximumWidth: CGFloat
+    ) -> NSSize {
+        var width = min(max(size.width, minimumDimension), maximumWidth)
+        var height = width / aspectRatio
+        if height < minimumDimension {
+            height = minimumDimension
+            width = min(max(height * aspectRatio, minimumDimension), maximumWidth)
+            height = width / aspectRatio
+        }
+        return NSSize(width: width, height: height)
+    }
 }
 
 private struct ResizeState {
     var edge: ResizeEdge
     var origin: NSPoint
     var dimensions: BlockInputImageDimensions
+    var aspectRatio: CGFloat
 }
 
 private enum ResizeEdge {

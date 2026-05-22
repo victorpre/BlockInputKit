@@ -21,15 +21,18 @@ extension BlockInputBlockItem {
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         style: BlockInputStyle = .default
     ) -> CGFloat {
-        max(
-            textScrollViewWidth(
-                for: itemWidth,
-                block: block,
-                allowsReordering: allowsReordering,
-                editorHorizontalInset: editorHorizontalInset,
-                style: style
-            )
-                - 2 * textContainerLineFragmentPadding,
+        let scrollViewWidth = textScrollViewWidth(
+            for: itemWidth,
+            block: block,
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset,
+            style: style
+        )
+        if block.kind.isImage {
+            return max(scrollViewWidth - (2 * imageSurfaceHorizontalInset), 120)
+        }
+        return max(
+            scrollViewWidth - 2 * textContainerLineFragmentPadding,
             120
         )
     }

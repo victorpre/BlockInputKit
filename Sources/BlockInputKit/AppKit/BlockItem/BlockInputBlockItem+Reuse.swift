@@ -40,8 +40,12 @@ extension BlockInputBlockItem {
         frontMatterDividerLeadingConstraint?.constant = Self.horizontalRuleInnerInset
         frontMatterDividerTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: true)
         frontMatterDividerBottomConstraint?.constant = -Self.frontMatterDividerVerticalInset
+        imageBlockLeadingConstraint?.constant = Self.imageSurfaceHorizontalInset
+        imageBlockTrailingConstraint?.constant = -Self.imageSurfaceHorizontalInset
         imageBlockTopConstraint?.constant = Self.imageExternalVerticalInset
         imageBlockBottomConstraint?.constant = -Self.imageExternalVerticalInset
+        imageBlockWidthConstraint?.constant = 120
+        imageBlockView.maximumResizeWidth = Int.max
     }
 
     func resetChromeForReuse() {

@@ -50,6 +50,7 @@ extension BlockInputBlockItem {
         applyKindLabelAttributes(for: block)
         updateQuoteBarVerticalExtent()
         configureChecklistButton(for: block, contentIndent: contentIndent)
+        updateImageBlockLayout(for: block)
     }
 
     private func configureFrontMatterDivider(isVisible: Bool) {

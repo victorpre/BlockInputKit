@@ -3,6 +3,7 @@ import AppKit
 extension BlockInputBlockItem {
     func applySelectionChrome(_ chrome: BlockInputBlockSelectionChrome) {
         blockSelectionChrome = chrome
+        updateImageSelectionBorder()
         selectionBackgroundView.isHidden = !chrome.showsContentBackground
         selectionBackgroundView.fillColor = chrome.contentBackgroundColor(style: style)
         selectionBackgroundView.cornerRadius = selectionChromeCornerRadius(for: chrome)
@@ -11,6 +12,11 @@ extension BlockInputBlockItem {
 
     func updateSelectionChromeFrame() {
         guard blockSelectionChrome.showsContentBackground else {
+            selectionBackgroundView.isHidden = true
+            selectionBackgroundView.segmentRects = []
+            return
+        }
+        guard !usesImageSelectionBorder else {
             selectionBackgroundView.isHidden = true
             selectionBackgroundView.segmentRects = []
             return
@@ -91,13 +97,33 @@ extension BlockInputBlockItem {
         return BlockInputSelectionBackgroundLayout(frame: frame, segmentFrames: [frame])
     }
 
+    private var usesImageSelectionBorder: Bool {
+        blockSelectionChrome.showsContentBackground
+            && renderedBlock?.kind.isImage == true
+            && !imageBlockView.isHidden
+    }
+
+    private func updateImageSelectionBorder() {
+        let borderColor = usesImageSelectionBorder
+            ? blockSelectionChrome.contentBackgroundColor(style: style)
+            : nil
+        imageBlockView.setSelectionBorderColor(borderColor)
+    }
+
     private func selectionChromeCornerRadius(for chrome: BlockInputBlockSelectionChrome) -> CGFloat {
         guard chrome.showsContentBackground,
-              renderedBlock?.kind == .table,
-              !tableView.isHidden else {
+              let renderedBlock else {
             return chrome.cornerRadius
         }
-        return BlockInputTableView.cornerRadius
+        if renderedBlock.kind == .table,
+           !tableView.isHidden {
+            return BlockInputTableView.cornerRadius
+        }
+        if renderedBlock.kind.isImage,
+           !imageBlockView.isHidden {
+            return style.imageBlock.cornerRadius ?? 6
+        }
+        return chrome.cornerRadius
     }
 
     private func selectedWholeContentBackgroundFrame() -> NSRect {
@@ -108,6 +134,10 @@ extension BlockInputBlockItem {
         if renderedBlock?.kind == .table,
            !tableView.isHidden {
             return tableView.convert(tableView.visibleTableFrame, to: view).integral
+        }
+        if renderedBlock?.kind.isImage == true,
+           !imageBlockView.isHidden {
+            return imageBlockView.frame.integral
         }
         let leadingPadding: CGFloat = 0
         let trailingPadding: CGFloat = 6
@@ -143,6 +173,10 @@ extension BlockInputBlockItem {
         if renderedBlock?.kind == .table, !tableView.isHidden {
             let tableFrame = tableView.convert(tableView.visibleTableFrame, to: view)
             return NSRect(x: tableFrame.minX, y: 0, width: max(1, tableFrame.width), height: view.bounds.height)
+        }
+        if renderedBlock?.kind.isImage == true,
+           !imageBlockView.isHidden {
+            return imageBlockView.frame
         }
         var minX = min(textGlyphLeadingX(), standardTextSelectionLeadingX())
         var maxX = textGlyphTrailingX()
