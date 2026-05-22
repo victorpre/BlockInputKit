@@ -23,6 +23,7 @@ struct BlockInputCompletionSession: Equatable {
 extension BlockInputView {
     static let overlayCompletionPopupVerticalOffset: CGFloat = 8
 
+    /// Dismisses the completion popup when the editor view changes size.
     public override func setFrameSize(_ newSize: NSSize) {
         let sizeChanged = frame.size != newSize
         super.setFrameSize(newSize)

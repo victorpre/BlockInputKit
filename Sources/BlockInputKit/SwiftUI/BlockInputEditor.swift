@@ -24,12 +24,14 @@ public struct BlockInputEditor: NSViewRepresentable {
         self.isFocused = isFocused
     }
 
+    /// Creates the wrapped AppKit editor view.
     public func makeNSView(context: Context) -> BlockInputView {
         let view = BlockInputView()
         updateView(view)
         return view
     }
 
+    /// Applies the current SwiftUI configuration and focus binding to the wrapped AppKit editor view.
     public func updateNSView(_ nsView: BlockInputView, context: Context) {
         updateView(nsView)
     }

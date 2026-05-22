@@ -95,11 +95,13 @@ public final class BlockInputView: NSView {
     let completionPopupEventCaptureView = BlockInputCompletionEventCaptureView()
     nonisolated(unsafe) var completionPopupMouseDownMonitor: Any?
     var completionPopupConsumesNextMouseUp = false
+    /// Creates an editor view and installs its collection-view-backed editing surface.
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setupCollectionView()
     }
 
+    /// Creates an editor view from a coder and installs its collection-view-backed editing surface.
     public required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupCollectionView()
@@ -116,8 +118,10 @@ public final class BlockInputView: NSView {
         NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: nil)
     }
 
+    /// Returns whether the editor can become the first responder.
     public override var acceptsFirstResponder: Bool { true }
 
+    /// Promotes editor focus and restores focus to the active block item when possible.
     public override func becomeFirstResponder() -> Bool {
         isBecomingFirstResponder = true
         defer { isBecomingFirstResponder = false }
@@ -126,6 +130,7 @@ public final class BlockInputView: NSView {
         return true
     }
 
+    /// Publishes focus loss when AppKit removes first-responder status from the editor.
     public override func resignFirstResponder() -> Bool {
         if !isBecomingFirstResponder {
             publishFocusLossIfNeeded()
@@ -133,6 +138,7 @@ public final class BlockInputView: NSView {
         return true
     }
 
+    /// Handles editor-owned key events before forwarding unhandled events to AppKit.
     public override func keyDown(with event: NSEvent) {
         if linkModalContainsCurrentResponder() { super.keyDown(with: event); return }
         if imageModalContainsCurrentResponder() { super.keyDown(with: event); return }
@@ -148,6 +154,7 @@ public final class BlockInputView: NSView {
         super.keyDown(with: event)
     }
 
+    /// Handles selector-based movement and cancellation commands before forwarding unhandled commands to AppKit.
     public override func doCommand(by selector: Selector) {
         if linkModalContainsCurrentResponder() { super.doCommand(by: selector); return }
         if imageModalContainsCurrentResponder() { super.doCommand(by: selector); return }
@@ -164,6 +171,7 @@ public final class BlockInputView: NSView {
         super.doCommand(by: selector)
     }
 
+    /// Handles editor keyboard shortcuts before forwarding unhandled key equivalents to AppKit.
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if performFocusedModalFieldEditorKeyEquivalent(event) { return true }
         if linkModalContainsCurrentResponder() { return super.performKeyEquivalent(with: event) }
@@ -174,6 +182,7 @@ public final class BlockInputView: NSView {
         return super.performKeyEquivalent(with: event)
     }
 
+    /// Selects all editor content or forwards the command to a focused modal field.
     public override func selectAll(_ sender: Any?) {
         if performFocusedModalFieldEditorAction(#selector(NSText.selectAll(_:)), sender: sender) {
             return

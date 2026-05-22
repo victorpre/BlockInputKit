@@ -1,10 +1,12 @@
 import AppKit
 
 extension BlockInputView: NSCollectionViewDataSource {
+    /// Returns the editor's single collection-view section.
     public func numberOfSections(in collectionView: NSCollectionView) -> Int {
         1
     }
 
+    /// Returns the number of loaded block rows plus the progressive loading row when visible.
     public func collectionView(
         _ collectionView: NSCollectionView,
         numberOfItemsInSection section: Int
@@ -12,6 +14,7 @@ extension BlockInputView: NSCollectionViewDataSource {
         blockCount + (showsProgressiveLoadingRow ? 1 : 0)
     }
 
+    /// Creates or reuses the collection item for a block row or the progressive loading row.
     public func collectionView(
         _ collectionView: NSCollectionView,
         itemForRepresentedObjectAt indexPath: IndexPath
@@ -42,6 +45,7 @@ extension BlockInputView: NSCollectionViewDataSource {
 }
 
 extension BlockInputView: NSCollectionViewDelegateFlowLayout {
+    /// Returns the measured size for a block row or the progressive loading row.
     public func collectionView(
         _ collectionView: NSCollectionView,
         layout collectionViewLayout: NSCollectionViewLayout,
@@ -197,6 +201,7 @@ extension BlockInputView {
 }
 
 extension BlockInputView: NSCollectionViewDelegate {
+    /// Provides a block pasteboard item when drag reordering can begin from the requested row.
     public func collectionView(
         _ collectionView: NSCollectionView,
         pasteboardWriterForItemAt indexPath: IndexPath
@@ -214,6 +219,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         return pasteboardItem
     }
 
+    /// Configures the drag session used for block reordering.
     public func collectionView(
         _ collectionView: NSCollectionView,
         draggingSession session: NSDraggingSession,
@@ -224,6 +230,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         session.draggingFormation = .none
     }
 
+    /// Validates block-reorder and file-drop targets and updates the drop indicator.
     public func collectionView(
         _ collectionView: NSCollectionView,
         validateDrop draggingInfo: NSDraggingInfo,
@@ -268,6 +275,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         return []
     }
 
+    /// Applies an accepted block reorder or collection-view file drop.
     public func collectionView(
         _ collectionView: NSCollectionView,
         acceptDrop draggingInfo: NSDraggingInfo,

@@ -52,32 +52,55 @@ public struct BlockInputInsertImageCommand: Equatable, Codable, Sendable {
 
 /// Programmatic editor commands that mirror BlockInputKit-owned shortcut and context-menu actions.
 public enum BlockInputEditorCommand: Equatable, Codable, Sendable {
+    /// Undo the most recent editor text or structural edit.
     case undo
+    /// Redo the most recently undone editor text or structural edit.
     case redo
+    /// Select all editable document content from the current editor context.
     case selectAll
+    /// Copy the active text, block, or mixed selection to the pasteboard.
     case copy
+    /// Cut the active text, block, or mixed selection to the pasteboard.
     case cut
+    /// Paste pasteboard content into the active text selection or caret.
     case paste
+    /// Toggle bold inline formatting for the active text selection.
     case bold
+    /// Toggle italic inline formatting for the active text selection.
     case italic
+    /// Toggle underline inline formatting for the active text selection.
     case underline
+    /// Toggle strikethrough inline formatting for the active text selection.
     case strikethrough
+    /// Insert or edit a Markdown link using the supplied command payload.
     case insertLink(BlockInputInsertLinkCommand = BlockInputInsertLinkCommand())
+    /// Remove the active Markdown link when the current context targets one.
     case removeLink
+    /// Insert an image block using the supplied command payload.
     case insertImage(BlockInputInsertImageCommand = BlockInputInsertImageCommand())
+    /// Delete the active image block when the current context targets one.
     case deleteImage
+    /// Insert a default table after the active block when table insertion is available.
     case insertTable
+    /// Insert a body row next to the active table cell.
     case insertRow
+    /// Insert a column next to the active table cell.
     case insertColumn
+    /// Delete the active table body row, preserving a final empty body row.
     case deleteRow
+    /// Delete the active table column.
     case deleteColumn
+    /// Delete the active table block.
     case deleteTable
 }
 
 /// Availability or toggle state for a command.
 public enum BlockInputEditorCommandState: String, Equatable, Codable, Sendable {
+    /// The command cannot run in the current editor context.
     case unavailable
+    /// The command is available and its toggle state is inactive, or it is a non-toggle command.
     case off
+    /// The command is available and its toggle state is active.
     case on
 }
 
