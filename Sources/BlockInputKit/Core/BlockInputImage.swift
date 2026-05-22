@@ -55,3 +55,29 @@ public struct BlockInputImage: Equatable, Codable, Sendable {
         value > 0 ? value : nil
     }
 }
+
+public extension BlockInputImage {
+    /// Resolves the image source against an optional base URL.
+    func resolvedURL(relativeTo baseURL: URL?) -> URL? {
+        if let absoluteURL = URL(string: source), absoluteURL.scheme != nil {
+            return absoluteURL
+        }
+        if let baseURL {
+            return URL(string: source, relativeTo: baseURL)?.absoluteURL
+        }
+        return URL(string: source)
+    }
+
+    /// Returns a stable cache key for a source and image loading policy.
+    func cacheKey(
+        resolvedURL: URL,
+        loaderVersion: String = "default-v1",
+        maximumPixelDimension: Int
+    ) -> String {
+        [
+            loaderVersion,
+            resolvedURL.absoluteString,
+            String(maximumPixelDimension)
+        ].joined(separator: "|")
+    }
+}

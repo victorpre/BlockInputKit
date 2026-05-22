@@ -151,6 +151,20 @@ public struct BlockInputConfiguration {
     public var dropIndicatorColor: NSColor
     /// Visual styling for editor text, code, and selection chrome.
     public var style: BlockInputStyle
+    /// Image loader used for image block bytes and natural dimensions.
+    public var imageLoader: any BlockInputImageLoading
+    /// Optional disk cache used by the default loader for remote image bytes and dimensions.
+    public var imageDiskCache: (any BlockInputImageDiskCaching)?
+    /// Base URL used to resolve relative image sources before loading.
+    public var imageBaseURL: URL?
+    /// Whether remote `http` and `https` image URLs should be loaded.
+    public var allowsRemoteImageLoading: Bool
+    /// Maximum source image payload accepted by the default image loader.
+    public var maximumImageSourceBytes: Int
+    /// Maximum decoded width or height accepted by the default image loader.
+    public var maximumImagePixelDimension: Int
+    /// Placeholder aspect ratio used before dimensions are known.
+    public var defaultImagePlaceholderAspectRatio: CGFloat
     /// Undo coordinator used by text and structural editor operations.
     ///
     /// When nil, `BlockInputView` uses a view-owned undo controller.
@@ -204,6 +218,13 @@ public struct BlockInputConfiguration {
         editorVerticalInset: CGFloat = BlockInputConfiguration.defaultEditorVerticalInset,
         dropIndicatorColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
+        imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader(),
+        imageDiskCache: (any BlockInputImageDiskCaching)? = BlockInputDefaultImageDiskCache(),
+        imageBaseURL: URL? = nil,
+        allowsRemoteImageLoading: Bool = true,
+        maximumImageSourceBytes: Int = 20 * 1024 * 1024,
+        maximumImagePixelDimension: Int = 8_192,
+        defaultImagePlaceholderAspectRatio: CGFloat = 16.0 / 9.0,
         undoController: BlockInputUndoController? = nil,
         completionProvider: (any BlockInputCompletionProvider)? = nil,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
@@ -224,6 +245,13 @@ public struct BlockInputConfiguration {
         self.editorVerticalInset = editorVerticalInset
         self.dropIndicatorColor = dropIndicatorColor
         self.style = style
+        self.imageLoader = imageLoader
+        self.imageDiskCache = imageDiskCache
+        self.imageBaseURL = imageBaseURL
+        self.allowsRemoteImageLoading = allowsRemoteImageLoading
+        self.maximumImageSourceBytes = max(1, maximumImageSourceBytes)
+        self.maximumImagePixelDimension = max(1, maximumImagePixelDimension)
+        self.defaultImagePlaceholderAspectRatio = max(0.01, defaultImagePlaceholderAspectRatio)
         self.undoController = undoController
         self.completionProvider = completionProvider
         self.slashCommandAvailability = slashCommandAvailability
