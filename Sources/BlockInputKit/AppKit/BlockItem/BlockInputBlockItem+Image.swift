@@ -269,17 +269,38 @@ private extension BlockInputImage {
     }
 
     func resolvedResizeDimensions(using naturalDimensions: BlockInputImageDimensions) -> BlockInputImageDimensions {
+        let naturalWidth = max(CGFloat(naturalDimensions.width), 1)
+        let naturalHeight = max(CGFloat(naturalDimensions.height), 1)
         switch (width, height) {
         case let (width?, height?):
-            return BlockInputImageDimensions(width: width, height: height)
+            return normalizedDimensions(width: width, height: height, naturalWidth: naturalWidth, naturalHeight: naturalHeight)
         case let (width?, nil):
-            let resolvedHeight = CGFloat(width) * CGFloat(naturalDimensions.height) / CGFloat(naturalDimensions.width)
+            let resolvedHeight = CGFloat(width) * naturalHeight / naturalWidth
             return BlockInputImageDimensions(width: width, height: Int(resolvedHeight.rounded()))
         case let (nil, height?):
-            let resolvedWidth = CGFloat(height) * CGFloat(naturalDimensions.width) / CGFloat(naturalDimensions.height)
+            let resolvedWidth = CGFloat(height) * naturalWidth / naturalHeight
             return BlockInputImageDimensions(width: Int(resolvedWidth.rounded()), height: height)
         case (nil, nil):
             return naturalDimensions
         }
+    }
+
+    private func normalizedDimensions(
+        width: Int,
+        height: Int,
+        naturalWidth: CGFloat,
+        naturalHeight: CGFloat
+    ) -> BlockInputImageDimensions {
+        let resolvedHeight = Int((CGFloat(width) * naturalHeight / naturalWidth).rounded())
+        let resolvedWidth = Int((CGFloat(height) * naturalWidth / naturalHeight).rounded())
+        if resolvedHeight == height || resolvedWidth == width {
+            return BlockInputImageDimensions(width: width, height: height)
+        }
+        // Raw Markdown edits cannot tell which attribute changed. Treat the larger explicit dimension as intentional
+        // and repair the other side so the rendered image and subsequent resize gestures use the natural aspect ratio.
+        if width >= height {
+            return BlockInputImageDimensions(width: width, height: max(resolvedHeight, 1))
+        }
+        return BlockInputImageDimensions(width: max(resolvedWidth, 1), height: height)
     }
 }

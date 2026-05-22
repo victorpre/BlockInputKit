@@ -109,6 +109,11 @@ final class BlockInputImageBlockView: NSView {
         addCursorRect(bottomResizeHitRect, cursor: .resizeUpDown)
     }
 
+    override func layout() {
+        super.layout()
+        updateImageAlignment()
+    }
+
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard !isHidden,
               alphaValue > 0,
@@ -172,6 +177,7 @@ final class BlockInputImageBlockView: NSView {
 
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.translatesAutoresizingMaskIntoConstraints = false
+        updateImageAlignment()
         addSubview(imageView)
 
         statusLabel.font = .preferredFont(forTextStyle: .body)
@@ -209,6 +215,14 @@ final class BlockInputImageBlockView: NSView {
 
     var statusTextForTesting: String {
         statusLabel.stringValue
+    }
+
+    var imageAlignmentForTesting: NSImageAlignment {
+        imageView.imageAlignment
+    }
+
+    private func updateImageAlignment() {
+        imageView.imageAlignment = userInterfaceLayoutDirection == .rightToLeft ? .alignRight : .alignLeft
     }
 
     private func resizeEdge(at point: NSPoint) -> ResizeEdge? {
