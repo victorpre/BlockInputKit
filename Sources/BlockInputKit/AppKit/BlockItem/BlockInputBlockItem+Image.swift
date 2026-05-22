@@ -219,6 +219,32 @@ extension BlockInputBlockItem {
         return startInset + max(boundedContentWidth - displayWidth, 0)
     }
 
+    func imageResizeHitView(containing rootPoint: NSPoint) -> BlockInputImageBlockView? {
+        guard !imageBlockView.isHidden,
+              imageBlockView.resizeDimensions != nil else {
+            return nil
+        }
+        let imagePoint = imageBlockView.convert(rootPoint, from: view)
+        return imageBlockView.containsResizeHitTarget(imagePoint) ? imageBlockView : nil
+    }
+
+    func addImageResizeCursorRects(to rootView: NSView) {
+        guard !imageBlockView.isHidden,
+              imageBlockView.resizeDimensions != nil else {
+            return
+        }
+        rootView.addCursorRect(rootView.convert(imageBlockView.rightResizeCursorRect, from: imageBlockView), cursor: .resizeLeftRight)
+        rootView.addCursorRect(rootView.convert(imageBlockView.bottomResizeCursorRect, from: imageBlockView), cursor: .resizeUpDown)
+    }
+
+    func imageResizeCursor(at rootPoint: NSPoint) -> NSCursor? {
+        guard !imageBlockView.isHidden,
+              imageBlockView.resizeDimensions != nil else {
+            return nil
+        }
+        return imageBlockView.resizeCursor(at: imageBlockView.convert(rootPoint, from: view))
+    }
+
     private static func constrainedImageDisplaySize(
         width: CGFloat,
         height: CGFloat,

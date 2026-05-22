@@ -4,6 +4,7 @@ final class BlockInputImageBlockView: NSView {
     private let imageView = NSImageView()
     private let statusLabel = NSTextField(labelWithString: "")
     private var resizeStart: ResizeState?
+    private var cleansUpDeferredResizeStateOnMouseUp = false
     private var loadedCacheKey: String?
     private var surfaceBorderColor: NSColor?
     private var selectionBorderColor: NSColor?
@@ -20,6 +21,10 @@ final class BlockInputImageBlockView: NSView {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setup()
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
     }
 
     func configurePlaceholder(style: BlockInputStyle) {
@@ -83,10 +88,15 @@ final class BlockInputImageBlockView: NSView {
         setAccessibilityLabel(nil)
         surfaceBorderColor = nil
         selectionBorderColor = nil
-        resizeDimensions = nil
-        maximumResizeWidth = Int.max
-        resizeStart = nil
-        onResize = nil
+        if resizeStart == nil {
+            resizeDimensions = nil
+            maximumResizeWidth = Int.max
+            onResize = nil
+        } else {
+            // SwiftUI hosts may reconfigure/reuse the row while AppKit still sends drag events to this mouse-down view.
+            // Keep the active resize callback alive until mouse-up so the gesture can finish against the current block.
+            cleansUpDeferredResizeStateOnMouseUp = true
+        }
         updateBorderLayer()
     }
 
@@ -95,14 +105,14 @@ final class BlockInputImageBlockView: NSView {
         guard resizeDimensions != nil else {
             return
         }
-        addCursorRect(NSRect(x: bounds.maxX - 8, y: 0, width: 8, height: bounds.height), cursor: .resizeLeftRight)
-        addCursorRect(NSRect(x: 0, y: 0, width: bounds.width, height: 8), cursor: .resizeUpDown)
+        addCursorRect(rightResizeHitRect, cursor: .resizeLeftRight)
+        addCursorRect(bottomResizeHitRect, cursor: .resizeUpDown)
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard !isHidden,
               alphaValue > 0,
-              bounds.contains(point) else {
+              hitBounds.contains(point) else {
             return nil
         }
         // Keep mouse handling on the image surface instead of its image/label children so resize and selection share
@@ -122,6 +132,7 @@ final class BlockInputImageBlockView: NSView {
             return
         }
         let displayedDimensions = displayedResizeDimensions(for: dimensions)
+        cleansUpDeferredResizeStateOnMouseUp = false
         resizeStart = ResizeState(
             edge: edge,
             origin: event.locationInWindow,
@@ -145,6 +156,12 @@ final class BlockInputImageBlockView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         resizeStart = nil
+        if cleansUpDeferredResizeStateOnMouseUp, isHidden {
+            resizeDimensions = nil
+            maximumResizeWidth = Int.max
+            onResize = nil
+        }
+        cleansUpDeferredResizeStateOnMouseUp = false
         blockItem?.finishBlockSelectionDrag()
     }
 
@@ -195,13 +212,66 @@ final class BlockInputImageBlockView: NSView {
     }
 
     private func resizeEdge(at point: NSPoint) -> ResizeEdge? {
-        if point.x >= bounds.maxX - 8 {
+        if rightResizeHitRect.contains(point) {
             return .right
         }
-        if point.y <= bounds.minY + 8 {
+        if bottomResizeHitRect.contains(point) {
             return .bottom
         }
         return nil
+    }
+
+    func containsResizeHitTarget(_ point: NSPoint) -> Bool {
+        rightResizeHitRect.contains(point) || bottomResizeHitRect.contains(point)
+    }
+
+    func resizeCursor(at point: NSPoint) -> NSCursor? {
+        switch resizeEdge(at: point) {
+        case .right:
+            return .resizeLeftRight
+        case .bottom:
+            return .resizeUpDown
+        case nil:
+            return nil
+        }
+    }
+
+    var rightResizeCursorRect: NSRect {
+        rightResizeHitRect
+    }
+
+    var bottomResizeCursorRect: NSRect {
+        bottomResizeHitRect
+    }
+
+    private var hitBounds: NSRect {
+        guard resizeDimensions != nil else {
+            return bounds
+        }
+        return NSRect(
+            x: bounds.minX,
+            y: bounds.minY - imageResizeHitOutset,
+            width: bounds.width + imageResizeHitOutset,
+            height: bounds.height + (2 * imageResizeHitOutset)
+        )
+    }
+
+    private var rightResizeHitRect: NSRect {
+        NSRect(
+            x: bounds.maxX - imageResizeHitThickness,
+            y: bounds.minY - imageResizeHitOutset,
+            width: imageResizeHitThickness + imageResizeHitOutset,
+            height: bounds.height + (2 * imageResizeHitOutset)
+        )
+    }
+
+    private var bottomResizeHitRect: NSRect {
+        NSRect(
+            x: bounds.minX,
+            y: bounds.minY - imageResizeHitOutset,
+            width: bounds.width,
+            height: imageResizeHitThickness + imageResizeHitOutset
+        )
     }
 
     private func applyBorderStyle(_ style: BlockInputStyle) {
@@ -299,3 +369,6 @@ private enum ResizeEdge {
     case right
     case bottom
 }
+
+private let imageResizeHitThickness: CGFloat = 8
+private let imageResizeHitOutset: CGFloat = 4

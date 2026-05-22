@@ -3,15 +3,28 @@ import AppKit
 /// Root view that owns row-level cursor rects and preserves first-click inline link routing.
 final class BlockInputBlockItemRootView: NSView {
     weak var blockItem: BlockInputBlockItem?
+    // Reordered rows can receive edge mouse events at the root view. Keep routing that drag sequence
+    // to the image view so resize does not depend on which view AppKit chose for mouse-down.
+    private weak var activeImageResizeView: BlockInputImageBlockView?
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         guard let event else {
             return false
         }
+        let point = convert(event.locationInWindow, from: nil)
+        if blockItem?.imageResizeHitView(containing: point) != nil {
+            return true
+        }
         return blockItem?.textView.linkHitResult(for: event) != nil
     }
 
     override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if let imageResizeHitView = blockItem?.imageResizeHitView(containing: point) {
+            activeImageResizeView = imageResizeHitView
+            imageResizeHitView.mouseDown(with: event)
+            return
+        }
         if blockItem?.textView.linkHitResult(for: event) != nil {
             blockItem?.textView.mouseDown(with: event)
             return
@@ -19,8 +32,33 @@ final class BlockInputBlockItemRootView: NSView {
         super.mouseDown(with: event)
     }
 
+    override func mouseDragged(with event: NSEvent) {
+        if let activeImageResizeView {
+            activeImageResizeView.mouseDragged(with: event)
+            return
+        }
+        super.mouseDragged(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if let activeImageResizeView {
+            activeImageResizeView.mouseUp(with: event)
+            self.activeImageResizeView = nil
+            return
+        }
+        super.mouseUp(with: event)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        if let imageResizeHitView = blockItem?.imageResizeHitView(containing: point) {
+            return imageResizeHitView
+        }
+        return super.hitTest(point)
+    }
+
     override func resetCursorRects() {
         super.resetCursorRects()
+        blockItem?.addImageResizeCursorRects(to: self)
         guard let blockItem,
               let cursor = blockItem.reorderHandleCursor else {
             return
@@ -30,6 +68,10 @@ final class BlockInputBlockItemRootView: NSView {
 
     override func cursorUpdate(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        if let imageResizeCursor = blockItem?.imageResizeCursor(at: point) {
+            imageResizeCursor.set()
+            return
+        }
         guard let blockItem,
               let cursor = blockItem.reorderHandleCursor,
               blockItem.containsReorderHandleHitTarget(point) else {
