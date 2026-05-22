@@ -11,14 +11,14 @@ extension BlockInputBlockItem {
             return .textBlock
         case .quote:
             return .quote
-        case .heading, .code, .horizontalRule, .frontMatter, .table, .rawMarkdown:
+        case .heading, .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
             return .standard
         }
     }
 
     static func prefix(for kind: BlockInputBlockKind, indentationLevel: Int) -> String {
         switch kind {
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .image, .rawMarkdown:
             return ""
         case .bulletedListItem:
             return unorderedListMarker(indentationLevel: indentationLevel)
@@ -51,7 +51,7 @@ extension BlockInputBlockItem {
                 return .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
             }
             return .monospacedSystemFont(ofSize: NSFont.systemFontSize * scale, weight: .regular)
-        case .paragraph, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem, .table:
+        case .paragraph, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem, .table, .image:
             return baseFont
         }
     }

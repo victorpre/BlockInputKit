@@ -9,47 +9,47 @@ enum BlockInputStreamingMarkdownImporter {
             reader = bufferedReader.reader
         }
         var blocks: [BlockInputBlock] = []
-        while let block = try await parseNextBlock(from: &bufferedReader) {
-            blocks.append(block)
+        while let parsedBlocks = try await parseNextBlocks(from: &bufferedReader) {
+            blocks.append(contentsOf: parsedBlocks)
         }
         return BlockInputDocument(blocks: blocks)
     }
 
-    private static func parseNextBlock<Reader: BlockInputMarkdownLineReader>(
+    private static func parseNextBlocks<Reader: BlockInputMarkdownLineReader>(
         from reader: inout BlockInputBufferedMarkdownLineReader<Reader>
-    ) async throws -> BlockInputBlock? {
+    ) async throws -> [BlockInputBlock]? {
         while let line = try await reader.readLine() {
             let lineIndex = reader.consumedLineCount - 1
             guard !isBlank(line) else {
                 continue
             }
             if let language = BlockInputMarkdownImporter.codeFenceLanguage(in: line) {
-                return try await parseCodeBlock(startingWith: line, language: language, from: &reader)
+                return [try await parseCodeBlock(startingWith: line, language: language, from: &reader)]
             }
             if lineIndex == 0,
                line.trimmingCharacters(in: .whitespaces) == "---",
                let frontMatter = try await parseFrontMatter(startingWith: line, from: &reader) {
-                return frontMatter
+                return [frontMatter]
             }
             if let table = try await parseTable(startingWith: line, from: &reader) {
-                return table
+                return [table]
             }
             if let unsupported = try await parseUnsupportedBlock(startingWith: line, from: &reader) {
-                return unsupported
+                return [unsupported]
             }
             if line.trimmingCharacters(in: .whitespaces) == "---" {
-                return BlockInputBlock(kind: .horizontalRule)
+                return [BlockInputBlock(kind: .horizontalRule)]
             }
             if let heading = BlockInputMarkdownImporter.parseHeading(line) {
-                return heading
+                return BlockInputMarkdownImporter.imageBlocks(bySplitting: heading)
             }
             if line.hasPrefix(">") {
-                return try await parseQuote(startingWith: line, from: &reader)
+                return BlockInputMarkdownImporter.imageBlocks(bySplitting: try await parseQuote(startingWith: line, from: &reader))
             }
             if let parsed = BlockInputMarkdownImporter.parseListLine(line) {
-                return parsed
+                return BlockInputMarkdownImporter.imageBlocks(bySplitting: parsed)
             }
-            return try await parseParagraph(startingWith: line, from: &reader)
+            return BlockInputMarkdownImporter.imageBlocks(bySplitting: try await parseParagraph(startingWith: line, from: &reader))
         }
         return nil
     }
@@ -184,6 +184,9 @@ enum BlockInputStreamingMarkdownImporter {
         startingWith line: String,
         from reader: inout BlockInputBufferedMarkdownLineReader<Reader>
     ) async throws -> BlockInputBlock {
+        if let imageBlock = BlockInputMarkdownImporter.imageBlock(fromHTMLLine: line) {
+            return imageBlock
+        }
         let opening = line.trimmingCharacters(in: .whitespaces)
         if opening.hasPrefix("<!--") {
             return try await parseDelimitedHTMLBlock(

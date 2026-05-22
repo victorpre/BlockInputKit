@@ -4,8 +4,11 @@ extension BlockInputMarkdownImporter {
     static func parseHTMLBlock(
         lines: [String],
         startIndex: Int
-    ) -> (block: BlockInputBlock, nextIndex: Int) {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         let opening = lines[startIndex].trimmingCharacters(in: .whitespaces)
+        if let imageBlock = imageBlock(fromHTMLLine: lines[startIndex]) {
+            return ([imageBlock], startIndex + 1)
+        }
         if let parsed = parseHTMLComment(lines: lines, startIndex: startIndex, opening: opening) {
             return parsed
         }
@@ -37,7 +40,7 @@ extension BlockInputMarkdownImporter {
         lines: [String],
         startIndex: Int,
         opening: String
-    ) -> (block: BlockInputBlock, nextIndex: Int)? {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int)? {
         guard opening.hasPrefix("<!--") else {
             return nil
         }
@@ -51,7 +54,7 @@ extension BlockInputMarkdownImporter {
         lines: [String],
         startIndex: Int,
         opening: String
-    ) -> (block: BlockInputBlock, nextIndex: Int)? {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int)? {
         guard opening.hasPrefix("<![CDATA[") else {
             return nil
         }
@@ -65,7 +68,7 @@ extension BlockInputMarkdownImporter {
         lines: [String],
         startIndex: Int,
         closingDelimiter: String
-    ) -> (block: BlockInputBlock, nextIndex: Int) {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         var index = startIndex + 1
         while index < lines.count {
             if lines[index].contains(closingDelimiter) {
@@ -80,7 +83,7 @@ extension BlockInputMarkdownImporter {
         lines: [String],
         startIndex: Int,
         opening: String
-    ) -> (block: BlockInputBlock, nextIndex: Int)? {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int)? {
         if opening.hasPrefix("<?") {
             if opening.contains("?>") {
                 return rawBlock(lines: lines, range: startIndex..<(startIndex + 1))
@@ -101,7 +104,7 @@ extension BlockInputMarkdownImporter {
         startIndex: Int,
         opening: String,
         tagName: String
-    ) -> (block: BlockInputBlock, nextIndex: Int) {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         if containsHTMLClosingTag(opening, tagName: tagName) || isSelfContainedHTMLTag(opening, tagName: tagName) {
             return rawBlock(lines: lines, range: startIndex..<(startIndex + 1))
         }
@@ -125,7 +128,7 @@ extension BlockInputMarkdownImporter {
         lines: [String],
         startIndex: Int,
         tagName: String
-    ) -> (block: BlockInputBlock, nextIndex: Int) {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         var index = startIndex + 1
         while index < lines.count {
             if containsHTMLClosingTag(lines[index], tagName: tagName) {

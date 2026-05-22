@@ -248,7 +248,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .image, .rawMarkdown:
             return false
         }
     }
@@ -258,7 +258,7 @@ private extension BlockInputBlockKind {
         case .numberedListItem:
             return true
         case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .bulletedListItem, .checklistItem,
-             .table, .rawMarkdown:
+             .table, .image, .rawMarkdown:
             return false
         }
     }

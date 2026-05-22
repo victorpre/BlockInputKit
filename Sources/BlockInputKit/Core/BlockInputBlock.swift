@@ -50,6 +50,8 @@ public enum BlockInputBlockKind: Equatable, Codable, Sendable {
     /// Table blocks keep their full pipe-table Markdown in ``BlockInputBlock/text`` so
     /// cell source ranges can be mapped back to the underlying document text.
     case table
+    /// Image block rendered from Markdown image syntax, HTML `<img>` syntax, or a local image drop.
+    case image(BlockInputImage)
     /// Unsupported block-level Markdown source that should round-trip verbatim.
     ///
     /// The block's `text` stores the original Markdown source for this block.
@@ -73,7 +75,7 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
     /// For ``BlockInputBlockKind/rawMarkdown``, this stores the original Markdown source.
     /// For ``BlockInputBlockKind/frontMatter``, this stores the delimiter-free raw YAML body
     /// without the required closing-delimiter separator line break.
-    /// Non-text blocks such as horizontal rules normalize this value to an empty string.
+    /// Non-text blocks such as horizontal rules and images normalize this value to an empty string.
     public var text: String {
         didSet {
             normalizeForKind()
@@ -105,7 +107,7 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
     ) {
         self.id = id
         self.kind = kind
-        self.text = kind == .horizontalRule ? "" : text
+        self.text = kind.normalizesTextToEmpty ? "" : text
         self.indentationLevel = indentationLevel
         self.lineIndentationLevels = lineIndentationLevels
         normalizeForKind()
@@ -117,7 +119,7 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
         id = try container.decode(BlockInputBlockID.self, forKey: .id)
         kind = try container.decode(BlockInputBlockKind.self, forKey: .kind)
         let decodedText = try container.decode(String.self, forKey: .text)
-        text = kind == .horizontalRule ? "" : decodedText
+        text = kind.normalizesTextToEmpty ? "" : decodedText
         indentationLevel = try container.decode(Int.self, forKey: .indentationLevel)
         lineIndentationLevels = try container.decodeIfPresent(
             [Int].self,
@@ -134,6 +136,9 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
         if kind == .table {
             return false
         }
+        if case .image = kind {
+            return false
+        }
         return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
@@ -143,7 +148,7 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
     }
 
     private mutating func normalizeForKind() {
-        if kind == .horizontalRule, !text.isEmpty {
+        if kind.normalizesTextToEmpty, !text.isEmpty {
             text = ""
         }
         let normalizedIndentation = kind.supportsIndentation ? max(0, indentationLevel) : 0
@@ -367,14 +372,14 @@ extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .image, .rawMarkdown:
             return false
         }
     }
 
     var canUnwrapToParagraph: Bool {
         switch self {
-        case .paragraph, .code, .table, .rawMarkdown:
+        case .paragraph, .code, .table, .image, .rawMarkdown:
             return false
         case .heading, .horizontalRule, .frontMatter, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
@@ -385,7 +390,7 @@ extension BlockInputBlockKind {
         switch self {
         case .heading, .code, .frontMatter, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .horizontalRule, .table, .rawMarkdown:
+        case .paragraph, .horizontalRule, .table, .image, .rawMarkdown:
             return false
         }
     }
@@ -394,7 +399,7 @@ extension BlockInputBlockKind {
         switch self {
         case .code, .frontMatter, .quote, .rawMarkdown:
             return true
-        case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem, .table:
+        case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem, .table, .image:
             return false
         }
     }
@@ -403,7 +408,7 @@ extension BlockInputBlockKind {
         switch self {
         case .code, .frontMatter, .quote:
             return true
-        case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem, .table, .rawMarkdown:
+        case .paragraph, .heading, .horizontalRule, .bulletedListItem, .numberedListItem, .checklistItem, .table, .image, .rawMarkdown:
             return false
         }
     }
@@ -412,7 +417,17 @@ extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .image, .rawMarkdown:
+            return false
+        }
+    }
+
+    var normalizesTextToEmpty: Bool {
+        switch self {
+        case .horizontalRule, .image:
+            return true
+        case .paragraph, .heading, .code, .frontMatter, .quote, .bulletedListItem, .numberedListItem, .checklistItem,
+                .table, .rawMarkdown:
             return false
         }
     }

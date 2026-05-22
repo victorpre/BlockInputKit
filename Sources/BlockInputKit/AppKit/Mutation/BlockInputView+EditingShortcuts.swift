@@ -268,7 +268,7 @@ extension BlockInputBlock {
         switch kind {
         case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .code, .horizontalRule, .frontMatter, .table, .rawMarkdown:
+        case .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
             return false
         }
     }

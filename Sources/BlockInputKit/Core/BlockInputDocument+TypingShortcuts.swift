@@ -330,7 +330,7 @@ extension BlockInputBlockKind {
             return "\(start)."
         case .checklistItem(let isChecked):
             return isChecked ? "- [x]" : "- [ ]"
-        case .paragraph, .code, .table, .rawMarkdown:
+        case .paragraph, .code, .table, .image, .rawMarkdown:
             return nil
         }
     }
@@ -339,7 +339,7 @@ extension BlockInputBlockKind {
         switch self {
         case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .code, .horizontalRule, .frontMatter, .table, .rawMarkdown:
+        case .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
             return false
         }
     }

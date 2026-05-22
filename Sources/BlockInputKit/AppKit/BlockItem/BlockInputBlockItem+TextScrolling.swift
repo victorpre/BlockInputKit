@@ -12,7 +12,7 @@ extension BlockInputBlockItem {
         case .table:
             configureWrappingTextScrolling()
         case .paragraph, .heading, .horizontalRule, .frontMatter, .quote, .bulletedListItem, .numberedListItem, .checklistItem,
-             .rawMarkdown:
+             .image, .rawMarkdown:
             configureWrappingTextScrolling()
         }
     }

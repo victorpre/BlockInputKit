@@ -10,6 +10,13 @@ extension BlockInputView {
         guard let blockBeforeEdit = block(withID: blockID) else {
             return nil
         }
+        if let selection = applyImageSyntaxSplitIfNeeded(
+            blockBeforeEdit: blockBeforeEdit,
+            proposedText: proposedText,
+            selectionBefore: selectionBefore
+        ) {
+            return selection
+        }
         let isFirstEmptyBlock = index(of: blockID) == 0 && blockBeforeEdit.text.isEmpty
         guard let shortcut = document.typingShortcut(
             for: blockBeforeEdit,
@@ -91,6 +98,71 @@ extension BlockInputView {
             collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
             collectionView.layoutSubtreeIfNeeded()
             restoreMountedSelection()
+        }
+        publishDocumentChange()
+        return afterSelection
+    }
+
+    private func applyImageSyntaxSplitIfNeeded(
+        blockBeforeEdit: BlockInputBlock,
+        proposedText: String,
+        selectionBefore: BlockInputSelection?
+    ) -> BlockInputSelection? {
+        var proposedBlock = blockBeforeEdit
+        proposedBlock.text = proposedText
+        var replacementBlocks = BlockInputMarkdownImporter.imageBlocks(bySplitting: proposedBlock)
+        guard replacementBlocks.contains(where: { block in
+            if case .image = block.kind {
+                return true
+            }
+            return false
+        }) else {
+            return nil
+        }
+        guard let index = index(of: blockBeforeEdit.id),
+              !replacementBlocks.isEmpty else {
+            return nil
+        }
+        replacementBlocks[0].id = blockBeforeEdit.id
+        let afterBlock = replacementBlocks[0]
+        let insertedBlocks = Array(replacementBlocks.dropFirst())
+        let insertionIndex = index + 1
+        if canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) {
+            guard replaceCachedBlock(afterBlock, at: index),
+                  document.insertBlocks(insertedBlocks, at: insertionIndex) != nil else {
+                return nil
+            }
+        } else {
+            markDocumentCacheUnsynchronized()
+        }
+        let imageBlock = replacementBlocks.first { block in
+            if case .image = block.kind {
+                return true
+            }
+            return false
+        }
+        let afterSelection = imageBlock.map { BlockInputSelection.blocks([$0.id]) }
+        syncDocumentStore(.replaceBlock(afterBlock))
+        if !insertedBlocks.isEmpty {
+            syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: insertionIndex))
+        }
+        applySelection(afterSelection, notify: true)
+        undoController?.registerBlockReplacementInsertionStructuralEdit(BlockInputReplaceInsertEdit(
+            actionName: "Insert Image",
+            beforeBlock: blockBeforeEdit,
+            afterBlock: afterBlock,
+            insertedBlocks: insertedBlocks,
+            insertionIndex: insertionIndex,
+            selectionBefore: selectionBefore ?? selection,
+            selectionAfter: afterSelection
+        ))
+        if shouldDeferGranularCountLayout {
+            _ = reconfigureVisibleReplacement(afterBlock, at: index)
+            for offset in insertedBlocks.indices {
+                insertVisibleBlock(at: insertionIndex + offset)
+            }
+        } else {
+            reloadDataKeepingFocus()
         }
         publishDocumentChange()
         return afterSelection

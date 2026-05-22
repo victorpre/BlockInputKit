@@ -136,6 +136,37 @@ final class BlockInputDocumentTests: XCTestCase {
         XCTAssertEqual(decoded.text, "")
     }
 
+    func testImageBlocksNormalizeStoredTextAndAreNotEmpty() throws {
+        var block = BlockInputBlock(
+            id: "image",
+            kind: .image(BlockInputImage(source: "https://example.com/image.png", altText: "Example")),
+            text: "Hidden"
+        )
+
+        XCTAssertEqual(block.text, "")
+        XCTAssertFalse(block.isEmpty)
+
+        block.text = "Ignored"
+        XCTAssertEqual(block.text, "")
+
+        let encoded = try JSONEncoder().encode(block)
+        let decoded = try JSONDecoder().decode(BlockInputBlock.self, from: encoded)
+        XCTAssertEqual(decoded.kind, block.kind)
+        XCTAssertEqual(decoded.text, "")
+    }
+
+    func testImageDimensionsNormalizeToPositiveValues() {
+        var image = BlockInputImage(source: "image.png", width: -1, height: 0)
+
+        XCTAssertNil(image.width)
+        XCTAssertNil(image.height)
+
+        image.width = 120
+        image.height = -20
+        XCTAssertEqual(image.width, 120)
+        XCTAssertNil(image.height)
+    }
+
     func testNonListBlocksNormalizeIndentation() throws {
         var block = BlockInputBlock(id: "quote", kind: .quote, text: "Quoted", indentationLevel: 2)
 

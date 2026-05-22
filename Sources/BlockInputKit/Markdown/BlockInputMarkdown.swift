@@ -11,7 +11,7 @@ enum BlockInputMarkdownImporter {
                 index += 1
                 continue
             }
-            blocks.append(parsed.block)
+            blocks.append(contentsOf: parsed.blocks)
             index = parsed.nextIndex
         }
 
@@ -21,7 +21,7 @@ enum BlockInputMarkdownImporter {
     private static func parseNextBlock(
         lines: [String],
         startIndex: Int
-    ) -> (block: BlockInputBlock, nextIndex: Int)? {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int)? {
         let line = lines[startIndex]
         guard !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return nil
@@ -40,16 +40,16 @@ enum BlockInputMarkdownImporter {
             return parsed
         }
         if line.trimmingCharacters(in: .whitespaces) == "---" {
-            return (BlockInputBlock(kind: .horizontalRule), startIndex + 1)
+            return ([BlockInputBlock(kind: .horizontalRule)], startIndex + 1)
         }
         if let heading = parseHeading(line) {
-            return (heading, startIndex + 1)
+            return (imageBlocks(bySplitting: heading), startIndex + 1)
         }
         if line.hasPrefix(">") {
             return parseQuote(lines: lines, startIndex: startIndex)
         }
         if let parsed = parseListLine(lines[startIndex]) {
-            return (parsed, startIndex + 1)
+            return (imageBlocks(bySplitting: parsed), startIndex + 1)
         }
         return parseParagraph(lines: lines, startIndex: startIndex)
     }
@@ -65,33 +65,33 @@ enum BlockInputMarkdownImporter {
         lines: [String],
         startIndex: Int,
         language: String?
-    ) -> (block: BlockInputBlock, nextIndex: Int) {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         var content: [String] = []
         var index = startIndex + 1
         while index < lines.count {
             if lines[index].trimmingCharacters(in: .whitespaces).hasPrefix("```") {
-                return (BlockInputBlock(kind: .code(language: language), text: content.joined(separator: "\n")), index + 1)
+                return ([BlockInputBlock(kind: .code(language: language), text: content.joined(separator: "\n"))], index + 1)
             }
             content.append(lines[index])
             index += 1
         }
-        return (BlockInputBlock(kind: .code(language: language), text: content.joined(separator: "\n")), index)
+        return ([BlockInputBlock(kind: .code(language: language), text: content.joined(separator: "\n"))], index)
     }
 
-    private static func parseQuote(lines: [String], startIndex: Int) -> (block: BlockInputBlock, nextIndex: Int) {
+    private static func parseQuote(lines: [String], startIndex: Int) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         var content: [String] = []
         var index = startIndex
         while index < lines.count, lines[index].hasPrefix(">") {
             content.append(lines[index].droppingPrefix(">").droppingPrefix(" "))
             index += 1
         }
-        return (BlockInputBlock(kind: .quote, text: content.joined(separator: "\n")), index)
+        return (imageBlocks(bySplitting: BlockInputBlock(kind: .quote, text: content.joined(separator: "\n"))), index)
     }
 
     private static func parseUnsupportedBlock(
         lines: [String],
         startIndex: Int
-    ) -> (block: BlockInputBlock, nextIndex: Int)? {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int)? {
         if isSetextHeading(lines: lines, startIndex: startIndex) {
             return rawBlock(lines: lines, range: startIndex..<(startIndex + 2))
         }
@@ -110,20 +110,20 @@ enum BlockInputMarkdownImporter {
     private static func parseTable(
         lines: [String],
         startIndex: Int
-    ) -> (block: BlockInputBlock, nextIndex: Int)? {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int)? {
         let line = lines[startIndex]
         guard !isFootnoteDefinition(line),
               !isHTMLBlockOpening(line),
               let parsed = BlockInputTable.parse(lines: lines, startIndex: startIndex) else {
             return nil
         }
-        return (BlockInputBlock(kind: .table, text: parsed.table.markdown), parsed.nextIndex)
+        return ([BlockInputBlock(kind: .table, text: parsed.table.markdown)], parsed.nextIndex)
     }
 
     private static func parseFrontMatter(
         lines: [String],
         startIndex: Int
-    ) -> (block: BlockInputBlock, nextIndex: Int)? {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int)? {
         var hasBodyContent = false
         var index = startIndex + 1
         while index < lines.count {
@@ -134,7 +134,7 @@ enum BlockInputMarkdownImporter {
                 // required line break before the closing delimiter so ordinary file
                 // loads do not display a synthetic blank line in the editor.
                 let body = bodyLines.joined(separator: "\n")
-                return (BlockInputBlock(kind: .frontMatter, text: body), index + 1)
+                return ([BlockInputBlock(kind: .frontMatter, text: body)], index + 1)
             }
             if !trimmed.isEmpty {
                 hasBodyContent = true
@@ -150,7 +150,7 @@ enum BlockInputMarkdownImporter {
     private static func parseFootnoteDefinition(
         lines: [String],
         startIndex: Int
-    ) -> (block: BlockInputBlock, nextIndex: Int) {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         var index = startIndex
         while index < lines.count {
             let line = lines[index]
@@ -172,7 +172,7 @@ enum BlockInputMarkdownImporter {
         lines: [String],
         startIndex: Int,
         while shouldContinue: (String) -> Bool
-    ) -> (block: BlockInputBlock, nextIndex: Int) {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         var index = startIndex
         while index < lines.count, shouldContinue(lines[index]) {
             index += 1
@@ -183,16 +183,16 @@ enum BlockInputMarkdownImporter {
     static func rawBlock(
         lines: [String],
         range: Range<Int>
-    ) -> (block: BlockInputBlock, nextIndex: Int) {
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         var upperBound = range.upperBound
         while upperBound < lines.count, lines[upperBound].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             upperBound += 1
         }
         let source = lines[range.lowerBound..<upperBound].joined(separator: "\n")
-        return (BlockInputBlock(kind: .rawMarkdown, text: source), upperBound)
+        return ([BlockInputBlock(kind: .rawMarkdown, text: source)], upperBound)
     }
 
-    private static func parseParagraph(lines: [String], startIndex: Int) -> (block: BlockInputBlock, nextIndex: Int) {
+    private static func parseParagraph(lines: [String], startIndex: Int) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         var content: [String] = []
         var index = startIndex
         while index < lines.count {
@@ -212,7 +212,7 @@ enum BlockInputMarkdownImporter {
             content.append(line)
             index += 1
         }
-        return (BlockInputBlock(kind: .paragraph, text: content.joined(separator: "\n")), index)
+        return (imageBlocks(bySplitting: BlockInputBlock(kind: .paragraph, text: content.joined(separator: "\n"))), index)
     }
 
     static func parseHeading(_ line: String) -> BlockInputBlock? {
@@ -404,6 +404,8 @@ enum BlockInputMarkdownSerializer {
             }.joined(separator: "\n")
         case .table, .rawMarkdown:
             return sourceMarkdown(block)
+        case .image(let image):
+            return BlockInputMarkdownImporter.markdown(for: image)
         }
     }
 
@@ -446,7 +448,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .image, .rawMarkdown:
             return false
         }
     }

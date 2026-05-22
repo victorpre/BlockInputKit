@@ -56,6 +56,8 @@ enum BlockInputStreamingMarkdownSerializer {
             }
         case .table, .rawMarkdown:
             try await writer.writeMarkdown(sourceMarkdown(block))
+        case .image(let image):
+            try await writer.writeMarkdown(BlockInputMarkdownImporter.markdown(for: image))
         }
     }
 
@@ -118,7 +120,7 @@ private extension BlockInputBlockKind {
         switch self {
         case .bulletedListItem, .numberedListItem, .checklistItem:
             return true
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .rawMarkdown:
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .quote, .table, .image, .rawMarkdown:
             return false
         }
     }
