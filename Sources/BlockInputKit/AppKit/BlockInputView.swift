@@ -80,6 +80,8 @@ public final class BlockInputView: NSView {
     var linkModalView: BlockInputLinkModalView?
     // Captured source context for the visible modal; save/remove actions verify it before mutating block text.
     var linkModalContext: BlockInputLinkContext?
+    var imageModalView: BlockInputImageModalView?
+    var imageModalContext: BlockInputImageContext?
     // Local monitors are needed because a child modal view does not receive every outside mouse-down by responder routing.
     nonisolated(unsafe) var linkModalMouseDownMonitor: Any?
     var linkModalRetargetMouseDownWindowLocation: NSPoint?
@@ -126,6 +128,7 @@ public final class BlockInputView: NSView {
 
     public override func keyDown(with event: NSEvent) {
         if linkModalContainsCurrentResponder() { super.keyDown(with: event); return }
+        if imageModalContainsCurrentResponder() { super.keyDown(with: event); return }
         if event.isCancelOperation, cancelMultiBlockSelection() { return }
         if handleEditorArrowKeyEvent(event) { return }
         if handleWordMovementShortcut(event) { return }
@@ -140,6 +143,7 @@ public final class BlockInputView: NSView {
 
     public override func doCommand(by selector: Selector) {
         if linkModalContainsCurrentResponder() { super.doCommand(by: selector); return }
+        if imageModalContainsCurrentResponder() { super.doCommand(by: selector); return }
         if selector == #selector(cancelOperation(_:)), cancelMultiBlockSelection() {
             return
         }
@@ -155,6 +159,7 @@ public final class BlockInputView: NSView {
 
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if linkModalContainsCurrentResponder() { return super.performKeyEquivalent(with: event) }
+        if imageModalContainsCurrentResponder() { return super.performKeyEquivalent(with: event) }
         if event.blockInputIsSelectAllShortcut, selectAllFromActiveSelection() { return true }
         if let undoShortcut = event.blockInputUndoShortcut, performUndoShortcut(undoShortcut) { return true }
         if let formattingShortcut = event.blockInputTextFormattingShortcut {

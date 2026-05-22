@@ -139,7 +139,7 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         didRequestInsertFileURLs fileURLs: [URL],
         atUTF16Offset utf16Offset: Int
     ) -> Bool
-    /// Builds editor-owned link context-menu items from mounted row state.
+    /// Builds editor-owned insertion/link context-menu items from mounted row state.
     func blockItem(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,

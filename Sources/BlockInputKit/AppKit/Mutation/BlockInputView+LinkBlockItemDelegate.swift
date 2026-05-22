@@ -31,7 +31,11 @@ extension BlockInputView {
         didRequestInsertFileURLs fileURLs: [URL],
         atUTF16Offset utf16Offset: Int
     ) -> Bool {
-        insertFileURLsInline(fileURLs, into: blockID, atUTF16Offset: utf16Offset, item: item) != nil
+        let imageURLs = fileURLs.filter { Self.imageBlock(for: $0) != nil }
+        let otherURLs = fileURLs.filter { Self.imageBlock(for: $0) == nil }
+        let insertedImages = imageURLs.isEmpty ? nil : insertImageFileURLs(imageURLs, below: blockID)
+        let insertedFiles = otherURLs.isEmpty ? nil : insertFileURLsInline(otherURLs, into: blockID, atUTF16Offset: utf16Offset, item: item)
+        return insertedImages != nil || insertedFiles != nil
     }
 
     func blockItem(

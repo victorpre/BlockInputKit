@@ -103,7 +103,7 @@ extension BlockInputView {
         return afterSelection
     }
 
-    private func applyImageSyntaxSplitIfNeeded(
+    func applyImageSyntaxSplitIfNeeded(
         blockBeforeEdit: BlockInputBlock,
         proposedText: String,
         selectionBefore: BlockInputSelection?

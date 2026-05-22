@@ -339,7 +339,8 @@ final class BlockInputTableCellEditingTests: XCTestCase {
         let menu = try XCTUnwrap(textView.menu(for: try rightMouseDownEvent(windowNumber: mounted.window.windowNumber)))
         let insertLinkIndex = try XCTUnwrap(menu.items.firstIndex { $0.title == "Insert Link" })
 
-        XCTAssertEqual(menu.items[insertLinkIndex + 1].title, "Insert Table")
+        XCTAssertEqual(menu.items[insertLinkIndex + 1].title, "Insert Image")
+        XCTAssertEqual(menu.items[insertLinkIndex + 2].title, "Insert Table")
 
         try performTableCellMenuItem(titled: "Insert Table", in: menu)
 

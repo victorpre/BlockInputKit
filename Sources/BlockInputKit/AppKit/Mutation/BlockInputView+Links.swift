@@ -105,25 +105,26 @@ extension BlockInputView {
 
     func linkContextMenuItems(blockID: BlockInputBlockID, selectedRange: NSRange, event: NSEvent) -> [NSMenuItem] {
         let tableItems = tableContextMenuItems(blockID: blockID, selectedRange: selectedRange, event: event)
+        let imageItems = imageContextMenuItems(blockID: blockID, selectedRange: selectedRange, event: event)
         guard let context = linkContext(
             blockID: blockID,
             selectedRange: selectedRange,
             event: event,
             prefersClickedOffset: true
         ) else {
-            return tableItems
+            return imageItems + tableItems
         }
         let insertItem = NSMenuItem(title: "Insert Link", action: #selector(blockInputInsertLinkFromMenu(_:)), keyEquivalent: "")
         insertItem.target = self
         insertItem.representedObject = context
         guard case .edit = context.mode,
               context.sourceRange.length == 0 else {
-            return [insertItem] + tableItems
+            return [insertItem] + imageItems + tableItems
         }
         let removeItem = NSMenuItem(title: "Remove Link", action: #selector(blockInputRemoveLinkFromMenu(_:)), keyEquivalent: "")
         removeItem.target = self
         removeItem.representedObject = context
-        return [insertItem] + tableItems + [removeItem]
+        return [insertItem] + imageItems + tableItems + [removeItem]
     }
 
     @objc(blockInputInsertLinkFromMenu:)
