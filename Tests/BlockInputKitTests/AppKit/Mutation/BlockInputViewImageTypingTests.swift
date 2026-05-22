@@ -4,6 +4,30 @@ import XCTest
 
 @MainActor
 final class BlockInputViewImageTypingTests: XCTestCase {
+    func testTypingMarkdownImageAsEntireParagraphConvertsBlockAndSelectsImage() {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let imageURL = "https://af.codes/images/portfolio/streettriple.jpg"
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "")
+        ])))
+
+        let selection = view.applyTypingShortcutIfNeeded(
+            blockID: blockID,
+            proposedText: "![bike](\(imageURL))",
+            proposedUTF16Offset: ("![bike](\(imageURL))" as NSString).length,
+            selectionBefore: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0))
+        )
+
+        XCTAssertEqual(view.document.blocks.count, 1)
+        XCTAssertEqual(
+            view.document.blocks[0].kind,
+            .image(BlockInputImage(source: imageURL, altText: "bike"))
+        )
+        XCTAssertEqual(view.document.blocks[0].text, "")
+        XCTAssertEqual(selection, .blocks([blockID]))
+    }
+
     func testTypingMarkdownImageInParagraphSplitsBlockAndSelectsImage() throws {
         let blockID = BlockInputBlockID(rawValue: "block")
         let view = BlockInputView()

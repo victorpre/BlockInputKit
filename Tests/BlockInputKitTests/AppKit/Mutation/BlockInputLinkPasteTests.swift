@@ -153,6 +153,66 @@ final class BlockInputLinkPasteTests: XCTestCase {
         assertPastedLinkText("Open [https://example.com](https://example.com)", blockID: "block", in: mounted.view, textView: textView)
     }
 
+    func testPastingURLInsidePendingMarkdownImageSyntaxCreatesImageBlock() throws {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let imageURL = "https://af.codes/images/portfolio/streettriple.jpg"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: blockID, text: "![bike]()")
+        ])
+        let textView = try textView(in: mounted.view)
+        XCTAssertTrue(mounted.window.makeFirstResponder(textView))
+        textView.setSelectedRange(NSRange(location: ("![bike](" as NSString).length, length: 0))
+
+        try withPasteboardString(imageURL) {
+            textView.paste(nil)
+        }
+
+        XCTAssertEqual(mounted.view.document.blocks.count, 1)
+        XCTAssertEqual(
+            mounted.view.document.blocks[0].kind,
+            .image(BlockInputImage(source: imageURL, altText: "bike"))
+        )
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "")
+    }
+
+    func testPastingURLInsideUnclosedMarkdownImageSyntaxInsertsPlainURL() throws {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let imageURL = "https://af.codes/images/portfolio/streettriple.jpg"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: blockID, text: "![bike](")
+        ])
+        let textView = try textView(in: mounted.view)
+        XCTAssertTrue(mounted.window.makeFirstResponder(textView))
+        textView.setSelectedRange(NSRange(location: ("![bike](" as NSString).length, length: 0))
+
+        try withPasteboardString(imageURL) {
+            textView.paste(nil)
+        }
+
+        XCTAssertEqual(mounted.view.document.blocks.count, 1)
+        XCTAssertEqual(mounted.view.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "![bike](\(imageURL)")
+    }
+
+    func testURLPasteMutationInsidePendingMarkdownImageDestinationCreatesImageBlock() {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let imageURL = "https://af.codes/images/portfolio/streettriple.jpg"
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "![bike]()")
+        ])))
+        let imageDestinationRange = NSRange(location: ("![bike](" as NSString).length, length: 0)
+        view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: imageDestinationRange.location)), notify: false)
+
+        XCTAssertTrue(view.pasteURLString(imageURL, blockID: blockID, selectedRange: imageDestinationRange))
+        XCTAssertEqual(view.document.blocks.count, 1)
+        XCTAssertEqual(
+            view.document.blocks[0].kind,
+            .image(BlockInputImage(source: imageURL, altText: "bike"))
+        )
+        XCTAssertEqual(view.document.blocks[0].text, "")
+    }
+
     func testPastingFileURLAtCollapsedCursorCreatesLinkAndPlacesCaretAfterLink() throws {
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "block", text: "Open ")

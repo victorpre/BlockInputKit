@@ -81,17 +81,17 @@ extension BlockInputView {
         )
     }
 
-    func linkContextForActiveSelection(urlPasteSelectedRangeOverride: NSRange? = nil) -> BlockInputLinkContext? {
-        switch selection {
-        case let .cursor(cursor):
-            let range = urlPasteSelectedRangeOverride ?? NSRange(location: cursor.utf16Offset, length: 0)
-            return linkContext(blockID: cursor.blockID, selectedRange: range, event: nil, prefersClickedOffset: false)
-        case let .text(textRange):
-            let range = urlPasteSelectedRangeOverride ?? textRange.range
-            return linkContext(blockID: textRange.blockID, selectedRange: range, event: nil, prefersClickedOffset: false)
-        case .blocks, .mixed, nil:
+    func linkContextForActiveSelection(
+        blockID blockIDOverride: BlockInputBlockID? = nil,
+        urlPasteSelectedRangeOverride: NSRange? = nil
+    ) -> BlockInputLinkContext? {
+        guard let target = linkPasteTarget(
+            blockID: blockIDOverride,
+            selectedRangeOverride: urlPasteSelectedRangeOverride
+        ) else {
             return nil
         }
+        return linkContext(blockID: target.blockID, selectedRange: target.range, event: nil, prefersClickedOffset: false)
     }
 
     func linkContextMenuItems(for event: NSEvent) -> [NSMenuItem] {
@@ -263,9 +263,15 @@ extension BlockInputView {
 
     /// Handles supported URL paste by editing an existing link or inserting Markdown without selecting the result.
     @discardableResult
-    func pasteURLString(_ urlString: String, selectedRange: NSRange? = nil) -> Bool {
-        guard BlockInputLinkURL.supportedURL(from: urlString) != nil,
-              let context = linkContextForActiveSelection(urlPasteSelectedRangeOverride: selectedRange),
+    func pasteURLString(_ urlString: String, blockID: BlockInputBlockID? = nil, selectedRange: NSRange? = nil) -> Bool {
+        guard BlockInputLinkURL.supportedURL(from: urlString) != nil else {
+            return false
+        }
+        if pasteURLIntoMarkdownImageDestinationIfNeeded(urlString, blockID: blockID, selectedRange: selectedRange) {
+            return true
+        }
+        guard
+              let context = linkContextForActiveSelection(blockID: blockID, urlPasteSelectedRangeOverride: selectedRange),
               let block = block(withID: context.blockID) else {
             return false
         }
@@ -431,6 +437,10 @@ extension BlockInputView {
     }
 
     private func supportsInlineLinkMutation(in block: BlockInputBlock, range: NSRange) -> Bool {
+        if block.kind.supportsImageSyntaxSplitting,
+           block.text.blockInputMarkdownImageDestinationRange(containing: range) != nil {
+            return false
+        }
         if BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) {
             return true
         }

@@ -127,25 +127,16 @@ extension BlockInputView {
         let afterBlock = replacementBlocks[0]
         let insertedBlocks = Array(replacementBlocks.dropFirst())
         let insertionIndex = index + 1
-        if canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) {
-            guard replaceCachedBlock(afterBlock, at: index),
-                  document.insertBlocks(insertedBlocks, at: insertionIndex) != nil else {
-                return nil
-            }
-        } else {
-            markDocumentCacheUnsynchronized()
+        guard synchronizeImageSyntaxSplitDocumentCache(
+            afterBlock: afterBlock,
+            insertedBlocks: insertedBlocks,
+            index: index,
+            insertionIndex: insertionIndex
+        ) else {
+            return nil
         }
-        let imageBlock = replacementBlocks.first { block in
-            if case .image = block.kind {
-                return true
-            }
-            return false
-        }
-        let afterSelection = imageBlock.map { BlockInputSelection.blocks([$0.id]) }
-        syncDocumentStore(.replaceBlock(afterBlock))
-        if !insertedBlocks.isEmpty {
-            syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: insertionIndex))
-        }
+        let afterSelection = imageSyntaxSplitSelection(in: replacementBlocks)
+        syncImageSyntaxSplitStore(afterBlock: afterBlock, insertedBlocks: insertedBlocks, insertionIndex: insertionIndex)
         applySelection(afterSelection, notify: true)
         undoController?.registerBlockReplacementInsertionStructuralEdit(BlockInputReplaceInsertEdit(
             actionName: "Insert Image",
@@ -156,16 +147,66 @@ extension BlockInputView {
             selectionBefore: selectionBefore ?? selection,
             selectionAfter: afterSelection
         ))
-        if shouldDeferGranularCountLayout {
-            _ = reconfigureVisibleReplacement(afterBlock, at: index)
-            for offset in insertedBlocks.indices {
-                insertVisibleBlock(at: insertionIndex + offset)
-            }
-        } else {
-            reloadDataKeepingFocus()
-        }
+        layoutImageSyntaxSplit(afterBlock: afterBlock, insertedBlocks: insertedBlocks, index: index, insertionIndex: insertionIndex)
         publishDocumentChange()
         return afterSelection
+    }
+
+    private func synchronizeImageSyntaxSplitDocumentCache(
+        afterBlock: BlockInputBlock,
+        insertedBlocks: [BlockInputBlock],
+        index: Int,
+        insertionIndex: Int
+    ) -> Bool {
+        guard canSynchronizeCacheForGranularInsertion(insertedBlockCount: insertedBlocks.count) else {
+            markDocumentCacheUnsynchronized()
+            return true
+        }
+        guard replaceCachedBlock(afterBlock, at: index) else {
+            return false
+        }
+        if !insertedBlocks.isEmpty,
+           document.insertBlocks(insertedBlocks, at: insertionIndex) == nil {
+            return false
+        }
+        return true
+    }
+
+    private func imageSyntaxSplitSelection(in blocks: [BlockInputBlock]) -> BlockInputSelection? {
+        blocks.first { block in
+            if case .image = block.kind {
+                return true
+            }
+            return false
+        }
+        .map { BlockInputSelection.blocks([$0.id]) }
+    }
+
+    private func syncImageSyntaxSplitStore(
+        afterBlock: BlockInputBlock,
+        insertedBlocks: [BlockInputBlock],
+        insertionIndex: Int
+    ) {
+        syncDocumentStore(.replaceBlock(afterBlock))
+        if !insertedBlocks.isEmpty {
+            syncDocumentStore(.insertBlocks(insertedBlocks, insertionIndex: insertionIndex))
+        }
+    }
+
+    private func layoutImageSyntaxSplit(
+        afterBlock: BlockInputBlock,
+        insertedBlocks: [BlockInputBlock],
+        index: Int,
+        insertionIndex: Int
+    ) {
+        guard shouldDeferGranularCountLayout else {
+            reloadDataKeepingFocus()
+            return
+        }
+        _ = reconfigureVisibleReplacement(afterBlock, at: index)
+        for offset in insertedBlocks.indices {
+            insertVisibleBlock(at: insertionIndex + offset)
+        }
     }
 
     private func applyGranularHorizontalRuleShortcut(

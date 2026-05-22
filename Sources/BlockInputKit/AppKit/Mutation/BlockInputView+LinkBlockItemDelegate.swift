@@ -13,7 +13,7 @@ extension BlockInputView {
         } else {
             applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: selectedRange.location)), notify: false)
         }
-        return pasteURLString(urlString, selectedRange: selectedRange)
+        return pasteURLString(urlString, blockID: blockID, selectedRange: selectedRange)
     }
 
     func blockItem(
