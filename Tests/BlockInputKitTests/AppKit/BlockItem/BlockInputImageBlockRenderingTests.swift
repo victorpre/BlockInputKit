@@ -109,6 +109,43 @@ final class BlockInputImageBlockRenderingTests: XCTestCase {
         XCTAssertEqual(item.testingImageBlockView.statusTextForTesting, "")
     }
 
+    func testResolvedTallImageUpdatesScrollableContentHeight() async throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(kind: .image(BlockInputImage(source: "https://example.com/tall.png")))
+            ]),
+            imageLoader: TallImageLoader()
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+
+        try await waitForLoadedImage(in: item.testingImageBlockView)
+        mounted.view.collectionView.layoutSubtreeIfNeeded()
+        let updatedItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let contentHeight = mounted.view.collectionView.collectionViewLayout?.collectionViewContentSize.height ?? 0
+
+        XCTAssertGreaterThan(updatedItem.view.frame.height, mounted.view.collectionView.visibleRect.height)
+        XCTAssertGreaterThanOrEqual(contentHeight, updatedItem.view.frame.maxY - 0.5)
+    }
+
+    func testImageReplacementUpdatesScrollableContentHeight() throws {
+        let imageID = BlockInputBlockID(rawValue: "image")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: imageID, kind: .image(BlockInputImage(source: "https://example.com/image.png", width: 100, height: 100)))
+        ])
+        let originalContentHeight = mounted.view.collectionView.collectionViewLayout?.collectionViewContentSize.height ?? 0
+        let tallBlock = BlockInputBlock(
+            id: imageID,
+            kind: .image(BlockInputImage(source: "https://example.com/image.png", width: 100, height: 2_000))
+        )
+
+        XCTAssertTrue(mounted.view.applyGranularBlockReplacement(tallBlock, at: 0, selection: .blocks([imageID])))
+        let updatedItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let contentHeight = mounted.view.collectionView.collectionViewLayout?.collectionViewContentSize.height ?? 0
+
+        XCTAssertGreaterThan(contentHeight, originalContentHeight)
+        XCTAssertGreaterThanOrEqual(contentHeight, updatedItem.view.frame.maxY - 0.5)
+    }
+
     func testImageBlockShowsFailureWhenRemoteLoadingIsDisabled() async throws {
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
             document: BlockInputDocument(blocks: [
@@ -194,6 +231,15 @@ private struct DelayedImageLoader: BlockInputImageLoading {
     func loadImage(_ request: BlockInputImageLoadRequest) async throws -> BlockInputLoadedImage {
         try await Task.sleep(nanoseconds: 250_000_000)
         return try await ImmediateImageLoader().loadImage(request)
+    }
+}
+
+private struct TallImageLoader: BlockInputImageLoading {
+    func loadImage(_ request: BlockInputImageLoadRequest) async throws -> BlockInputLoadedImage {
+        try BlockInputLoadedImage(
+            data: ImmediateImageLoader.imageData(),
+            dimensions: BlockInputImageDimensions(width: 100, height: 2_000)
+        )
     }
 }
 

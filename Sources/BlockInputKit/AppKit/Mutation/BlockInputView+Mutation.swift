@@ -161,7 +161,8 @@ extension BlockInputView {
     func reconfigureVisibleReplacement(
         _ block: BlockInputBlock,
         at index: Int,
-        requiresDeferredLayout: Bool = true
+        requiresDeferredLayout: Bool = true,
+        invalidatesLayoutMetrics: Bool = false
     ) -> Bool {
         let indexPath = IndexPath(item: index, section: 0)
         guard !requiresDeferredLayout || shouldDeferGranularCountLayout,
@@ -177,8 +178,12 @@ extension BlockInputView {
             isSelected: isBlockSelected(block.id),
             delegate: self
         )
-        resizeVisibleItem(item, for: block)
-        reflowVisibleItemsAfterHeightChange(startingAt: index)
+        if invalidatesLayoutMetrics {
+            invalidateLayoutForBlock(at: index, editedItem: item, block: block)
+        } else {
+            resizeVisibleItem(item, for: block)
+            reflowVisibleItemsAfterHeightChange(startingAt: index)
+        }
         restoreMountedSelection()
         return true
     }
@@ -378,7 +383,8 @@ extension BlockInputView {
         syncDocumentStore(.replaceBlock(block))
         _ = replaceCachedBlock(block, at: index)
         applySelection(validUndoSelection(selection), notify: true)
-        if reconfigureVisibleReplacement(block, at: index, requiresDeferredLayout: false) {
+        // Image dimensions can resolve or undo after mounting; refresh flow metrics so scroll bounds include the full block height.
+        if reconfigureVisibleReplacement(block, at: index, requiresDeferredLayout: false, invalidatesLayoutMetrics: block.kind.isImage) {
             publishDocumentChange()
             return true
         }
