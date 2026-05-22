@@ -350,6 +350,8 @@ The demo app provides file mention suggestions from `FileManager.default.current
 ./scripts/lint.sh
 ```
 
+Linting uses the repo SwiftLint configuration in `.swiftlint.yml`; keep project exceptions centralized there instead of adding inline suppression comments.
+
 ## Snapshot Tests
 
 Verify the representative AppKit snapshot suite:

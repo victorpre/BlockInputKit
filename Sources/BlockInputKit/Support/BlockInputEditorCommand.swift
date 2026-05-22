@@ -74,14 +74,12 @@ public enum BlockInputEditorCommand: Equatable, Codable, Sendable {
     case deleteTable
 }
 
-// Availability or toggle state for a command.
-// swiftlint:disable identifier_name
+/// Availability or toggle state for a command.
 public enum BlockInputEditorCommandState: String, Equatable, Codable, Sendable {
     case unavailable
     case off
     case on
 }
-// swiftlint:enable identifier_name
 
 /// SwiftUI-friendly command bridge bound to the currently mounted editor view.
 @MainActor

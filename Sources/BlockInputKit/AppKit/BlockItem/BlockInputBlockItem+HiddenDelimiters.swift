@@ -2,7 +2,6 @@ import AppKit
 
 /// Layout-manager delegate that collapses attributed Markdown source delimiters into zero-width glyphs.
 final class BlockInputDelimiterGlyphs: NSObject, NSLayoutManagerDelegate {
-    // swiftlint:disable:next function_parameter_count
     func layoutManager(
         _ layoutManager: NSLayoutManager,
         shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,

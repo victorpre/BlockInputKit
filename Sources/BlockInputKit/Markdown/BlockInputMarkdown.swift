@@ -378,6 +378,10 @@ enum BlockInputMarkdownSerializer {
     }
 
     private static func markdownBlock(_ block: BlockInputBlock) -> String {
+        literalMarkdownBlock(block) ?? structuredMarkdownBlock(block)
+    }
+
+    private static func literalMarkdownBlock(_ block: BlockInputBlock) -> String? {
         switch block.kind {
         case .paragraph:
             return block.text
@@ -390,6 +394,17 @@ enum BlockInputMarkdownSerializer {
             return "---"
         case .frontMatter:
             return frontMatterMarkdown(block.text)
+        case .table, .rawMarkdown:
+            return sourceMarkdown(block)
+        case .image(let image):
+            return BlockInputMarkdownImporter.markdown(for: image)
+        case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+            return nil
+        }
+    }
+
+    private static func structuredMarkdownBlock(_ block: BlockInputBlock) -> String {
+        switch block.kind {
         case .quote:
             return BlockInputLineBreaks.lines(in: block.text).map { "> \($0)" }.joined(separator: "\n")
         case .bulletedListItem:
@@ -402,10 +417,8 @@ enum BlockInputMarkdownSerializer {
             return BlockInputLineBreaks.lines(in: block.text).enumerated().map { offset, line in
                 "\(indent(for: block, lineOffset: offset))- [\(isChecked ? "x" : " ")] \(line)"
             }.joined(separator: "\n")
-        case .table, .rawMarkdown:
-            return sourceMarkdown(block)
-        case .image(let image):
-            return BlockInputMarkdownImporter.markdown(for: image)
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
+            preconditionFailure("Expected structured Markdown block")
         }
     }
 

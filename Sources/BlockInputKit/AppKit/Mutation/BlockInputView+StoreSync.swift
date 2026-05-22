@@ -1,7 +1,6 @@
 import AppKit
 
 extension BlockInputView {
-    // swiftlint:disable:next cyclomatic_complexity
     func syncDocumentStore(_ action: StoreSyncAction) {
         guard let documentStore else {
             return
@@ -9,6 +8,21 @@ extension BlockInputView {
         guard canSynchronizeDocumentStore(action) else {
             return
         }
+        if syncMoveBlockAndReplaceChangedBlocks(action, documentStore: documentStore) {
+            return
+        }
+        if syncMoveBlockAndApplyMarkerTransaction(action, documentStore: documentStore) {
+            return
+        }
+        if syncSimpleDocumentStoreAction(action, documentStore: documentStore) {
+            publishDocumentMutation(action.documentChange(document: document))
+        }
+    }
+
+    private func syncSimpleDocumentStoreAction(
+        _ action: StoreSyncAction,
+        documentStore: BlockInputDocumentStore
+    ) -> Bool {
         switch action {
         case .replaceDocument:
             documentStore.replaceDocument(document)
@@ -20,34 +34,52 @@ extension BlockInputView {
             documentStore.deleteBlocks(withIDs: blockIDs)
         case let .moveBlock(blockID, targetIndex):
             documentStore.moveBlock(withID: blockID, to: targetIndex)
-        case let .moveBlockAndReplaceChangedBlocks(blockID, targetIndex, changedBlocks):
-            if let markerStore = documentStore as? BlockInputMarkerAdjustingStore {
-                markerStore.moveBlockWithoutNormalizing(withID: blockID, to: targetIndex)
-            } else {
-                documentStore.moveBlock(withID: blockID, to: targetIndex)
-            }
-            publishDocumentMutation(.moveBlock(blockID, index: targetIndex))
-            for block in changedBlocks {
-                documentStore.replaceBlock(block)
-                publishDocumentMutation(.replaceBlock(block))
-            }
-            return
         case let .numberedListMarkerTransaction(transaction):
             guard let markerStore = documentStore as? BlockInputMarkerAdjustingStore else {
-                return
+                return false
             }
             markerStore.applyNumberedListMarkerTransaction(transaction)
-        case let .moveBlockAndApplyMarkerTransaction(blockID, targetIndex, transaction):
-            guard let markerStore = documentStore as? BlockInputMarkerAdjustingStore else {
-                return
-            }
-            markerStore.moveBlockWithoutNormalizing(withID: blockID, to: targetIndex)
-            publishDocumentMutation(.moveBlock(blockID, index: targetIndex))
-            markerStore.applyNumberedListMarkerTransaction(transaction)
-            publishDocumentMutation(.numberedListMarkersChanged(transaction))
-            return
+        case .moveBlockAndReplaceChangedBlocks, .moveBlockAndApplyMarkerTransaction:
+            return false
         }
-        publishDocumentMutation(action.documentChange(document: document))
+        return true
+    }
+
+    private func syncMoveBlockAndReplaceChangedBlocks(
+        _ action: StoreSyncAction,
+        documentStore: BlockInputDocumentStore
+    ) -> Bool {
+        guard case let .moveBlockAndReplaceChangedBlocks(blockID, targetIndex, changedBlocks) = action else {
+            return false
+        }
+        if let markerStore = documentStore as? BlockInputMarkerAdjustingStore {
+            markerStore.moveBlockWithoutNormalizing(withID: blockID, to: targetIndex)
+        } else {
+            documentStore.moveBlock(withID: blockID, to: targetIndex)
+        }
+        publishDocumentMutation(.moveBlock(blockID, index: targetIndex))
+        for block in changedBlocks {
+            documentStore.replaceBlock(block)
+            publishDocumentMutation(.replaceBlock(block))
+        }
+        return true
+    }
+
+    private func syncMoveBlockAndApplyMarkerTransaction(
+        _ action: StoreSyncAction,
+        documentStore: BlockInputDocumentStore
+    ) -> Bool {
+        guard case let .moveBlockAndApplyMarkerTransaction(blockID, targetIndex, transaction) = action else {
+            return false
+        }
+        guard let markerStore = documentStore as? BlockInputMarkerAdjustingStore else {
+            return true
+        }
+        markerStore.moveBlockWithoutNormalizing(withID: blockID, to: targetIndex)
+        publishDocumentMutation(.moveBlock(blockID, index: targetIndex))
+        markerStore.applyNumberedListMarkerTransaction(transaction)
+        publishDocumentMutation(.numberedListMarkersChanged(transaction))
+        return true
     }
 
     func changedBlocksByID(

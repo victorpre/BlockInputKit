@@ -26,20 +26,10 @@ enum BlockInputStreamingMarkdownSerializer {
         _ block: BlockInputBlock,
         to writer: inout Writer
     ) async throws {
+        if try await writeLiteralBlock(block, to: &writer) {
+            return
+        }
         switch block.kind {
-        case .paragraph:
-            try await writer.writeMarkdown(block.text)
-        case .heading(let level):
-            let clampedLevel = min(max(level, 1), 6)
-            try await writer.writeMarkdown("\(String(repeating: "#", count: clampedLevel)) \(block.text)")
-        case .code(let language):
-            try await writer.writeMarkdown("```\(language ?? "")\n")
-            try await writer.writeMarkdown(block.text)
-            try await writer.writeMarkdown("\n```")
-        case .horizontalRule:
-            try await writer.writeMarkdown("---")
-        case .frontMatter:
-            try await writer.writeMarkdown(frontMatterMarkdown(block.text))
         case .quote:
             try await writeLines(BlockInputLineBreaks.lines(in: block.text), to: &writer) { _, line in
                 "> \(line)"
@@ -54,11 +44,37 @@ enum BlockInputStreamingMarkdownSerializer {
             try await writeLines(BlockInputLineBreaks.lines(in: block.text), to: &writer) { offset, line in
                 "\(indent(for: block, lineOffset: offset))- [\(isChecked ? "x" : " ")] \(line)"
             }
+        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
+            break
+        }
+    }
+
+    private static func writeLiteralBlock<Writer: BlockInputMarkdownWriter>(
+        _ block: BlockInputBlock,
+        to writer: inout Writer
+    ) async throws -> Bool {
+        switch block.kind {
+        case .paragraph:
+            try await writer.writeMarkdown(block.text)
+        case .heading(let level):
+            let clampedLevel = min(max(level, 1), 6)
+            try await writer.writeMarkdown("\(String(repeating: "#", count: clampedLevel)) \(block.text)")
+        case .code(let language):
+            try await writer.writeMarkdown("```\(language ?? "")\n")
+            try await writer.writeMarkdown(block.text)
+            try await writer.writeMarkdown("\n```")
+        case .horizontalRule:
+            try await writer.writeMarkdown("---")
+        case .frontMatter:
+            try await writer.writeMarkdown(frontMatterMarkdown(block.text))
         case .table, .rawMarkdown:
             try await writer.writeMarkdown(sourceMarkdown(block))
         case .image(let image):
             try await writer.writeMarkdown(BlockInputMarkdownImporter.markdown(for: image))
+        case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
+            return false
         }
+        return true
     }
 
     private static func sourceMarkdown(_ block: BlockInputBlock) -> String {
