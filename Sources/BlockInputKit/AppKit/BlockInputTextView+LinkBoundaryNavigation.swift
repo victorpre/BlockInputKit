@@ -44,7 +44,11 @@ extension BlockInputTextView {
         text: String
     ) -> Int? {
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
-        let linkRanges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
+        let linkRanges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: text,
+            excluding: inlineCodeRanges,
+            fileBaseURL: blockItem?.fileBaseURL
+        )
             .filter { $0.style == .link }
         switch direction {
         case .leftward:

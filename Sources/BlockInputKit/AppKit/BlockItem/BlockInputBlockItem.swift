@@ -62,6 +62,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var renderedCodeColorScheme: BlockInputSyntaxColorScheme?
     var style = BlockInputStyle.default
     var imageLoadingContext = BlockInputImageBlockLoadingContext()
+    var fileBaseURL: URL?
     var allowsReordering = true
     var editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
     var handleLeadingConstraint: NSLayoutConstraint?
@@ -178,6 +179,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         accentColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
         imageLoadingContext: BlockInputImageBlockLoadingContext = BlockInputImageBlockLoadingContext(),
+        fileBaseURL: URL? = nil,
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) {
@@ -190,6 +192,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.editorHorizontalInset = editorHorizontalInset
         self.style = style
         self.imageLoadingContext = imageLoadingContext
+        self.fileBaseURL = fileBaseURL
         selectionBeforeTextChange = nil
         textView.hideFileDropCaret()
         isHorizontalRule = block.kind == .horizontalRule

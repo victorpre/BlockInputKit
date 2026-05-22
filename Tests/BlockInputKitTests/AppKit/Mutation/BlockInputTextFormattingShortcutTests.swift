@@ -21,6 +21,27 @@ final class BlockInputTextFormattingShortcutTests: XCTestCase {
         )))
     }
 
+    func testCommandBFormatsVisibleRelativeFileLinkLabelWhenBaseURLIsConfigured() throws {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let text = "[README](assets/README.md)"
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: text)
+            ]),
+            fileBaseURL: URL(fileURLWithPath: "/tmp/project", isDirectory: true)
+        ))
+        let textView = try textView(in: mounted.view, at: 0)
+        textView.setSelectedRange(NSRange(location: 0, length: (text as NSString).length))
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandBEvent()))
+
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "[**README**](assets/README.md)")
+        XCTAssertEqual(mounted.view.selection, .text(BlockInputTextRange(
+            blockID: blockID,
+            range: NSRange(location: 3, length: 6)
+        )))
+    }
+
     func testFormattingShortcutsUseExpectedDelimiters() throws {
         let cases: [(NSEvent, String)] = [
             (try commandIEvent(), "_word_"),

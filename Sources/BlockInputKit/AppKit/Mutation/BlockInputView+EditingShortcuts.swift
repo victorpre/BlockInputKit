@@ -97,7 +97,7 @@ extension BlockInputView {
             guard let block = block(withID: textRange.blockID) else {
                 return nil
             }
-            return block.markdownAwareCopiedText(in: textRange.range)
+            return block.markdownAwareCopiedText(in: textRange.range, fileBaseURL: fileBaseURL)
         case let .blocks(blockIDs):
             let copiedBlocks = blocksForMarkdownCopy(blockIDs: blockIDs)
             guard !copiedBlocks.isEmpty else {
@@ -182,7 +182,7 @@ extension BlockInputView {
 }
 
 extension BlockInputBlock {
-    func markdownAwareCopiedText(in range: NSRange) -> String? {
+    func markdownAwareCopiedText(in range: NSRange, fileBaseURL: URL? = nil) -> String? {
         guard kind != .horizontalRule else {
             return nil
         }
@@ -205,7 +205,7 @@ extension BlockInputBlock {
            NSMaxRange(clampedRange) == utf16Length {
             return BlockInputDocument(blocks: [self]).markdown
         }
-        if let copiedLinkLabelText = copiedVisibleLinkLabelText(in: clampedRange) {
+        if let copiedLinkLabelText = copiedVisibleLinkLabelText(in: clampedRange, fileBaseURL: fileBaseURL) {
             return copiedLinkLabelText
         }
         return (text as NSString).substring(with: clampedRange)
@@ -249,12 +249,16 @@ extension BlockInputBlock {
         return false
     }
 
-    private func copiedVisibleLinkLabelText(in range: NSRange) -> String? {
+    private func copiedVisibleLinkLabelText(in range: NSRange, fileBaseURL: URL? = nil) -> String? {
         guard supportsInlineLinkCopy else {
             return nil
         }
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
-        let linkRange = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
+        let linkRange = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: text,
+            excluding: inlineCodeRanges,
+            fileBaseURL: fileBaseURL
+        )
             .first { markdownRange in
                 markdownRange.style == .link && markdownRange.contentRange.containsSourceRange(range)
             }

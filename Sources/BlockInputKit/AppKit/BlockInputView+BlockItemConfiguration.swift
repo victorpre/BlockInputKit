@@ -7,6 +7,7 @@ extension BlockInputView {
             accentColor: dropIndicatorColor,
             style: style,
             imageLoadingContext: imageLoadingContext,
+            fileBaseURL: fileBaseURL,
             isSelected: isBlockSelected(block.id),
             delegate: self
         )

@@ -20,19 +20,23 @@ struct BlockInputInlineMarkdownRange: Equatable {
     let delimiterRanges: [NSRange]
     /// Populated only for `.link` ranges so click handling can use the already-validated destination.
     let linkDestination: URL?
+    /// Original unescaped Markdown destination text.
+    let linkRawDestination: String?
 
     init(
         style: BlockInputInlineMarkdownStyle,
         fullRange: NSRange,
         contentRange: NSRange,
         delimiterRanges: [NSRange],
-        linkDestination: URL? = nil
+        linkDestination: URL? = nil,
+        linkRawDestination: String? = nil
     ) {
         self.style = style
         self.fullRange = fullRange
         self.contentRange = contentRange
         self.delimiterRanges = delimiterRanges
         self.linkDestination = linkDestination
+        self.linkRawDestination = linkRawDestination
     }
 }
 
@@ -43,7 +47,8 @@ struct BlockInputInlineMarkdownRange: Equatable {
 enum BlockInputInlineMarkdownParsing {
     static func inlineMarkdownRanges(
         in text: String,
-        excluding excludedRanges: [NSRange] = []
+        excluding excludedRanges: [NSRange] = [],
+        fileBaseURL: URL? = nil
     ) -> [BlockInputInlineMarkdownRange] {
         let nsText = text as NSString
         guard nsText.length > 0 else {
@@ -54,7 +59,7 @@ enum BlockInputInlineMarkdownParsing {
             ranges: excludedRanges
         )
         return mergedByContentLocation([
-            linkRanges(in: nsText, excluding: excludedRangeLookup),
+            linkRanges(in: nsText, excluding: excludedRangeLookup, fileBaseURL: fileBaseURL),
             composedDelimiterRanges(in: nsText, delimiter: tripleAsterisk, styles: [.bold, .italic], excluding: excludedRangeLookup),
             delimiterRanges(in: nsText, delimiter: doubleAsterisk, style: .bold, excluding: excludedRangeLookup),
             delimiterRanges(in: nsText, delimiter: doubleTilde, style: .strikethrough, excluding: excludedRangeLookup),

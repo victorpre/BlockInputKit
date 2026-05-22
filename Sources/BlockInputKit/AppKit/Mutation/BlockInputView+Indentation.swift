@@ -197,8 +197,8 @@ extension BlockInputView {
             editorHorizontalInset: editorHorizontalInset,
             style: style
         )
-        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: beforeTextWidth, style: style)
-        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: afterTextWidth, style: style)
+        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: beforeTextWidth, style: style, fileBaseURL: fileBaseURL)
+        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: afterTextWidth, style: style, fileBaseURL: fileBaseURL)
         return abs(beforeHeight - afterHeight) > 0.5
     }
 

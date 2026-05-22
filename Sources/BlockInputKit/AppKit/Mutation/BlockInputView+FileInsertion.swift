@@ -49,18 +49,23 @@ public extension BlockInputView {
             return nil
         }
         let displayName = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
-        return BlockInputBlock(text: "[\(escapedMarkdownLinkText(displayName))](<\(escapedMarkdownDestination(url.absoluteString))>)")
+        return fileLinkBlock(label: displayName, source: url.absoluteString)
     }
 
-    private static func escapedMarkdownLinkText(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "[", with: "\\[")
-            .replacingOccurrences(of: "]", with: "\\]")
+    internal static func fileLinkBlock(label: String, source: String) -> BlockInputBlock? {
+        guard let normalized = normalizedDropSource(source) else {
+            return nil
+        }
+        let resolvedLabel = label.isEmpty ? normalized : label
+        return BlockInputBlock(text: markdownFileLinkBlockSource(label: resolvedLabel, destination: normalized))
     }
 
-    private static func escapedMarkdownDestination(_ text: String) -> String {
-        text
+    private static func markdownFileLinkBlockSource(label: String, destination: String) -> String {
+        "[\(BlockInputLinkURL.escapedLabel(label))](<\(escapedFileLinkBlockDestination(destination))>)"
+    }
+
+    private static func escapedFileLinkBlockDestination(_ destination: String) -> String {
+        destination
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "<", with: "\\<")
             .replacingOccurrences(of: ">", with: "\\>")
@@ -131,6 +136,14 @@ extension BlockInputView {
         guard !insertedBlocks.isEmpty else {
             return nil
         }
+        return insertDroppedFileBlocks(insertedBlocks, at: insertionIndex)
+    }
+
+    @discardableResult
+    func insertDroppedFileBlocks(_ insertedBlocks: [BlockInputBlock], at insertionIndex: Int) -> BlockInputSelection? {
+        guard !insertedBlocks.isEmpty else {
+            return nil
+        }
         return performStructuralEdit(
             named: Self.fileDropActionName(for: insertedBlocks),
             storeSyncAction: { beforeDocument, _, _ in
@@ -152,7 +165,7 @@ extension BlockInputView {
         imageBlock(for: url) ?? fileLinkBlock(for: url)
     }
 
-    private static func fileDropActionName(for blocks: [BlockInputBlock]) -> String {
+    static func fileDropActionName(for blocks: [BlockInputBlock]) -> String {
         guard blocks.allSatisfy(\.kind.isImage) else {
             return "Insert Files"
         }
@@ -197,8 +210,48 @@ extension BlockInputView {
         return afterSelection
     }
 
+    @discardableResult
+    func insertFileReferencesInline(
+        _ references: [BlockInputFileDropReference],
+        into blockID: BlockInputBlockID,
+        atUTF16Offset utf16Offset: Int
+    ) -> BlockInputSelection? {
+        let insertionText = Self.inlineFileLinkInsertionText(for: references)
+        guard !insertionText.isEmpty,
+              let index = index(of: blockID),
+              var block = block(at: index),
+              block.id == blockID,
+              BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
+            return nil
+        }
+        let beforeBlock = block
+        let beforeSelection = selection
+        let insertionOffset = min(max(utf16Offset, 0), block.utf16Length)
+        let mutableText = NSMutableString(string: block.text)
+        mutableText.insert(insertionText, at: insertionOffset)
+        block.text = mutableText as String
+        let afterOffset = insertionOffset + (insertionText as NSString).length
+        let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
+            blockID: blockID,
+            utf16Offset: afterOffset
+        ))
+        _ = applyGranularBlockReplacement(block, at: index, selection: afterSelection)
+        undoController?.registerBlockReplacementStructuralEdit(
+            actionName: "Insert Files",
+            beforeBlock: beforeBlock,
+            afterBlock: block,
+            selectionBefore: beforeSelection,
+            selectionAfter: afterSelection
+        )
+        return afterSelection
+    }
+
     private static func inlineFileLinkInsertionText(for fileURLs: [URL]) -> String {
         fileURLs.compactMap(inlineFileLinkMarkdownSource).joined(separator: " ")
+    }
+
+    static func inlineFileLinkInsertionText(for references: [BlockInputFileDropReference]) -> String {
+        references.compactMap(inlineFileLinkMarkdownSource).joined(separator: " ")
     }
 
     private static func inlineFileLinkMarkdownSource(for url: URL) -> String? {
@@ -207,5 +260,34 @@ extension BlockInputView {
         }
         let displayName = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
         return BlockInputLinkURL.markdownLink(label: displayName, destination: url.absoluteString)
+    }
+
+    static func inlineFileLinkMarkdownSource(for reference: BlockInputFileDropReference) -> String? {
+        guard reference.kind == .fileLink,
+              let source = normalizedDropSource(reference.source) else {
+            return nil
+        }
+        let label = reference.label.isEmpty ? source : reference.label
+        return BlockInputLinkURL.markdownLink(label: label, destination: source)
+    }
+
+    static func block(for reference: BlockInputFileDropReference) -> BlockInputBlock? {
+        guard let source = normalizedDropSource(reference.source) else {
+            return nil
+        }
+        switch reference.kind {
+        case .fileLink:
+            return fileLinkBlock(label: reference.label, source: source)
+        case .image:
+            return BlockInputBlock(kind: .image(BlockInputImage(source: source, altText: reference.label)))
+        }
+    }
+
+    static func normalizedDropSource(_ source: String) -> String? {
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains(where: \.isNewline) else {
+            return nil
+        }
+        return trimmed
     }
 }

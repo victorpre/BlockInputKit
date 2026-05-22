@@ -26,6 +26,7 @@ final class BlockInputLinkModalView: NSView, NSTextFieldDelegate {
     var onOpen: ((String) -> Void)?
     var onCancel: (() -> Void)?
     var onFocusCheck: (() -> Void)?
+    var fileBaseURL: URL?
 
     init() {
         super.init(frame: NSRect(x: 0, y: 0, width: 300, height: 148))
@@ -215,7 +216,8 @@ final class BlockInputLinkModalView: NSView, NSTextFieldDelegate {
     private var currentURLIsSupported: Bool {
         BlockInputLinkURL.supportedURL(
             from: urlField.stringValue,
-            allowsCustomSchemes: textField.stringValue.hasPrefix("/")
+            allowsCustomSchemes: textField.stringValue.hasPrefix("/"),
+            fileBaseURL: fileBaseURL
         ) != nil
     }
 

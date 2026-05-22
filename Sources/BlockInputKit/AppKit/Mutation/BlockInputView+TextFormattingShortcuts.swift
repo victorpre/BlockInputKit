@@ -204,7 +204,8 @@ extension BlockInputView {
         }
         let clampedRange = block.text.blockInputFormattingClampedRange(
             range,
-            trimsHiddenDelimiters: trimsHiddenDelimiters
+            trimsHiddenDelimiters: trimsHiddenDelimiters,
+            fileBaseURL: fileBaseURL
         )
         guard clampedRange.length > 0 else {
             return nil

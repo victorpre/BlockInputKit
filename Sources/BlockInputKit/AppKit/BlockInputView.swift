@@ -25,6 +25,7 @@ public final class BlockInputView: NSView {
     var imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader()
     var imageDiskCache: (any BlockInputImageDiskCaching)?
     var imageBaseURL: URL?
+    var fileBaseURL: URL?
     var allowsRemoteImageLoading = true
     var maximumImageSourceBytes = 20 * 1024 * 1024
     var maximumImagePixelDimension = 8_192
@@ -42,6 +43,8 @@ public final class BlockInputView: NSView {
     var fallbackUndoController = BlockInputUndoController()
     var undoController: BlockInputUndoController?
     var completionProvider: (any BlockInputCompletionProvider)?
+    var fileDropHandler: BlockInputFileDropHandler?
+    var fileDropTasks: [UUID: Task<Void, Never>] = [:]
     var slashCommandAvailability = BlockInputSlashCommandAvailability.documentStart
     var slashCommandChipClickHandler:
         (@MainActor (BlockInputSlashCommandChipClickContext) -> BlockInputSlashCommandChipClickAction)?
@@ -104,6 +107,9 @@ public final class BlockInputView: NSView {
     deinit {
         progressiveLoadTask?.cancel()
         completionRequestTask?.cancel()
+        for task in fileDropTasks.values {
+            task.cancel()
+        }
         documentStoreObservation?.cancel()
         removeNonisolatedEventMonitors()
         NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: nil)

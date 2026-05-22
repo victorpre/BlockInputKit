@@ -157,6 +157,8 @@ public struct BlockInputConfiguration {
     public var imageDiskCache: (any BlockInputImageDiskCaching)?
     /// Base URL used to resolve relative image sources before loading.
     public var imageBaseURL: URL?
+    /// Base URL used to resolve relative file-link sources inserted by file drop hooks.
+    public var fileBaseURL: URL?
     /// Whether remote `http` and `https` image URLs should be loaded.
     public var allowsRemoteImageLoading: Bool
     /// Maximum source image payload accepted by the default image loader.
@@ -171,6 +173,8 @@ public struct BlockInputConfiguration {
     public var undoController: BlockInputUndoController?
     /// Host completion source for mentions and slash commands.
     public var completionProvider: (any BlockInputCompletionProvider)?
+    /// Optional host hook for resolving local file drops before insertion.
+    public var fileDropHandler: BlockInputFileDropHandler?
     /// Where live slash-command completion is allowed to open.
     public var slashCommandAvailability: BlockInputSlashCommandAvailability
     /// Optional host router for slash-command chip clicks.
@@ -221,12 +225,14 @@ public struct BlockInputConfiguration {
         imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader(),
         imageDiskCache: (any BlockInputImageDiskCaching)? = BlockInputDefaultImageDiskCache(),
         imageBaseURL: URL? = nil,
+        fileBaseURL: URL? = nil,
         allowsRemoteImageLoading: Bool = true,
         maximumImageSourceBytes: Int = 20 * 1024 * 1024,
         maximumImagePixelDimension: Int = 8_192,
         defaultImagePlaceholderAspectRatio: CGFloat = 16.0 / 9.0,
         undoController: BlockInputUndoController? = nil,
         completionProvider: (any BlockInputCompletionProvider)? = nil,
+        fileDropHandler: BlockInputFileDropHandler? = nil,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
         slashCommandChipClickHandler:
             (@MainActor (BlockInputSlashCommandChipClickContext) -> BlockInputSlashCommandChipClickAction)? = nil,
@@ -248,12 +254,14 @@ public struct BlockInputConfiguration {
         self.imageLoader = imageLoader
         self.imageDiskCache = imageDiskCache
         self.imageBaseURL = imageBaseURL
+        self.fileBaseURL = fileBaseURL
         self.allowsRemoteImageLoading = allowsRemoteImageLoading
         self.maximumImageSourceBytes = max(1, maximumImageSourceBytes)
         self.maximumImagePixelDimension = max(1, maximumImagePixelDimension)
         self.defaultImagePlaceholderAspectRatio = max(0.01, defaultImagePlaceholderAspectRatio)
         self.undoController = undoController
         self.completionProvider = completionProvider
+        self.fileDropHandler = fileDropHandler
         self.slashCommandAvailability = slashCommandAvailability
         self.slashCommandChipClickHandler = slashCommandChipClickHandler
         self.completionPopupConfiguration = completionPopupConfiguration ?? BlockInputCompletionPopupConfiguration(

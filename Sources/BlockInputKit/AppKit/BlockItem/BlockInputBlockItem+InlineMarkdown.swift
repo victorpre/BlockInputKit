@@ -4,13 +4,14 @@ private let inlineChipAdjacentWhitespaceKern: CGFloat = 5
 
 extension BlockInputBlockItem {
     func applyInlineMarkdownAttributes(for block: BlockInputBlock, textStorage: NSTextStorage) {
-        Self.applyInlineMarkdownAttributes(for: block, textStorage: textStorage, style: style)
+        Self.applyInlineMarkdownAttributes(for: block, textStorage: textStorage, style: style, fileBaseURL: fileBaseURL)
     }
 
     static func applyInlineMarkdownAttributes(
         for block: BlockInputBlock,
         textStorage: NSTextStorage,
-        style: BlockInputStyle
+        style: BlockInputStyle,
+        fileBaseURL: URL? = nil
     ) {
         guard Self.supportsInlineMarkdownStyling(block.kind) else {
             return
@@ -19,7 +20,8 @@ extension BlockInputBlockItem {
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: textStorage.string).map(\.fullRange)
         let markdownRanges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: textStorage.string,
-            excluding: inlineCodeRanges
+            excluding: inlineCodeRanges,
+            fileBaseURL: fileBaseURL
         )
         let baseFont = Self.font(for: block.kind, style: style)
         for markdownRange in markdownRanges {
@@ -67,7 +69,8 @@ extension BlockInputBlockItem {
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: textView.string).map(\.fullRange)
         let markdownRanges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: textView.string,
-            excluding: inlineCodeRanges
+            excluding: inlineCodeRanges,
+            fileBaseURL: fileBaseURL
         )
         return Set(markdownRanges.compactMap { markdownRange in
             selectedRange.intersectsStyledContent(markdownRange.contentRange) ? markdownRange.style : nil

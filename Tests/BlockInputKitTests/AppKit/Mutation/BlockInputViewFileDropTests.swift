@@ -373,4 +373,5 @@ final class BlockInputViewFileDropTests: XCTestCase {
         return layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
             .offsetBy(dx: textView.textContainerOrigin.x, dy: textView.textContainerOrigin.y)
     }
+
 }

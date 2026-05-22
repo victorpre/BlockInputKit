@@ -162,8 +162,9 @@ extension BlockInputView {
         case .edit(let linkRange):
             mode = .edit
             text = linkText(in: block, range: linkRange)
-            urlString = linkRange.linkDestination?.absoluteString ?? ""
+            urlString = linkRange.linkRawDestination ?? linkRange.linkDestination?.absoluteString ?? ""
         }
+        modal.fileBaseURL = fileBaseURL
         modal.configure(mode: mode, text: text, urlString: urlString)
         configureLinkModalActions(modal, context: context, mode: mode)
         linkModalView = modal
@@ -205,7 +206,8 @@ extension BlockInputView {
             guard let self,
                   let url = BlockInputLinkURL.supportedURL(
                     from: urlString,
-                    allowsCustomSchemes: allowsCustomSchemes
+                    allowsCustomSchemes: allowsCustomSchemes,
+                    fileBaseURL: fileBaseURL
                   ) else { return }
             _ = linkURLOpener(url)
         }
@@ -311,7 +313,8 @@ extension BlockInputView {
     ) -> Bool {
         guard let destination = BlockInputLinkURL.supportedURL(
                 from: urlString,
-                allowsCustomSchemes: text.hasPrefix("/")
+                allowsCustomSchemes: text.hasPrefix("/"),
+                fileBaseURL: fileBaseURL
               ),
               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               let index = index(of: context.blockID),
@@ -319,8 +322,9 @@ extension BlockInputView {
             return false
         }
         let escapedLabel = BlockInputLinkURL.escapedLabel(text)
+        let markdownDestination = BlockInputLinkURL.markdownDestination(from: urlString, resolvedURL: destination)
         let replacement = BlockInputLinkReplacement(
-            text: BlockInputLinkURL.markdownLink(escapedLabel: escapedLabel, destination: destination.absoluteString),
+            text: BlockInputLinkURL.markdownLink(escapedLabel: escapedLabel, destination: markdownDestination),
             selectedUTF16Length: (escapedLabel as NSString).length,
             selectsResultingText: selectsResultingText,
             actionName: actionName
@@ -349,7 +353,8 @@ extension BlockInputView {
         let clampedRange = text.blockInputLinkClampedRange(range)
         return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: text,
-            excluding: BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
+            excluding: BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange),
+            fileBaseURL: fileBaseURL
         )
         .filter { $0.style == .link }
         .first { linkRange in

@@ -15,6 +15,19 @@ final class BlockInputBlockItemHeightTests: XCTestCase {
     }
 
     @MainActor
+    func testHeightMeasurementCollapsesRelativeFileLinkDelimitersWhenBaseURLIsConfigured() {
+        let plainBlock = BlockInputBlock(kind: .paragraph, text: "Read docs")
+        let linkBlock = BlockInputBlock(kind: .paragraph, text: "Read [docs](assets/README.md)")
+        let baseURL = URL(fileURLWithPath: "/tmp/project", isDirectory: true)
+
+        XCTAssertEqual(
+            BlockInputBlockItem.height(for: linkBlock, textWidth: 120, fileBaseURL: baseURL),
+            BlockInputBlockItem.height(for: plainBlock, textWidth: 120),
+            accuracy: 0.5
+        )
+    }
+
+    @MainActor
     func testListHeightAccountsForIndentedTextWidth() {
         let text = Array(repeating: "Wrapped list content", count: 8).joined(separator: " ")
         let itemWidth: CGFloat = 260

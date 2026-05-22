@@ -17,7 +17,8 @@ extension BlockInputBlockItem {
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: textView.string).map(\.fullRange)
         return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: textView.string,
-            excluding: inlineCodeRanges
+            excluding: inlineCodeRanges,
+            fileBaseURL: fileBaseURL
         )
         .contains { $0.inlineChipKind(in: textView.string) != nil }
     }

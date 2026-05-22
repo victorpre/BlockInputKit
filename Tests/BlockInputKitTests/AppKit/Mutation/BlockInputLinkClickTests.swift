@@ -4,6 +4,31 @@ import XCTest
 
 @MainActor
 final class BlockInputLinkClickTests: XCTestCase {
+    func testCommandClickRelativeFileChipResolvesAgainstFileBaseURL() throws {
+        let baseURL = URL(fileURLWithPath: "/tmp/project", isDirectory: true)
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: "Open [README](assets/README.md)")
+            ]),
+            fileBaseURL: baseURL
+        ))
+        var openedURL: URL?
+        mounted.view.linkURLOpener = {
+            openedURL = $0
+            return true
+        }
+        let textView = try textView(in: mounted.view)
+        let location = try windowLocation(forUTF16Offset: 7, in: textView)
+
+        XCTAssertTrue(mounted.view.handleLinkClick(
+            blockID: "block",
+            selectedRange: NSRange(location: 7, length: 0),
+            event: try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber, modifierFlags: .command)
+        ))
+
+        XCTAssertEqual(openedURL, baseURL.appendingPathComponent("assets/README.md"))
+    }
+
     func testPlainClickOpensModalAndCommandClickOpensURL() throws {
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "block", text: "Open [docs](https://example.com)")

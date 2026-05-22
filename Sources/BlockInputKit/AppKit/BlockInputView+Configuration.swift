@@ -16,6 +16,7 @@ extension BlockInputView {
         } ?? false
         if documentStoreChanged {
             detachDocumentStoreObservation()
+            cancelFileDropTasks()
         }
         documentStore = configuredDocumentStore
         let reusesLargeDocumentCache = previousDocumentStore != nil
@@ -39,12 +40,9 @@ extension BlockInputView {
         configureCompletion(configuration)
         if documentStoreChanged || previousDocument != configuredDocument {
             dismissCompletionPopup()
+            cancelFileDropTasks()
         }
-        onDocumentMutation = configuration.onDocumentMutation
-        onDocumentChange = configuration.onDocumentChange
-        documentChangeSnapshotDelay = configuration.documentChangeSnapshotDelay
-        onSelectionChange = configuration.onSelectionChange
-        onFocusChange = configuration.onFocusChange
+        configureHostCallbacks(configuration)
         if documentStoreChanged || configuration.onDocumentChange == nil {
             cancelPendingDocumentSnapshot()
         }
@@ -57,6 +55,15 @@ extension BlockInputView {
             reloadDataWithoutRestoringFocus()
         }
         attachDocumentStoreObservationIfNeeded()
+    }
+
+    private func configureHostCallbacks(_ configuration: BlockInputConfiguration) {
+        onDocumentMutation = configuration.onDocumentMutation
+        onDocumentChange = configuration.onDocumentChange
+        documentChangeSnapshotDelay = configuration.documentChangeSnapshotDelay
+        onSelectionChange = configuration.onSelectionChange
+        onFocusChange = configuration.onFocusChange
+        fileDropHandler = configuration.fileDropHandler
     }
 
     func configureUndoController(
@@ -91,6 +98,7 @@ extension BlockInputView {
         imageLoader = configuration.imageLoader
         imageDiskCache = configuration.imageDiskCache
         imageBaseURL = configuration.imageBaseURL
+        fileBaseURL = configuration.fileBaseURL
         allowsRemoteImageLoading = configuration.allowsRemoteImageLoading
         maximumImageSourceBytes = configuration.maximumImageSourceBytes
         maximumImagePixelDimension = configuration.maximumImagePixelDimension

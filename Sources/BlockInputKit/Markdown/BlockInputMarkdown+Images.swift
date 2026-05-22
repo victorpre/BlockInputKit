@@ -38,7 +38,7 @@ extension BlockInputMarkdownImporter {
 
     static func markdown(for image: BlockInputImage) -> String {
         if image.sourceStyle == .markdown, image.width == nil, image.height == nil {
-            return "![\(escapedMarkdownAltText(image.altText))](\(image.source))"
+            return "![\(escapedMarkdownAltText(image.altText))](\(escapedMarkdownImageDestination(image.source)))"
         }
         var attributes = [
             "src=\"\(escapedHTMLAttribute(image.source))\""
@@ -85,6 +85,17 @@ extension BlockInputMarkdownImporter {
             .replacingOccurrences(of: "]", with: "\\]")
     }
 
+    private static func escapedMarkdownImageDestination(_ source: String) -> String {
+        if source.contains(where: { $0.isWhitespace || $0 == "(" || $0 == ")" || $0 == "<" || $0 == ">" || $0 == "\\" }) {
+            let escapedSource = source
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "<", with: "\\<")
+                .replacingOccurrences(of: ">", with: "\\>")
+            return "<\(escapedSource)>"
+        }
+        return source
+    }
+
     private static func escapedHTMLAttribute(_ text: String) -> String {
         text
             .replacingOccurrences(of: "&", with: "&amp;")
@@ -115,7 +126,11 @@ private enum BlockInputImageSyntaxParser {
     }
 
     private static func markdownImageMatches(in text: String) -> [BlockInputImageMatch] {
-        let pattern = #"!\[([^\]\n]*)\]\(([^)\n]+)\)"#
+        markdownImageMatches(in: text, pattern: #"!\[((?:\\.|[^\]\n])*)\]\(<((?:\\.|[^>\n])+)>\)"#) +
+            markdownImageMatches(in: text, pattern: #"!\[((?:\\.|[^\]\n])*)\]\(((?:\\.|[^)\n])+)\)"#)
+    }
+
+    private static func markdownImageMatches(in text: String, pattern: String) -> [BlockInputImageMatch] {
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
             return []
         }
@@ -124,8 +139,10 @@ private enum BlockInputImageSyntaxParser {
             guard match.numberOfRanges == 3 else {
                 return nil
             }
-            let altText = nsText.substring(with: match.range(at: 1))
-            let source = nsText.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+            let altText = nsText.substring(with: match.range(at: 1)).blockInputUnescapedLinkLabel
+            let source = nsText.substring(with: match.range(at: 2))
+                .blockInputUnescapedLinkDestination
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !source.isEmpty else {
                 return nil
             }

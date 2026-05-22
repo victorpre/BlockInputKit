@@ -65,7 +65,7 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
             editorHorizontalInset: editorHorizontalInset,
             style: style
         )
-        let height = BlockInputBlockItem.height(for: block, textWidth: textWidth, style: style)
+        let height = BlockInputBlockItem.height(for: block, textWidth: textWidth, style: style, fileBaseURL: fileBaseURL)
         return NSSize(width: availableWidth, height: height)
     }
 }
@@ -297,6 +297,9 @@ extension BlockInputView: NSCollectionViewDelegate {
             return moveBlock(blockID: blockID, to: targetIndex) != nil
         }
         if let target = collectionFileDropTarget(for: draggingInfo) {
+            if fileDropHandler != nil {
+                return handleDroppedFileURLs(target.fileURLs, placement: .documentEnd)
+            }
             return insertDroppedFileURLs(target.fileURLs, at: target.insertionIndex) != nil
         }
         return false

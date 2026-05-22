@@ -9,10 +9,10 @@ extension BlockInputTextView {
                 return true
             }
             let clampedRange = string.blockInputTextViewClampedRange(range)
-            copiedText = BlockInputBlock(text: string).markdownAwareCopiedText(in: clampedRange)
+            copiedText = BlockInputBlock(text: string).markdownAwareCopiedText(in: clampedRange, fileBaseURL: blockItem?.fileBaseURL)
         } else if var block = blockItem?.renderedBlock {
             block.text = string
-            copiedText = block.markdownAwareCopiedText(in: range)
+            copiedText = block.markdownAwareCopiedText(in: range, fileBaseURL: blockItem?.fileBaseURL)
         } else {
             let clampedRange = string.blockInputTextViewClampedRange(range)
             copiedText = clampedRange.length > 0

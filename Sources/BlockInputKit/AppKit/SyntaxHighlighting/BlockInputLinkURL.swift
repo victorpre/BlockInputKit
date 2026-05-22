@@ -8,13 +8,17 @@ enum BlockInputLinkURL {
     static let supportedSchemes: Set<String> = ["http", "https", "file"]
 
     /// Returns a URL only when the destination is non-empty, single-line, and uses a supported actionable scheme.
-    static func supportedURL(from string: String, allowsCustomSchemes: Bool = false) -> URL? {
+    static func supportedURL(from string: String, allowsCustomSchemes: Bool = false, fileBaseURL: URL? = nil) -> URL? {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              !trimmed.contains(where: \.isNewline),
-              let url = URL(string: trimmed),
-              let scheme = url.scheme?.lowercased() else {
+        guard !trimmed.isEmpty, !trimmed.contains(where: \.isNewline) else {
             return nil
+        }
+        guard let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased() else {
+            guard let fileBaseURL else {
+                return nil
+            }
+            return URL(fileURLWithPath: trimmed, relativeTo: fileBaseURL).absoluteURL
         }
         guard allowsCustomSchemes || supportedSchemes.contains(scheme) else {
             return nil
@@ -67,6 +71,14 @@ enum BlockInputLinkURL {
         "[\(escapedLabel)](\(escapedDestination(destination)))"
     }
 
+    static func markdownDestination(from source: String, resolvedURL: URL) -> String {
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard URL(string: trimmed)?.scheme != nil else {
+            return trimmed
+        }
+        return resolvedURL.absoluteString
+    }
+
     /// Escapes label delimiters that would otherwise become nested link syntax.
     static func escapedLabel(_ label: String) -> String {
         label.replacingOccurrences(of: "\\", with: "\\\\")
@@ -92,6 +104,8 @@ extension String {
     var blockInputUnescapedLinkDestination: String {
         replacingOccurrences(of: "\\(", with: "(")
             .replacingOccurrences(of: "\\)", with: ")")
+            .replacingOccurrences(of: "\\<", with: "<")
+            .replacingOccurrences(of: "\\>", with: ">")
             .replacingOccurrences(of: "\\\\", with: "\\")
     }
 }

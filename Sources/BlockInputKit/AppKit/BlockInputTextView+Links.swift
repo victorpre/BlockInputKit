@@ -281,7 +281,8 @@ extension BlockInputTextView {
     private func linkRangesForCurrentText() -> [BlockInputInlineMarkdownRange] {
         BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: string,
-            excluding: BlockInputCodeParsing.inlineCodeRanges(in: string).map(\.fullRange)
+            excluding: BlockInputCodeParsing.inlineCodeRanges(in: string).map(\.fullRange),
+            fileBaseURL: blockItem?.fileBaseURL
         )
         .filter { $0.style == .link }
     }

@@ -10,7 +10,7 @@ extension BlockInputView {
               let block = block(at: index),
               block.id == blockID,
               Self.blockKindSupportsLinkBoundaryEditing(block.kind),
-              let deletionRange = Self.linkRangeAdjacentToBoundary(
+              let deletionRange = linkRangeAdjacentToBoundary(
                 item.currentSelectedRange,
                 direction: direction,
                 in: block.text
@@ -61,7 +61,7 @@ extension BlockInputView {
     func inlineChipBoundaryAdjustedRange(_ range: NSRange, in block: BlockInputBlock) -> NSRange {
         guard range.length == 0,
               Self.blockKindSupportsLinkBoundaryEditing(block.kind),
-              let linkRange = Self.inlineChipRangeEndingAtContentBoundary(range.location, in: block.text) else {
+              let linkRange = inlineChipRangeEndingAtContentBoundary(range.location, in: block.text) else {
             return range
         }
         return NSRange(location: NSMaxRange(linkRange.fullRange), length: 0)
@@ -92,7 +92,7 @@ extension BlockInputView {
         }
         let insertedText = proposedText.substring(with: NSRange(location: cursorOffset, length: insertionLength))
         guard !insertedText.isEmpty,
-              let linkRange = Self.inlineChipRangeEndingAtContentBoundary(cursorOffset, in: beforeBlock.text) else {
+              let linkRange = inlineChipRangeEndingAtContentBoundary(cursorOffset, in: beforeBlock.text) else {
             return nil
         }
         let insertionOffset = NSMaxRange(linkRange.fullRange)
@@ -108,19 +108,19 @@ extension BlockInputView {
         BlockInputBlockItem.supportsInlineMarkdownStyling(kind)
     }
 
-    private static func inlineChipRangeEndingAtContentBoundary(
+    private func inlineChipRangeEndingAtContentBoundary(
         _ offset: Int,
         in text: String
     ) -> BlockInputInlineMarkdownRange? {
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
-        return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
+        return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges, fileBaseURL: fileBaseURL)
             .first { range in
                 range.inlineChipKind(in: text) != nil &&
                     NSMaxRange(range.contentRange) == offset
             }
     }
 
-    private static func linkRangeAdjacentToBoundary(
+    private func linkRangeAdjacentToBoundary(
         _ selectedRange: NSRange,
         direction: BlockInputLinkBoundaryDeletionDirection,
         in text: String
@@ -129,7 +129,7 @@ extension BlockInputView {
             return nil
         }
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
-        return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
+        return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges, fileBaseURL: fileBaseURL)
             .first { range in
                 range.style == .link && range.isAdjacent(to: selectedRange.location, direction: direction)
             }

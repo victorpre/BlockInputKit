@@ -17,6 +17,22 @@ final class BlockInputLinkEditingTests: XCTestCase {
         }
     }
 
+    func testCopyingRelativeFileLinkLabelCopiesPlainTextOnly() throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: "Open [a\\[b\\]c](assets/README.md)")
+            ]),
+            fileBaseURL: URL(fileURLWithPath: "/tmp/project", isDirectory: true)
+        ))
+        let textView = try textView(in: mounted.view)
+        textView.setSelectedRange(NSRange(location: 6, length: 7))
+
+        try withCleanPasteboard { pasteboard in
+            textView.copy(nil)
+            XCTAssertEqual(pasteboard.string(forType: .string), "a[b]c")
+        }
+    }
+
     func testCopyingWholeLinkBlockKeepsMarkdownSource() throws {
         let text = "[docs](https://example.com)"
         let mounted = makeMountedBlockInputView(blocks: [
@@ -195,6 +211,42 @@ final class BlockInputLinkEditingTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks[0].text, "Open [guide](file:///tmp/guide.md)")
         XCTAssertTrue(mounted.window.firstResponder === textView)
         XCTAssertEqual(textView.selectedRange(), NSRange(location: 6, length: 5))
+    }
+
+    func testEditModalPreservesRelativeFileDestinationWithFileBaseURL() throws {
+        let baseURL = URL(fileURLWithPath: "/tmp/project", isDirectory: true)
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: "Open [docs](assets/README.md)")
+            ]),
+            fileBaseURL: baseURL
+        ))
+        var openedURL: URL?
+        mounted.view.linkURLOpener = {
+            openedURL = $0
+            return true
+        }
+        let context = try XCTUnwrap(mounted.view.linkContext(
+            blockID: "block",
+            selectedRange: NSRange(location: 7, length: 0),
+            event: nil,
+            prefersClickedOffset: false
+        ))
+
+        mounted.view.showLinkModal(context: context)
+        let modal = try XCTUnwrap(mounted.view.linkModalView)
+        XCTAssertEqual(modal.urlField.stringValue, "assets/README.md")
+        XCTAssertTrue(modal.openButton.isEnabled)
+        XCTAssertTrue(modal.saveButton.isEnabled)
+
+        modal.openButton.performClick(nil)
+        XCTAssertEqual(openedURL, baseURL.appendingPathComponent("assets").appendingPathComponent("README.md"))
+
+        modal.textField.stringValue = "guide"
+        modal.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: modal.textField))
+        modal.saveButton.performClick(nil)
+
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Open [guide](assets/README.md)")
     }
 
     func testRemovingLinkFromModalRestoresFocusToPlainText() throws {

@@ -113,12 +113,14 @@ struct EditorScreen: View {
 - `imageLoader`: Loads image bytes and dimensions for image blocks. The default loader uses in-memory caching and optional remote disk caching.
 - `imageDiskCache`: Optional remote image disk cache used by the default image loader. Hosts can provide a custom `BlockInputImageDiskCaching` implementation.
 - `imageBaseURL`: Base URL used to resolve relative image sources before loading.
+- `fileBaseURL`: Base URL used to resolve relative file-link chip destinations before opening.
 - `allowsRemoteImageLoading`: Enables or disables `http` and `https` image loads.
 - `maximumImageSourceBytes`: Maximum source image payload accepted by the default loader.
 - `maximumImagePixelDimension`: Maximum decoded width or height accepted by the default loader.
 - `defaultImagePlaceholderAspectRatio`: Placeholder aspect ratio used before image dimensions are known.
 - `undoController`: Shares text and structural undo coordination with the host.
 - `completionProvider`: Supplies mention and slash-command suggestions.
+- `fileDropHandler`: Async hook that can accept, cancel, or replace dropped file and image references before insertion.
 - `slashCommandAvailability`: Controls whether `/` completion opens only when `/` starts block index `0` at UTF-16 offset `0`, or after token boundaries anywhere.
 - `slashCommandChipClickHandler`: Lets the host route slash-command chip clicks to a modal, URL open, or host-owned action.
 - `completionPopupConfiguration`: Configures live completion placement. Use `.caret` for a caret-anchored popup, or `.overlay` for a hostable overlay. Overlay placement can provide both the destination parent view and the popup frame inside that parent.
@@ -188,6 +190,33 @@ BlockInputCompletionSuggestion.slashCommand(
 Hosts may also provide custom `insertionText`. A link renders as a slash-command chip when its visible label starts with `/`; the URI scheme is host-owned. `file://` links keep file-chip behavior even when their visible label starts with `/`. Configure `slashCommandChipClickHandler` when slash chips should run host behavior, open their URI directly, or show the built-in link modal.
 
 Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block instead of file chips. Paragraphs, headings, quotes, list items, and checklist items accept inline file drops; code, frontmatter, raw Markdown, horizontal rules, row whitespace, and unloaded progressive rows reject them.
+
+Use `fileDropHandler` when the host needs to copy dropped files into project storage, rewrite destinations, or reject a drop before the editor mutates. The handler receives the dropped files, their default references, the drop placement, and a document snapshot. Return `.useDefault` for built-in insertion, `.cancel` to leave the document unchanged, or `.insert(...)` with replacement references. References with `kind: .fileLink` become inline file chips for text drops and file-link blocks for bottom-space drops. References with `kind: .image` become image blocks, so image drops do not need a separate hook.
+
+```swift
+let projectURL = URL(filePath: "/Users/me/Project", directoryHint: .isDirectory)
+
+let configuration = BlockInputConfiguration(
+    document: document,
+    fileBaseURL: projectURL,
+    imageBaseURL: projectURL,
+    fileDropHandler: { context in
+        let references = try context.files.map { file in
+            let destination = projectURL
+                .appending(path: "Assets", directoryHint: .isDirectory)
+                .appending(path: file.url.lastPathComponent)
+            try FileManager.default.copyItem(at: file.url, to: destination)
+
+            return BlockInputFileDropReference(
+                kind: file.defaultKind,
+                source: "Assets/\(destination.lastPathComponent)",
+                label: file.defaultLabel
+            )
+        }
+        return .insert(references)
+    }
+)
+```
 
 ## Images
 

@@ -109,6 +109,21 @@ extension BlockInputView {
         return insertImageBlocks(imageBlocks, at: index + 1)
     }
 
+    @discardableResult
+    func insertImageReferences(_ references: [BlockInputFileDropReference], below blockID: BlockInputBlockID) -> BlockInputSelection? {
+        let imageBlocks = references.compactMap { reference -> BlockInputBlock? in
+            guard reference.kind == .image else {
+                return nil
+            }
+            return Self.block(for: reference)
+        }
+        guard !imageBlocks.isEmpty,
+              let index = index(of: blockID) else {
+            return nil
+        }
+        return insertImageBlocks(imageBlocks, at: index + 1)
+    }
+
     static func imageBlock(for url: URL) -> BlockInputBlock? {
         guard url.isFileURL,
               imageFileExtensions.contains(url.pathExtension.lowercased()) else {

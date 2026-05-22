@@ -1,12 +1,17 @@
 import AppKit
 
 extension BlockInputBlockItem {
-    static func height(for block: BlockInputBlock, textWidth: CGFloat, style: BlockInputStyle = .default) -> CGFloat {
+    static func height(
+        for block: BlockInputBlock,
+        textWidth: CGFloat,
+        style: BlockInputStyle = .default,
+        fileBaseURL: URL? = nil
+    ) -> CGFloat {
         let text = block.text.isEmpty ? " " : block.text
         let availableTextWidth = max(textWidth - perLineContentIndent(for: block), 120)
         let font = font(for: block.kind, style: style)
         let metrics = verticalMetrics(for: block)
-        let hiddenDelimiterRanges = hiddenInlineDelimiterRanges(for: block, text: text)
+        let hiddenDelimiterRanges = hiddenInlineDelimiterRanges(for: block, text: text, fileBaseURL: fileBaseURL)
         let inlineCodeRanges = inlineCodeRangesForHeight(for: block, text: text)
         let frontMatterReserve = block.kind == .frontMatter
             ? (frontMatterDividerVerticalInset * 2) + frontMatterDividerHeight
@@ -190,14 +195,19 @@ extension BlockInputBlockItem {
         }
     }
 
-    private static func hiddenInlineDelimiterRanges(for block: BlockInputBlock, text: String) -> [NSRange] {
+    private static func hiddenInlineDelimiterRanges(
+        for block: BlockInputBlock,
+        text: String,
+        fileBaseURL: URL? = nil
+    ) -> [NSRange] {
         switch block.kind {
         case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
             let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text)
             let inlineCodeFullRanges = inlineCodeRanges.map(\.fullRange)
             let inlineMarkdownRanges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
                 in: text,
-                excluding: inlineCodeFullRanges
+                excluding: inlineCodeFullRanges,
+                fileBaseURL: fileBaseURL
             )
             return (
                 inlineCodeRanges.flatMap(\.delimiterRanges)

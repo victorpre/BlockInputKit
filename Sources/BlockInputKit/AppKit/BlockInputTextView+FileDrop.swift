@@ -94,7 +94,7 @@ extension BlockInputTextView {
 
     private func inlineChipRange(containing offset: Int, in text: String) -> BlockInputInlineMarkdownRange? {
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
-        return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
+        return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges, fileBaseURL: blockItem?.fileBaseURL)
             .first { range in
                 range.inlineChipKind(in: text) != nil &&
                     range.fullRange.location <= offset &&

@@ -4,6 +4,43 @@ import XCTest
 
 @MainActor
 final class BlockInputViewBottomFileDropTests: XCTestCase {
+    func testAsyncDropHookAppendsTransformedReferencesInBottomBlankSpace() async throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "first", text: "First")
+            ]),
+            fileDropHandler: { context in
+                XCTAssertEqual(context.placement, .documentEnd)
+                return .insert([
+                    BlockInputFileDropReference(kind: .fileLink, source: "assets/README.md", label: "Readme"),
+                    BlockInputFileDropReference(kind: .image, source: "assets/Photo.png", label: "Photo")
+                ])
+            }
+        ))
+        let draggingInfo = try bottomBlankSpaceDraggingInfo(
+            in: mounted.view,
+            fileURLs: [
+                URL(fileURLWithPath: "/tmp/README.md"),
+                URL(fileURLWithPath: "/tmp/Photo.png")
+            ]
+        )
+
+        XCTAssertTrue(mounted.view.collectionView(
+            mounted.view.collectionView,
+            acceptDrop: draggingInfo,
+            indexPath: IndexPath(item: 1, section: 0),
+            dropOperation: .before
+        ))
+        await drainFileDropTasks(in: mounted.view)
+
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), [
+            "First",
+            "[Readme](<assets/README.md>)",
+            ""
+        ])
+        XCTAssertEqual(mounted.view.document.blocks[2].kind, .image(BlockInputImage(source: "assets/Photo.png", altText: "Photo")))
+    }
+
     func testDroppingImageInBottomBlankSpaceAppendsImageBlock() throws {
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "first", text: "First"),
@@ -112,5 +149,12 @@ final class BlockInputViewBottomFileDropTests: XCTestCase {
             fileURLs: fileURLs,
             location: view.collectionView.convert(visibleLocation, to: nil)
         )
+    }
+
+    private func drainFileDropTasks(in view: BlockInputView) async {
+        while !view.fileDropTasks.isEmpty {
+            await Task.yield()
+        }
+        await Task.yield()
     }
 }

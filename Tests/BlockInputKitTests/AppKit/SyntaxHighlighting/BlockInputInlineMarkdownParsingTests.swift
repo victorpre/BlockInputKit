@@ -92,6 +92,15 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
         XCTAssertEqual(range.inlineChipKind(in: text), .fileLink)
     }
 
+    func testAngleBracketLinkDestinationsUnescapeEscapedAngles() throws {
+        let text = #"Open [file](<file:///tmp/A\>B.md>)"#
+        let range = try XCTUnwrap(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text)
+            .first { $0.style == .link })
+
+        XCTAssertEqual(range.linkRawDestination, "file:///tmp/A>B.md")
+        XCTAssertEqual(range.inlineChipKind(in: text), .fileLink)
+    }
+
     func testReportsUnsupportedLinkSourceRangesForCompletionExclusion() {
         let text = [
             "Open [@read](mailto:user@example.com)",

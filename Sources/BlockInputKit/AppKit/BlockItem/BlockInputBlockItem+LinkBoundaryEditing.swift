@@ -63,7 +63,11 @@ extension BlockInputBlockItem {
 
     private func linkSourceExpandedDeletionRange(_ affectedRange: NSRange, in text: String) -> NSRange? {
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
-        let overlappingLinks = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
+        let overlappingLinks = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: text,
+            excluding: inlineCodeRanges,
+            fileBaseURL: fileBaseURL
+        )
             .filter { range in
                 range.style == .link && range.fullRange.intersectionLength(with: affectedRange) > 0
             }

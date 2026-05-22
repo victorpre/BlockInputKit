@@ -46,6 +46,15 @@ final class BlockInputMarkdownImageTests: XCTestCase {
         XCTAssertEqual(document.blocks.map(\.text), ["Before", "", "after"])
     }
 
+    func testMarkdownImageWithEscapedDestinationRoundTrips() {
+        let document = BlockInputDocument(blocks: [
+            BlockInputBlock(kind: .image(BlockInputImage(source: "assets/Photo <1>\\final>draft.png", altText: "A [photo]")))
+        ])
+
+        XCTAssertEqual(document.markdown, #"![A \[photo\]](<assets/Photo \<1\>\\final\>draft.png>)"#)
+        XCTAssertEqual(BlockInputDocument(markdown: document.markdown).blocks.map(\.kind), document.blocks.map(\.kind))
+    }
+
     func testInlineHTMLImageSplitsHeading() {
         let document = BlockInputDocument(markdown: "## Before <img src=\"image.png\" alt=\"Alt\" /> after")
 

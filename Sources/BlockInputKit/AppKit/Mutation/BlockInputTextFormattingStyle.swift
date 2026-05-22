@@ -207,7 +207,8 @@ extension String {
     /// Clamps AppKit UTF-16 selections and optionally trims hidden formatting delimiters from visible text selections.
     func blockInputFormattingClampedRange(
         _ range: NSRange,
-        trimsHiddenDelimiters: Bool
+        trimsHiddenDelimiters: Bool,
+        fileBaseURL: URL? = nil
     ) -> NSRange {
         let text = self as NSString
         let location = min(max(range.location, 0), text.length)
@@ -216,13 +217,13 @@ extension String {
         guard trimsHiddenDelimiters else {
             return clampedRange
         }
-        return blockInputTrimmingInlineMarkdownDelimiterEdges(from: clampedRange)
+        return blockInputTrimmingInlineMarkdownDelimiterEdges(from: clampedRange, fileBaseURL: fileBaseURL)
     }
 
-    private func blockInputTrimmingInlineMarkdownDelimiterEdges(from range: NSRange) -> NSRange {
+    private func blockInputTrimmingInlineMarkdownDelimiterEdges(from range: NSRange, fileBaseURL: URL? = nil) -> NSRange {
         var location = range.location
         var upperBound = NSMaxRange(range)
-        let delimiterRanges = blockInputFormattingInlineMarkdownRanges(in: self)
+        let delimiterRanges = blockInputFormattingInlineMarkdownRanges(in: self, fileBaseURL: fileBaseURL)
             .flatMap(\.delimiterRanges)
             .sorted { lhs, rhs in
                 if lhs.location == rhs.location {
@@ -254,7 +255,7 @@ private extension NSRange {
     }
 }
 
-private func blockInputFormattingInlineMarkdownRanges(in text: String) -> [BlockInputInlineMarkdownRange] {
+private func blockInputFormattingInlineMarkdownRanges(in text: String, fileBaseURL: URL? = nil) -> [BlockInputInlineMarkdownRange] {
     let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
-    return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges)
+    return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text, excluding: inlineCodeRanges, fileBaseURL: fileBaseURL)
 }

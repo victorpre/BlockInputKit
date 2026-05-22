@@ -15,7 +15,8 @@ extension BlockInputInlineMarkdownParsing {
     /// Scans inline links without materializing a Markdown AST so mounted rows remain cheap to refresh while typing.
     static func linkRanges(
         in text: NSString,
-        excluding excludedRangeLookup: BlockInputExcludedRangeLookup
+        excluding excludedRangeLookup: BlockInputExcludedRangeLookup,
+        fileBaseURL: URL? = nil
     ) -> [BlockInputInlineMarkdownRange] {
         var ranges: [BlockInputInlineMarkdownRange] = []
         var location = 0
@@ -37,7 +38,12 @@ extension BlockInputInlineMarkdownParsing {
                 location += 1
                 continue
             }
-            let linkSearch = linkRange(in: text, openingBracketLocation: location, excluding: excludedRangeLookup)
+            let linkSearch = linkRange(
+                in: text,
+                openingBracketLocation: location,
+                excluding: excludedRangeLookup,
+                fileBaseURL: fileBaseURL
+            )
             if let linkRange = linkSearch.range {
                 ranges.append(linkRange)
                 location = NSMaxRange(linkRange.fullRange)
@@ -92,7 +98,8 @@ extension BlockInputInlineMarkdownParsing {
     private static func linkRange(
         in text: NSString,
         openingBracketLocation: Int,
-        excluding excludedRangeLookup: BlockInputExcludedRangeLookup
+        excluding excludedRangeLookup: BlockInputExcludedRangeLookup,
+        fileBaseURL: URL? = nil
     ) -> BlockInputLinkSearch {
         let labelSearch = closingLinkLabelLocation(
             in: text,
@@ -131,7 +138,7 @@ extension BlockInputInlineMarkdownParsing {
             closingParenthesisLocation: closingParenthesisLocation
         )
         let sourceRange = sourceRanges.fullRange
-        guard let linkRange = parsedLinkRange(in: text, sourceRanges: sourceRanges) else {
+        guard let linkRange = parsedLinkRange(in: text, sourceRanges: sourceRanges, fileBaseURL: fileBaseURL) else {
             return BlockInputLinkSearch(range: nil, sourceRange: sourceRange, resumeLocation: NSMaxRange(sourceRange))
         }
         return BlockInputLinkSearch(range: linkRange, sourceRange: sourceRange, resumeLocation: NSMaxRange(sourceRange))
@@ -139,7 +146,8 @@ extension BlockInputInlineMarkdownParsing {
 
     private static func parsedLinkRange(
         in text: NSString,
-        sourceRanges: BlockInputLinkSourceRanges
+        sourceRanges: BlockInputLinkSourceRanges,
+        fileBaseURL: URL? = nil
     ) -> BlockInputInlineMarkdownRange? {
         let label = text.substring(with: sourceRanges.labelRange)
         let urlString = normalizedLinkDestination(text.substring(with: sourceRanges.urlRange).blockInputUnescapedLinkDestination)
@@ -147,7 +155,8 @@ extension BlockInputInlineMarkdownParsing {
         guard linkLabelIsSupported(label),
               let destination = BlockInputLinkURL.supportedURL(
                 from: urlString,
-                allowsCustomSchemes: allowsCustomSchemes
+                allowsCustomSchemes: allowsCustomSchemes,
+                fileBaseURL: fileBaseURL
               ) else {
             return nil
         }
@@ -156,7 +165,8 @@ extension BlockInputInlineMarkdownParsing {
             fullRange: sourceRanges.fullRange,
             contentRange: sourceRanges.labelRange,
             delimiterRanges: linkDelimiterRanges(in: text, sourceRanges: sourceRanges),
-            linkDestination: destination
+            linkDestination: destination,
+            linkRawDestination: urlString
         )
     }
 

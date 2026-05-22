@@ -10,6 +10,7 @@ extension BlockInputBlockItem {
         textView.font = Self.font(for: .paragraph)
         textView.hideFileDropCaret()
         style = .default
+        fileBaseURL = nil
         imageLoadTask?.cancel()
         imageLoadTask = nil
     }

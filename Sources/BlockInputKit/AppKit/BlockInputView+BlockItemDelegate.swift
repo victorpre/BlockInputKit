@@ -143,8 +143,8 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             editorHorizontalInset: editorHorizontalInset,
             style: style
         )
-        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: beforeTextWidth, style: style)
-        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: afterTextWidth, style: style)
+        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: beforeTextWidth, style: style, fileBaseURL: fileBaseURL)
+        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: afterTextWidth, style: style, fileBaseURL: fileBaseURL)
         let isStaleCodeBlockHeight: Bool
         if case .code = afterBlock.kind {
             isStaleCodeBlockHeight = abs(item.view.frame.height - afterHeight) > 0.5
