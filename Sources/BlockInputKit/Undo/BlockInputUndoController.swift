@@ -52,6 +52,10 @@ public final class BlockInputUndoController {
     /// Creates an empty undo controller.
     public init() {}
 
+    func canUndo() -> Bool { undoOrder.reversed().contains { $0.canPerform(text: canUndoTextEdit, structural: !structuralUndoStack.isEmpty) } }
+
+    func canRedo() -> Bool { redoOrder.reversed().contains { $0.canPerform(text: canRedoTextEdit, structural: !structuralRedoStack.isEmpty) } }
+
     func canUndoTextEdit(in blockID: BlockInputBlockID) -> Bool {
         !(textUndoByBlockID[blockID]?.isEmpty ?? true)
     }
@@ -483,9 +487,4 @@ public final class BlockInputUndoController {
         textRedoByBlockID = [:]
         redoOrder = []
     }
-}
-
-enum BlockInputHistoryOperation: Equatable {
-    case text(BlockInputBlockID)
-    case structural
 }

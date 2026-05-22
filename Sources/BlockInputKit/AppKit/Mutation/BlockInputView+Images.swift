@@ -40,7 +40,7 @@ extension BlockInputView {
         guard let context = (sender as? NSMenuItem)?.representedObject as? BlockInputImageContext else {
             return
         }
-        showImageModal(context: context)
+        _ = performCommand(.insertImage(BlockInputInsertImageCommand(presentation: .modal)), context: .init(imageContext: context))
     }
 
     @objc(blockInputDeleteImageFromMenu:)
@@ -48,14 +48,19 @@ extension BlockInputView {
         guard let context = (sender as? NSMenuItem)?.representedObject as? BlockInputImageDeletionContext else {
             return
         }
-        selectedHorizontalRuleIndex = context.index
-        applySelection(.blocks([context.blockID]), notify: false)
-        _ = deleteSelectedHorizontalRuleForBackspaceOrDelete()
+        _ = performCommand(
+            .deleteImage,
+            context: .init(imageBlockID: context.blockID, imageIndex: context.index)
+        )
     }
 
-    func showImageModal(context: BlockInputImageContext) {
+    func showImageModal(
+        context: BlockInputImageContext,
+        source: String? = nil,
+        altText: String? = nil
+    ) {
         let modal = imageModalView ?? BlockInputImageModalView()
-        modal.configure()
+        modal.configure(urlString: source ?? "", altText: altText ?? "")
         configureImageModalActions(modal, context: context)
         imageModalView = modal
         imageModalContext = context
@@ -154,7 +159,7 @@ extension BlockInputView {
         }
     }
 
-    private func imageContext(blockID: BlockInputBlockID, selectedRange: NSRange, event: NSEvent) -> BlockInputImageContext? {
+    func imageContext(blockID: BlockInputBlockID, selectedRange: NSRange, event: NSEvent) -> BlockInputImageContext? {
         guard let block = block(withID: blockID),
               block.kind.supportsImageSyntaxSplitting,
               let item = visibleItem(for: blockID, refreshConfiguration: false) else {
@@ -169,6 +174,31 @@ extension BlockInputView {
             selectedRange: clampedRange(range, in: block.text),
             sourceText: block.text,
             anchorWindowRect: item.anchorWindowRect(forUTF16Range: range)
+        )
+    }
+
+    func imageContextForActiveSelection() -> BlockInputImageContext? {
+        guard let blockID = activeBlockID,
+              let block = block(withID: blockID),
+              block.kind.supportsImageSyntaxSplitting,
+              let item = visibleItem(for: blockID, refreshConfiguration: false) else {
+            return nil
+        }
+        let selectedRange: NSRange
+        switch selection {
+        case let .text(textRange) where textRange.blockID == blockID:
+            selectedRange = textRange.range
+        case let .cursor(cursor) where cursor.blockID == blockID:
+            selectedRange = NSRange(location: cursor.utf16Offset, length: 0)
+        default:
+            selectedRange = item.currentSelectedRange
+        }
+        let clampedSelection = clampedRange(selectedRange, in: block.text)
+        return BlockInputImageContext(
+            blockID: blockID,
+            selectedRange: clampedSelection,
+            sourceText: block.text,
+            anchorWindowRect: item.anchorWindowRect(forUTF16Range: clampedSelection)
         )
     }
 

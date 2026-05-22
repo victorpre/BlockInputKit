@@ -374,27 +374,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate?.blockItemDidRequestSelectAll(self, blockID: blockID)
     }
 
-    func requestCopyActiveSelection() -> Bool {
-        guard let blockID else {
-            return false
-        }
-        return delegate?.blockItemDidRequestCopyActiveSelection(self, blockID: blockID) ?? false
-    }
-
-    func requestCutActiveSelection() -> Bool {
-        guard let blockID else {
-            return false
-        }
-        return delegate?.blockItemDidRequestCutActiveSelection(self, blockID: blockID) ?? false
-    }
-
-    func requestUndoShortcut(_ shortcut: BlockInputUndoShortcut) -> Bool {
-        guard let blockID else {
-            return false
-        }
-        return delegate?.blockItem(self, blockID: blockID, didRequestUndoShortcut: shortcut) ?? false
-    }
-
     func requestSelectHorizontalRule() {
         requestSelectCurrentBlock()
     }

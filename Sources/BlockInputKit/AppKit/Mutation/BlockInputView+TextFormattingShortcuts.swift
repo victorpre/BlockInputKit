@@ -1,6 +1,14 @@
 import AppKit
 
 extension BlockInputView {
+    func textFormattingCommandState(_ shortcut: BlockInputTextFormattingShortcut) -> BlockInputEditorCommandState {
+        guard let context = textFormattingContext() else {
+            return .unavailable
+        }
+        let style = TextFormattingStyle(shortcut)
+        return context.segments.allSatisfy { $0.formattedRange(for: style) != nil } ? .on : .off
+    }
+
     @discardableResult
     func performTextFormattingShortcut(_ shortcut: BlockInputTextFormattingShortcut) -> Bool {
         guard let context = textFormattingContext() else {

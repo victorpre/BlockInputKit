@@ -8,6 +8,7 @@ final class BlockInputImageModalView: NSView, NSTextFieldDelegate {
     let altTextField = NSTextField()
     let insertButton = NSButton(title: "Insert", target: nil, action: nil)
     private let buttonRow = NSStackView()
+    private let fieldFocus = BlockInputModalFieldFocusTracker()
 
     var onInsert: ((String, String) -> Void)?
     var onCancel: (() -> Void)?
@@ -60,32 +61,31 @@ final class BlockInputImageModalView: NSView, NSTextFieldDelegate {
     }
 
     func focusInitialField() {
-        window?.makeFirstResponder(urlField)
+        fieldFocus.focus(urlField)
+    }
+
+    func controlTextDidBeginEditing(_ notification: Notification) {
+        fieldFocus.markEditingDidBegin(notification)
     }
 
     func controlTextDidChange(_ notification: Notification) {
+        fieldFocus.markEditingDidChange(notification)
         validateFields()
     }
 
     func controlTextDidEndEditing(_ notification: Notification) {
+        fieldFocus.markEditingDidEnd(notification)
         onFocusCheck?()
     }
 
     func containsResponder(_ responder: NSResponder) -> Bool {
-        if urlField.currentEditor() === responder || altTextField.currentEditor() === responder {
-            return true
-        }
-        var candidateView = responder as? NSView
-        while let view = candidateView {
-            if view === self {
-                return true
-            }
-            candidateView = view.superview
-        }
-        return false
+        fieldFocus.containsResponder(responder, modalView: self, fields: [urlField, altTextField])
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        if fieldFocus.performTextCommand(commandSelector, textView: textView) {
+            return true
+        }
         guard commandSelector == #selector(cancelOperation(_:)) else {
             return false
         }

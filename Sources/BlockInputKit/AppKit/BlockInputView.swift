@@ -42,6 +42,7 @@ public final class BlockInputView: NSView {
     var progressiveStoreError: String?
     var fallbackUndoController = BlockInputUndoController()
     var undoController: BlockInputUndoController?
+    var commandDispatcher: BlockInputEditorCommandDispatcher?
     var completionProvider: (any BlockInputCompletionProvider)?
     var fileDropHandler: BlockInputFileDropHandler?
     var fileDropTasks: [UUID: Task<Void, Never>] = [:]
@@ -164,30 +165,20 @@ public final class BlockInputView: NSView {
     }
 
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if performFocusedModalFieldEditorKeyEquivalent(event) { return true }
         if linkModalContainsCurrentResponder() { return super.performKeyEquivalent(with: event) }
         if imageModalContainsCurrentResponder() { return super.performKeyEquivalent(with: event) }
-        if event.blockInputIsSelectAllShortcut, selectAllFromActiveSelection() { return true }
-        if let undoShortcut = event.blockInputUndoShortcut, performUndoShortcut(undoShortcut) { return true }
-        if let formattingShortcut = event.blockInputTextFormattingShortcut {
-            _ = performTextFormattingShortcut(formattingShortcut)
-            return true
-        }
+        if performKeyboardShortcutCommand(for: event) { return true }
         if handleEditorArrowKeyEvent(event) { return true }
         if handleWordMovementShortcut(event) { return true }
-        if event.blockInputIsCopyShortcut,
-           copyActiveSelection() {
-            return true
-        }
-        // Mounted text views handle normal text paste; the editor consumes Cmd+V only for editor-owned selections.
-        if event.blockInputIsPasteShortcut,
-           pasteIntoActiveSelection() {
-            return true
-        }
         return super.performKeyEquivalent(with: event)
     }
 
     public override func selectAll(_ sender: Any?) {
-        if selectAllFromActiveSelection() {
+        if performFocusedModalFieldEditorAction(#selector(NSText.selectAll(_:)), sender: sender) {
+            return
+        }
+        if performCommand(.selectAll) {
             return
         }
         super.selectAll(sender)

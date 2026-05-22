@@ -19,6 +19,7 @@ final class BlockInputLinkModalView: NSView, NSTextFieldDelegate {
     private let removeButtonIcon = NSImageView()
     private let removeButtonLabel = NSTextField(labelWithString: "Remove")
     private let buttonRow = NSStackView()
+    private let fieldFocus = BlockInputModalFieldFocusTracker()
     private var mode: BlockInputLinkModalMode = .create
 
     var onSave: ((String, String) -> Void)?
@@ -91,32 +92,31 @@ final class BlockInputLinkModalView: NSView, NSTextFieldDelegate {
     }
 
     func focusInitialField() {
-        window?.makeFirstResponder(textField)
+        fieldFocus.focus(textField)
+    }
+
+    func controlTextDidBeginEditing(_ notification: Notification) {
+        fieldFocus.markEditingDidBegin(notification)
     }
 
     func controlTextDidChange(_ notification: Notification) {
+        fieldFocus.markEditingDidChange(notification)
         validateFields()
     }
 
     func controlTextDidEndEditing(_ notification: Notification) {
+        fieldFocus.markEditingDidEnd(notification)
         onFocusCheck?()
     }
 
     func containsResponder(_ responder: NSResponder) -> Bool {
-        if textField.currentEditor() === responder || urlField.currentEditor() === responder {
-            return true
-        }
-        var candidateView = responder as? NSView
-        while let view = candidateView {
-            if view === self {
-                return true
-            }
-            candidateView = view.superview
-        }
-        return false
+        fieldFocus.containsResponder(responder, modalView: self, fields: [textField, urlField])
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        if fieldFocus.performTextCommand(commandSelector, textView: textView) {
+            return true
+        }
         guard commandSelector == #selector(cancelOperation(_:)) else {
             return false
         }

@@ -10,6 +10,20 @@ struct BlockInputTextUndoEntry {
     let selectionAfter: BlockInputSelection?
 }
 
+enum BlockInputHistoryOperation: Equatable {
+    case text(BlockInputBlockID)
+    case structural
+
+    func canPerform(text: (BlockInputBlockID) -> Bool, structural: Bool) -> Bool {
+        switch self {
+        case .text(let blockID):
+            return text(blockID)
+        case .structural:
+            return structural
+        }
+    }
+}
+
 struct BlockInputReplaceInsertEdit {
     var actionName: String
     var beforeBlock: BlockInputBlock

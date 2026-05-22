@@ -37,6 +37,7 @@ extension BlockInputView {
             configuration: configuration,
             configuredDocument: configuredDocument
         )
+        configureCommandDispatcher(configuration.commandDispatcher)
         configureCompletion(configuration)
         if documentStoreChanged || previousDocument != configuredDocument {
             dismissCompletionPopup()
@@ -55,6 +56,14 @@ extension BlockInputView {
             reloadDataWithoutRestoringFocus()
         }
         attachDocumentStoreObservationIfNeeded()
+    }
+
+    private func configureCommandDispatcher(_ dispatcher: BlockInputEditorCommandDispatcher?) {
+        if commandDispatcher !== dispatcher {
+            commandDispatcher?.unbind(from: self)
+        }
+        commandDispatcher = dispatcher
+        dispatcher?.bind(to: self)
     }
 
     private func configureHostCallbacks(_ configuration: BlockInputConfiguration) {

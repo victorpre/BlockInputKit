@@ -294,25 +294,19 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         blockID: BlockInputBlockID,
         didRequestUndoShortcut shortcut: BlockInputUndoShortcut
     ) -> Bool {
-        performUndoShortcut(shortcut, preferredBlockID: blockID)
+        performCommand(BlockInputEditorCommand(shortcut), context: BlockInputResolvedCommandContext(preferredBlockID: blockID))
     }
 
     func blockItemDidRequestCopyActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        switch selection {
-        case .blocks, .mixed:
-            return copyActiveSelection()
-        case .cursor, .text, nil:
-            return false
-        }
+        performCommand(.copy)
     }
 
     func blockItemDidRequestCutActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        switch selection {
-        case .blocks, .mixed:
-            return cutActiveSelection()
-        case .cursor, .text, nil:
-            return false
-        }
+        performCommand(.cut)
+    }
+
+    func blockItemDidRequestPasteActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
+        performCommand(.paste)
     }
 
     func blockItemDidRequestDeleteActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
@@ -332,7 +326,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
            !usesEditorLevelTextFormattingSelection {
             applySelection(.text(BlockInputTextRange(blockID: blockID, range: item.currentSelectedRange)), notify: false)
         }
-        return performTextFormattingShortcut(shortcut)
+        return performCommand(BlockInputEditorCommand(shortcut))
     }
 
     func blockItem(

@@ -1,11 +1,11 @@
 import AppKit
 
 extension BlockInputTextView {
-    func copySelectedPlainText() -> Bool {
+    func copySelectedPlainText(allowingEditorRoute: Bool = true) -> Bool {
         let range = selectedRange()
         let copiedText: String?
         if blockItem?.isTableCellTextView(self) == true {
-            if blockItem?.requestCopyActiveSelection() == true {
+            if allowingEditorRoute, blockItem?.requestCopyActiveSelection() == true {
                 return true
             }
             let clampedRange = string.blockInputTextViewClampedRange(range)

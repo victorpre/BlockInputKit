@@ -30,6 +30,14 @@ extension NSEvent {
             && charactersIgnoringModifiers?.lowercased() == "c"
     }
 
+    var blockInputIsCutShortcut: Bool {
+        modifierFlags.contains(.command)
+            && !modifierFlags.contains(.option)
+            && !modifierFlags.contains(.control)
+            && !modifierFlags.contains(.shift)
+            && charactersIgnoringModifiers?.lowercased() == "x"
+    }
+
     var blockInputIsPasteShortcut: Bool {
         modifierFlags.contains(.command)
             && !modifierFlags.contains(.option)
@@ -68,6 +76,16 @@ extension NSEvent {
             }
         }
         return key == "x" ? .strikethrough : nil
+    }
+
+    var blockInputEditorCommandShortcut: BlockInputEditorCommand? {
+        if blockInputIsSelectAllShortcut { return .selectAll }
+        if let undoShortcut = blockInputUndoShortcut { return BlockInputEditorCommand(undoShortcut) }
+        if let formattingShortcut = blockInputTextFormattingShortcut { return BlockInputEditorCommand(formattingShortcut) }
+        if blockInputIsCopyShortcut { return .copy }
+        if blockInputIsCutShortcut { return .cut }
+        if blockInputIsPasteShortcut { return .paste }
+        return nil
     }
 
     var blockInputSelectionExpansionDirection: BlockInputVerticalMovementDirection? {

@@ -104,6 +104,26 @@ final class BlockInputEditorTests: XCTestCase {
         XCTAssertTrue(mounted.window.firstResponder === item.testingTextView)
     }
 
+    func testCommandDispatcherBindsToMountedEditor() {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let dispatcher = BlockInputEditorCommandDispatcher()
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "First")
+            ]),
+            commandDispatcher: dispatcher
+        ))
+        mounted.view.applySelection(.text(BlockInputTextRange(
+            blockID: blockID,
+            range: NSRange(location: 0, length: 5)
+        )), notify: false)
+
+        XCTAssertTrue(dispatcher.canPerform(.bold))
+        XCTAssertTrue(dispatcher.perform(.bold))
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "**First**")
+        XCTAssertEqual(dispatcher.state(for: .bold), .on)
+    }
+
     func testFalseFocusBindingDoesNotRestoreExistingSelectionDuringUpdate() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         var isFocused = false

@@ -99,6 +99,43 @@ struct EditorScreen: View {
 }
 ```
 
+## Commands
+
+Use semantic commands when toolbar buttons, menu items, or host UI need to drive the editor through the same paths as
+keyboard shortcuts and editor-owned context menus:
+
+```swift
+editor.performCommand(.bold)
+editor.performCommand(.insertLink(BlockInputInsertLinkCommand(
+    text: "Docs",
+    urlString: "https://example.com",
+    presentation: .automatic
+)))
+
+if editor.canPerformCommand(.insertTable) {
+    editor.performCommand(.insertTable)
+}
+```
+
+SwiftUI hosts can keep a dispatcher and pass it through configuration:
+
+```swift
+@State private var commandDispatcher = BlockInputEditorCommandDispatcher()
+
+BlockInputEditor(configuration: BlockInputConfiguration(
+    commandDispatcher: commandDispatcher
+))
+
+Button("Bold") {
+    commandDispatcher.perform(.bold)
+}
+```
+
+`BlockInputEditorCommand` covers undo, redo, select all, clipboard, inline formatting, link insertion/removal, image
+insertion/deletion, and table insertion/row/column/table actions. Link and image insert commands mutate directly when
+valid URL data is supplied with `.automatic`; omit the URL/source, or use `.modal`, to open the built-in modal prefilled
+with any supplied text.
+
 ## Configuration Options
 
 `BlockInputConfiguration` accepts these host integration options:
@@ -118,6 +155,7 @@ struct EditorScreen: View {
 - `maximumImageSourceBytes`: Maximum source image payload accepted by the default loader.
 - `maximumImagePixelDimension`: Maximum decoded width or height accepted by the default loader.
 - `defaultImagePlaceholderAspectRatio`: Placeholder aspect ratio used before image dimensions are known.
+- `commandDispatcher`: Optional command bridge for SwiftUI or other hosts without direct `BlockInputView` access.
 - `undoController`: Shares text and structural undo coordination with the host.
 - `completionProvider`: Supplies mention and slash-command suggestions.
 - `fileDropHandler`: Async hook that can accept, cancel, or replace dropped file and image references before insertion.

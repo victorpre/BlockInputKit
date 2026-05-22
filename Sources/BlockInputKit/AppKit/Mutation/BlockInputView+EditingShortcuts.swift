@@ -1,6 +1,13 @@
 import AppKit
 
 extension BlockInputView {
+    func canCopyActiveSelection() -> Bool {
+        guard let copiedText = selectedPlainText() else {
+            return false
+        }
+        return !copiedText.isEmpty
+    }
+
     func copyActiveSelection() -> Bool {
         guard let copiedText = selectedPlainText(), !copiedText.isEmpty else {
             return false
@@ -88,6 +95,14 @@ extension BlockInputView {
         guard let textView = window?.firstResponder as? BlockInputTextView else {
             return false
         }
+        if action == #selector(NSText.cut(_:)) {
+            textView.performCutFromEditorCommand()
+            return true
+        }
+        if action == #selector(NSText.paste(_:)) {
+            textView.performPasteFromEditorCommand()
+            return true
+        }
         return NSApp.sendAction(action, to: textView, from: self)
     }
 
@@ -96,6 +111,9 @@ extension BlockInputView {
         case let .text(textRange):
             guard let block = block(withID: textRange.blockID) else {
                 return nil
+            }
+            if let cellText = block.markdownAwareCopiedTableCellText(in: textRange.range, fileBaseURL: fileBaseURL) {
+                return cellText
             }
             return block.markdownAwareCopiedText(in: textRange.range, fileBaseURL: fileBaseURL)
         case let .blocks(blockIDs):
@@ -182,6 +200,17 @@ extension BlockInputView {
 }
 
 extension BlockInputBlock {
+    func markdownAwareCopiedTableCellText(in sourceRange: NSRange, fileBaseURL: URL? = nil) -> String? {
+        guard kind == .table,
+              let table = BlockInputTable(markdown: text),
+              let position = table.cellPosition(containingSourceRange: sourceRange),
+              let localRange = table.localRange(forSourceRange: sourceRange, in: position),
+              let cell = table.cell(at: position) else {
+            return nil
+        }
+        return BlockInputBlock(text: cell.text).markdownAwareCopiedText(in: localRange, fileBaseURL: fileBaseURL)
+    }
+
     func markdownAwareCopiedText(in range: NSRange, fileBaseURL: URL? = nil) -> String? {
         guard kind != .horizontalRule else {
             return nil

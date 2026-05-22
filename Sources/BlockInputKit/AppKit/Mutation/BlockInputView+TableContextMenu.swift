@@ -54,43 +54,43 @@ extension BlockInputView {
         guard let context = (sender as? NSMenuItem)?.representedObject as? BlockInputTableMenuContext else {
             return
         }
-        _ = insertTable(after: context.blockID)
+        _ = performCommand(.insertTable, context: .init(tableContext: context))
     }
 
     @objc(blockInputInsertTableRowFromMenu:)
     func blockInputInsertTableRowFromMenu(_ sender: Any?) {
         guard let context = (sender as? NSMenuItem)?.representedObject as? BlockInputTableMenuContext,
-              let position = context.position else {
+              context.position != nil else {
             return
         }
-        _ = insertTableBodyRow(blockID: context.blockID, position: position)
+        _ = performCommand(.insertRow, context: .init(tableContext: context))
     }
 
     @objc(blockInputInsertTableColumnFromMenu:)
     func blockInputInsertTableColumnFromMenu(_ sender: Any?) {
         guard let context = (sender as? NSMenuItem)?.representedObject as? BlockInputTableMenuContext,
-              let position = context.position else {
+              context.position != nil else {
             return
         }
-        _ = insertTableColumn(blockID: context.blockID, position: position)
+        _ = performCommand(.insertColumn, context: .init(tableContext: context))
     }
 
     @objc(blockInputDeleteTableRowFromMenu:)
     func blockInputDeleteTableRowFromMenu(_ sender: Any?) {
         guard let context = (sender as? NSMenuItem)?.representedObject as? BlockInputTableMenuContext,
-              let position = context.position else {
+              context.position != nil else {
             return
         }
-        _ = deleteTableBodyRow(blockID: context.blockID, position: position, keepsLastBodyRow: true)
+        _ = performCommand(.deleteRow, context: .init(tableContext: context))
     }
 
     @objc(blockInputDeleteTableColumnFromMenu:)
     func blockInputDeleteTableColumnFromMenu(_ sender: Any?) {
         guard let context = (sender as? NSMenuItem)?.representedObject as? BlockInputTableMenuContext,
-              let position = context.position else {
+              context.position != nil else {
             return
         }
-        _ = deleteTableColumn(blockID: context.blockID, position: position)
+        _ = performCommand(.deleteColumn, context: .init(tableContext: context))
     }
 
     @objc(blockInputDeleteTableFromMenu:)
@@ -98,7 +98,7 @@ extension BlockInputView {
         guard let context = (sender as? NSMenuItem)?.representedObject as? BlockInputTableMenuContext else {
             return
         }
-        _ = deleteTable(blockID: context.blockID)
+        _ = performCommand(.deleteTable, context: .init(tableContext: context))
     }
 
     private func tableMenuCellPosition(

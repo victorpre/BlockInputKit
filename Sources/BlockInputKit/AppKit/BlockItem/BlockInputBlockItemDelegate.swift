@@ -89,6 +89,7 @@ protocol BlockInputBlockItemDelegate: AnyObject {
     ) -> Bool
     func blockItemDidRequestCopyActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRequestCutActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
+    func blockItemDidRequestPasteActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRequestDeleteActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool
     func blockItemDidRequestSelectTable(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItem(_ item: BlockInputBlockItem, didChangeSelectionIn blockID: BlockInputBlockID, selectedRange: NSRange?)

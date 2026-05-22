@@ -171,6 +171,8 @@ public struct BlockInputConfiguration {
     ///
     /// When nil, `BlockInputView` uses a view-owned undo controller.
     public var undoController: BlockInputUndoController?
+    /// Optional command bridge for hosts without direct access to the mounted AppKit editor.
+    public var commandDispatcher: BlockInputEditorCommandDispatcher?
     /// Host completion source for mentions and slash commands.
     public var completionProvider: (any BlockInputCompletionProvider)?
     /// Optional host hook for resolving local file drops before insertion.
@@ -231,6 +233,7 @@ public struct BlockInputConfiguration {
         maximumImagePixelDimension: Int = 8_192,
         defaultImagePlaceholderAspectRatio: CGFloat = 16.0 / 9.0,
         undoController: BlockInputUndoController? = nil,
+        commandDispatcher: BlockInputEditorCommandDispatcher? = nil,
         completionProvider: (any BlockInputCompletionProvider)? = nil,
         fileDropHandler: BlockInputFileDropHandler? = nil,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
@@ -260,6 +263,7 @@ public struct BlockInputConfiguration {
         self.maximumImagePixelDimension = max(1, maximumImagePixelDimension)
         self.defaultImagePlaceholderAspectRatio = max(0.01, defaultImagePlaceholderAspectRatio)
         self.undoController = undoController
+        self.commandDispatcher = commandDispatcher
         self.completionProvider = completionProvider
         self.fileDropHandler = fileDropHandler
         self.slashCommandAvailability = slashCommandAvailability

@@ -154,12 +154,16 @@ class BlockInputTextView: NSTextView {
         if handleNonTableSelectionKeyEquivalent(event) {
             return true
         }
-        if event.blockInputIsCopyShortcut,
-           copySelectedPlainText() {
+        if event.blockInputIsCopyShortcut {
+            if blockItem?.requestCopyActiveSelection() == true || copySelectedPlainText(allowingEditorRoute: false) {
+                return true
+            }
+        }
+        if event.blockInputIsCutShortcut {
+            cut(nil)
             return true
         }
         if event.blockInputIsPasteShortcut {
-            // Keep Cmd+V on the NSTextView paste path so URL interception and native fallback share one implementation.
             paste(nil)
             return true
         }
@@ -176,12 +180,19 @@ class BlockInputTextView: NSTextView {
     }
 
     override func paste(_ sender: Any?) {
+        if blockItem?.requestPasteActiveSelection() == true {
+            return
+        }
+        performPasteFromEditorCommand()
+    }
+
+    func performPasteFromEditorCommand() {
         // Supported URL paste is the only custom path; invalid or unsupported pasteboard contents fall through to AppKit.
         if let urlString = BlockInputLinkURL.supportedURLString(),
            blockItem?.requestPasteURL(urlString, selectedRange: blockInputSourceSelectedRange()) == true {
             return
         }
-        super.paste(sender)
+        super.paste(nil)
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { fileDropOperation(sender, super.draggingEntered(sender)) }
@@ -212,19 +223,25 @@ class BlockInputTextView: NSTextView {
     }
 
     override func copy(_ sender: Any?) {
-        guard copySelectedPlainText() else {
+        if blockItem?.requestCopyActiveSelection() == true {
+            return
+        }
+        guard copySelectedPlainText(allowingEditorRoute: false) else {
             super.copy(sender)
             return
         }
     }
 
     override func cut(_ sender: Any?) {
-        if blockItem?.isTableCellTextView(self) == true,
-           blockItem?.requestCutActiveSelection() == true {
+        if blockItem?.requestCutActiveSelection() == true {
             return
         }
-        guard copySelectedPlainText() else {
-            super.cut(sender)
+        performCutFromEditorCommand()
+    }
+
+    func performCutFromEditorCommand() {
+        guard copySelectedPlainText(allowingEditorRoute: false) else {
+            super.cut(nil)
             return
         }
         delete(nil)
