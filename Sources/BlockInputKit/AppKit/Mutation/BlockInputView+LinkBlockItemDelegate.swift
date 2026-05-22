@@ -49,21 +49,52 @@ extension BlockInputView {
     }
 
     func blockItem(_ item: BlockInputBlockItem, blockID: BlockInputBlockID, didResizeImageToWidth width: Int, height: Int) {
+        updateImageDimensions(
+            blockID: blockID,
+            width: width,
+            height: height,
+            actionName: "Resize Image",
+            forcesHTMLExport: true
+        )
+    }
+
+    func blockItem(_ item: BlockInputBlockItem, blockID: BlockInputBlockID, didResolveImageDimensions dimensions: BlockInputImageDimensions) {
+        updateImageDimensions(
+            blockID: blockID,
+            width: dimensions.width,
+            height: dimensions.height,
+            actionName: "Resolve Image Dimensions",
+            forcesHTMLExport: false
+        )
+    }
+
+    private func updateImageDimensions(
+        blockID: BlockInputBlockID,
+        width: Int,
+        height: Int,
+        actionName: String,
+        forcesHTMLExport: Bool
+    ) {
         guard let index = index(of: blockID),
               var block = block(at: index),
               case var .image(image) = block.kind else {
+            return
+        }
+        guard image.width != width || image.height != height else {
             return
         }
         let beforeBlock = block
         let beforeSelection = selection
         image.width = width
         image.height = height
-        image.sourceStyle = .html
+        if forcesHTMLExport {
+            image.sourceStyle = .html
+        }
         block.kind = .image(image)
-        let afterSelection = BlockInputSelection.blocks([blockID])
+        let afterSelection = forcesHTMLExport ? BlockInputSelection.blocks([blockID]) : beforeSelection
         _ = applyGranularBlockReplacement(block, at: index, selection: afterSelection)
         undoController?.registerBlockReplacementStructuralEdit(
-            actionName: "Resize Image",
+            actionName: actionName,
             beforeBlock: beforeBlock,
             afterBlock: block,
             selectionBefore: beforeSelection,

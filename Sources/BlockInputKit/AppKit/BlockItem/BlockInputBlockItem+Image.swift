@@ -100,10 +100,18 @@ extension BlockInputBlockItem {
                         self?.imageBlockView.configureFailure(style: self?.style ?? .default)
                         return
                     }
+                    if request.image.resizeDimensions == nil,
+                       let self {
+                        self.delegate?.blockItem(
+                            self,
+                            blockID: blockID,
+                            didResolveImageDimensions: loaded.dimensions
+                        )
+                    }
                     self?.imageBlockView.configureLoadedImage(
                         nsImage,
                         style: self?.style ?? .default,
-                        resizeDimensions: request.image.resizeDimensions
+                        resizeDimensions: request.image.resizeDimensions ?? loaded.dimensions
                     )
                 }
             } catch {

@@ -101,6 +101,11 @@ final class BlockInputImageBlockRenderingTests: XCTestCase {
         try await waitForLoadedImage(in: item.testingImageBlockView)
 
         XCTAssertNotNil(item.testingImageBlockView.loadedImageForTesting)
+        XCTAssertEqual(item.testingImageBlockView.resizeDimensions, BlockInputImageDimensions(width: 1, height: 1))
+        XCTAssertEqual(
+            mounted.view.document.blocks[0].kind,
+            .image(BlockInputImage(source: imageURL.absoluteString, width: 1, height: 1))
+        )
         XCTAssertEqual(item.testingImageBlockView.statusTextForTesting, "")
     }
 
