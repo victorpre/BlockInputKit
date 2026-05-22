@@ -9,7 +9,7 @@ final class BlockInputViewSnapshotTests: XCTestCase {
         for snapshotCase in SnapshotCase.representativeMatrix {
             assertSnapshot(
                 of: makeSnapshotView(for: snapshotCase),
-                as: .image(precision: 0.995, perceptualPrecision: 0.995),
+                as: appKitSnapshotImage(),
                 named: snapshotCase.name
             )
         }
@@ -19,7 +19,7 @@ final class BlockInputViewSnapshotTests: XCTestCase {
         for snapshotCase in ListMarkerSnapshotCase.matrix {
             assertSnapshot(
                 of: ListMarkerAlignmentSnapshotView(snapshotCase: snapshotCase),
-                as: .image(precision: 0.995, perceptualPrecision: 0.995),
+                as: appKitSnapshotImage(),
                 named: snapshotCase.name
             )
         }
@@ -29,7 +29,7 @@ final class BlockInputViewSnapshotTests: XCTestCase {
         for snapshotCase in LinkModalSnapshotCase.matrix {
             assertSnapshot(
                 of: makeLinkModalSnapshotView(for: snapshotCase),
-                as: .image(precision: 0.995, perceptualPrecision: 0.995),
+                as: appKitSnapshotImage(),
                 named: snapshotCase.name
             )
         }
@@ -39,7 +39,7 @@ final class BlockInputViewSnapshotTests: XCTestCase {
         for snapshotCase in CompletionPopupSnapshotCase.matrix {
             assertSnapshot(
                 of: CompletionPopupSnapshotView(snapshotCase: snapshotCase),
-                as: .image(precision: 0.995, perceptualPrecision: 0.995),
+                as: appKitSnapshotImage(),
                 named: snapshotCase.name
             )
         }
@@ -50,7 +50,7 @@ final class BlockInputViewSnapshotTests: XCTestCase {
             let mounted = try await makeCompletionPlacementSnapshotView(for: snapshotCase)
             assertSnapshot(
                 of: mounted.snapshotView,
-                as: .image(precision: 0.995, perceptualPrecision: 0.995),
+                as: appKitSnapshotImage(),
                 named: snapshotCase.name
             )
         }
@@ -60,7 +60,7 @@ final class BlockInputViewSnapshotTests: XCTestCase {
         for snapshotCase in FileChipSnapshotCase.matrix {
             assertSnapshot(
                 of: makeFileChipSnapshotView(for: snapshotCase),
-                as: .image(precision: 0.995, perceptualPrecision: 0.995),
+                as: appKitSnapshotImage(),
                 named: snapshotCase.name
             )
         }
