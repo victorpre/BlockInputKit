@@ -1,7 +1,7 @@
 ## AppKit Editor Surface
 
 - Keep AppKit editor behavior coordinated through `BlockInputView` and `BlockInputBlockItem` delegates instead of letting child `NSTextView` instances mutate document structure directly.
-- Route local file drops through mounted text views for inline chip insertion; collection-view drops stay reserved for block reordering.
+- Route local file drops through mounted text views for inline chip insertion; collection-view file drops are only for appending from bottom blank space, while block-ID drops stay reserved for block reordering.
 - Keep live completion UI editor-owned; mounted text views should route completion keys through `BlockInputView`/`BlockInputBlockItem` delegates, while suggestions remain host-provided through `completionProvider`.
 - Keep completion overlay hosting explicit: `.overlay` customization should use `BlockInputCompletionPopupConfiguration.overlayProvider`, returning both the popup parent view and the frame in that parent's coordinate space.
 - Keep inline link/chip clicks routed through visual hit geometry across the collection view, item root, scroll view, clip view, and text view; first-click behavior must not depend on the text view already being focused.

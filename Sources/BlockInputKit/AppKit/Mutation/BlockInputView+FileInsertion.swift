@@ -44,7 +44,7 @@ public extension BlockInputView {
         }
     }
 
-    private static func fileLinkBlock(for url: URL) -> BlockInputBlock? {
+    internal static func fileLinkBlock(for url: URL) -> BlockInputBlock? {
         guard url.isFileURL else {
             return nil
         }
@@ -117,6 +117,48 @@ public extension BlockInputView {
 }
 
 extension BlockInputView {
+    static func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
+        let options: [NSPasteboard.ReadingOptionKey: Any] = [
+            .urlReadingFileURLsOnly: true
+        ]
+        let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL]
+        return urls?.filter(\.isFileURL) ?? []
+    }
+
+    @discardableResult
+    func insertDroppedFileURLs(_ fileURLs: [URL], at insertionIndex: Int) -> BlockInputSelection? {
+        let insertedBlocks = fileURLs.compactMap(Self.droppedFileBlock)
+        guard !insertedBlocks.isEmpty else {
+            return nil
+        }
+        return performStructuralEdit(
+            named: Self.fileDropActionName(for: insertedBlocks),
+            storeSyncAction: { beforeDocument, _, _ in
+                .insertBlocks(insertedBlocks, insertionIndex: self.fileInsertionIndex(at: insertionIndex, in: beforeDocument))
+            },
+            edit: { document in
+                let clampedIndex = self.fileInsertionIndex(at: insertionIndex, in: document)
+                document.blocks.insert(contentsOf: insertedBlocks, at: clampedIndex)
+                let firstBlock = insertedBlocks[0]
+                if firstBlock.kind.isImage {
+                    return .blocks([firstBlock.id])
+                }
+                return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0))
+            }
+        )
+    }
+
+    private static func droppedFileBlock(for url: URL) -> BlockInputBlock? {
+        imageBlock(for: url) ?? fileLinkBlock(for: url)
+    }
+
+    private static func fileDropActionName(for blocks: [BlockInputBlock]) -> String {
+        guard blocks.allSatisfy(\.kind.isImage) else {
+            return "Insert Files"
+        }
+        return blocks.count == 1 ? "Insert Image" : "Insert Images"
+    }
+
     @discardableResult
     func insertFileURLsInline(
         _ fileURLs: [URL],

@@ -258,6 +258,12 @@ extension BlockInputView: NSCollectionViewDelegate {
             showDropIndicator(atInsertionIndex: indicatorIndex)
             return .move
         }
+        if let target = collectionFileDropTarget(for: draggingInfo) {
+            proposedDropIndexPath.pointee = NSIndexPath(forItem: target.insertionIndex, inSection: 0)
+            proposedDropOperation.pointee = .before
+            showDropIndicator(atInsertionIndex: target.insertionIndex)
+            return .copy
+        }
         hideDropIndicator()
         return []
     }
@@ -289,6 +295,9 @@ extension BlockInputView: NSCollectionViewDelegate {
                 return false
             }
             return moveBlock(blockID: blockID, to: targetIndex) != nil
+        }
+        if let target = collectionFileDropTarget(for: draggingInfo) {
+            return insertDroppedFileURLs(target.fileURLs, at: target.insertionIndex) != nil
         }
         return false
     }
@@ -345,6 +354,24 @@ extension BlockInputView: NSCollectionViewDelegate {
             return false
         }
         return true
+    }
+
+    func collectionFileDropTarget(for draggingInfo: NSDraggingInfo) -> BlockInputCollectionFileDropTarget? {
+        guard draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID) == nil,
+              !showsProgressiveLoadingRow else {
+            return nil
+        }
+        let fileURLs = Self.fileURLs(from: draggingInfo.draggingPasteboard)
+        guard !fileURLs.isEmpty,
+              fileURLs.contains(where: { Self.imageBlock(for: $0) != nil || Self.fileLinkBlock(for: $0) != nil }) else {
+            return nil
+        }
+        let location = collectionView.convert(draggingInfo.draggingLocation, from: nil)
+        guard collectionView.visibleRect.contains(location),
+              collectionLocationIsInBottomBlankSpace(location) else {
+            return nil
+        }
+        return BlockInputCollectionFileDropTarget(fileURLs: fileURLs, insertionIndex: blockCount)
     }
 
     func resolvedDropInsertionIndex(
@@ -436,4 +463,21 @@ extension BlockInputView: NSCollectionViewDelegate {
     private func clampedInsertionIndex(_ index: Int) -> Int {
         min(max(index, 0), blockCount)
     }
+
+    private func collectionLocationIsInBottomBlankSpace(_ location: NSPoint) -> Bool {
+        guard blockCount > 0 else {
+            return true
+        }
+        guard let attributes = collectionView.layoutAttributesForItem(
+            at: IndexPath(item: blockCount - 1, section: 0)
+        ) else {
+            return false
+        }
+        return location.y >= attributes.frame.maxY
+    }
+}
+
+struct BlockInputCollectionFileDropTarget {
+    var fileURLs: [URL]
+    var insertionIndex: Int
 }

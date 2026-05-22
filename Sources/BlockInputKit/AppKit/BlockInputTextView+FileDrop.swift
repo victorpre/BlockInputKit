@@ -67,7 +67,7 @@ extension BlockInputTextView {
               BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
             return nil
         }
-        let fileURLs = Self.fileURLs(from: draggingInfo.draggingPasteboard)
+        let fileURLs = BlockInputView.fileURLs(from: draggingInfo.draggingPasteboard)
         guard !fileURLs.isEmpty else {
             return nil
         }
@@ -77,14 +77,6 @@ extension BlockInputTextView {
         }
         let offset = fileDropUTF16Offset(at: localLocation, in: block.text)
         return BlockInputFileDropTarget(fileURLs: fileURLs, utf16Offset: offset)
-    }
-
-    private static func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
-        let options: [NSPasteboard.ReadingOptionKey: Any] = [
-            .urlReadingFileURLsOnly: true
-        ]
-        let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL]
-        return urls?.filter(\.isFileURL) ?? []
     }
 
     private func fileDropUTF16Offset(at localLocation: NSPoint, in text: String) -> Int {

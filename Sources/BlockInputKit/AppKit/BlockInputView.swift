@@ -422,7 +422,7 @@ private extension BlockInputView {
             BlockInputLoadingItem.self,
             forItemWithIdentifier: BlockInputLoadingItem.reuseIdentifier
         )
-        collectionView.registerForDraggedTypes([.blockInputBlockID])
+        collectionView.registerForDraggedTypes([.blockInputBlockID, .fileURL])
         collectionView.setDraggingSourceOperationMask(.move, forLocal: true)
         installSelectionExpansionKeyMonitor()
 
