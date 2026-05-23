@@ -42,6 +42,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     let codeBackgroundView = NSView()
     let tableView = BlockInputTableView()
     let imageBlockView = BlockInputImageBlockView()
+    let imageCaretView = NSView()
     let horizontalRuleView = BlockInputHorizontalRuleView()
     let frontMatterDividerView = BlockInputFrontMatterDividerView()
     let selectionBackgroundView = BlockInputSelectionBackgroundView()
@@ -91,8 +92,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var imageBlockTopConstraint: NSLayoutConstraint?
     var imageBlockBottomConstraint: NSLayoutConstraint?
     var imageLoadTask: Task<Void, Never>?
+    var imageLoadCacheKey: String?
     private var isHorizontalRule = false
-    private var isImageBlock = false
+    var isImageBlock = false
+    var imageCaretOffset: Int?
 
     var currentSelectedRange: NSRange {
         tableView.activeCellSelectedSourceRange ?? textView.selectedRange()
@@ -135,6 +138,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         if let renderedBlock {
             updateImageBlockLayout(for: renderedBlock)
         }
+        updateImageCaretFrame()
         view.window?.invalidateCursorRects(for: view)
     }
 
@@ -352,6 +356,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         applySelectionChrome(isSelected ? .whole : .none)
         horizontalRuleView.isSelected = isHorizontalRule && isSelected
         if isSelected {
+            setImageCaretOffset(nil)
+        }
+        if isSelected {
             collapseNativeSelectionIfNeeded()
         }
     }
@@ -416,5 +423,6 @@ extension BlockInputBlockItem {
         textView.cancelBlockSelectionDrag()
         textView.blockItem = nil
         finishBlockSelectionDrag()
+        setImageCaretOffset(nil)
     }
 }

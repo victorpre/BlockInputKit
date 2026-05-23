@@ -21,6 +21,22 @@ final class BlockInputBoundaryExpansionTests: XCTestCase {
         XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: secondID, utf16Offset: 6)))
     }
 
+    func testCommandDownToDocumentEndingImageMovesCaretAfterImage() throws {
+        let imageID = BlockInputBlockID(rawValue: "image")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "first", text: "First"),
+            BlockInputBlock(id: imageID, kind: .image(BlockInputImage(source: "https://example.com/image.png")))
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+        textView.setSelectedRange(NSRange(location: 5, length: 0))
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandDownEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: imageID, utf16Offset: 1)))
+    }
+
     func testCommandUpFromStartOfBlockMovesCaretToDocumentStart() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

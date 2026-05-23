@@ -98,7 +98,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         blocks.remove(at: index)
         if blocks.indices.contains(index - 1) {
             let previous = blocks[index - 1]
-            return .cursor(BlockInputCursor(blockID: previous.id, utf16Offset: previous.utf16Length))
+            return .cursor(BlockInputCursor(blockID: previous.id, utf16Offset: previous.cursorUTF16Length))
         }
         if let next = blocks.first {
             return .cursor(BlockInputCursor(blockID: next.id, utf16Offset: 0))
@@ -126,7 +126,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         }
         if blocks.indices.contains(firstDeletionIndex - 1) {
             let previous = blocks[firstDeletionIndex - 1]
-            return .cursor(BlockInputCursor(blockID: previous.id, utf16Offset: previous.utf16Length))
+            return .cursor(BlockInputCursor(blockID: previous.id, utf16Offset: previous.cursorUTF16Length))
         }
         if blocks.indices.contains(firstDeletionIndex) {
             let next = blocks[firstDeletionIndex]
@@ -174,7 +174,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
             let block = blocks[firstSelectedIndex]
             return BlockInputCursor(blockID: block.id, utf16Offset: 0)
         }
-        return blocks.last.map { BlockInputCursor(blockID: $0.id, utf16Offset: $0.utf16Length) }
+        return blocks.last.map { BlockInputCursor(blockID: $0.id, utf16Offset: $0.cursorUTF16Length) }
     }
 
     /// Applies Backspace/Delete key semantics for an empty block.
@@ -192,7 +192,7 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         guard let index = index(of: blockID),
               index > 0,
               blocks[index].kind == .paragraph,
-              blocks[index - 1].kind != .horizontalRule,
+              blocks[index - 1].kind.isSelectableStandaloneBlock == false,
               blocks[index - 1].kind != .frontMatter else {
             return nil
         }

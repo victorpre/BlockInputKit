@@ -34,6 +34,9 @@ extension BlockInputView {
     }
 
     func pasteIntoActiveSelection() -> Bool {
+        if pasteTextAtImageCaretIfNeeded() {
+            return true
+        }
         switch selection {
         case .cursor, .text:
             return performTextViewEditAction(#selector(NSText.paste(_:)))

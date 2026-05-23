@@ -25,6 +25,10 @@ final class BlockInputBlockItemRootView: NSView {
             imageResizeHitView.mouseDown(with: event)
             return
         }
+        if let offset = blockItem?.imageCaretOffset(containing: point) {
+            blockItem?.requestImageCaret(at: offset)
+            return
+        }
         if blockItem?.textView.linkHitResult(for: event) != nil {
             blockItem?.textView.mouseDown(with: event)
             return

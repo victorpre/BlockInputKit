@@ -57,10 +57,10 @@ extension BlockInputView {
         if selection != nil,
            let blockID = activeBlockID,
            let block = block(withID: blockID) {
-            return BlockInputCursor(blockID: blockID, utf16Offset: block.utf16Length)
+            return BlockInputCursor(blockID: blockID, utf16Offset: block.cursorUTF16Length)
         }
         if let lastFocusedBlockID, let block = block(withID: lastFocusedBlockID) {
-            return BlockInputCursor(blockID: lastFocusedBlockID, utf16Offset: block.utf16Length)
+            return BlockInputCursor(blockID: lastFocusedBlockID, utf16Offset: block.cursorUTF16Length)
         }
         let firstBlock = block(at: 0) ?? document.blocks[0]
         return BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0)
@@ -113,26 +113,40 @@ extension BlockInputView {
             return nil
         }
         if refreshConfiguration {
-            item.configure(
-                block: block,
-                allowsReordering: allowsBlockReordering,
-                editorHorizontalInset: editorHorizontalInset,
-                accentColor: dropIndicatorColor,
-                style: style,
-                isSelected: isBlockSelected(block.id),
-                delegate: self
-            )
+            configureBlockItem(item, block: block)
         }
         return item
     }
 
     func focusVisibleItem(for cursor: BlockInputCursor) {
-        guard let item = visibleItem(for: cursor.blockID) else {
+        let isImageCursor = block(withID: cursor.blockID)?.kind.isImage == true
+        guard let item = isImageCursor
+            ? visibleImageItem(for: cursor.blockID)
+            : visibleItem(for: cursor.blockID) else {
             pendingFocus = cursor
+            return
+        }
+        if isImageCursor {
+            item.setImageCaretOffset(cursor.utf16Offset)
+            if !isBecomingFirstResponder, window?.firstResponder !== self {
+                window?.makeFirstResponder(self)
+            }
+            pendingFocus = nil
             return
         }
         item.focusText(atUTF16Offset: cursor.utf16Offset)
         pendingFocus = nil
+    }
+
+    private func visibleImageItem(for blockID: BlockInputBlockID) -> BlockInputBlockItem? {
+        guard let index = activeStandaloneBlockIndex(for: blockID),
+              block(at: index)?.kind.isImage == true else {
+            return nil
+        }
+        let indexPath = IndexPath(item: index, section: 0)
+        collectionView.scrollToItems(at: [indexPath], scrollPosition: .nearestVerticalEdge)
+        collectionView.layoutSubtreeIfNeeded()
+        return collectionView.item(at: indexPath) as? BlockInputBlockItem
     }
 
     func restoreVisibleTextSelection(_ textRange: BlockInputTextRange) {
@@ -180,7 +194,7 @@ extension BlockInputView {
             publishFocusChange(true)
             return true
         }
-        focus(blockID: block.id, utf16Offset: direction == .upward ? 0 : block.utf16Length)
+        focus(blockID: block.id, utf16Offset: direction == .upward ? 0 : block.cursorUTF16Length)
         return true
     }
 
@@ -193,12 +207,7 @@ extension BlockInputView {
     func restoreMountedSelection() {
         switch selection {
         case let .cursor(cursor):
-            guard let item = mountedBlockItem(for: cursor.blockID) else {
-                pendingFocus = cursor
-                return
-            }
-            item.focusText(atUTF16Offset: cursor.utf16Offset)
-            pendingFocus = nil
+            restoreMountedCursorSelection(cursor)
         case let .text(textRange):
             guard let item = mountedBlockItem(for: textRange.blockID) else {
                 return
@@ -218,6 +227,34 @@ extension BlockInputView {
         }
     }
 
+    private func restoreMountedCursorSelection(_ cursor: BlockInputCursor) {
+        let item = block(withID: cursor.blockID)?.kind.isImage == true
+            ? mountedImageItem(for: cursor.blockID)
+            : mountedBlockItem(for: cursor.blockID)
+        guard let item else {
+            pendingFocus = cursor
+            return
+        }
+        if block(withID: cursor.blockID)?.kind.isImage == true {
+            item.setImageCaretOffset(cursor.utf16Offset)
+            if !isBecomingFirstResponder, window?.firstResponder !== self {
+                window?.makeFirstResponder(self)
+            }
+            pendingFocus = nil
+            return
+        }
+        item.focusText(atUTF16Offset: cursor.utf16Offset)
+        pendingFocus = nil
+    }
+
+    private func mountedImageItem(for blockID: BlockInputBlockID) -> BlockInputBlockItem? {
+        guard let index = activeStandaloneBlockIndex(for: blockID),
+              block(at: index)?.kind.isImage == true else {
+            return nil
+        }
+        return collectionView.item(at: IndexPath(item: index, section: 0)) as? BlockInputBlockItem
+    }
+
     private func mountedBlockItem(for blockID: BlockInputBlockID) -> BlockInputBlockItem? {
         guard let index = index(of: blockID),
               let block = block(at: index) else {
@@ -227,15 +264,7 @@ extension BlockInputView {
         guard let item = collectionView.item(at: indexPath) as? BlockInputBlockItem else {
             return nil
         }
-        item.configure(
-            block: block,
-            allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset,
-            accentColor: dropIndicatorColor,
-            style: style,
-            isSelected: isBlockSelected(block.id),
-            delegate: self
-        )
+        configureBlockItem(item, block: block)
         return item
     }
 
@@ -288,7 +317,13 @@ extension BlockInputView {
         case let .cursor(cursor):
             lastFocusedBlockID = cursor.blockID
             pendingFocus = cursor
-            selectedHorizontalRuleIndex = nil
+            if let selectedIndex = selectedHorizontalRuleIndex,
+               block(at: selectedIndex)?.id == cursor.blockID,
+               block(at: selectedIndex)?.kind.isSelectableStandaloneBlock == true {
+                selectedHorizontalRuleIndex = selectedIndex
+            } else {
+                selectedHorizontalRuleIndex = nil
+            }
             lastNativeTextSelectionExpansion = nil
             blockSelectionExpansion = nil
         case let .text(range):
@@ -331,12 +366,21 @@ extension BlockInputView {
     }
 
     private func updateVisibleBlockSelectionHighlights() {
+        let activeImageCursorIndex = activeImageCursorIndexForSelection()
         for item in collectionView.visibleItems().compactMap({ $0 as? BlockInputBlockItem }) {
             guard let blockID = item.representedBlockID else {
                 item.setBlockSelection(false)
+                item.setImageCaretOffset(nil)
                 continue
             }
             item.setBlockSelection(isBlockSelected(blockID))
+            if case let .cursor(cursor) = selection,
+               cursor.blockID == blockID,
+               activeImageCursorIndex == collectionView.indexPath(for: item)?.item {
+                item.setImageCaretOffset(cursor.utf16Offset)
+            } else {
+                item.setImageCaretOffset(nil)
+            }
             if let range = selection?.partialTextRange(for: blockID) {
                 item.setSelectionHighlightRange(range.range)
             } else if let range = selection?.textRange(for: blockID) {
@@ -347,6 +391,14 @@ extension BlockInputView {
                 item.collapseNativeSelectionIfNeeded()
             }
         }
+    }
+
+    private func activeImageCursorIndexForSelection() -> Int? {
+        guard case let .cursor(cursor) = selection,
+              block(withID: cursor.blockID)?.kind.isImage == true else {
+            return nil
+        }
+        return activeStandaloneBlockIndex(for: cursor.blockID)
     }
 
     private func shouldCollapseNativeTextSelection(in blockID: BlockInputBlockID) -> Bool {

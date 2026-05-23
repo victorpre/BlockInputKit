@@ -168,6 +168,23 @@ final class BlockInputImageBlockRenderingTests: XCTestCase {
         XCTAssertNotNil(imageView.layer?.backgroundColor)
     }
 
+    func testReconfiguringLoadingImageKeepsPlaceholderWithoutShowingCancellationFailure() async throws {
+        let imageID = BlockInputBlockID(rawValue: "image")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: imageID, kind: .image(BlockInputImage(source: "https://example.com/image.png")))
+            ]),
+            imageLoader: DelayedImageLoader()
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+
+        mounted.view.configureBlockItem(item, block: mounted.view.document.blocks[0])
+        try await Task.sleep(nanoseconds: 25_000_000)
+
+        XCTAssertNil(item.testingImageBlockView.loadedImageForTesting)
+        XCTAssertEqual(item.testingImageBlockView.statusTextForTesting, "")
+    }
+
     func testImageResizeIsDisabledUntilDimensionsAreKnown() throws {
         let unknown = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(kind: .image(BlockInputImage(source: "https://example.com/image.png"))),

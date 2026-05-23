@@ -129,7 +129,7 @@ extension BlockInputView {
               let block = block(withID: blockID) else {
             return nil
         }
-        return BlockInputCursor(blockID: blockID, utf16Offset: block.utf16Length)
+        return BlockInputCursor(blockID: blockID, utf16Offset: block.cursorUTF16Length)
     }
 }
 

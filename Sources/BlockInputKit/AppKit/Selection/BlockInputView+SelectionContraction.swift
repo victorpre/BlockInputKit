@@ -190,7 +190,7 @@ extension BlockInputView {
         }
         let cursor = BlockInputCursor(
             blockID: block.id,
-            utf16Offset: direction == .upward ? 0 : block.utf16Length
+            utf16Offset: direction == .upward ? 0 : block.cursorUTF16Length
         )
         applySelection(.cursor(cursor), notify: true)
         focusVisibleItem(for: cursor)

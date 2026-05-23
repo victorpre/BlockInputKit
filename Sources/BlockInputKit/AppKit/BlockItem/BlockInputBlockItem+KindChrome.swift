@@ -26,7 +26,7 @@ extension BlockInputBlockItem {
         } else {
             tableView.resetForReuse()
         }
-        imageBlockView.isHidden = !usesImageSurface
+        configureImageSurfaceVisibility(usesImageSurface)
         configureImageBlockIfNeeded(for: block)
         configureCodeBackground(for: block)
         scrollViewTopConstraint?.constant = 0
@@ -51,6 +51,13 @@ extension BlockInputBlockItem {
         updateQuoteBarVerticalExtent()
         configureChecklistButton(for: block, contentIndent: contentIndent)
         updateImageBlockLayout(for: block)
+    }
+
+    private func configureImageSurfaceVisibility(_ usesImageSurface: Bool) {
+        imageBlockView.isHidden = !usesImageSurface
+        if !usesImageSurface {
+            setImageCaretOffset(nil)
+        }
     }
 
     private func configureFrontMatterDivider(isVisible: Bool) {

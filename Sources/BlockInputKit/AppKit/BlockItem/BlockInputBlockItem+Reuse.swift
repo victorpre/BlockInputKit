@@ -13,6 +13,7 @@ extension BlockInputBlockItem {
         fileBaseURL = nil
         imageLoadTask?.cancel()
         imageLoadTask = nil
+        imageLoadCacheKey = nil
     }
 
     func resetLayoutForReuse() {
@@ -47,6 +48,7 @@ extension BlockInputBlockItem {
         imageBlockBottomConstraint?.constant = -Self.imageExternalVerticalInset
         imageBlockWidthConstraint?.constant = 120
         imageBlockView.maximumResizeWidth = Int.max
+        setImageCaretOffset(nil)
     }
 
     func resetChromeForReuse() {

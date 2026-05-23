@@ -53,7 +53,7 @@ extension BlockInputView {
         blockID: BlockInputBlockID,
         returnSelection: ReturnSelection?
     ) -> BlockInputSelection? {
-        guard let index = index(of: blockID),
+        guard let index = activeStandaloneBlockIndex(for: blockID),
               let block = block(at: index),
               cachedBlockMatches(block, at: index) else {
             return nil

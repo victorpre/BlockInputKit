@@ -147,6 +147,17 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
         (text as NSString).length
     }
 
+    /// Logical caret length for selection and focus.
+    ///
+    /// Image blocks have no editable text, but the editor exposes two caret
+    /// positions around the rendered image: `0` before it and `1` after it.
+    public var cursorUTF16Length: Int {
+        if case .image = kind {
+            return 1
+        }
+        return utf16Length
+    }
+
     private mutating func normalizeForKind() {
         if kind.normalizesTextToEmpty, !text.isEmpty {
             text = ""

@@ -51,6 +51,10 @@ extension BlockInputBlockItem {
         imageBlockView
     }
 
+    var testingImageCaretView: NSView {
+        imageCaretView
+    }
+
     var testingTableOverflowScrollView: NSScrollView {
         tableView.overflowScrollViewForTesting
     }

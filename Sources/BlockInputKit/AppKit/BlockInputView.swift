@@ -140,9 +140,9 @@ public final class BlockInputView: NSView {
 
     /// Handles editor-owned key events before forwarding unhandled events to AppKit.
     public override func keyDown(with event: NSEvent) {
-        if linkModalContainsCurrentResponder() { super.keyDown(with: event); return }
-        if imageModalContainsCurrentResponder() { super.keyDown(with: event); return }
+        if modalContainsCurrentResponder { super.keyDown(with: event); return }
         if event.isCancelOperation, cancelMultiBlockSelection() { return }
+        if handleImageCaretKeyDown(event) { return }
         if handleEditorArrowKeyEvent(event) { return }
         if handleWordMovementShortcut(event) { return }
         if let direction = event.plainVerticalMovementDirection, collapseMultiBlockSelection(direction: direction) { return }
@@ -201,7 +201,7 @@ public final class BlockInputView: NSView {
         }
         let cursor = BlockInputCursor(
             blockID: blockID,
-            utf16Offset: min(max(utf16Offset, 0), block.utf16Length)
+            utf16Offset: min(max(utf16Offset, 0), block.cursorUTF16Length)
         )
         pendingFocus = cursor
         applySelection(.cursor(cursor), notify: true)
@@ -248,7 +248,7 @@ public final class BlockInputView: NSView {
         if deletionIndex > 0, let previousBlock = block(at: deletionIndex - 1) {
             afterSelection = .cursor(BlockInputCursor(
                 blockID: previousBlock.id,
-                utf16Offset: previousBlock.utf16Length
+                utf16Offset: previousBlock.cursorUTF16Length
             ))
         } else if let nextBlock = block(at: deletionIndex + 1) {
             afterSelection = .cursor(BlockInputCursor(blockID: nextBlock.id, utf16Offset: 0))
@@ -403,6 +403,12 @@ public final class BlockInputView: NSView {
         return result
     }
 
+}
+
+private extension BlockInputView {
+    var modalContainsCurrentResponder: Bool {
+        linkModalContainsCurrentResponder() || imageModalContainsCurrentResponder()
+    }
 }
 
 private extension BlockInputView {

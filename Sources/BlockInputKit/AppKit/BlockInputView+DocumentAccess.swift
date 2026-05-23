@@ -54,7 +54,7 @@ extension BlockInputView {
         guard let block = block(withID: cursor.blockID) else {
             return false
         }
-        return cursor.utf16Offset >= 0 && cursor.utf16Offset <= block.utf16Length
+        return cursor.utf16Offset >= 0 && cursor.utf16Offset <= block.cursorUTF16Length
     }
 
     func containsValidTextRange(_ textRange: BlockInputTextRange) -> Bool {

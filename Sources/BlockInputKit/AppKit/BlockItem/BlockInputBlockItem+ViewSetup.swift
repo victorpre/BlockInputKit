@@ -13,6 +13,7 @@ extension BlockInputBlockItem {
         setupTextView()
         setupTableView()
         setupImageBlockView()
+        setupImageCaretView()
         setupHorizontalRuleView()
         setupFrontMatterDividerView()
         setupQuoteBarView()
@@ -88,6 +89,14 @@ extension BlockInputBlockItem {
         imageBlockView.isHidden = true
     }
 
+    private func setupImageCaretView() {
+        imageCaretView.wantsLayer = true
+        imageCaretView.layer?.backgroundColor = NSColor.keyboardFocusIndicatorColor.cgColor
+        imageCaretView.isHidden = true
+        imageCaretView.setAccessibilityElement(true)
+        imageCaretView.setAccessibilityRole(.staticText)
+    }
+
     private func setupHorizontalRuleView() {
         horizontalRuleView.blockItem = self
     }
@@ -114,9 +123,14 @@ extension BlockInputBlockItem {
         selectionBackgroundView.translatesAutoresizingMaskIntoConstraints = true
         view.addSubview(selectionBackgroundView)
         for subview in [
-            kindLabel, checklistButton, quoteBarView, scrollView, tableView, imageBlockView, horizontalRuleView,
-            frontMatterDividerView, handleView
+            kindLabel, checklistButton, quoteBarView, scrollView, tableView, imageBlockView, horizontalRuleView
         ] {
+            subview.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(subview)
+        }
+        imageCaretView.translatesAutoresizingMaskIntoConstraints = true
+        view.addSubview(imageCaretView)
+        for subview in [frontMatterDividerView, handleView] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }

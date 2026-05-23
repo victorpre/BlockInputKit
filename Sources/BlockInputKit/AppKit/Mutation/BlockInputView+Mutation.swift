@@ -169,15 +169,7 @@ extension BlockInputView {
               let item = collectionView.item(at: indexPath) as? BlockInputBlockItem else {
             return false
         }
-        item.configure(
-            block: block,
-            allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset,
-            accentColor: dropIndicatorColor,
-            style: style,
-            isSelected: isBlockSelected(block.id),
-            delegate: self
-        )
+        configureBlockItem(item, block: block)
         if invalidatesLayoutMetrics {
             invalidateLayoutForBlock(at: index, editedItem: item, block: block)
         } else {

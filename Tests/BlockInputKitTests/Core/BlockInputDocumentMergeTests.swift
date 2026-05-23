@@ -46,4 +46,18 @@ final class BlockInputDocumentMergeTests: XCTestCase {
         XCTAssertNil(selection)
         XCTAssertEqual(document.blocks.map(\.id), [listID, quoteID])
     }
+
+    func testMergeParagraphIntoPreviousImageIsIgnored() {
+        let imageID = BlockInputBlockID(rawValue: "image")
+        let paragraphID = BlockInputBlockID(rawValue: "paragraph")
+        var document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: imageID, kind: .image(BlockInputImage(source: "https://example.com/image.png"))),
+            BlockInputBlock(id: paragraphID, text: "")
+        ])
+
+        let selection = document.mergeBlockIntoPrevious(blockID: paragraphID)
+
+        XCTAssertNil(selection)
+        XCTAssertEqual(document.blocks.map(\.id), [imageID, paragraphID])
+    }
 }

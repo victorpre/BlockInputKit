@@ -71,6 +71,13 @@ extension BlockInputBlockItem {
         delegate?.blockItemDidRequestSelectHorizontalRule(self, blockID: blockID)
     }
 
+    func requestImageCaret(at offset: Int) {
+        guard let blockID else {
+            return
+        }
+        delegate?.blockItem(self, blockID: blockID, didRequestImageCaretAt: offset)
+    }
+
     @objc func requestToggleChecklist() {
         guard let blockID else {
             return

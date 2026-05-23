@@ -72,8 +72,8 @@ extension BlockInputBlockItem {
     }
 
     func configureImageBlockIfNeeded(for block: BlockInputBlock) {
-        imageLoadTask?.cancel()
         guard case let .image(image) = block.kind else {
+            cancelImageLoad()
             imageBlockView.resetForReuse()
             return
         }
@@ -88,6 +88,7 @@ extension BlockInputBlockItem {
         }
         guard let resolvedURL = image.resolvedURL(relativeTo: imageLoadingContext.baseURL),
               allowsLoading(resolvedURL) else {
+            cancelImageLoad()
             imageBlockView.configureFailure(style: style)
             return
         }
@@ -96,10 +97,21 @@ extension BlockInputBlockItem {
             maximumPixelDimension: imageLoadingContext.maximumPixelDimension
         )
         if imageBlockView.reuseLoadedImage(cacheKey: cacheKey, style: style, resizeDimensions: image.resizeDimensions) {
+            cancelImageLoad()
             return
         }
+        if imageLoadCacheKey == cacheKey, imageLoadTask != nil {
+            return
+        }
+        cancelImageLoad()
         imageBlockView.configurePlaceholder(style: style)
         startImageLoad(for: image, resolvedURL: resolvedURL, cacheKey: cacheKey, blockID: block.id)
+    }
+
+    private func cancelImageLoad() {
+        imageLoadTask?.cancel()
+        imageLoadTask = nil
+        imageLoadCacheKey = nil
     }
 
     private func startImageLoad(
@@ -117,6 +129,7 @@ extension BlockInputBlockItem {
             diskCache: imageLoadingContext.diskCache
         )
         let loader = imageLoadingContext.loader
+        imageLoadCacheKey = cacheKey
         imageLoadTask = Task { [weak self] in
             do {
                 let loaded = try await loader.loadImage(request)
@@ -126,9 +139,14 @@ extension BlockInputBlockItem {
                 await MainActor.run {
                     self?.finishImageLoad(loaded, request: request, blockID: blockID)
                 }
+            } catch is CancellationError {
+                return
             } catch {
+                guard !Task.isCancelled else {
+                    return
+                }
                 await MainActor.run {
-                    self?.finishImageLoadFailure(blockID: blockID)
+                    self?.finishImageLoadFailure(blockID: blockID, cacheKey: cacheKey)
                 }
             }
         }
@@ -139,9 +157,12 @@ extension BlockInputBlockItem {
         request: BlockInputImageLoadRequest,
         blockID: BlockInputBlockID
     ) {
-        guard renderedBlock?.id == blockID else {
+        guard renderedBlock?.id == blockID,
+              imageLoadCacheKey == request.cacheKey else {
             return
         }
+        imageLoadTask = nil
+        imageLoadCacheKey = nil
         guard let nsImage = NSImage(data: loaded.data) else {
             imageBlockView.configureFailure(style: style)
             return
@@ -162,10 +183,13 @@ extension BlockInputBlockItem {
         }
     }
 
-    private func finishImageLoadFailure(blockID: BlockInputBlockID) {
-        guard renderedBlock?.id == blockID else {
+    private func finishImageLoadFailure(blockID: BlockInputBlockID, cacheKey: String) {
+        guard renderedBlock?.id == blockID,
+              imageLoadCacheKey == cacheKey else {
             return
         }
+        imageLoadTask = nil
+        imageLoadCacheKey = nil
         imageBlockView.configureFailure(style: style)
     }
 
@@ -208,6 +232,102 @@ extension BlockInputBlockItem {
             contentWidth: textWidth,
             containerWidth: scrollViewWidth
         )
+        updateImageCaretFrame()
+    }
+
+    func setImageCaretOffset(_ offset: Int?) {
+        guard let offset,
+              isImageBlock,
+              offset >= 0,
+              offset <= 1 else {
+            imageCaretOffset = nil
+            imageCaretView.isHidden = true
+            imageCaretView.setAccessibilityLabel(nil)
+            return
+        }
+        imageCaretOffset = offset
+        imageCaretView.isHidden = false
+        imageCaretView.alphaValue = 1
+        imageCaretView.layer?.backgroundColor = NSColor.keyboardFocusIndicatorColor.cgColor
+        imageCaretView.setAccessibilityLabel(offset == 0 ? "Before image" : "After image")
+        updateImageCaretFrame()
+    }
+
+    func updateImageCaretFrame() {
+        guard let imageCaretOffset,
+              isImageBlock,
+              !imageBlockView.isHidden else {
+            imageCaretView.isHidden = true
+            return
+        }
+        let caretWidth: CGFloat = 2
+        let caretHeight = imageBlockView.frame.height
+        let caretX = imageCaretX(offset: imageCaretOffset, width: caretWidth)
+        imageCaretView.frame = NSRect(x: caretX, y: imageBlockView.frame.minY, width: caretWidth, height: caretHeight)
+        imageCaretView.isHidden = false
+    }
+
+    func imageCaretOffset(containing rootPoint: NSPoint) -> Int? {
+        guard isImageBlock,
+              !imageBlockView.isHidden,
+              imageResizeHitView(containing: rootPoint) == nil else {
+            return nil
+        }
+        let topZone = NSRect(
+            x: imageBlockView.frame.minX,
+            y: imageBlockView.frame.maxY,
+            width: imageBlockView.frame.width,
+            height: max(view.bounds.maxY - imageBlockView.frame.maxY, Self.imageExternalVerticalInset)
+        )
+        let bottomZone = NSRect(
+            x: imageBlockView.frame.minX,
+            y: view.bounds.minY,
+            width: imageBlockView.frame.width,
+            height: max(imageBlockView.frame.minY - view.bounds.minY, Self.imageExternalVerticalInset)
+        )
+        if topZone.contains(rootPoint) {
+            return 0
+        }
+        if bottomZone.contains(rootPoint) {
+            return 1
+        }
+        let sideZones = imageSideCaretZones()
+        let leadingZone = sideZones.leading
+        let trailingZone = sideZones.trailing
+        if leadingZone.contains(rootPoint) {
+            return 0
+        }
+        if trailingZone.contains(rootPoint) {
+            return 1
+        }
+        return nil
+    }
+
+    private func imageSideCaretZones() -> (leading: NSRect, trailing: NSRect) {
+        let leftZone = NSRect(
+            x: view.bounds.minX,
+            y: imageBlockView.frame.minY,
+            width: max(imageBlockView.frame.minX - view.bounds.minX, Self.imageSurfaceHorizontalInset),
+            height: imageBlockView.frame.height
+        )
+        let rightZone = NSRect(
+            x: imageBlockView.frame.maxX,
+            y: imageBlockView.frame.minY,
+            width: max(view.bounds.maxX - imageBlockView.frame.maxX, Self.imageSurfaceHorizontalInset),
+            height: imageBlockView.frame.height
+        )
+        return view.userInterfaceLayoutDirection == .rightToLeft
+            ? (leading: rightZone, trailing: leftZone)
+            : (leading: leftZone, trailing: rightZone)
+    }
+
+    private func imageCaretX(offset: Int, width: CGFloat) -> CGFloat {
+        switch (offset, view.userInterfaceLayoutDirection) {
+        case (0, .rightToLeft), (1, .leftToRight):
+            return min(imageBlockView.frame.maxX, view.bounds.maxX - width)
+        default:
+            return max(imageBlockView.frame.minX - width, view.bounds.minX)
+        }
     }
 
     private func imageHorizontalOffset(displayWidth: CGFloat, contentWidth: CGFloat, containerWidth: CGFloat) -> CGFloat {
