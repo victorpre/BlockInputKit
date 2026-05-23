@@ -229,6 +229,13 @@ protocol BlockInputBlockItemDelegate: AnyObject {
     func blockItem(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
+        didRequestWordSelectionAdjustment direction: BlockInputWordMovementDirection,
+        previousSelectedRange: NSRange,
+        selectedRange: NSRange
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
         didRequestCollapseSelection direction: BlockInputVerticalMovementDirection
     ) -> Bool
     func blockItem(

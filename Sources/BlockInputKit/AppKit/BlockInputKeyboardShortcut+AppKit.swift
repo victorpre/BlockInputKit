@@ -87,6 +87,11 @@ extension BlockInputKeyboardModifiers {
              #selector(NSTextView.moveWordBackward(_:)),
              #selector(NSTextView.moveWordForward(_:)):
             self = .option
+        case #selector(NSTextView.moveWordLeftAndModifySelection(_:)),
+             #selector(NSTextView.moveWordRightAndModifySelection(_:)),
+             #selector(NSTextView.moveWordBackwardAndModifySelection(_:)),
+             #selector(NSTextView.moveWordForwardAndModifySelection(_:)):
+            self = [.option, .shift]
         default:
             self = []
         }
@@ -110,9 +115,13 @@ private extension BlockInputKeyboardKey {
         #selector(NSTextView.moveToBeginningOfLine(_:)): .leftArrow,
         #selector(NSTextView.moveWordLeft(_:)): .leftArrow,
         #selector(NSTextView.moveWordBackward(_:)): .leftArrow,
+        #selector(NSTextView.moveWordLeftAndModifySelection(_:)): .leftArrow,
+        #selector(NSTextView.moveWordBackwardAndModifySelection(_:)): .leftArrow,
         #selector(NSTextView.moveToEndOfLine(_:)): .rightArrow,
         #selector(NSTextView.moveWordRight(_:)): .rightArrow,
         #selector(NSTextView.moveWordForward(_:)): .rightArrow,
+        #selector(NSTextView.moveWordRightAndModifySelection(_:)): .rightArrow,
+        #selector(NSTextView.moveWordForwardAndModifySelection(_:)): .rightArrow,
         #selector(NSTextView.insertTab(_:)): .tab,
         #selector(NSTextView.insertBacktab(_:)): .tab,
         #selector(NSTextView.cancelOperation(_:)): .escape

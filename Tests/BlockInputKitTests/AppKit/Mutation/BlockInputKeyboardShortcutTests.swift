@@ -163,6 +163,28 @@ final class BlockInputKeyboardShortcutTests: XCTestCase {
         XCTAssertEqual(shortcuts, [.shiftReturn])
     }
 
+    func testSelectorPathCanInterceptOptionShiftWordSelection() throws {
+        let shortcut = BlockInputKeyboardShortcut(key: .rightArrow, modifiers: [.option, .shift])
+        var shortcuts: [BlockInputKeyboardShortcut] = []
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "first", text: "First")
+            ]),
+            keyboardShortcuts: [
+                shortcut: { context in
+                    shortcuts.append(context.shortcut)
+                    return .handled
+                }
+            ]
+        ))
+        let textView = try focusedTextView(in: mounted.view, at: 0, selectedRange: NSRange(location: 0, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.moveWordRightAndModifySelection(_:)))
+
+        XCTAssertEqual(shortcuts, [shortcut])
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 0, length: 0))
+    }
+
     func testRegisteredReturnWorksInTableCells() throws {
         let blockID = BlockInputBlockID(rawValue: "table")
         let table = BlockInputTable.normalized(

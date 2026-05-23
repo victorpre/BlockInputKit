@@ -108,6 +108,7 @@ extension BlockInputTextView {
             handleDocumentBoundaryCommand(selector) ||
             handleSelectionExpansionCommand(selector) ||
             handleHorizontalSelectionAdjustmentCommand(selector) ||
+            handleWordSelectionAdjustmentCommand(selector) ||
             handleWordMovementCommand(selector) ||
             handleLinkBoundaryMovementCommand(selector) ||
             handleBoundaryCommand(selector) {

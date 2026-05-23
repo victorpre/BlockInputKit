@@ -173,6 +173,7 @@ public final class BlockInputView: NSView {
         if handleDocumentBoundaryCommand(selector) ||
             handleSelectionExpansionCommand(selector) ||
             handleHorizontalSelectionAdjustmentCommand(selector) ||
+            handleWordSelectionAdjustmentCommand(selector) ||
             handleWordMovementCommand(selector) { return }
         super.doCommand(by: selector)
     }

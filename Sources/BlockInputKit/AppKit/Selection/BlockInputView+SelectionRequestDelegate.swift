@@ -79,6 +79,21 @@ extension BlockInputView {
     func blockItem(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
+        didRequestWordSelectionAdjustment direction: BlockInputWordMovementDirection,
+        previousSelectedRange: NSRange,
+        selectedRange: NSRange
+    ) -> Bool {
+        adjustWordSelection(
+            from: blockID,
+            previousSelectedRange: previousSelectedRange,
+            selectedRange: selectedRange,
+            direction: direction
+        )
+    }
+
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
         didRequestCollapseSelection direction: BlockInputVerticalMovementDirection
     ) -> Bool {
         collapseMultiBlockSelection(direction: direction)

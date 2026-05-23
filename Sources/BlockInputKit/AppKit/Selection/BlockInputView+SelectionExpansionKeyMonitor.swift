@@ -14,7 +14,8 @@ extension BlockInputView {
                   !linkModalContainsCurrentResponder(),
                   handleFocusedTableCellSelectionKeyEvent(event)
                     || handleSelectionExpansionKeyEvent(event)
-                    || handleHorizontalSelectionAdjustmentKeyEvent(event) else {
+                    || handleHorizontalSelectionAdjustmentKeyEvent(event)
+                    || handleWordSelectionAdjustmentShortcut(event) else {
                 if event.isArrowKey {
                     BlockInputSelectionDebug.emit("monitor pass selection=\(String(describing: self?.selection))")
                 }

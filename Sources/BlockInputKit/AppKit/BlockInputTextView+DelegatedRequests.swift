@@ -55,6 +55,10 @@ extension BlockInputTextView {
             BlockInputSelectionDebug.emit("text key consumed horizontal")
             return
         }
+        if handleWordSelectionAdjustmentShortcut(event) {
+            BlockInputSelectionDebug.emit("text key consumed word selection")
+            return
+        }
         if handleLinkBoundaryMovementShortcut(event) {
             BlockInputSelectionDebug.emit("text key consumed link boundary")
             return
@@ -168,6 +172,10 @@ extension BlockInputTextView {
         }
         if handleHorizontalSelectionAdjustmentShortcut(event) {
             BlockInputSelectionDebug.emit("text equivalent consumed horizontal")
+            return true
+        }
+        if handleWordSelectionAdjustmentShortcut(event) {
+            BlockInputSelectionDebug.emit("text equivalent consumed word selection")
             return true
         }
         return false

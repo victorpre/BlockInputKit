@@ -41,6 +41,23 @@ extension BlockInputBlockItem {
         ) ?? false
     }
 
+    func requestWordSelectionAdjustment(
+        _ direction: BlockInputWordMovementDirection,
+        previousSelectedRange: NSRange,
+        selectedRange: NSRange
+    ) -> Bool {
+        guard let blockID else {
+            return false
+        }
+        return delegate?.blockItem(
+            self,
+            blockID: blockID,
+            didRequestWordSelectionAdjustment: direction,
+            previousSelectedRange: previousSelectedRange,
+            selectedRange: selectedRange
+        ) ?? false
+    }
+
     private func shouldPerformNativeWordMovement(
         from offset: Int,
         textLength: Int,

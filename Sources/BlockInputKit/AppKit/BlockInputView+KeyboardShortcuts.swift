@@ -112,6 +112,7 @@ extension BlockInputView {
         if event.isCancelOperation, cancelMultiBlockSelection() { return }
         if handleImageCaretKeyDown(event) { return }
         if handleEditorArrowKeyEvent(event) { return }
+        if handleWordSelectionAdjustmentShortcut(event) { return }
         if handleWordMovementShortcut(event) { return }
         if let direction = event.plainVerticalMovementDirection, collapseMultiBlockSelection(direction: direction) { return }
         if let direction = event.verticalMovementDirection, moveSelectedBlockVertically(direction) { return }
@@ -125,6 +126,7 @@ extension BlockInputView {
     func performEditorKeyEquivalentDefaults(_ event: NSEvent) -> Bool {
         if performKeyboardShortcutCommand(for: event) { return true }
         if handleEditorArrowKeyEvent(event) { return true }
+        if handleWordSelectionAdjustmentShortcut(event) { return true }
         if handleWordMovementShortcut(event) { return true }
         return super.performKeyEquivalent(with: event)
     }

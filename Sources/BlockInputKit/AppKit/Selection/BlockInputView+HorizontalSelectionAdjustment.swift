@@ -128,7 +128,7 @@ extension BlockInputView {
         }
     }
 
-    private func applyHorizontalSelection(
+    func applyHorizontalSelection(
         _ selection: BlockInputSelection,
         anchor: BlockInputDocumentTextBoundary,
         active: BlockInputDocumentTextBoundary
@@ -148,14 +148,14 @@ extension BlockInputView {
         }
     }
 
-    private func textContainerX(for boundary: BlockInputDocumentTextBoundary) -> CGFloat? {
+    func textContainerX(for boundary: BlockInputDocumentTextBoundary) -> CGFloat? {
         guard let item = visibleItem(for: boundary.blockID, refreshConfiguration: false) else {
             return nil
         }
         return item.textContainerX(forUTF16Offset: boundary.utf16Offset)
     }
 
-    private func horizontalSelectionSpan(
+    func horizontalSelectionSpan(
         preferredDirection: BlockInputHorizontalMovementDirection
     ) -> (anchor: BlockInputDocumentTextBoundary, active: BlockInputDocumentTextBoundary)? {
         guard let selectedBounds = selectionBounds() else {
@@ -318,7 +318,7 @@ extension BlockInputView {
         return BlockInputDocumentTextBoundary(blockID: nextBlock.id, utf16Offset: nextOffset)
     }
 
-    private func selection(
+    func selection(
         from anchor: BlockInputDocumentTextBoundary,
         to active: BlockInputDocumentTextBoundary
     ) -> BlockInputSelection? {
@@ -432,7 +432,7 @@ extension BlockInputView {
         ))
     }
 
-    private func scrollHorizontalSelectionBoundaryToVisible(_ boundary: BlockInputDocumentTextBoundary) {
+    func scrollHorizontalSelectionBoundaryToVisible(_ boundary: BlockInputDocumentTextBoundary) {
         guard let index = index(of: boundary.blockID) else {
             return
         }
