@@ -173,6 +173,12 @@ public struct BlockInputConfiguration {
     public var undoController: BlockInputUndoController?
     /// Optional command bridge for hosts without direct access to the mounted AppKit editor.
     public var commandDispatcher: BlockInputEditorCommandDispatcher?
+    /// Registered host keyboard shortcuts to intercept before built-in editor behavior.
+    ///
+    /// Only shortcuts present in this dictionary are intercepted. Handlers run on the main actor after modal,
+    /// completion, and IME priority, but before editor defaults. Return `.ignored` to resume the editor's normal behavior
+    /// for the original event, or `.performDefault(.returnKey)` to explicitly run plain Return behavior.
+    public var keyboardShortcuts: [BlockInputKeyboardShortcut: BlockInputKeyboardShortcutHandler]
     /// Host completion source for mentions and slash commands.
     public var completionProvider: (any BlockInputCompletionProvider)?
     /// Optional host hook for resolving local file drops before insertion.
@@ -234,6 +240,7 @@ public struct BlockInputConfiguration {
         defaultImagePlaceholderAspectRatio: CGFloat = 16.0 / 9.0,
         undoController: BlockInputUndoController? = nil,
         commandDispatcher: BlockInputEditorCommandDispatcher? = nil,
+        keyboardShortcuts: [BlockInputKeyboardShortcut: BlockInputKeyboardShortcutHandler] = [:],
         completionProvider: (any BlockInputCompletionProvider)? = nil,
         fileDropHandler: BlockInputFileDropHandler? = nil,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
@@ -264,6 +271,7 @@ public struct BlockInputConfiguration {
         self.defaultImagePlaceholderAspectRatio = max(0.01, defaultImagePlaceholderAspectRatio)
         self.undoController = undoController
         self.commandDispatcher = commandDispatcher
+        self.keyboardShortcuts = keyboardShortcuts
         self.completionProvider = completionProvider
         self.fileDropHandler = fileDropHandler
         self.slashCommandAvailability = slashCommandAvailability

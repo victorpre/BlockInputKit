@@ -3,21 +3,41 @@ import AppKit
 extension BlockInputTextView {
     override func keyDown(with event: NSEvent) {
         if blockItem?.isTableCellTextView(self) == true {
-            if !hasMarkedText(),
-               handleTableCellCommandArrow(event) {
+            let result = dispatchKeyboardShortcut(event: event, focusSource: .tableCell)
+            if handleKeyboardShortcutDispatchResult(result, event: event, continuation: {
+                self.performTableCellKeyDownDefaults(event)
+            }) {
                 return
             }
-            if !hasMarkedText(),
-               blockItem?.handleTableCellKeyDown(event, selectedRange: selectedRange()) == true {
-                return
-            }
-            // Table cells keep native arrow and selection movement local to the cell.
-            super.keyDown(with: event)
+            performTableCellKeyDownDefaults(event)
             return
         }
         if blockItem?.requestCompletionKeyDown(event) == true {
             return
         }
+        let result = dispatchKeyboardShortcut(event: event, focusSource: .blockText)
+        if handleKeyboardShortcutDispatchResult(result, event: event, continuation: {
+            self.performNonTableKeyDownDefaults(event)
+        }) {
+            return
+        }
+        performNonTableKeyDownDefaults(event)
+    }
+
+    func performTableCellKeyDownDefaults(_ event: NSEvent) {
+        if !hasMarkedText(),
+           handleTableCellCommandArrow(event) {
+            return
+        }
+        if !hasMarkedText(),
+           blockItem?.handleTableCellKeyDown(event, selectedRange: selectedRange()) == true {
+            return
+        }
+        // Table cells keep native arrow and selection movement local to the cell.
+        super.keyDown(with: event)
+    }
+
+    func performNonTableKeyDownDefaults(_ event: NSEvent) {
         if event.isArrowKey {
             BlockInputSelectionDebug.emit(
                 "text key key=\(event.debugKeyName) modifiers=\(event.debugModifierNames) range=\(selectedRange())"

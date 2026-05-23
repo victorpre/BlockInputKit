@@ -36,6 +36,37 @@ final class BlockInputEditorTests: XCTestCase {
         XCTAssertFalse(isFocused)
     }
 
+    func testFocusBindingPreservesKeyboardShortcutHandlers() {
+        var isFocused = false
+        var handledShortcuts: [BlockInputKeyboardShortcut] = []
+        let editor = BlockInputEditor(
+            configuration: BlockInputConfiguration(
+                keyboardShortcuts: [
+                    .returnKey: { context in
+                        handledShortcuts.append(context.shortcut)
+                        return .handled
+                    }
+                ]
+            ),
+            isFocused: Binding(
+                get: { isFocused },
+                set: { isFocused = $0 }
+            )
+        )
+        let resolvedConfiguration = editor.resolvedConfiguration()
+        let handler = resolvedConfiguration.keyboardShortcuts[.returnKey]
+
+        _ = handler?(BlockInputKeyboardShortcutContext(
+            shortcut: .returnKey,
+            selection: nil,
+            activeBlock: nil,
+            focusSource: .editor,
+            isRepeat: false
+        ))
+
+        XCTAssertEqual(handledShortcuts, [.returnKey])
+    }
+
     func testFocusBindingFocusesAndResignsMountedEditor() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         var isFocused = true

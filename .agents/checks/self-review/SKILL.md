@@ -23,7 +23,9 @@ Perform a repo-aware quality audit of the current BlockInputKit changes before t
    - Any external code that is now unused due to these changes.
    - File-size pressure.
    - Missing unit, AppKit, or snapshot-style test coverage.
-   - Missing class docs or code comments where public API intent is not obvious.
+   - Missing docs for changed `public` or `open` APIs, including types, enum cases, properties, functions, initializers,
+     typealiases, and configuration hooks.
+   - Missing class docs or code comments where non-public API intent is not obvious.
    - Missing or stale `AGENTS.md` guidance.
    - Lint risks and Swift style issues.
    - Accessibility issues in UI changes.

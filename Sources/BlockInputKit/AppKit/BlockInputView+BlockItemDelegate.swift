@@ -332,6 +332,25 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     func blockItem(
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
+        didRequestKeyboardShortcut shortcut: BlockInputKeyboardShortcut,
+        selectedRange: NSRange,
+        focusSource: BlockInputKeyboardShortcutFocusSource,
+        isRepeat: Bool,
+        performDefault: @escaping @MainActor (BlockInputKeyboardShortcut) -> Bool
+    ) -> BlockInputKeyboardShortcutDispatchResult {
+        dispatchKeyboardShortcut(
+            shortcut,
+            focusSource: focusSource,
+            isRepeat: isRepeat,
+            selectionOverride: keyboardShortcutSelection(blockID: blockID, selectedRange: selectedRange),
+            activeBlockOverride: keyboardShortcutBlock(item: item, blockID: blockID, focusSource: focusSource),
+            performDefault: performDefault
+        )
+    }
+
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
         textFormattingMenuItemStatesForSelectedRange selectedRange: NSRange
     ) -> [BlockInputTextFormattingMenuItemState] {
         textFormattingContextMenuItemStates(selectedRange: selectedRange, in: blockID)

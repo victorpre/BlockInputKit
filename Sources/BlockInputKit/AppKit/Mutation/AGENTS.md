@@ -21,6 +21,8 @@
 
 ## Shortcuts
 
+- Keep host `keyboardShortcuts` after modal/completion/IME priority but before editor defaults; route Return, selector,
+  key-equivalent, table-cell, image-caret, and block-selection paths through one dispatch layer.
 - Keep clipboard shortcuts intentionally asymmetric: Cmd+C may use a direct key-equivalent path for editor/block selections, but paste should stay on AppKit `NSText`/responder actions to preserve native insertion semantics.
 - Preserve Cmd+Up/Cmd+Down as document-boundary caret movement; they must not extend block selection.
 - Keep final-cell table Tab routed through the structural `Insert Row` mutation path; hover plus controls stay on the append-row path.

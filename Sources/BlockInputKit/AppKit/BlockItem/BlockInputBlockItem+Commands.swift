@@ -36,6 +36,27 @@ extension BlockInputBlockItem {
         return delegate?.blockItemDidRequestReturn(self, blockID: blockID) ?? true
     }
 
+    func requestKeyboardShortcut(
+        _ shortcut: BlockInputKeyboardShortcut,
+        selectedRange: NSRange,
+        focusSource: BlockInputKeyboardShortcutFocusSource,
+        isRepeat: Bool,
+        performDefault: @escaping @MainActor (BlockInputKeyboardShortcut) -> Bool
+    ) -> BlockInputKeyboardShortcutDispatchResult {
+        guard let blockID else {
+            return .notRegistered
+        }
+        return delegate?.blockItem(
+            self,
+            blockID: blockID,
+            didRequestKeyboardShortcut: shortcut,
+            selectedRange: selectedRange,
+            focusSource: focusSource,
+            isRepeat: isRepeat,
+            performDefault: performDefault
+        ) ?? .notRegistered
+    }
+
     func requestDeleteEmptyBlock() -> Bool {
         guard let blockID else {
             return false

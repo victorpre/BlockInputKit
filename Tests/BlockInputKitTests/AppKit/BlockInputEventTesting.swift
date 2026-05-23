@@ -69,16 +69,25 @@ private func mouseEvent(
 }
 
 func keyDownEvent(keyCode: UInt16, characters: String) throws -> NSEvent {
+    try keyDownEvent(keyCode: keyCode, characters: characters, modifierFlags: [], isARepeat: false)
+}
+
+func keyDownEvent(
+    keyCode: UInt16,
+    characters: String,
+    modifierFlags: NSEvent.ModifierFlags,
+    isARepeat: Bool = false
+) throws -> NSEvent {
     try XCTUnwrap(NSEvent.keyEvent(
         with: .keyDown,
         location: .zero,
-        modifierFlags: [],
+        modifierFlags: modifierFlags,
         timestamp: 0,
         windowNumber: 0,
         context: nil,
         characters: characters,
-        charactersIgnoringModifiers: characters,
-        isARepeat: false,
+        charactersIgnoringModifiers: characters.lowercased(),
+        isARepeat: isARepeat,
         keyCode: keyCode
     ))
 }

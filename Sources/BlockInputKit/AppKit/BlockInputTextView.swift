@@ -12,6 +12,8 @@ class BlockInputTextView: NSTextView {
     var blockSelectionDragAnchorOffset: Int?
     var blockSelectionClickLinkRange: BlockInputInlineMarkdownRange?
     var blockSelectionMouseDownWindowLocation: NSPoint?
+    var isIgnoringShortcutDispatch = false
+    var ignoredKeyboardShortcutEventIDs: Set<ObjectIdentifier> = []
     let fileDropCaretView = NSView()
     // Native modified-click and multi-click gestures can re-enter mouseDragged/mouseUp during AppKit tracking. Keep that
     // separate from the custom plain-drag state so native selection restoration cannot be consumed as a block drag.
@@ -135,39 +137,19 @@ class BlockInputTextView: NSTextView {
                 "text equivalent key=\(event.debugKeyName) modifiers=\(event.debugModifierNames) range=\(selectedRange())"
             )
         }
-        if event.blockInputIsSelectAllShortcut,
-           let blockItem {
-            blockItem.requestSelectAll()
+        let focusSource: BlockInputKeyboardShortcutFocusSource =
+            blockItem?.isTableCellTextView(self) == true ? .tableCell : .blockText
+        switch dispatchKeyboardShortcut(event: event, focusSource: focusSource) {
+        case .handled:
             return true
-        }
-        if let undoShortcut = event.blockInputUndoShortcut,
-           blockItem?.requestUndoShortcut(undoShortcut) == true {
-            return true
-        }
-        if let formattingShortcut = event.blockInputTextFormattingShortcut {
-            _ = blockItem?.requestTextFormattingShortcut(formattingShortcut)
-            return true
-        }
-        if handleTableCellKeyEquivalent(event) {
-            return true
-        }
-        if handleNonTableSelectionKeyEquivalent(event) {
-            return true
-        }
-        if event.blockInputIsCopyShortcut {
-            if blockItem?.requestCopyActiveSelection() == true || copySelectedPlainText(allowingEditorRoute: false) {
-                return true
+        case .ignored:
+            return performKeyboardShortcutContinuationAfterIgnoredEvent(event) {
+                performKeyEquivalentDefaults(with: event)
             }
+        case .notRegistered:
+            break
         }
-        if event.blockInputIsCutShortcut {
-            cut(nil)
-            return true
-        }
-        if event.blockInputIsPasteShortcut {
-            paste(nil)
-            return true
-        }
-        return super.performKeyEquivalent(with: event)
+        return performKeyEquivalentDefaults(with: event)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -250,28 +232,30 @@ class BlockInputTextView: NSTextView {
     override func doCommand(by selector: Selector) {
         BlockInputSelectionDebug.emit("text command selector=\(selector) range=\(selectedRange())")
         if blockItem?.isTableCellTextView(self) == true {
-            if blockItem?.handleTableCellCommand(selector, selectedRange: selectedRange()) == true {
-                BlockInputSelectionDebug.emit("text command consumed table selector=\(selector)")
+            switch dispatchKeyboardShortcut(selector: selector, focusSource: .tableCell) {
+            case .handled:
                 return
+            case .ignored:
+                performTableCellCommandDefaults(selector)
+            case .notRegistered:
+                performTableCellCommandDefaults(selector)
             }
-            super.doCommand(by: selector)
             return
         }
         if blockItem?.requestCompletionCommand(selector) == true {
             BlockInputSelectionDebug.emit("text command consumed completion selector=\(selector)")
             return
         }
-        if handleBlockCommand(selector) ||
-            handleDocumentBoundaryCommand(selector) ||
-            handleSelectionExpansionCommand(selector) ||
-            handleHorizontalSelectionAdjustmentCommand(selector) ||
-            handleWordMovementCommand(selector) ||
-            handleLinkBoundaryMovementCommand(selector) ||
-            handleBoundaryCommand(selector) {
-            BlockInputSelectionDebug.emit("text command consumed selector=\(selector)")
+        switch dispatchKeyboardShortcut(selector: selector, focusSource: .blockText) {
+        case .handled:
             return
+        case .ignored:
+            performNonTableCommandDefaults(selector)
+            return
+        case .notRegistered:
+            break
         }
-        super.doCommand(by: selector)
+        performNonTableCommandDefaults(selector)
     }
 
     override func moveWordLeft(_ sender: Any?) {
@@ -322,7 +306,7 @@ class BlockInputTextView: NSTextView {
         super.moveToEndOfDocument(sender)
     }
 
-    private func handleBlockCommand(_ selector: Selector) -> Bool {
+    func handleBlockCommand(_ selector: Selector) -> Bool {
         switch selector {
         case #selector(insertNewline(_:)):
             guard let blockItem else {
@@ -364,7 +348,7 @@ class BlockInputTextView: NSTextView {
         return blockItem?.requestDeleteEmptyBlock() == true
     }
 
-    private func handleBoundaryCommand(_ selector: Selector) -> Bool {
+    func handleBoundaryCommand(_ selector: Selector) -> Bool {
         switch selector {
         case #selector(moveUp(_:)):
             return blockItem?.requestCollapseSelection(.upward) == true
@@ -377,7 +361,7 @@ class BlockInputTextView: NSTextView {
         }
     }
 
-    private func handleSelectionExpansionCommand(_ selector: Selector) -> Bool {
+    func handleSelectionExpansionCommand(_ selector: Selector) -> Bool {
         let direction: BlockInputVerticalMovementDirection
         switch selector {
         case #selector(moveUpAndModifySelection(_:)):
@@ -391,7 +375,7 @@ class BlockInputTextView: NSTextView {
         return true
     }
 
-    private func handleDocumentBoundaryCommand(_ selector: Selector) -> Bool {
+    func handleDocumentBoundaryCommand(_ selector: Selector) -> Bool {
         switch selector {
         case #selector(moveToBeginningOfDocument(_:)):
             return requestDocumentBoundaryFromOwningBlock(.upward)

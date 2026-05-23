@@ -114,6 +114,15 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         blockID: BlockInputBlockID,
         didRequestTextFormattingShortcut shortcut: BlockInputTextFormattingShortcut
     ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestKeyboardShortcut shortcut: BlockInputKeyboardShortcut,
+        selectedRange: NSRange,
+        focusSource: BlockInputKeyboardShortcutFocusSource,
+        isRepeat: Bool,
+        performDefault: @escaping @MainActor (BlockInputKeyboardShortcut) -> Bool
+    ) -> BlockInputKeyboardShortcutDispatchResult
     /// Lets a mounted text view route completion key events through the editor-owned popup.
     func blockItem(
         _ item: BlockInputBlockItem,

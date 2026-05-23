@@ -130,6 +130,38 @@ Button("Bold") {
 
 `BlockInputEditorCommand` covers undo, redo, select all, clipboard actions, inline formatting, links, images, and table insertion/row/column/table actions.
 
+### Host Keyboard Shortcuts
+
+Register keyboard shortcuts when the host needs to intercept keys before the editor's built-in behavior. Only dictionary
+keys are intercepted; unregistered keys keep normal AppKit/editor behavior.
+
+```swift
+let configuration = BlockInputConfiguration(
+    keyboardShortcuts: [
+        .returnKey: { context in
+            sendMessage()
+            return .handled
+        },
+        .shiftReturn: { _ in
+            .performDefault(.returnKey)
+        },
+        .optionReturn: { context in
+            runCustomAction(selection: context.selection)
+            return .handled
+        }
+    ]
+)
+```
+
+Handlers run synchronously on the main actor before default editor mutation/navigation, including text blocks, table
+cells, image carets, and whole-block selections. Completion popups, modal fields, and active IME marked text keep
+priority over host shortcuts. Return `.ignored` to continue the original event, or `.performDefault(.returnKey)` to
+explicitly run plain Return behavior without recursively invoking the host handler. Shortcut matching normalizes keypad
+Enter to Return, ignores inert flags such as numeric pad/caps lock, and lowercases single-character keys.
+Selector-only fallback uses `NSApp.currentEvent` when available, then maps known Return, Tab, Arrow, word, and document
+movement selectors to the same public shortcut values. Start async host work from the handler after returning `.handled`
+rather than blocking key dispatch.
+
 ### Callbacks
 
 Use callbacks for host state, persistence, and focus wiring:

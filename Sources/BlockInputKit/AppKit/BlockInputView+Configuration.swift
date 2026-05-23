@@ -38,6 +38,7 @@ extension BlockInputView {
             configuredDocument: configuredDocument
         )
         configureCommandDispatcher(configuration.commandDispatcher)
+        keyboardShortcuts = configuration.keyboardShortcuts
         configureCompletion(configuration)
         if documentStoreChanged || previousDocument != configuredDocument {
             dismissCompletionPopup()

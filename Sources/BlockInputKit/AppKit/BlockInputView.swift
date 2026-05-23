@@ -43,6 +43,10 @@ public final class BlockInputView: NSView {
     var fallbackUndoController = BlockInputUndoController()
     var undoController: BlockInputUndoController?
     var commandDispatcher: BlockInputEditorCommandDispatcher?
+    var keyboardShortcuts: [BlockInputKeyboardShortcut: BlockInputKeyboardShortcutHandler] = [:]
+    var isPerformingDefaultKeyboardShortcut = false
+    var isIgnoringShortcutDispatch = false
+    var ignoredKeyboardShortcutEventIDs: Set<ObjectIdentifier> = []
     var completionProvider: (any BlockInputCompletionProvider)?
     var fileDropHandler: BlockInputFileDropHandler?
     var fileDropTasks: [UUID: Task<Void, Never>] = [:]
@@ -141,23 +145,25 @@ public final class BlockInputView: NSView {
     /// Handles editor-owned key events before forwarding unhandled events to AppKit.
     public override func keyDown(with event: NSEvent) {
         if modalContainsCurrentResponder { super.keyDown(with: event); return }
-        if event.isCancelOperation, cancelMultiBlockSelection() { return }
-        if handleImageCaretKeyDown(event) { return }
-        if handleEditorArrowKeyEvent(event) { return }
-        if handleWordMovementShortcut(event) { return }
-        if let direction = event.plainVerticalMovementDirection, collapseMultiBlockSelection(direction: direction) { return }
-        if let direction = event.verticalMovementDirection, moveSelectedBlockVertically(direction) { return }
-        if event.isBackspaceOrDelete {
-            if selectedBlockCount == 1, deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil { return }
-            if deleteSelectedBlocksForBackspaceOrDelete() != nil { return }
+        switch dispatchKeyboardShortcut(event: event) {
+        case .handled:
+            return
+        case .ignored:
+            performKeyboardShortcutContinuationAfterIgnoredEvent(event) {
+                performEditorKeyDownDefaults(event)
+            }
+            return
+        case .notRegistered:
+            break
         }
-        super.keyDown(with: event)
+        performEditorKeyDownDefaults(event)
     }
 
     /// Handles selector-based movement and cancellation commands before forwarding unhandled commands to AppKit.
     public override func doCommand(by selector: Selector) {
         if linkModalContainsCurrentResponder() { super.doCommand(by: selector); return }
         if imageModalContainsCurrentResponder() { super.doCommand(by: selector); return }
+        if dispatchKeyboardShortcut(selector: selector) == .handled { return }
         if selector == #selector(cancelOperation(_:)), cancelMultiBlockSelection() {
             return
         }
@@ -176,10 +182,17 @@ public final class BlockInputView: NSView {
         if performFocusedModalFieldEditorKeyEquivalent(event) { return true }
         if linkModalContainsCurrentResponder() { return super.performKeyEquivalent(with: event) }
         if imageModalContainsCurrentResponder() { return super.performKeyEquivalent(with: event) }
-        if performKeyboardShortcutCommand(for: event) { return true }
-        if handleEditorArrowKeyEvent(event) { return true }
-        if handleWordMovementShortcut(event) { return true }
-        return super.performKeyEquivalent(with: event)
+        switch dispatchKeyboardShortcut(event: event) {
+        case .handled:
+            return true
+        case .ignored:
+            return performKeyboardShortcutContinuationAfterIgnoredEvent(event) {
+                performEditorKeyEquivalentDefaults(event)
+            }
+        case .notRegistered:
+            break
+        }
+        return performEditorKeyEquivalentDefaults(event)
     }
 
     /// Selects all editor content or forwards the command to a focused modal field.
