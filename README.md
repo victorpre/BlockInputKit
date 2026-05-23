@@ -344,6 +344,8 @@ The demo also includes file mention suggestions, slash commands with `.anywhere`
 
 Linting uses the repo SwiftLint configuration in `.swiftlint.yml`; keep project exceptions centralized there instead of adding inline suppression comments.
 
+Agent workflows live under `.agents`: capability workflows in `.agents/skills`, and review or audit checks in `.agents/checks`.
+
 ## Snapshot Tests
 
 Verify the representative snapshot suite:

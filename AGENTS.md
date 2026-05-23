@@ -13,7 +13,8 @@
 Read the nearest `AGENTS.md` before editing. Current scopes:
 
 - `AGENTS.md`: repo-wide workflow.
-- `.agents/AGENTS.md`: repo-local agent skills.
+- `.agents/AGENTS.md`: repo-local agent workflow guidance.
+- `.agents/checks/AGENTS.md`: repo-local review, audit, and check workflows.
 - `Sources/BlockInputKit/AppKit/AGENTS.md`: AppKit editor surface and cross-cutting editor rules.
 - `Sources/BlockInputKit/AppKit/BlockItem/AGENTS.md`: AppKit block item reuse, chrome, markers, and metrics.
 - `Sources/BlockInputKit/AppKit/Mutation/AGENTS.md`: AppKit store sync, editing operations, and command shortcuts.
