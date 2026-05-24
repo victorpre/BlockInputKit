@@ -294,6 +294,7 @@ extension BlockInputView {
         let generation = focusRestoreGeneration
         collectionView.reloadData()
         collectionView.collectionViewLayout?.invalidateLayout()
+        updatePlaceholderVisibility()
         if selection != nil {
             // AppKit may recreate items either immediately or on the next pass;
             // restoring in both places keeps cursor/text selection stable.
@@ -304,6 +305,7 @@ extension BlockInputView {
                 }
                 collectionView.layoutSubtreeIfNeeded()
                 restoreVisibleSelection()
+                updatePlaceholderVisibility()
                 invalidatePreferredHeight()
             }
         }
@@ -315,6 +317,7 @@ extension BlockInputView {
         collectionView.reloadData()
         collectionView.collectionViewLayout?.invalidateLayout()
         collectionView.layoutSubtreeIfNeeded()
+        updatePlaceholderVisibility()
         invalidatePreferredHeight()
     }
 

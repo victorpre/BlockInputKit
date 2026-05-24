@@ -140,11 +140,12 @@ extension BlockInputView {
     func handleDocumentStoreChange(_ change: BlockInputDocumentStoreChange) {
         switch change {
         case .loadingStateChanged:
-            break
+            updatePlaceholderVisibility()
         case .appendedBlocks(let batch):
             progressiveStoreError = nil
             updateDocumentCacheAfterProgressiveBatch(batch)
             appendProgressiveBatch(batch)
+            updatePlaceholderVisibility()
             if batch.isComplete,
                pendingDocumentSnapshotWorkItem != nil {
                 scheduleDeferredDocumentSnapshot()
@@ -160,6 +161,7 @@ extension BlockInputView {
         case .failed(let error):
             progressiveStoreError = error
             collectionView.reloadData()
+            updatePlaceholderVisibility()
         }
     }
 
@@ -198,6 +200,7 @@ extension BlockInputView {
                 return
             }
             self.restoreMountedSelection()
+            self.updatePlaceholderVisibility()
             self.invalidatePreferredHeight()
         }
     }

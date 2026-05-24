@@ -15,6 +15,7 @@ extension BlockInputView {
     }
 
     func publishDocumentChange() {
+        updatePlaceholderVisibility()
         guard let onDocumentChange else {
             return
         }

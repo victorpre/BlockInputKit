@@ -97,6 +97,18 @@ let configuration = BlockInputConfiguration(
 
 `dropIndicatorColor`, selection colors, inline code, code block, and image block styling are also configurable.
 
+### Placeholder
+
+Use `placeholder` for subtle empty-editor text. The placeholder is visual only; it is not inserted into the document,
+included in Markdown export, or reported through document-change callbacks.
+
+```swift
+let configuration = BlockInputConfiguration(
+    document: BlockInputDocument(),
+    placeholder: "Ask anything"
+)
+```
+
 ### Editor Height Sizing
 
 Height sizing is opt-in. When enabled, the editor reports a rendered-content preferred height that starts at a default

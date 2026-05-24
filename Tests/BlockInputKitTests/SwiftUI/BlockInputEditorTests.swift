@@ -56,6 +56,12 @@ final class BlockInputEditorTests: XCTestCase {
         XCTAssertEqual(host.fittingSize.height, expectedHeight, accuracy: 1)
     }
 
+    func testResolvedConfigurationPreservesPlaceholder() {
+        let editor = BlockInputEditor(configuration: BlockInputConfiguration(placeholder: "Ask anything"))
+
+        XCTAssertEqual(editor.resolvedConfiguration().placeholder, "Ask anything")
+    }
+
     func testFocusBindingPreservesKeyboardShortcutHandlers() {
         var isFocused = false
         var handledShortcuts: [BlockInputKeyboardShortcut] = []

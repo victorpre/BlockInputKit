@@ -31,6 +31,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.document.blocks.map(\.id), [blockID])
         XCTAssertEqual(configuration.editorHorizontalInset, BlockInputConfiguration.defaultEditorHorizontalInset)
         XCTAssertEqual(configuration.editorVerticalInset, BlockInputConfiguration.defaultEditorVerticalInset)
+        XCTAssertNil(configuration.placeholder)
         XCTAssertNil(configuration.heightSizing)
         XCTAssertEqual(configuration.slashCommandAvailability, .documentStart)
         XCTAssertNil(configuration.slashCommandChipClickHandler)
@@ -60,6 +61,7 @@ final class BlockInputConfigurationTests: XCTestCase {
             allowsBlockReordering: false,
             editorHorizontalInset: 28,
             editorVerticalInset: 14,
+            placeholder: "Message",
             dropIndicatorColor: .systemPink,
             heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 2, maximumVisibleLineCount: 5),
             undoController: undoController,
@@ -72,6 +74,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertFalse(view.allowsBlockReordering)
         XCTAssertEqual(view.editorHorizontalInset, 28)
         XCTAssertEqual(view.editorVerticalInset, 14)
+        XCTAssertEqual(view.placeholder, "Message")
         let sectionInset = try XCTUnwrap((view.collectionView.collectionViewLayout as? NSCollectionViewFlowLayout)?.sectionInset)
         XCTAssertEqual(sectionInset.top, 14)
         XCTAssertEqual(sectionInset.bottom, 14)

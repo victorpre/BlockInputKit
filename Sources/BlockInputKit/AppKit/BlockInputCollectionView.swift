@@ -8,6 +8,7 @@ final class BlockInputCollectionView: NSCollectionView {
     override func layout() {
         super.layout()
         blockInputView?.scheduleProgressivePreloadCheck()
+        blockInputView?.updatePlaceholderLayout()
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {

@@ -70,6 +70,7 @@ extension BlockInputView {
         allowsBlockReordering = configuration.allowsBlockReordering
         editorHorizontalInset = configuration.editorHorizontalInset
         editorVerticalInset = configuration.editorVerticalInset
+        placeholder = configuration.placeholder
         dropIndicatorColor = configuration.dropIndicatorColor
         configureHeightSizing(configuration.heightSizing)
     }

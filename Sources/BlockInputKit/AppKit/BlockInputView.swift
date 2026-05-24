@@ -20,6 +20,8 @@ public final class BlockInputView: NSView {
     public internal(set) var editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
     /// Color used for the drag insertion indicator line.
     public internal(set) var dropIndicatorColor = NSColor.controlAccentColor
+    /// Subtle text shown when the editor has no meaningful document content.
+    public internal(set) var placeholder: String?
     /// Visual styling used for text, code, and selection chrome.
     public internal(set) var style = BlockInputStyle.default
     var heightSizing: BlockInputEditorHeightSizing?
@@ -36,6 +38,7 @@ public final class BlockInputView: NSView {
 
     let scrollView = BlockInputDocumentScrollView()
     let collectionView = BlockInputCollectionView()
+    let placeholderLabel = BlockInputPlaceholderLabel(labelWithString: "")
     let dropIndicatorView = NSView()
     let layout = BlockInputCollectionViewFlowLayout()
     var documentStore: (any BlockInputDocumentStore)?
@@ -463,6 +466,8 @@ private extension BlockInputView {
         dropIndicatorView.isHidden = true
         dropIndicatorView.setAccessibilityElement(false)
         collectionView.addSubview(dropIndicatorView, positioned: .above, relativeTo: nil)
+        configurePlaceholderLabel()
+        collectionView.addSubview(placeholderLabel, positioned: .above, relativeTo: nil)
 
         scrollView.borderType = .noBorder
         scrollView.hasHorizontalScroller = false

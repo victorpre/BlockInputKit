@@ -53,6 +53,7 @@ final class DemoModel: ObservableObject {
         BlockInputConfiguration(
             documentStore: session.store,
             allowsBlockReordering: allowsReordering,
+            placeholder: "Start writing...",
             imageBaseURL: Bundle.module.resourceURL,
             undoController: session.undoController,
             completionProvider: completionProvider,

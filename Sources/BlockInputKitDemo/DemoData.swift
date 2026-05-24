@@ -56,7 +56,7 @@ enum DemoData {
             BlockInputBlock(kind: .quote, text: "Focus, selection, return, delete, and Cmd+A coordinate across blocks."),
             BlockInputBlock(kind: .code(language: "swift"), text: """
             let editor = BlockInputView()
-            editor.configure(BlockInputConfiguration(document: document))
+            editor.configure(BlockInputConfiguration(document: document, placeholder: "Start writing..."))
             editor.focusEditor()
             """),
             BlockInputBlock(kind: .horizontalRule)

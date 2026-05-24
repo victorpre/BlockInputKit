@@ -179,6 +179,11 @@ public struct BlockInputConfiguration {
     public var editorHorizontalInset: CGFloat
     /// Visual vertical inset used above and below editor content.
     public var editorVerticalInset: CGFloat
+    /// Subtle text shown when the editor has no meaningful document content.
+    ///
+    /// The placeholder is visual only. It is not inserted into the document, exported as Markdown, or reported through
+    /// document-change callbacks.
+    public var placeholder: String?
     /// Color used for editor accent affordances, including drag insertion and selected horizontal rules.
     public var dropIndicatorColor: NSColor
     /// Visual styling for editor text, code, and selection chrome.
@@ -266,6 +271,7 @@ public struct BlockInputConfiguration {
         allowsBlockReordering: Bool = true,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         editorVerticalInset: CGFloat = BlockInputConfiguration.defaultEditorVerticalInset,
+        placeholder: String? = nil,
         dropIndicatorColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
         heightSizing: BlockInputEditorHeightSizing? = nil,
@@ -298,6 +304,7 @@ public struct BlockInputConfiguration {
         self.allowsBlockReordering = allowsBlockReordering
         self.editorHorizontalInset = editorHorizontalInset
         self.editorVerticalInset = editorVerticalInset
+        self.placeholder = placeholder
         self.dropIndicatorColor = dropIndicatorColor
         self.style = style
         self.heightSizing = heightSizing
