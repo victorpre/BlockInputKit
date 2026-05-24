@@ -2,7 +2,8 @@ import AppKit
 
 extension BlockInputBlockItem {
     func requestIndent() -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         guard currentSelectionCanChangeIndent else {
@@ -13,7 +14,8 @@ extension BlockInputBlockItem {
     }
 
     func requestOutdent() -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         guard currentSelectionCanChangeIndent else {

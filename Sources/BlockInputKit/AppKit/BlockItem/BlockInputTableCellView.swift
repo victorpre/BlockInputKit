@@ -5,6 +5,7 @@ struct BlockInputTableCellConfiguration {
     var isHeader: Bool
     var alignment: NSTextAlignment
     var style: BlockInputStyle
+    var isEditable: Bool
     var position: BlockInputTable.CellPosition
     var tableView: BlockInputTableView?
     var blockItem: BlockInputBlockItem?
@@ -21,6 +22,7 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
     private var isHeader = false
     private var alignment: NSTextAlignment = .left
     private var style = BlockInputStyle.default
+    private var isEditable = true
     private var isRowSelected = false
     private var isCellSelected = false
     var position = BlockInputTable.CellPosition(row: .header, column: 0)
@@ -52,18 +54,29 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
         isHeader = configuration.isHeader
         alignment = configuration.alignment
         style = configuration.style
+        isEditable = configuration.isEditable
         position = configuration.position
         tableView = configuration.tableView
         textView.blockItem = configuration.blockItem
+        textView.isEditable = configuration.isEditable
+        textView.isSelectable = true
         textView.textStorage?.setAttributedString(BlockInputTableView.attributedString(
             configuration.text,
             isHeader: configuration.isHeader,
             alignment: configuration.alignment,
             style: configuration.style,
             usesPlaceholder: false,
-            appliesInlineMarkdown: true
+            appliesInlineMarkdown: true,
+            isEditable: configuration.isEditable
         ))
         updateAccessibility()
+        updateColors()
+    }
+
+    func updateEditableState(_ isEditable: Bool) {
+        self.isEditable = isEditable
+        textView.isEditable = isEditable
+        refreshInlineMarkdownAttributesAfterEdit()
         updateColors()
     }
 
@@ -80,7 +93,8 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
             alignment: alignment,
             style: style,
             usesPlaceholder: false,
-            appliesInlineMarkdown: true
+            appliesInlineMarkdown: true,
+            isEditable: isEditable
         )
         isConfiguring = true
         defer { isConfiguring = false }
@@ -92,13 +106,23 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
     func updateColors() {
         wantsLayer = true
         if isRowSelected || isCellSelected {
-            layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.22).cgColor
+            let alpha = BlockInputReadOnlyStyle.alpha(
+                isEditable: isEditable,
+                editable: 0.22,
+                readOnly: BlockInputReadOnlyStyle.tableSelectionBackgroundAlpha
+            )
+            layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(alpha).cgColor
         } else {
+            let headerAlpha = BlockInputReadOnlyStyle.alpha(
+                isEditable: isEditable,
+                editable: 0.08,
+                readOnly: BlockInputReadOnlyStyle.tableHeaderBackgroundAlpha
+            )
             layer?.backgroundColor = isHeader
-                ? NSColor.separatorColor.withAlphaComponent(0.08).cgColor
+                ? NSColor.separatorColor.withAlphaComponent(headerAlpha).cgColor
                 : NSColor.textBackgroundColor.withAlphaComponent(0.01).cgColor
         }
-        layer?.borderColor = NSColor.separatorColor.cgColor
+        layer?.borderColor = BlockInputReadOnlyStyle.tableBorderColor(isEditable: isEditable)
         layer?.borderWidth = 0.5
     }
 
@@ -227,6 +251,9 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
     ) -> Bool {
         guard !isConfiguring else {
             return true
+        }
+        guard isEditable else {
+            return false
         }
         if let replacementString,
            replacementString.rangeOfCharacter(from: .newlines) != nil {

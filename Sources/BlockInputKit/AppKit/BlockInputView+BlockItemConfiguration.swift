@@ -8,6 +8,8 @@ extension BlockInputView {
             style: style,
             imageLoadingContext: imageLoadingContext,
             fileBaseURL: fileBaseURL,
+            isEditable: isEditable,
+            disabledCursor: disabledCursor,
             isSelected: isBlockSelected(block.id),
             delegate: self
         )

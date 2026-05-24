@@ -7,6 +7,9 @@ struct BlockInputTableMenuContext {
 
 extension BlockInputView {
     func tableContextMenuItems(blockID: BlockInputBlockID, selectedRange: NSRange, event: NSEvent) -> [NSMenuItem] {
+        guard isEditable else {
+            return []
+        }
         guard let block = block(withID: blockID) else {
             return []
         }

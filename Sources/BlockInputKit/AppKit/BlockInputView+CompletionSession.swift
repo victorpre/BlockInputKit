@@ -44,7 +44,8 @@ extension BlockInputView {
         item: BlockInputBlockItem,
         blockID: BlockInputBlockID
     ) {
-        guard completionProvider != nil,
+        guard isEditable,
+              completionProvider != nil,
               let block = block(withID: blockID),
               BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind),
               item.currentSelectedRange.length == 0 else {
@@ -92,7 +93,8 @@ extension BlockInputView {
     }
 
     func handleCompletionCommand(_ selector: Selector) -> Bool {
-        guard completionSession != nil else {
+        guard isEditable,
+              completionSession != nil else {
             return false
         }
         switch selector {
@@ -116,7 +118,8 @@ extension BlockInputView {
     }
 
     func handleCompletionKeyDown(_ event: NSEvent) -> Bool {
-        guard completionSession != nil else {
+        guard isEditable,
+              completionSession != nil else {
             return false
         }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -456,7 +459,8 @@ extension BlockInputView {
     }
 
     private func acceptCompletionSuggestionFromPopup(_ suggestion: BlockInputCompletionSuggestion) {
-        guard let session = completionSession else {
+        guard isEditable,
+              let session = completionSession else {
             return
         }
         dismissCompletionPopup()

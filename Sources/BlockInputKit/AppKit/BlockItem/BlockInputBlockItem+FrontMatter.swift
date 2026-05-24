@@ -27,12 +27,12 @@ extension BlockInputBlockItem {
             }
             textStorage.addAttribute(
                 .foregroundColor,
-                value: NSColor.systemBlue,
+                value: readOnlyForegroundColor(.systemBlue, for: block.kind),
                 range: NSRange(location: line.range.location, length: colonOffset)
             )
             textStorage.addAttribute(
                 .foregroundColor,
-                value: NSColor.secondaryLabelColor,
+                value: readOnlyForegroundColor(.secondaryLabelColor, for: block.kind),
                 range: NSRange(location: line.range.location + colonOffset, length: 1)
             )
         }
@@ -56,7 +56,11 @@ extension BlockInputBlockItem {
             guard range.length > 0 else {
                 continue
             }
-            textStorage.addAttribute(.foregroundColor, value: NSColor.systemOrange, range: range)
+            textStorage.addAttribute(
+                .foregroundColor,
+                value: readOnlyForegroundColor(.systemOrange, for: block.kind),
+                range: range
+            )
             textStorage.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: range)
         }
     }

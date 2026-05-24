@@ -5,7 +5,8 @@ extension BlockInputView {
         blockID: BlockInputBlockID,
         to targetIndex: Int
     ) -> BlockInputSelection? {
-        guard documentStore != nil,
+        guard isEditable,
+              documentStore != nil,
               blockCount > largeDocumentCacheMutationLimit,
               let sourceIndex = index(of: blockID) else {
             return nil
@@ -190,6 +191,10 @@ extension BlockInputView {
                 editorHorizontalInset: editorHorizontalInset,
                 accentColor: dropIndicatorColor,
                 style: style,
+                imageLoadingContext: imageLoadingContext,
+                fileBaseURL: fileBaseURL,
+                isEditable: isEditable,
+                disabledCursor: disabledCursor,
                 isSelected: isBlockSelected(block.id),
                 delegate: self
             )

@@ -15,7 +15,8 @@ extension BlockInputView {
     /// Applies Return key semantics to the active block.
     @discardableResult
     public func insertBlockBelowCurrentBlock() -> BlockInputSelection? {
-        guard let blockID = activeBlockID else {
+        guard isEditable,
+              let blockID = activeBlockID else {
             return nil
         }
         let returnSelection = currentReturnSelection(for: blockID)

@@ -18,6 +18,9 @@ extension BlockInputView {
     }
 
     func cutActiveSelection() -> Bool {
+        guard isEditable else {
+            return false
+        }
         if let copiedText = markdownAwareCopiedTextForTextCut() {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(copiedText, forType: .string)
@@ -34,6 +37,9 @@ extension BlockInputView {
     }
 
     func pasteIntoActiveSelection() -> Bool {
+        guard isEditable else {
+            return false
+        }
         if pasteTextAtImageCaretIfNeeded() {
             return true
         }
@@ -48,6 +54,9 @@ extension BlockInputView {
     /// Deletes the selected whole blocks.
     @discardableResult
     public func deleteSelectedBlocksForBackspaceOrDelete() -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         refreshDocumentFromStore()
         if case let .mixed(selection) = selection {
             return deleteMixedSelection(selection)

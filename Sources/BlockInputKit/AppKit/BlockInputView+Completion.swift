@@ -84,7 +84,8 @@ extension BlockInputView {
         in blockID: BlockInputBlockID? = nil,
         replacing replacementRange: NSRange? = nil
     ) -> BlockInputSelection? {
-        guard let resolvedBlockID = blockID ?? activeBlockID,
+        guard isEditable,
+              let resolvedBlockID = blockID ?? activeBlockID,
               let index = index(of: resolvedBlockID),
               let block = block(at: index),
               block.id == resolvedBlockID,

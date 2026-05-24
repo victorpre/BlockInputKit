@@ -20,6 +20,7 @@ extension BlockInputBlockItem {
         if let foregroundColor = style.codeBlock.foregroundColor {
             textStorage.addAttribute(.foregroundColor, value: foregroundColor, range: fullRange)
         }
+        applyReadOnlyCodeForegroundIfNeeded(textStorage: textStorage, range: fullRange)
     }
 
     func configureCodeBackground(for block: BlockInputBlock) {
@@ -30,7 +31,10 @@ extension BlockInputBlockItem {
             return
         }
         codeBackgroundView.isHidden = false
-        codeBackgroundView.alphaValue = 1
+        codeBackgroundView.alphaValue = BlockInputReadOnlyStyle.alpha(
+            isEditable: isEditable,
+            readOnly: BlockInputReadOnlyStyle.codeBackgroundAlpha
+        )
         codeBackgroundView.layer?.backgroundColor = codeBackgroundColor(for: effectiveCodeColorScheme).cgColor
         codeBackgroundView.layer?.borderColor = Self.codeBorderColor(for: effectiveCodeColorScheme).cgColor
         codeBackgroundView.layer?.cornerRadius = style.codeBlock.cornerRadius ?? 6
@@ -79,6 +83,13 @@ extension BlockInputBlockItem {
         let naturalWidth = widestCodeLineWidth(in: text, font: font) + codeTextHorizontalPadding * 2
         let minimumWidth = max(ceil(font.pointSize * 12), 144)
         return min(max(naturalWidth, minimumWidth), max(availableWidth, 0))
+    }
+
+    private func applyReadOnlyCodeForegroundIfNeeded(textStorage: NSTextStorage, range: NSRange) {
+        guard !isEditable else {
+            return
+        }
+        BlockInputReadOnlyStyle.applyDisabledForeground(to: textStorage, range: range)
     }
 
     private static func widestCodeLineWidth(in text: String, font: NSFont) -> CGFloat {

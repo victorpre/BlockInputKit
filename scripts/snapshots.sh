@@ -5,7 +5,7 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/snapshots.sh <verify|record> [test_identifier ...]
 
-Defaults to the representative AppKit snapshot suite when no identifiers are provided.
+Defaults to the representative AppKit snapshot suites when no identifiers are provided.
 
 Examples:
   ./scripts/snapshots.sh verify
@@ -36,7 +36,9 @@ case "$mode" in
 esac
 
 if [ "$#" -eq 0 ]; then
-  set -- "BlockInputKitTests/BlockInputViewSnapshotTests"
+  set -- \
+    "BlockInputKitTests/BlockInputViewSnapshotTests" \
+    "BlockInputKitTests/BlockInputViewReadOnlySnapshotTests"
 fi
 
 tmp_args=$(mktemp)

@@ -79,6 +79,9 @@ extension BlockInputView {
 
     @discardableResult
     func insertTable(after blockID: BlockInputBlockID) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let index = index(of: blockID) else {
             return false
         }
@@ -122,6 +125,9 @@ extension BlockInputView {
 
     @discardableResult
     func deleteTable(blockID: BlockInputBlockID) -> Bool {
+        guard isEditable else {
+            return false
+        }
         refreshDocumentFromStore()
         guard block(withID: blockID)?.kind == .table else {
             return false
@@ -143,6 +149,9 @@ extension BlockInputView {
 
     @discardableResult
     func appendTableBodyRow(blockID: BlockInputBlockID) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let beforeBlock = block(withID: blockID),
               let table = BlockInputTable(markdown: beforeBlock.text) else {
             return false
@@ -154,6 +163,9 @@ extension BlockInputView {
 
     @discardableResult
     func appendTableColumn(blockID: BlockInputBlockID) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let beforeBlock = block(withID: blockID),
               let table = BlockInputTable(markdown: beforeBlock.text) else {
             return false
@@ -165,6 +177,9 @@ extension BlockInputView {
 
     @discardableResult
     func insertTableBodyRow(blockID: BlockInputBlockID, position: BlockInputTable.CellPosition) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let beforeBlock = block(withID: blockID),
               let table = BlockInputTable(markdown: beforeBlock.text) else {
             return false
@@ -185,6 +200,9 @@ extension BlockInputView {
 
     @discardableResult
     func insertTableColumn(blockID: BlockInputBlockID, position: BlockInputTable.CellPosition) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let beforeBlock = block(withID: blockID),
               let table = BlockInputTable(markdown: beforeBlock.text) else {
             return false
@@ -203,6 +221,9 @@ extension BlockInputView {
         position: BlockInputTable.CellPosition,
         keepsLastBodyRow: Bool
     ) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard case .body(let rowIndex) = position.row,
               let beforeBlock = block(withID: blockID),
               let table = BlockInputTable(markdown: beforeBlock.text),
@@ -219,6 +240,9 @@ extension BlockInputView {
 
     @discardableResult
     func deleteTableColumn(blockID: BlockInputBlockID, position: BlockInputTable.CellPosition) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let beforeBlock = block(withID: blockID),
               let table = BlockInputTable(markdown: beforeBlock.text),
               let updatedTable = table.deletingColumn(position.column) else {
@@ -240,6 +264,9 @@ extension BlockInputView {
         blockID: BlockInputBlockID,
         placement: BlockInputTableBoundaryPlacement
     ) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let index = index(of: blockID),
               block(at: index)?.kind == .table else {
             return false
@@ -256,6 +283,9 @@ extension BlockInputView {
         focus position: BlockInputTable.CellPosition,
         actionName: String
     ) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let index = index(of: blockID),
               var block = block(at: index),
               block.kind == .table,
@@ -282,6 +312,9 @@ extension BlockInputView {
         actionName: String,
         selectionAfter afterSelection: BlockInputSelection
     ) -> Bool {
+        guard isEditable else {
+            return false
+        }
         let beforeSelection = selection
         let insertedBlocks = [block]
         let resolvedInsertionIndex = frontMatterPreservingInsertionIndex(insertionIndex)

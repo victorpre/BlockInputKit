@@ -22,6 +22,10 @@ public final class BlockInputView: NSView {
     public internal(set) var dropIndicatorColor = NSColor.controlAccentColor
     /// Subtle text shown when the editor has no meaningful document content.
     public internal(set) var placeholder: String?
+    /// Whether editor-owned document mutations are currently enabled.
+    public internal(set) var isEditable = true
+    /// Cursor shown over non-editable editor surfaces.
+    public internal(set) var disabledCursor: NSCursor?
     /// Visual styling used for text, code, and selection chrome.
     public internal(set) var style = BlockInputStyle.default
     var heightSizing: BlockInputEditorHeightSizing?
@@ -132,6 +136,11 @@ public final class BlockInputView: NSView {
     /// Returns whether the editor can become the first responder.
     public override var acceptsFirstResponder: Bool { true }
 
+    public override func resetCursorRects() {
+        super.resetCursorRects()
+        addDisabledCursorRectIfNeeded(to: self)
+    }
+
     /// Promotes editor focus and restores focus to the active block item when possible.
     public override func becomeFirstResponder() -> Bool {
         isBecomingFirstResponder = true
@@ -235,7 +244,8 @@ public final class BlockInputView: NSView {
     /// Deletes the active block if it is empty, preserving the required focus semantics.
     @discardableResult
     public func deleteCurrentEmptyBlockForBackspaceOrDelete() -> BlockInputSelection? {
-        guard let blockID = activeBlockID else {
+        guard isEditable,
+              let blockID = activeBlockID else {
             return nil
         }
         if let selection = deleteCurrentEmptyBlockGranularly(blockID: blockID) {
@@ -303,6 +313,9 @@ public final class BlockInputView: NSView {
     /// Deletes a selected non-text media block after the row itself has focus-like selection.
     @discardableResult
     public func deleteSelectedHorizontalRuleForBackspaceOrDelete() -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         refreshDocumentFromStore()
         guard case let .blocks(blockIDs) = selection,
               blockIDs.count == 1,
@@ -341,7 +354,7 @@ public final class BlockInputView: NSView {
     /// Moves a block when reordering is enabled.
     @discardableResult
     public func moveBlock(blockID: BlockInputBlockID, to targetIndex: Int) -> BlockInputSelection? {
-        guard allowsBlockReordering else {
+        guard isEditable, allowsBlockReordering else {
             return nil
         }
         if let selection = moveStoreBackedLargeListBlock(blockID: blockID, to: targetIndex) {
@@ -377,7 +390,8 @@ public final class BlockInputView: NSView {
     /// Undoes the most recent text edit in the active block.
     @discardableResult
     public func undoTextEditInActiveBlock() -> BlockInputUndoResult? {
-        guard let blockID = activeBlockID else {
+        guard isEditable,
+              let blockID = activeBlockID else {
             return nil
         }
         return undoTextEdit(in: blockID)
@@ -386,7 +400,8 @@ public final class BlockInputView: NSView {
     /// Redoes the most recent undone text edit in the active block.
     @discardableResult
     public func redoTextEditInActiveBlock() -> BlockInputUndoResult? {
-        guard let blockID = activeBlockID else {
+        guard isEditable,
+              let blockID = activeBlockID else {
             return nil
         }
         return redoTextEdit(in: blockID)
@@ -395,6 +410,9 @@ public final class BlockInputView: NSView {
     /// Undoes the most recent structural edit.
     @discardableResult
     public func undoStructuralEdit() -> BlockInputUndoResult? {
+        guard isEditable else {
+            return nil
+        }
         if let result = undoController?.nextGranularStructuralUndoResult(),
            applyGranularUndoResult(result) {
             undoController?.commitGranularStructuralUndo()
@@ -411,6 +429,9 @@ public final class BlockInputView: NSView {
     /// Redoes the most recent undone structural edit.
     @discardableResult
     public func redoStructuralEdit() -> BlockInputUndoResult? {
+        guard isEditable else {
+            return nil
+        }
         if let result = undoController?.nextGranularStructuralRedoResult(),
            applyGranularUndoResult(result) {
             undoController?.commitGranularStructuralRedo()
@@ -429,64 +450,5 @@ public final class BlockInputView: NSView {
 private extension BlockInputView {
     var modalContainsCurrentResponder: Bool {
         linkModalContainsCurrentResponder() || imageModalContainsCurrentResponder()
-    }
-}
-
-private extension BlockInputView {
-    func setupCollectionView() {
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
-
-        layout.minimumLineSpacing = 0
-        layout.minimumInteritemSpacing = 0
-        editorVerticalInset = BlockInputConfiguration.defaultEditorVerticalInset
-
-        collectionView.collectionViewLayout = layout
-        collectionView.dataSource = self
-        collectionView.delegate = self
-        collectionView.blockInputView = self
-        collectionView.isSelectable = false
-        collectionView.backgroundColors = [.textBackgroundColor]
-        collectionView.register(
-            BlockInputBlockItem.self,
-            forItemWithIdentifier: BlockInputBlockItem.reuseIdentifier
-        )
-        collectionView.register(
-            BlockInputLoadingItem.self,
-            forItemWithIdentifier: BlockInputLoadingItem.reuseIdentifier
-        )
-        collectionView.registerForDraggedTypes([.blockInputBlockID, .fileURL])
-        collectionView.setDraggingSourceOperationMask(.move, forLocal: true)
-        installSelectionExpansionKeyMonitor()
-
-        dropIndicatorView.wantsLayer = true
-        dropIndicatorView.layer?.cornerRadius = 1
-        dropIndicatorView.layer?.zPosition = 10
-        updateDropIndicatorColor()
-        dropIndicatorView.isHidden = true
-        dropIndicatorView.setAccessibilityElement(false)
-        collectionView.addSubview(dropIndicatorView, positioned: .above, relativeTo: nil)
-        configurePlaceholderLabel()
-        collectionView.addSubview(placeholderLabel, positioned: .above, relativeTo: nil)
-
-        scrollView.borderType = .noBorder
-        scrollView.hasHorizontalScroller = false
-        scrollView.hasVerticalScroller = true
-        scrollView.drawsBackground = true
-        scrollView.backgroundColor = .textBackgroundColor
-        scrollView.documentView = collectionView
-        scrollView.onContentBoundsDidChange = { [weak self] in
-            self?.scheduleProgressivePreloadCheck()
-            self?.dismissCompletionPopup()
-        }
-
-        addSubview(scrollView)
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
     }
 }

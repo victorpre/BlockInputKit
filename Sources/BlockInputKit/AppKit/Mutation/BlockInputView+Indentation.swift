@@ -13,6 +13,9 @@ extension BlockInputView {
         selectedRange: NSRange,
         direction: IndentationDirection
     ) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         if !isDocumentCacheSynchronized {
             refreshDocumentFromStore()
         }

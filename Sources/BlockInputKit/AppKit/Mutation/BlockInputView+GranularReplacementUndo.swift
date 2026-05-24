@@ -23,6 +23,9 @@ extension BlockInputView {
         _ context: ReplacementInsertionUndoContext,
         selection: BlockInputSelection?
     ) -> Bool {
+        guard isEditable else {
+            return false
+        }
         let resolvedInsertionIndex = frontMatterPreservingInsertionIndex(
             context.insertionIndex,
             afterReplacing: context.replacement,
@@ -74,6 +77,9 @@ extension BlockInputView {
         _ context: ReplacementDeletionUndoContext,
         selection: BlockInputSelection?
     ) -> Bool {
+        guard isEditable else {
+            return false
+        }
         syncDocumentStore(.replaceBlock(context.replacement))
         if let markerTransaction = context.markerTransaction,
            documentStore is BlockInputMarkerAdjustingStore {

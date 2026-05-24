@@ -10,10 +10,9 @@ extension BlockInputView {
         let configuredDocumentStore = configuration.documentStore
         let previousDocumentStore = documentStore
         let previousDocument = document
+        let wasEditable = isEditable
         let wasDocumentCacheSynchronized = isDocumentCacheSynchronized
-        let documentStoreChanged = previousDocumentStore.map {
-            ($0 as AnyObject) !== (configuredDocumentStore as AnyObject)
-        } ?? false
+        let documentStoreChanged = previousDocumentStore.map { ($0 as AnyObject) !== (configuredDocumentStore as AnyObject) } ?? false
         if documentStoreChanged {
             detachDocumentStoreObservation()
             cancelFileDropTasks()
@@ -26,6 +25,7 @@ extension BlockInputView {
         document = configuredDocument
         isDocumentCacheSynchronized = reusesLargeDocumentCache ? wasDocumentCacheSynchronized : true
         configureEditorSurface(configuration)
+        dismissMutationUIIfNeeded(wasEditable: wasEditable)
         configureImageLoading(configuration)
         configureUndoController(
             previousDocumentStore: previousDocumentStore,
@@ -47,6 +47,7 @@ extension BlockInputView {
         }
         updateDropIndicatorColor()
         hideDropIndicator()
+        invalidateReadOnlyCursorRects()
         clearStaleFocusState()
         if restoresFocus {
             reloadDataKeepingFocus()
@@ -71,6 +72,8 @@ extension BlockInputView {
         editorHorizontalInset = configuration.editorHorizontalInset
         editorVerticalInset = configuration.editorVerticalInset
         placeholder = configuration.placeholder
+        isEditable = configuration.isEditable
+        disabledCursor = configuration.disabledCursor
         dropIndicatorColor = configuration.dropIndicatorColor
         configureHeightSizing(configuration.heightSizing)
     }
@@ -153,7 +156,8 @@ extension BlockInputView {
         slashCommandAvailability = configuration.slashCommandAvailability
         slashCommandChipClickHandler = configuration.slashCommandChipClickHandler
         completionPopupConfiguration = configuration.completionPopupConfiguration
-        if completionProvider == nil ||
+        if !isEditable ||
+            completionProvider == nil ||
             previousCompletionPopupPlacement != completionPopupPlacement ||
             previousSlashCommandAvailability != slashCommandAvailability ||
             !Self.sameCompletionProvider(previousCompletionProvider, completionProvider) {

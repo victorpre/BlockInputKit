@@ -7,7 +7,8 @@ public extension BlockInputView {
     /// metadata rather than the block's owned text.
     @discardableResult
     func toggleChecklistItem(blockID: BlockInputBlockID? = nil) -> BlockInputSelection? {
-        guard let targetBlockID = blockID ?? activeBlockID,
+        guard isEditable,
+              let targetBlockID = blockID ?? activeBlockID,
               let index = index(of: targetBlockID),
               let beforeBlock = block(at: index),
               case let .checklistItem(isChecked) = beforeBlock.kind else {

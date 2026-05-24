@@ -13,6 +13,9 @@ extension BlockInputView {
             return true
         }
         if event.blockInputIsReturn {
+            guard isEditable else {
+                return false
+            }
             if let selection = insertBlockBelowCurrentBlock() {
                 scrollImageCaretReturnSelectionToVisible(selection)
                 restoreVisibleSelection()
@@ -26,11 +29,15 @@ extension BlockInputView {
         guard let text = event.blockInputInsertedText else {
             return false
         }
+        guard isEditable else {
+            return false
+        }
         return insertTextAtImageCaret(text, cursor: cursor) != nil
     }
 
     func insertTextAtImageCaret(_ text: String, cursor: BlockInputCursor) -> BlockInputSelection? {
-        guard !text.isEmpty,
+        guard isEditable,
+              !text.isEmpty,
               let index = activeImageCaretIndex(for: cursor.blockID),
               block(at: index)?.kind.isImage == true else {
             return nil
@@ -53,7 +60,8 @@ extension BlockInputView {
     }
 
     func pasteTextAtImageCaretIfNeeded() -> Bool {
-        guard case let .cursor(cursor) = selection,
+        guard isEditable,
+              case let .cursor(cursor) = selection,
               block(withID: cursor.blockID)?.kind.isImage == true,
               let text = NSPasteboard.general.string(forType: .string),
               !text.isEmpty else {

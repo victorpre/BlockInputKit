@@ -34,6 +34,9 @@ extension BlockInputView {
             }
             return didOpen
         }
+        guard isEditable else {
+            return false
+        }
         showLinkModal(context: context)
         return true
     }
@@ -59,6 +62,9 @@ extension BlockInputView {
         }
         switch action {
         case .showLinkModal:
+            guard isEditable else {
+                return false
+            }
             showLinkModal(context: context)
             return true
         case .openURL:

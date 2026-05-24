@@ -9,27 +9,33 @@ extension BlockInputBlockItem {
     }
 
     func requestCutActiveSelection() -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         return delegate?.blockItemDidRequestCutActiveSelection(self, blockID: blockID) ?? false
     }
 
     func requestPasteActiveSelection() -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         return delegate?.blockItemDidRequestPasteActiveSelection(self, blockID: blockID) ?? false
     }
 
     func requestUndoShortcut(_ shortcut: BlockInputUndoShortcut) -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         return delegate?.blockItem(self, blockID: blockID, didRequestUndoShortcut: shortcut) ?? false
     }
 
     func requestReturn() -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let blockID else {
             return true
         }
@@ -58,14 +64,16 @@ extension BlockInputBlockItem {
     }
 
     func requestDeleteEmptyBlock() -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         return delegate?.blockItemDidRequestDeleteEmptyBlock(self, blockID: blockID) ?? false
     }
 
     func requestUnwrapBlock() -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         return delegate?.blockItemDidRequestUnwrapBlock(self, blockID: blockID) ?? false
@@ -100,7 +108,8 @@ extension BlockInputBlockItem {
     }
 
     @objc func requestToggleChecklist() {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return
         }
         delegate?.blockItemDidRequestToggleChecklist(self, blockID: blockID)
@@ -119,7 +128,8 @@ extension BlockInputBlockItem {
     }
 
     func draggingPasteboardItem() -> NSPasteboardItem? {
-        guard handleView.isEnabled,
+        guard isEditable,
+              handleView.isEnabled,
               let blockID else {
             return nil
         }

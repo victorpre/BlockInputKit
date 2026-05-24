@@ -3,6 +3,7 @@ import AppKit
 /// Vertical-only editor scroll owner. Nested block views may scroll horizontally, but the document clip view must not.
 final class BlockInputDocumentScrollView: NSScrollView {
     var onContentBoundsDidChange: (() -> Void)?
+    weak var blockInputView: BlockInputView?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -26,6 +27,11 @@ final class BlockInputDocumentScrollView: NSScrollView {
             name: NSView.boundsDidChangeNotification,
             object: contentView
         )
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        blockInputView?.addDisabledCursorRectIfNeeded(to: self)
     }
 
     @objc

@@ -6,6 +6,12 @@ extension BlockInputView {
         blockID: BlockInputBlockID,
         didChangeTableCellText change: BlockInputTableCellTextChange
     ) {
+        guard isEditable else {
+            if let block = block(withID: blockID) {
+                item.updateTableCellEditState(for: block)
+            }
+            return
+        }
         guard let index = index(of: blockID),
               let beforeBlock = block(at: index),
               beforeBlock.kind == .table,

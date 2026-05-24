@@ -104,6 +104,7 @@ extension BlockInputView {
     }
 
     func linkContextMenuItems(blockID: BlockInputBlockID, selectedRange: NSRange, event: NSEvent) -> [NSMenuItem] {
+        guard isEditable else { return [] }
         let tableItems = tableContextMenuItems(blockID: blockID, selectedRange: selectedRange, event: event)
         let imageItems = imageContextMenuItems(blockID: blockID, selectedRange: selectedRange, event: event)
         guard let context = linkContext(
@@ -146,9 +147,7 @@ extension BlockInputView {
 
     /// Presents the single editor-owned link modal and binds its actions to the captured source context.
     func showLinkModal(context: BlockInputLinkContext, text prefilledText: String? = nil, urlString prefilledURLString: String? = nil) {
-        guard let block = block(withID: context.blockID) else {
-            return
-        }
+        guard isEditable, let block = block(withID: context.blockID) else { return }
         removeLinkModalDismissalMonitors()
         let modal = linkModalView ?? BlockInputLinkModalView()
         let mode: BlockInputLinkModalMode
@@ -266,6 +265,7 @@ extension BlockInputView {
     /// Handles supported URL paste by editing an existing link or inserting Markdown without selecting the result.
     @discardableResult
     func pasteURLString(_ urlString: String, blockID: BlockInputBlockID? = nil, selectedRange: NSRange? = nil) -> Bool {
+        guard isEditable else { return false }
         guard BlockInputLinkURL.supportedURL(from: urlString) != nil else {
             return false
         }
@@ -311,6 +311,7 @@ extension BlockInputView {
         actionName: String,
         selectsResultingText: Bool = true
     ) -> Bool {
+        guard isEditable else { return false }
         guard let destination = BlockInputLinkURL.supportedURL(
                 from: urlString,
                 allowsCustomSchemes: text.hasPrefix("/"),
@@ -334,6 +335,7 @@ extension BlockInputView {
 
     @discardableResult
     func removeLink(context: BlockInputLinkContext) -> Bool {
+        guard isEditable else { return false }
         guard case .edit(let linkRange) = context.mode,
               let index = index(of: context.blockID),
               var block = block(at: index) else {

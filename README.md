@@ -109,6 +109,24 @@ let configuration = BlockInputConfiguration(
 )
 ```
 
+### Read-Only Mode
+
+Set `isEditable` to `false` to keep content selectable, copyable, scrollable, focusable, and accessible while blocking
+editor-owned document mutations. Existing text is subtly dimmed, and `disabledCursor` can communicate the read-only
+state over editor surfaces.
+
+```swift
+let configuration = BlockInputConfiguration(
+    document: document,
+    isEditable: false,
+    disabledCursor: .operationNotAllowed
+)
+```
+
+Read-only mode suppresses mutation commands, typing, paste/drop insertion, reordering, checklist toggles, table/image
+editing controls, completion acceptance, and edit modals. Link opening and host-handled slash chip clicks can still run
+when they do not mutate the document.
+
 ### Editor Height Sizing
 
 Height sizing is opt-in. When enabled, the editor reports a rendered-content preferred height that starts at a default

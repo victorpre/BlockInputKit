@@ -11,6 +11,8 @@ extension BlockInputBlockItem {
         textView.hideFileDropCaret()
         style = .default
         fileBaseURL = nil
+        isEditable = true
+        disabledCursor = nil
         imageLoadTask?.cancel()
         imageLoadTask = nil
         imageLoadCacheKey = nil

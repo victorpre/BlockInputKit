@@ -41,7 +41,8 @@ extension BlockInputTableView {
     }
 
     func updateAppendControlVisibility(for localPoint: NSPoint) {
-        guard !chromeView.frame.isEmpty,
+        guard isEditable,
+              !chromeView.frame.isEmpty,
               !documentView.frame.isEmpty else {
             hoveredAppendTarget = nil
             appendHoverAnchor = nil
@@ -83,15 +84,21 @@ extension BlockInputTableView {
             width: buttonSize.width,
             height: buttonSize.height
         )
-        appendRowButton.isHidden = hoveredAppendTarget != .row
-        appendColumnButton.isHidden = hoveredAppendTarget != .column || !rightTableEdgeIsVisible
+        appendRowButton.isHidden = !isEditable || hoveredAppendTarget != .row
+        appendColumnButton.isHidden = !isEditable || hoveredAppendTarget != .column || !rightTableEdgeIsVisible
     }
 
     @objc func appendRowButtonClicked(_ sender: Any?) {
+        guard isEditable else {
+            return
+        }
         delegate?.tableViewDidRequestAppendBodyRow(self, from: activeCellPosition)
     }
 
     @objc func appendColumnButtonClicked(_ sender: Any?) {
+        guard isEditable else {
+            return
+        }
         delegate?.tableViewDidRequestAppendColumn(self, from: activeCellPosition)
     }
 

@@ -8,6 +8,7 @@ final class DemoModel: ObservableObject {
     @Published var sidebarItems = DemoNote.all.map { DemoSidebarItem(id: .builtIn($0.id)) }
     @Published var selectedItemID: DemoSidebarItemID? = .builtIn(.mixed)
     @Published var editorMode: DemoEditorMode = .rendered
+    @Published var isEditable = true
     @Published var allowsReordering = true
     @Published var completionPopupPlacement = BlockInputCompletionPopupPlacement.caret
 
@@ -54,6 +55,8 @@ final class DemoModel: ObservableObject {
             documentStore: session.store,
             allowsBlockReordering: allowsReordering,
             placeholder: "Start writing...",
+            isEditable: isEditable,
+            disabledCursor: .operationNotAllowed,
             imageBaseURL: Bundle.module.resourceURL,
             undoController: session.undoController,
             completionProvider: completionProvider,
@@ -98,6 +101,10 @@ final class DemoModel: ObservableObject {
 
     func setAllowsReordering(_ allowsReordering: Bool) {
         self.allowsReordering = allowsReordering
+    }
+
+    func setIsEditable(_ isEditable: Bool) {
+        self.isEditable = isEditable
     }
 
     func setCompletionPopupPlacement(_ placement: BlockInputCompletionPopupPlacement) {

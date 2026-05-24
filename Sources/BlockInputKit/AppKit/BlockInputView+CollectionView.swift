@@ -212,9 +212,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         _ collectionView: NSCollectionView,
         pasteboardWriterForItemAt indexPath: IndexPath
     ) -> NSPasteboardWriting? {
-        guard allowsBlockReordering else {
-            return nil
-        }
+        guard isEditable, allowsBlockReordering else { return nil }
         guard let block = block(at: indexPath.item),
               block.kind != .frontMatter else {
             return nil
@@ -243,6 +241,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         proposedIndexPath proposedDropIndexPath: AutoreleasingUnsafeMutablePointer<NSIndexPath>,
         dropOperation proposedDropOperation: UnsafeMutablePointer<NSCollectionView.DropOperation>
     ) -> NSDragOperation {
+        guard isEditable else { hideDropIndicator(); return [] }
         if canAcceptBlockReorderDrop(draggingInfo) {
             let insertionIndex = resolvedDropInsertionIndex(
                 from: draggingInfo,
@@ -289,6 +288,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         dropOperation: NSCollectionView.DropOperation
     ) -> Bool {
         hideDropIndicator()
+        guard isEditable else { return false }
         let resolvedInsertionIndex = resolvedDropInsertionIndex(
             from: draggingInfo,
             proposedItemIndex: indexPath.item
@@ -364,7 +364,7 @@ extension BlockInputView: NSCollectionViewDelegate {
     }
 
     func canAcceptBlockReorderDrop(_ draggingInfo: NSDraggingInfo) -> Bool {
-        guard allowsBlockReordering,
+        guard isEditable, allowsBlockReordering,
               let rawID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID),
               let index = index(of: BlockInputBlockID(rawValue: rawID)),
               block(at: index)?.kind != .frontMatter else {
@@ -374,7 +374,7 @@ extension BlockInputView: NSCollectionViewDelegate {
     }
 
     func collectionFileDropTarget(for draggingInfo: NSDraggingInfo) -> BlockInputCollectionFileDropTarget? {
-        guard draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID) == nil,
+        guard isEditable, draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID) == nil,
               !showsProgressiveLoadingRow else {
             return nil
         }

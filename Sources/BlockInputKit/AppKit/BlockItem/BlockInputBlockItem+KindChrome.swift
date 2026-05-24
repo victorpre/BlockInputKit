@@ -16,7 +16,7 @@ extension BlockInputBlockItem {
         let perLineContentIndent = Self.perLineContentIndent(for: block)
         let verticalMetrics = Self.verticalMetrics(for: block)
         textView.textContainerInset = textContainerInset(for: kind, metrics: verticalMetrics)
-        textView.isEditable = !isHorizontalRule && !usesTableSurface
+        textView.isEditable = isEditable && !isHorizontalRule && !usesTableSurface
         textView.isSelectable = !isHorizontalRule && !usesTableSurface
         configureTextScrolling(for: block)
         applyTextAttributes(for: block)
@@ -65,14 +65,16 @@ extension BlockInputBlockItem {
             ? -((Self.frontMatterDividerVerticalInset * 2) + Self.frontMatterDividerHeight)
             : 0
         frontMatterDividerView.isHidden = !isVisible
-        frontMatterDividerView.alphaValue = isVisible ? 1 : 0
+        frontMatterDividerView.alphaValue = isVisible
+            ? BlockInputReadOnlyStyle.alpha(isEditable: isEditable, readOnly: BlockInputReadOnlyStyle.chromeAlpha)
+            : 0
     }
 
     private func configureChecklistButton(for block: BlockInputBlock, contentIndent: CGFloat) {
         switch block.kind {
         case let .checklistItem(isChecked):
             checklistButton.isHidden = false
-            checklistButton.isEnabled = true
+            checklistButton.isEnabled = isEditable
             checklistButton.state = isChecked ? .on : .off
             checklistButtonLeadingConstraint?.constant = Self.checklistButtonLeadingConstant(
                 indentationLevel: block.indentationLevel(forLine: 0),

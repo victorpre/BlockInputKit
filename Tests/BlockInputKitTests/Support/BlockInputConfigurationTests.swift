@@ -32,6 +32,8 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.editorHorizontalInset, BlockInputConfiguration.defaultEditorHorizontalInset)
         XCTAssertEqual(configuration.editorVerticalInset, BlockInputConfiguration.defaultEditorVerticalInset)
         XCTAssertNil(configuration.placeholder)
+        XCTAssertTrue(configuration.isEditable)
+        XCTAssertNil(configuration.disabledCursor)
         XCTAssertNil(configuration.heightSizing)
         XCTAssertEqual(configuration.slashCommandAvailability, .documentStart)
         XCTAssertNil(configuration.slashCommandChipClickHandler)
@@ -62,6 +64,8 @@ final class BlockInputConfigurationTests: XCTestCase {
             editorHorizontalInset: 28,
             editorVerticalInset: 14,
             placeholder: "Message",
+            isEditable: false,
+            disabledCursor: .operationNotAllowed,
             dropIndicatorColor: .systemPink,
             heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 2, maximumVisibleLineCount: 5),
             undoController: undoController,
@@ -75,6 +79,8 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(view.editorHorizontalInset, 28)
         XCTAssertEqual(view.editorVerticalInset, 14)
         XCTAssertEqual(view.placeholder, "Message")
+        XCTAssertFalse(view.isEditable)
+        XCTAssertEqual(view.disabledCursor, .operationNotAllowed)
         let sectionInset = try XCTUnwrap((view.collectionView.collectionViewLayout as? NSCollectionViewFlowLayout)?.sectionInset)
         XCTAssertEqual(sectionInset.top, 14)
         XCTAssertEqual(sectionInset.bottom, 14)

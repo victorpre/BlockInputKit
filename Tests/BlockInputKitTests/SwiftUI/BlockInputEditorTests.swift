@@ -62,6 +62,16 @@ final class BlockInputEditorTests: XCTestCase {
         XCTAssertEqual(editor.resolvedConfiguration().placeholder, "Ask anything")
     }
 
+    func testResolvedConfigurationPreservesReadOnlyOptions() {
+        let editor = BlockInputEditor(configuration: BlockInputConfiguration(
+            isEditable: false,
+            disabledCursor: .operationNotAllowed
+        ))
+
+        XCTAssertFalse(editor.resolvedConfiguration().isEditable)
+        XCTAssertEqual(editor.resolvedConfiguration().disabledCursor, .operationNotAllowed)
+    }
+
     func testFocusBindingPreservesKeyboardShortcutHandlers() {
         var isFocused = false
         var handledShortcuts: [BlockInputKeyboardShortcut] = []

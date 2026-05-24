@@ -83,7 +83,8 @@ extension BlockInputTableView {
         alignment: NSTextAlignment,
         style: BlockInputStyle,
         usesPlaceholder: Bool = true,
-        appliesInlineMarkdown: Bool = true
+        appliesInlineMarkdown: Bool = true,
+        isEditable: Bool = true
     ) -> NSAttributedString {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = alignment
@@ -102,6 +103,9 @@ extension BlockInputTableView {
                 textStorage: storage,
                 style: style
             )
+        }
+        if !isEditable {
+            BlockInputReadOnlyStyle.applyDisabledForeground(to: storage)
         }
         return storage
     }

@@ -34,6 +34,9 @@ extension BlockInputView {
         leadingReturnMove: LeadingReturnMove,
         replacementIndex: Int
     ) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         let afterBlock = leadingReturnMove.afterBlock
         let insertedBlocks = [leadingReturnMove.insertedBlock]
         let insertionIndex = replacementIndex + 1

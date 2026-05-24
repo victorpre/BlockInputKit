@@ -10,6 +10,9 @@ public extension BlockInputView {
         _ markdown: String,
         below blockID: BlockInputBlockID? = nil
     ) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         let trimmedMarkdown = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedMarkdown.isEmpty else {
             return nil

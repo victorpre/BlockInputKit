@@ -62,6 +62,7 @@ final class BlockInputBlockItemRootView: NSView {
 
     override func resetCursorRects() {
         super.resetCursorRects()
+        blockItem?.addDisabledCursorRectIfNeeded(to: self)
         blockItem?.addImageResizeCursorRects(to: self)
         guard let blockItem,
               let cursor = blockItem.reorderHandleCursor else {

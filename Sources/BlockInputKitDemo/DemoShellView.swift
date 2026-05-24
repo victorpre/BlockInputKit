@@ -73,7 +73,7 @@ struct DemoShellView: View {
                         DemoRawMarkdownEditor(text: Binding(
                             get: { model.rawMarkdownBinding(for: session).get() },
                             set: { model.rawMarkdownBinding(for: session).set($0) }
-                        ))
+                        ), isEditable: model.isEditable)
                         .id(session.id)
                     }
                 }
@@ -98,6 +98,10 @@ struct DemoShellView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             Spacer(minLength: 16)
+            Toggle("Read-only", isOn: Binding(
+                get: { !model.isEditable },
+                set: { model.setIsEditable(!$0) }
+            ))
             Toggle("Reordering", isOn: Binding(
                 get: { model.allowsReordering },
                 set: { model.setAllowsReordering($0) }
@@ -181,6 +185,7 @@ private struct ErrorStateView: View {
 
 private struct DemoRawMarkdownEditor: NSViewRepresentable {
     @Binding var text: String
+    var isEditable: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
@@ -193,6 +198,8 @@ private struct DemoRawMarkdownEditor: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
+        textView.isEditable = isEditable
+        textView.isSelectable = true
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
@@ -214,11 +221,15 @@ private struct DemoRawMarkdownEditor: NSViewRepresentable {
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.text = $text
         guard let textView = nsView.documentView as? NSTextView,
-              textView.string != text else {
+              textView.isEditable != isEditable || textView.string != text else {
             return
         }
         context.coordinator.isUpdating = true
-        textView.string = text
+        textView.isEditable = isEditable
+        textView.isSelectable = true
+        if textView.string != text {
+            textView.string = text
+        }
         context.coordinator.isUpdating = false
     }
 

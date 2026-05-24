@@ -162,6 +162,9 @@ class BlockInputTextView: NSTextView {
     }
 
     override func paste(_ sender: Any?) {
+        guard blockItem?.isEditable != false else {
+            return
+        }
         if blockItem?.requestPasteActiveSelection() == true {
             return
         }
@@ -169,6 +172,9 @@ class BlockInputTextView: NSTextView {
     }
 
     func performPasteFromEditorCommand() {
+        guard blockItem?.isEditable != false else {
+            return
+        }
         // Supported URL paste is the only custom path; invalid or unsupported pasteboard contents fall through to AppKit.
         if let urlString = BlockInputLinkURL.supportedURLString(),
            blockItem?.requestPasteURL(urlString, selectedRange: blockInputSourceSelectedRange()) == true {
@@ -192,7 +198,13 @@ class BlockInputTextView: NSTextView {
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool { performFileDropOperation(sender, super.performDragOperation(sender)) }
 
     override func resetCursorRects() {
+        if blockItem?.isEditable == false {
+            blockItem?.addDisabledCursorRectIfNeeded(to: self)
+            addLinkCursorRects()
+            return
+        }
         super.resetCursorRects()
+        blockItem?.addDisabledCursorRectIfNeeded(to: self)
         addLinkCursorRects()
     }
 
@@ -215,6 +227,9 @@ class BlockInputTextView: NSTextView {
     }
 
     override func cut(_ sender: Any?) {
+        guard blockItem?.isEditable != false else {
+            return
+        }
         if blockItem?.requestCutActiveSelection() == true {
             return
         }
@@ -222,6 +237,9 @@ class BlockInputTextView: NSTextView {
     }
 
     func performCutFromEditorCommand() {
+        guard blockItem?.isEditable != false else {
+            return
+        }
         guard copySelectedPlainText(allowingEditorRoute: false) else {
             super.cut(nil)
             return

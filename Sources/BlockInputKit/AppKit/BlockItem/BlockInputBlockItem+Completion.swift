@@ -2,7 +2,8 @@ import AppKit
 
 extension BlockInputBlockItem {
     func requestCompletionKeyDown(_ event: NSEvent) -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         return delegate?.blockItem(
@@ -13,7 +14,8 @@ extension BlockInputBlockItem {
     }
 
     func requestCompletionCommand(_ selector: Selector) -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         return delegate?.blockItem(

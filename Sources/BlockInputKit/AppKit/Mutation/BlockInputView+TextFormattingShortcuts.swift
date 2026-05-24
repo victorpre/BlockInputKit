@@ -11,7 +11,8 @@ extension BlockInputView {
 
     @discardableResult
     func performTextFormattingShortcut(_ shortcut: BlockInputTextFormattingShortcut) -> Bool {
-        guard let context = textFormattingContext() else {
+        guard isEditable,
+              let context = textFormattingContext() else {
             return false
         }
         let segments = context.segments

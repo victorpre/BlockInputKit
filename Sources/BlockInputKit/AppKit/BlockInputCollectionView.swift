@@ -18,6 +18,11 @@ final class BlockInputCollectionView: NSCollectionView {
         return blockInputView?.linkClickTarget(for: event) != nil
     }
 
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        blockInputView?.addDisabledCursorRectIfNeeded(to: self)
+    }
+
     override func mouseDown(with event: NSEvent) {
         if let target = blockInputView?.linkClickTarget(for: event) {
             target.item.textView.mouseDown(with: event)

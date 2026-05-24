@@ -10,6 +10,9 @@ public extension BlockInputView {
         _ fileURLs: [URL],
         below blockID: BlockInputBlockID? = nil
     ) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         let insertedBlocks = fileURLs.compactMap(Self.fileLinkBlock)
         guard !insertedBlocks.isEmpty else {
             return nil
@@ -34,6 +37,9 @@ public extension BlockInputView {
         _ fileURLs: [URL],
         at insertionIndex: Int
     ) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         let insertedBlocks = fileURLs.compactMap(Self.fileLinkBlock)
         guard !insertedBlocks.isEmpty else {
             return nil
@@ -132,6 +138,9 @@ extension BlockInputView {
 
     @discardableResult
     func insertDroppedFileURLs(_ fileURLs: [URL], at insertionIndex: Int) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         let insertedBlocks = fileURLs.compactMap(Self.droppedFileBlock)
         guard !insertedBlocks.isEmpty else {
             return nil
@@ -141,7 +150,8 @@ extension BlockInputView {
 
     @discardableResult
     func insertDroppedFileBlocks(_ insertedBlocks: [BlockInputBlock], at insertionIndex: Int) -> BlockInputSelection? {
-        guard !insertedBlocks.isEmpty else {
+        guard isEditable,
+              !insertedBlocks.isEmpty else {
             return nil
         }
         return performStructuralEdit(
@@ -179,6 +189,9 @@ extension BlockInputView {
         atUTF16Offset utf16Offset: Int,
         item: BlockInputBlockItem
     ) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         let insertionText = Self.inlineFileLinkInsertionText(for: fileURLs)
         guard !insertionText.isEmpty,
               item.representedBlockID == blockID,
@@ -216,6 +229,9 @@ extension BlockInputView {
         into blockID: BlockInputBlockID,
         atUTF16Offset utf16Offset: Int
     ) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         let insertionText = Self.inlineFileLinkInsertionText(for: references)
         guard !insertionText.isEmpty,
               let index = index(of: blockID),

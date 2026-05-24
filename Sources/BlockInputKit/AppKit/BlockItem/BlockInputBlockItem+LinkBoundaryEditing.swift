@@ -6,6 +6,9 @@ extension BlockInputBlockItem {
         shouldChangeTextIn affectedCharRange: NSRange,
         replacementString: String?
     ) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let blockID else {
             return true
         }
@@ -27,7 +30,8 @@ extension BlockInputBlockItem {
     }
 
     func requestLinkBoundaryDeletion(_ direction: BlockInputLinkBoundaryDeletionDirection) -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         return delegate?.blockItem(self, blockID: blockID, didRequestLinkBoundaryDeletion: direction) ?? false

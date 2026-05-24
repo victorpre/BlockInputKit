@@ -2,14 +2,16 @@ import AppKit
 
 extension BlockInputBlockItem {
     func requestTextFormattingShortcut(_ shortcut: BlockInputTextFormattingShortcut) -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         return delegate?.blockItem(self, blockID: blockID, didRequestTextFormattingShortcut: shortcut) ?? false
     }
 
     func textFormattingContextMenuItemStates(selectedRange: NSRange) -> [BlockInputTextFormattingMenuItemState] {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return []
         }
         return delegate?.blockItem(
@@ -20,7 +22,8 @@ extension BlockInputBlockItem {
     }
 
     func textFormattingContextMenuItemStates(for event: NSEvent) -> [BlockInputTextFormattingMenuItemState] {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return []
         }
         return delegate?.blockItem(
@@ -31,7 +34,8 @@ extension BlockInputBlockItem {
     }
 
     func textFormattingContextMenuItems(for event: NSEvent) -> [NSMenuItem] {
-        guard let delegate else {
+        guard isEditable,
+              let delegate else {
             return []
         }
         return textFormattingContextMenuItemStates(for: event).map {

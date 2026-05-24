@@ -11,6 +11,9 @@ struct BlockInputTableCellLinkReplacement {
 
 extension BlockInputView {
     func replaceTableCellLinkSource(_ context: BlockInputTableCellLinkReplacement) -> Bool {
+        guard isEditable else {
+            return false
+        }
         var block = context.block
         guard let table = BlockInputTable(markdown: block.text),
               let position = table.cellPosition(containingSourceRange: context.replacementRange),

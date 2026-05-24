@@ -51,6 +51,20 @@ final class BlockInputTableView: NSView {
     var selectedCellRange: BlockInputTableCellSelection?
     var cellSelectionDragAnchor: BlockInputTable.CellPosition?
     var isDraggingCellSelection = false
+    var isEditable = true {
+        didSet {
+            guard oldValue != isEditable else {
+                return
+            }
+            chromeView.isEditable = isEditable
+            if !isEditable {
+                hoveredAppendTarget = nil
+                appendHoverAnchor = nil
+                updateAppendControlFrames()
+            }
+            cellRows.flatMap { $0 }.forEach { $0.updateEditableState(isEditable) }
+        }
+    }
     var trackingArea: NSTrackingArea?
     var hoveredAppendTarget: AppendTarget?
     var appendHoverAnchor: NSPoint?
@@ -102,6 +116,7 @@ final class BlockInputTableView: NSView {
         appendHoverAnchor = nil
         appendRowButton.isHidden = true
         appendColumnButton.isHidden = true
+        chromeView.isEditable = isEditable
         setAccessibilityLabel(Self.accessibilityLabel(for: table))
         rebuildCells(for: table, style: style)
         isHidden = false
@@ -117,6 +132,7 @@ final class BlockInputTableView: NSView {
         selectedCellRange = nil
         cellSelectionDragAnchor = nil
         isDraggingCellSelection = false
+        isEditable = true
         hoveredAppendTarget = nil
         appendHoverAnchor = nil
         cellRows.flatMap { $0 }.forEach { $0.removeFromSuperview() }
@@ -210,7 +226,7 @@ final class BlockInputTableView: NSView {
     }
 
     override func accessibilityCustomActions() -> [NSAccessibilityCustomAction]? {
-        guard table != nil else {
+        guard isEditable, table != nil else {
             return nil
         }
         return [
@@ -238,6 +254,7 @@ final class BlockInputTableView: NSView {
                     isHeader: rowIndex == 0,
                     alignment: Self.textAlignment(for: table.alignments[columnIndex]),
                     style: style,
+                    isEditable: isEditable,
                     position: Self.cellPosition(rowIndex: rowIndex, columnIndex: columnIndex),
                     tableView: self,
                     blockItem: blockItem
@@ -329,6 +346,12 @@ final class BlockInputTableView: NSView {
 }
 
 final class BlockInputTableChromeView: NSView {
+    var isEditable = true {
+        didSet {
+            updateColors()
+        }
+    }
+
     override var isFlipped: Bool {
         true
     }
@@ -336,7 +359,7 @@ final class BlockInputTableChromeView: NSView {
     func updateColors() {
         wantsLayer = true
         layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(0.01).cgColor
-        layer?.borderColor = NSColor.separatorColor.cgColor
+        layer?.borderColor = BlockInputReadOnlyStyle.tableBorderColor(isEditable: isEditable)
     }
 }
 

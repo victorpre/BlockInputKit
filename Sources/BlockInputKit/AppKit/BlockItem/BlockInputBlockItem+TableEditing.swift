@@ -52,6 +52,9 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
     }
 
     private func handleTableCellDeleteCommand(selectedRange: NSRange) -> Bool {
+        guard isEditable else {
+            return false
+        }
         if deleteActiveTableSelectionIfNeeded() {
             return true
         }
@@ -159,7 +162,8 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
         selectedLocalRange: NSRange,
         selectionBefore: BlockInputSelection?
     ) {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return
         }
         delegate?.blockItem(
@@ -180,18 +184,20 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
         affectedLocalRange: NSRange,
         replacementString: String?
     ) -> Bool {
-        true
+        isEditable
     }
 
     func tableViewDidRequestAppendBodyRow(_ tableView: BlockInputTableView, from position: BlockInputTable.CellPosition?) {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return
         }
         _ = delegate?.blockItem(self, blockID: blockID, didRequestTableBodyRowAppendFrom: position)
     }
 
     func tableViewDidRequestAppendColumn(_ tableView: BlockInputTableView, from position: BlockInputTable.CellPosition?) {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return
         }
         _ = delegate?.blockItem(self, blockID: blockID, didRequestTableColumnAppendFrom: position)
@@ -206,7 +212,7 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
             ? tableView.nextCellPosition(after: position)
             : tableView.previousCellPosition(before: position)
         guard let target else {
-            guard direction == .forward else {
+            guard isEditable, direction == .forward else {
                 return false
             }
             // Final-cell Tab inserts below the current row, matching the context-menu Insert Row behavior.
@@ -223,11 +229,15 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
         if let target = tableView.verticalCellPosition(from: position, placement: placement) {
             return delegate?.blockItem(self, blockID: blockID, didRequestTableFocus: target) ?? false
         }
+        guard isEditable else {
+            return false
+        }
         return delegate?.blockItem(self, blockID: blockID, didRequestParagraphAdjacentToTable: placement) ?? false
     }
 
     private func handleTableCellDelete(selectedRange: NSRange) -> Bool {
-        guard selectedRange.length == 0,
+        guard isEditable,
+              selectedRange.length == 0,
               let blockID,
               let position = tableView.activeCellPosition,
               tableView.activeCellText?.isEmpty == true else {
@@ -244,14 +254,16 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
     }
 
     private func deleteActiveTableSelectionIfNeeded() -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         return delegate?.blockItemDidRequestDeleteActiveSelection(self, blockID: blockID) ?? false
     }
 
     private func deleteSelectedTableCellsIfNeeded() -> Bool {
-        guard let blockID else {
+        guard isEditable,
+              let blockID else {
             return false
         }
         if let position = tableView.selectedWholeColumnDeletionPosition {

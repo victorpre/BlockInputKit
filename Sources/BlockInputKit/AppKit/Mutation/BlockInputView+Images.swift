@@ -14,6 +14,9 @@ private struct BlockInputImageDeletionContext {
 
 extension BlockInputView {
     func imageContextMenuItems(blockID: BlockInputBlockID, selectedRange: NSRange, event: NSEvent) -> [NSMenuItem] {
+        guard isEditable else {
+            return []
+        }
         guard let block = block(withID: blockID) else {
             return []
         }
@@ -59,6 +62,9 @@ extension BlockInputView {
         source: String? = nil,
         altText: String? = nil
     ) {
+        guard isEditable else {
+            return
+        }
         let modal = imageModalView ?? BlockInputImageModalView()
         modal.configure(urlString: source ?? "", altText: altText ?? "")
         configureImageModalActions(modal, context: context)
@@ -93,6 +99,9 @@ extension BlockInputView {
 
     @discardableResult
     func insertImage(_ image: BlockInputImage, context: BlockInputImageContext) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         guard let index = index(of: context.blockID),
               let block = block(at: index),
               block.text == context.sourceText else {
@@ -106,6 +115,9 @@ extension BlockInputView {
 
     @discardableResult
     func insertImageFileURLs(_ fileURLs: [URL], below blockID: BlockInputBlockID) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         let imageBlocks = fileURLs.compactMap(Self.imageBlock(for:))
         guard !imageBlocks.isEmpty,
               let index = index(of: blockID) else {
@@ -116,6 +128,9 @@ extension BlockInputView {
 
     @discardableResult
     func insertImageReferences(_ references: [BlockInputFileDropReference], below blockID: BlockInputBlockID) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         let imageBlocks = references.compactMap { reference -> BlockInputBlock? in
             guard reference.kind == .image else {
                 return nil

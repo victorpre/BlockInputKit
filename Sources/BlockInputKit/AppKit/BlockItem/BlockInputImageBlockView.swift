@@ -11,6 +11,8 @@ final class BlockInputImageBlockView: NSView {
     weak var blockItem: BlockInputBlockItem?
     var onResize: ((Int, Int) -> Void)?
     var resizeDimensions: BlockInputImageDimensions?
+    var isEditable = true
+    var disabledCursor: NSCursor?
     var maximumResizeWidth = Int.max
 
     override init(frame frameRect: NSRect) {
@@ -86,6 +88,8 @@ final class BlockInputImageBlockView: NSView {
         isHidden = true
         toolTip = nil
         setAccessibilityLabel(nil)
+        isEditable = true
+        disabledCursor = nil
         surfaceBorderColor = nil
         selectionBorderColor = nil
         if resizeStart == nil {
@@ -102,7 +106,10 @@ final class BlockInputImageBlockView: NSView {
 
     override func resetCursorRects() {
         super.resetCursorRects()
-        guard resizeDimensions != nil else {
+        if !isEditable, let disabledCursor {
+            addCursorRect(bounds, cursor: disabledCursor)
+        }
+        guard isEditable, resizeDimensions != nil else {
             return
         }
         addCursorRect(rightResizeHitRect, cursor: .resizeLeftRight)
@@ -130,7 +137,8 @@ final class BlockInputImageBlockView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard let dimensions = resizeDimensions,
+        guard isEditable,
+              let dimensions = resizeDimensions,
               let edge = resizeEdge(at: convert(event.locationInWindow, from: nil)) else {
             blockItem?.beginBlockSelectionDrag()
             blockItem?.requestSelectCurrentBlock()
@@ -147,7 +155,7 @@ final class BlockInputImageBlockView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let resizeStart else {
+        guard isEditable, let resizeStart else {
             _ = blockItem?.updateBlockSelectionDrag(with: event)
             return
         }
@@ -236,10 +244,13 @@ final class BlockInputImageBlockView: NSView {
     }
 
     func containsResizeHitTarget(_ point: NSPoint) -> Bool {
-        rightResizeHitRect.contains(point) || bottomResizeHitRect.contains(point)
+        isEditable && (rightResizeHitRect.contains(point) || bottomResizeHitRect.contains(point))
     }
 
     func resizeCursor(at point: NSPoint) -> NSCursor? {
+        guard isEditable else {
+            return nil
+        }
         switch resizeEdge(at: point) {
         case .right:
             return .resizeLeftRight

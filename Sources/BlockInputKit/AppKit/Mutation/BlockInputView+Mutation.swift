@@ -247,6 +247,7 @@ extension BlockInputView {
         ) -> StoreSyncAction = { _, _, _ in .replaceDocument },
         edit: (inout BlockInputDocument) -> BlockInputSelection?
     ) -> BlockInputSelection? {
+        guard isEditable else { return nil }
         refreshDocumentFromStore()
         let beforeDocument = document
         let beforeSelection = selectionBeforeOverride ?? selection
@@ -277,6 +278,7 @@ extension BlockInputView {
     }
 
     func applyUndoResult(_ result: BlockInputUndoResult, storeSyncAction: StoreSyncAction? = nil) {
+        guard isEditable else { return }
         syncDocumentStore(storeSyncAction ?? defaultStoreSyncAction(for: result))
         let restoredSelection = result.selection.flatMap { selection -> BlockInputSelection? in
             containsValidSelection(selection) ? selection : nil
@@ -288,6 +290,7 @@ extension BlockInputView {
 
     @discardableResult
     func applyGranularUndoResult(_ result: BlockInputUndoResult) -> Bool {
+        guard isEditable else { return false }
         if let movedBlockID = result.movedBlockID,
            let moveIndex = result.moveIndex {
             return applyGranularMoveUndo(
@@ -377,6 +380,7 @@ extension BlockInputView {
         at index: Int,
         selection: BlockInputSelection?
     ) -> Bool {
+        guard isEditable else { return false }
         syncDocumentStore(.replaceBlock(block))
         _ = replaceCachedBlock(block, at: index)
         applySelection(validUndoSelection(selection), notify: true)
@@ -398,6 +402,7 @@ extension BlockInputView {
         _ blocks: [BlockInputBlock],
         selection: BlockInputSelection?
     ) -> Bool {
+        guard isEditable else { return false }
         guard !blocks.isEmpty else {
             applySelection(validUndoSelection(selection), notify: true)
             return true
@@ -474,8 +479,7 @@ extension BlockInputView {
         selection.flatMap { containsValidSelection($0) ? $0 : nil }
     }
 
-    /// Resolves granular insertion indexes before document, store, undo, and
-    /// collection-view mutations so all layers agree when frontmatter is pinned.
+    /// Resolves granular insertion indexes before document/store mutations so frontmatter stays pinned.
     func frontMatterPreservingInsertionIndex(
         _ index: Int,
         afterReplacing replacement: BlockInputBlock? = nil,
@@ -493,5 +497,4 @@ extension BlockInputView {
         }
         return document.blocks.first?.kind == .frontMatter ? 1 : 0
     }
-
 }

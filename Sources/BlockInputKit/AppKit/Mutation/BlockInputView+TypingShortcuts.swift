@@ -7,6 +7,9 @@ extension BlockInputView {
         proposedUTF16Offset: Int,
         selectionBefore: BlockInputSelection?
     ) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         guard let blockBeforeEdit = block(withID: blockID) else {
             return nil
         }
@@ -45,16 +48,23 @@ extension BlockInputView {
             named: "Format Block",
             selectionBeforeOverride: undoSelectionBefore,
             storeSyncAction: { _, afterDocument, _ in
-                guard let block = afterDocument.block(withID: blockID),
-                      block.kind != .horizontalRule else {
-                    return .replaceDocument
-                }
-                return afterDocument.block(withID: blockID).map(StoreSyncAction.replaceBlock) ?? .replaceDocument
+                typingShortcutStoreSyncAction(blockID: blockID, afterDocument: afterDocument)
             },
             edit: { document in
                 document.applyTypingShortcut(blockID: blockID, shortcut: shortcut)
             }
         )
+    }
+
+    private func typingShortcutStoreSyncAction(
+        blockID: BlockInputBlockID,
+        afterDocument: BlockInputDocument
+    ) -> StoreSyncAction {
+        guard let block = afterDocument.block(withID: blockID),
+              block.kind != .horizontalRule else {
+            return .replaceDocument
+        }
+        return .replaceBlock(block)
     }
 
     private func applyGranularTypingShortcutIfPossible(
@@ -108,6 +118,9 @@ extension BlockInputView {
         proposedText: String,
         selectionBefore: BlockInputSelection?
     ) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         var proposedBlock = blockBeforeEdit
         proposedBlock.text = proposedText
         var replacementBlocks = BlockInputMarkdownImporter.imageBlocks(bySplitting: proposedBlock)
@@ -262,7 +275,8 @@ extension BlockInputView {
     }
 
     func unwrapBlockToParagraph(blockID: BlockInputBlockID) -> BlockInputSelection? {
-        guard let index = index(of: blockID),
+        guard isEditable,
+              let index = index(of: blockID),
               let beforeBlock = block(at: index),
               beforeBlock.kind.canUnwrapToParagraph else {
             return nil

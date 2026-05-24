@@ -461,14 +461,17 @@ extension BlockInputBlockItem {
         if case .code = kind {
             return style.codeBlock.foregroundColor ?? style.baseText.foregroundColor ?? .labelColor
         }
-        return style.baseText.foregroundColor ?? .labelColor
+        return readOnlyForegroundColor(style.baseText.foregroundColor ?? .labelColor, for: kind)
     }
 
     private func typingForegroundColor(for kind: BlockInputBlockKind) -> NSColor? {
         if case .code = kind {
             return style.codeBlock.foregroundColor ?? style.baseText.foregroundColor
         }
-        return style.baseText.foregroundColor
+        guard !isEditable else {
+            return style.baseText.foregroundColor
+        }
+        return readOnlyForegroundColor(style.baseText.foregroundColor ?? .labelColor, for: kind)
     }
 }
 

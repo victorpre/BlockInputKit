@@ -4,6 +4,9 @@ public extension BlockInputView {
     /// Merges a paragraph block into the previous block.
     @discardableResult
     func mergeBlockIntoPrevious(blockID: BlockInputBlockID) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
         refreshDocumentFromStore()
         guard let index = index(of: blockID),
               index > 0,

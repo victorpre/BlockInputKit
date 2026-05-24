@@ -33,6 +33,9 @@ public extension BlockInputView {
 
     /// Returns whether a semantic editor command can currently run.
     func canPerformCommand(_ command: BlockInputEditorCommand) -> Bool {
+        guard isEditable || !command.isMutatingDocument else {
+            return false
+        }
         if let availability = canPerformUndoOrClipboardCommand(command) {
             return availability
         }
@@ -53,6 +56,9 @@ public extension BlockInputView {
 
     /// Returns toggle state for formatting commands and availability for non-toggle commands.
     func state(for command: BlockInputEditorCommand) -> BlockInputEditorCommandState {
+        guard isEditable || !command.isMutatingDocument else {
+            return .unavailable
+        }
         switch command {
         case .bold:
             return textFormattingCommandState(.bold)
@@ -73,6 +79,9 @@ extension BlockInputView {
         guard let command = event.blockInputEditorCommandShortcut else {
             return false
         }
+        guard isEditable || !command.isMutatingDocument else {
+            return command.consumesKeyboardShortcutWhenUnavailable
+        }
         let performed = performCommand(command)
         return performed || command.consumesKeyboardShortcutWhenUnavailable
     }
@@ -82,6 +91,9 @@ extension BlockInputView {
         _ command: BlockInputEditorCommand,
         context: BlockInputResolvedCommandContext
     ) -> Bool {
+        guard isEditable || !command.isMutatingDocument else {
+            return false
+        }
         if commandShouldFailForFocusedModal(command) {
             return false
         }

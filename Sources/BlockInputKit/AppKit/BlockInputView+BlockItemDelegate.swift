@@ -35,6 +35,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         guard beforeText != text else {
             return
         }
+        if discardReadOnlyTextChangeIfNeeded(item: item, block: beforeBlock) { return }
         if beforeBlock.kind == .horizontalRule {
             configureBlockItem(item, block: beforeBlock)
             return
@@ -156,6 +157,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestReturn(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let block = block(withID: blockID) else {
             return true
         }
@@ -187,6 +191,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestMergeWithPreviousBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard item.currentSelectedRange.location == 0,
               item.currentSelectedRange.length == 0 else {
             return false
@@ -196,6 +203,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestDeleteEmptyBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let block = block(withID: blockID) else {
             return false
         }
@@ -214,7 +224,10 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         blockID: BlockInputBlockID,
         didRequestLinkBoundaryDeletion direction: BlockInputLinkBoundaryDeletionDirection
     ) -> Bool {
-        deleteLinkAtBoundary(item: item, blockID: blockID, direction: direction)
+        guard isEditable else {
+            return false
+        }
+        return deleteLinkAtBoundary(item: item, blockID: blockID, direction: direction)
     }
 
     func blockItemDidRevealReorderHandle(_ item: BlockInputBlockItem) {
@@ -222,6 +235,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestUnwrapBlock(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard let currentBlock = block(withID: blockID) else {
             return false
         }
@@ -294,7 +310,10 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         blockID: BlockInputBlockID,
         didRequestUndoShortcut shortcut: BlockInputUndoShortcut
     ) -> Bool {
-        performCommand(BlockInputEditorCommand(shortcut), context: BlockInputResolvedCommandContext(preferredBlockID: blockID))
+        guard isEditable else {
+            return false
+        }
+        return performCommand(BlockInputEditorCommand(shortcut), context: BlockInputResolvedCommandContext(preferredBlockID: blockID))
     }
 
     func blockItemDidRequestCopyActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
@@ -302,14 +321,23 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestCutActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        performCommand(.cut)
+        guard isEditable else {
+            return false
+        }
+        return performCommand(.cut)
     }
 
     func blockItemDidRequestPasteActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
-        performCommand(.paste)
+        guard isEditable else {
+            return false
+        }
+        return performCommand(.paste)
     }
 
     func blockItemDidRequestDeleteActiveSelection(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) -> Bool {
+        guard isEditable else {
+            return false
+        }
         guard selection == .blocks([blockID]),
               block(withID: blockID)?.kind == .table else {
             return false
@@ -322,6 +350,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         blockID: BlockInputBlockID,
         didRequestTextFormattingShortcut shortcut: BlockInputTextFormattingShortcut
     ) -> Bool {
+        guard isEditable else {
+            return false
+        }
         if item.currentSelectedRange.length > 0,
            !usesEditorLevelTextFormattingSelection {
             applySelection(.text(BlockInputTextRange(blockID: blockID, range: item.currentSelectedRange)), notify: false)
@@ -365,6 +396,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
+        guard isEditable else {
+            return
+        }
         _ = toggleChecklistItem(blockID: blockID)
     }
 
@@ -394,6 +428,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         blockID: BlockInputBlockID,
         selectedRange: NSRange
     ) {
+        guard isEditable else {
+            return
+        }
         _ = performBlockIndentationEdit(
             named: "Indent Block",
             item: item,
@@ -408,6 +445,9 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         blockID: BlockInputBlockID,
         selectedRange: NSRange
     ) {
+        guard isEditable else {
+            return
+        }
         _ = performBlockIndentationEdit(
             named: "Outdent Block",
             item: item,

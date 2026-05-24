@@ -48,6 +48,10 @@ func rightMouseUpEvent(location: NSPoint = .zero, windowNumber: Int) throws -> N
     try mouseEvent(type: .rightMouseUp, location: location, windowNumber: windowNumber)
 }
 
+func mouseMovedEvent(location: NSPoint = .zero, windowNumber: Int) throws -> NSEvent {
+    try mouseEvent(type: .mouseMoved, location: location, windowNumber: windowNumber)
+}
+
 private func mouseEvent(
     type: NSEvent.EventType,
     location: NSPoint = .zero,

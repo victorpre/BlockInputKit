@@ -6,6 +6,9 @@ extension BlockInputView {
         _ shortcut: BlockInputUndoShortcut,
         preferredBlockID: BlockInputBlockID? = nil
     ) -> Bool {
+        guard isEditable else {
+            return false
+        }
         switch shortcut {
         case .undo:
             return undoForKeyboardShortcut(preferredBlockID: preferredBlockID) != nil
@@ -16,7 +19,8 @@ extension BlockInputView {
 
     @discardableResult
     func undoTextEdit(in blockID: BlockInputBlockID) -> BlockInputUndoResult? {
-        guard let block = block(withID: blockID),
+        guard isEditable,
+              let block = block(withID: blockID),
               let result = undoController?.undoTextEdit(for: block) else {
             return nil
         }
@@ -26,7 +30,8 @@ extension BlockInputView {
 
     @discardableResult
     func redoTextEdit(in blockID: BlockInputBlockID) -> BlockInputUndoResult? {
-        guard let block = block(withID: blockID),
+        guard isEditable,
+              let block = block(withID: blockID),
               let result = undoController?.redoTextEdit(for: block) else {
             return nil
         }

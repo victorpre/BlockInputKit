@@ -44,7 +44,8 @@ extension BlockInputTextView {
     }
 
     func validateFileDrop(_ sender: NSDraggingInfo) -> NSDragOperation {
-        guard let target = fileDropTarget(for: sender) else {
+        guard blockItem?.isEditable != false,
+              let target = fileDropTarget(for: sender) else {
             hideFileDropCaret()
             return []
         }
@@ -63,6 +64,7 @@ extension BlockInputTextView {
     func fileDropTarget(for draggingInfo: NSDraggingInfo) -> BlockInputFileDropTarget? {
         guard draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID) == nil,
               let blockItem,
+              blockItem.isEditable,
               let block = blockItem.renderedBlock,
               BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
             return nil

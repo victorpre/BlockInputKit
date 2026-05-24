@@ -65,6 +65,8 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var imageLoadingContext = BlockInputImageBlockLoadingContext()
     var fileBaseURL: URL?
     var allowsReordering = true
+    var isEditable = true
+    var disabledCursor: NSCursor?
     var editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
     var handleLeadingConstraint: NSLayoutConstraint?
     var handleWidthConstraint: NSLayoutConstraint?
@@ -184,6 +186,8 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         style: BlockInputStyle = .default,
         imageLoadingContext: BlockInputImageBlockLoadingContext = BlockInputImageBlockLoadingContext(),
         fileBaseURL: URL? = nil,
+        isEditable: Bool = true,
+        disabledCursor: NSCursor? = nil,
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) {
@@ -197,14 +201,11 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.style = style
         self.imageLoadingContext = imageLoadingContext
         self.fileBaseURL = fileBaseURL
+        applyReadOnlyConfiguration(isEditable: isEditable, disabledCursor: disabledCursor)
         selectionBeforeTextChange = nil
         textView.hideFileDropCaret()
         isHorizontalRule = block.kind == .horizontalRule
-        if case .image = block.kind {
-            isImageBlock = true
-        } else {
-            isImageBlock = false
-        }
+        isImageBlock = block.kind.isImage
         handleView.blockItem = self
         scrollView.blockItem = self
         horizontalRuleView.blockItem = self
@@ -221,12 +222,13 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         setBlockSelection(isSelected)
         // Frontmatter is pinned to document index 0, so keep the reorder
         // gutter width for alignment without exposing an unusable drag handle.
-        let canReorderBlock = allowsReordering && block.kind != .frontMatter
+        let canReorderBlock = isEditable && allowsReordering && block.kind != .frontMatter
         handleView.isEnabled = canReorderBlock
         handleView.isHidden = !canReorderBlock
         handleView.alphaValue = 0
         handleView.toolTip = canReorderBlock ? "Drag to reorder block" : nil
         view.window?.invalidateCursorRects(for: view)
+        invalidateCursorRects()
         handleLeadingConstraint?.constant = Self.handleLeadingInset(
             allowsReordering: allowsReordering,
             editorHorizontalInset: editorHorizontalInset

@@ -184,6 +184,15 @@ public struct BlockInputConfiguration {
     /// The placeholder is visual only. It is not inserted into the document, exported as Markdown, or reported through
     /// document-change callbacks.
     public var placeholder: String?
+    /// Whether the editor accepts user-driven document mutations.
+    ///
+    /// When false, existing content remains selectable, copyable, focusable, and accessible, but typing and editor-owned
+    /// mutation commands are disabled.
+    public var isEditable: Bool
+    /// Cursor shown over non-editable editor surfaces.
+    ///
+    /// Link and slash-command chip cursor rects may still take precedence where those interactions remain available.
+    public var disabledCursor: NSCursor?
     /// Color used for editor accent affordances, including drag insertion and selected horizontal rules.
     public var dropIndicatorColor: NSColor
     /// Visual styling for editor text, code, and selection chrome.
@@ -272,6 +281,8 @@ public struct BlockInputConfiguration {
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         editorVerticalInset: CGFloat = BlockInputConfiguration.defaultEditorVerticalInset,
         placeholder: String? = nil,
+        isEditable: Bool = true,
+        disabledCursor: NSCursor? = nil,
         dropIndicatorColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
         heightSizing: BlockInputEditorHeightSizing? = nil,
@@ -305,6 +316,8 @@ public struct BlockInputConfiguration {
         self.editorHorizontalInset = editorHorizontalInset
         self.editorVerticalInset = editorVerticalInset
         self.placeholder = placeholder
+        self.isEditable = isEditable
+        self.disabledCursor = disabledCursor
         self.dropIndicatorColor = dropIndicatorColor
         self.style = style
         self.heightSizing = heightSizing
