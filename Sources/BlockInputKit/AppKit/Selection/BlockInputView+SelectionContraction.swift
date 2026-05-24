@@ -26,6 +26,23 @@ extension BlockInputView {
                 return false
             }
         }
+        // Boundary-origin selections can leave the original caret block outside the selected bounds. Lists still need
+        // their internal line-by-line contraction before that outside caret is restored.
+        if case let .mixed(mixedSelection) = selection,
+           shrinkActiveIncrementalListEndpoint(
+            mixedSelection,
+            expansionDirection: expansion.direction,
+            preservesPartialOnlyMixedSelection: true
+           ) {
+            return true
+        }
+        if demoteExcludedAnchorIncrementalListSelectionIfNeeded(
+            expansionDirection: expansion.direction,
+            firstIndex: firstIndex,
+            lastIndex: lastIndex
+        ) {
+            return true
+        }
         return restoreExcludedAnchorSelectionIfNeeded(
             anchorIndex: anchorIndex,
             direction: expansion.direction,
@@ -44,12 +61,32 @@ extension BlockInputView {
         switch direction {
         case .upward:
             guard firstIndex < anchorIndex else {
+                if demoteIncrementalListWholeBlockSelectionIfNeeded(at: anchorIndex, expansionDirection: direction) {
+                    return true
+                }
                 return restoreAnchorTextSelection(at: anchorIndex, direction: direction)
+            }
+            if demoteActiveIncrementalListWholeBlockSelectionIfNeeded(
+                at: firstIndex,
+                expansionDirection: direction,
+                preservesPartialOnlyMixedSelection: false
+            ) {
+                return true
             }
             shrunkenBounds = (firstIndex + 1)...lastIndex
         case .downward:
             guard anchorIndex < lastIndex else {
+                if demoteIncrementalListWholeBlockSelectionIfNeeded(at: anchorIndex, expansionDirection: direction) {
+                    return true
+                }
                 return restoreAnchorTextSelection(at: anchorIndex, direction: direction)
+            }
+            if demoteActiveIncrementalListWholeBlockSelectionIfNeeded(
+                at: lastIndex,
+                expansionDirection: direction,
+                preservesPartialOnlyMixedSelection: false
+            ) {
+                return true
             }
             shrunkenBounds = firstIndex...(lastIndex - 1)
         }
@@ -72,6 +109,9 @@ extension BlockInputView {
         direction: BlockInputVerticalMovementDirection,
         anchorIndex: Int
     ) -> Bool {
+        if shrinkActiveIncrementalListEndpoint(selection, expansionDirection: direction) {
+            return true
+        }
         let sortedBlockIDs = selection.blockIDs.sorted { lhs, rhs in
             (index(of: lhs) ?? Int.max) < (index(of: rhs) ?? Int.max)
         }
@@ -100,6 +140,176 @@ extension BlockInputView {
         }
 
         return applyContractedMixedSelection(nextSelection, scrollIndex: removedIndex)
+    }
+
+    private func demoteIncrementalListWholeBlockSelectionIfNeeded(
+        at index: Int,
+        expansionDirection: BlockInputVerticalMovementDirection
+    ) -> Bool {
+        guard let block = block(at: index),
+              let demotedRange = block.incrementalListSelectionRangeAfterDemotingWholeBlock(
+                expansionDirection: expansionDirection
+              ) else {
+            return false
+        }
+        let textRange = BlockInputTextRange(blockID: block.id, range: demotedRange)
+        applySelection(.text(textRange), notify: true)
+        restoreVisibleTextSelection(textRange)
+        // Whole list blocks demote back into their internal list lines before contraction leaves the block.
+        blockSelectionExpansion = BlockInputBlockSelectionExpansion(anchorBlockID: block.id, direction: expansionDirection)
+        publishFocusChange(true)
+        return true
+    }
+
+    private func shrinkActiveIncrementalListEndpoint(
+        _ selection: BlockInputMixedSelection,
+        expansionDirection: BlockInputVerticalMovementDirection,
+        preservesPartialOnlyMixedSelection: Bool = false
+    ) -> Bool {
+        let endpoint = expansionDirection == .upward ? selection.leadingTextRange : selection.trailingTextRange
+        guard let endpoint,
+              let block = block(withID: endpoint.blockID),
+              block.usesIncrementalListLineSelection else {
+            return false
+        }
+        let blockIDs = selection.blockIDs
+        var leadingTextRange = selection.leadingTextRange
+        var trailingTextRange = selection.trailingTextRange
+        if let contractedRange = block.incrementalListSelectionRangeAfterContracting(
+            endpoint.range,
+            expansionDirection: expansionDirection
+        ), contractedRange.length > 0 {
+            let contractedTextRange = BlockInputTextRange(blockID: endpoint.blockID, range: contractedRange)
+            if expansionDirection == .upward {
+                leadingTextRange = contractedTextRange
+            } else {
+                trailingTextRange = contractedTextRange
+            }
+        } else if expansionDirection == .upward {
+            leadingTextRange = nil
+        } else {
+            trailingTextRange = nil
+        }
+
+        let nextSelection = contractedSelectionFromMixedParts(
+            blockIDs: blockIDs,
+            leadingTextRange: leadingTextRange,
+            trailingTextRange: trailingTextRange,
+            preservesPartialOnlyMixedSelection: preservesPartialOnlyMixedSelection
+        )
+        guard let nextSelection else {
+            return false
+        }
+
+        let preferredTextContainerX = preferredNavigationX
+        applySelection(nextSelection, notify: true)
+        preferredNavigationX = preferredTextContainerX
+        if case let .text(textRange) = nextSelection {
+            restoreVisibleTextSelection(textRange)
+        } else {
+            window?.makeFirstResponder(self)
+        }
+        blockSelectionExpansion = BlockInputBlockSelectionExpansion(
+            anchorBlockID: blockSelectionExpansion?.anchorBlockID ?? endpoint.blockID,
+            direction: expansionDirection
+        )
+        publishFocusChange(true)
+        return true
+    }
+
+    private func contractedSelectionFromMixedParts(
+        blockIDs: [BlockInputBlockID],
+        leadingTextRange: BlockInputTextRange?,
+        trailingTextRange: BlockInputTextRange?,
+        preservesPartialOnlyMixedSelection: Bool = false
+    ) -> BlockInputSelection? {
+        let sortedBlockIDs = blockIDs.sortedByDocumentOrder(in: self)
+        switch (sortedBlockIDs.isEmpty, leadingTextRange, trailingTextRange) {
+        case (true, nil, nil):
+            return nil
+        case (false, nil, nil):
+            return .blocks(sortedBlockIDs)
+        case (true, let leading?, nil):
+            if preservesPartialOnlyMixedSelection {
+                return .mixed(BlockInputMixedSelection(blockIDs: [], leadingTextRange: leading))
+            }
+            return .text(leading)
+        case (true, nil, let trailing?):
+            if preservesPartialOnlyMixedSelection {
+                return .mixed(BlockInputMixedSelection(blockIDs: [], trailingTextRange: trailing))
+            }
+            return .text(trailing)
+        default:
+            return .mixed(BlockInputMixedSelection(
+                blockIDs: sortedBlockIDs,
+                leadingTextRange: leadingTextRange,
+                trailingTextRange: trailingTextRange
+            ))
+        }
+    }
+
+    private func demoteExcludedAnchorIncrementalListSelectionIfNeeded(
+        expansionDirection: BlockInputVerticalMovementDirection,
+        firstIndex: Int,
+        lastIndex: Int
+    ) -> Bool {
+        let activeIndex = expansionDirection == .upward ? firstIndex : lastIndex
+        // Keep the mixed selection form even when the demoted list is the only selected block. That preserves the
+        // external caret anchor, so the next reverse key press can shrink another list line instead of re-anchoring
+        // inside the list block.
+        return demoteActiveIncrementalListWholeBlockSelectionIfNeeded(
+            at: activeIndex,
+            expansionDirection: expansionDirection,
+            preservesPartialOnlyMixedSelection: true
+        )
+    }
+
+    private func demoteActiveIncrementalListWholeBlockSelectionIfNeeded(
+        at activeIndex: Int,
+        expansionDirection: BlockInputVerticalMovementDirection,
+        preservesPartialOnlyMixedSelection: Bool
+    ) -> Bool {
+        guard case let .blocks(blockIDs) = selection,
+              let block = block(at: activeIndex),
+              blockIDs.contains(block.id),
+              block.usesIncrementalListLineSelection,
+              let demotedRange = block.incrementalListSelectionRangeAfterDemotingWholeBlock(
+                expansionDirection: expansionDirection
+              ) else {
+            return false
+        }
+        // The active whole list block is not removed in one jump. It first returns to the last internal line range
+        // that existed before whole-block promotion, mirroring table row contraction.
+        let remainingBlockIDs = blockIDs
+            .filter { $0 != block.id }
+            .sortedByDocumentOrder(in: self)
+        let textRange = BlockInputTextRange(blockID: block.id, range: demotedRange)
+        let nextSelection = expansionDirection == .upward
+            ? contractedSelectionFromMixedParts(
+                blockIDs: remainingBlockIDs,
+                leadingTextRange: textRange,
+                trailingTextRange: nil,
+                preservesPartialOnlyMixedSelection: preservesPartialOnlyMixedSelection
+            )
+            : contractedSelectionFromMixedParts(
+                blockIDs: remainingBlockIDs,
+                leadingTextRange: nil,
+                trailingTextRange: textRange,
+                preservesPartialOnlyMixedSelection: preservesPartialOnlyMixedSelection
+            )
+        guard let nextSelection else {
+            return false
+        }
+        let preferredTextContainerX = preferredNavigationX
+        applySelection(nextSelection, notify: true)
+        preferredNavigationX = preferredTextContainerX
+        blockSelectionExpansion = BlockInputBlockSelectionExpansion(
+            anchorBlockID: blockSelectionExpansion?.anchorBlockID ?? block.id,
+            direction: expansionDirection
+        )
+        window?.makeFirstResponder(self)
+        publishFocusChange(true)
+        return true
     }
 
     private func mixedSelectionAfterDemotingActiveEdge(
@@ -222,5 +432,14 @@ extension BlockInputView {
 private extension BlockInputMixedSelection {
     var hasPartialTextRange: Bool {
         leadingTextRange != nil || trailingTextRange != nil
+    }
+}
+
+private extension Array where Element == BlockInputBlockID {
+    @MainActor
+    func sortedByDocumentOrder(in view: BlockInputView) -> [BlockInputBlockID] {
+        sorted { lhs, rhs in
+            (view.index(of: lhs) ?? Int.max) < (view.index(of: rhs) ?? Int.max)
+        }
     }
 }

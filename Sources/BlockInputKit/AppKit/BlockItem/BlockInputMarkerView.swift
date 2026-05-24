@@ -85,6 +85,46 @@ final class BlockInputMarkerView: NSView {
         setMarkerLineMetrics(yOffsets: markerLineYOffsets, heights: [])
     }
 
+    // Selection chrome relies on this matching draw(_:) so nested markers remain inside selected line bounds.
+    func markerLineFrame(at lineIndex: Int) -> NSRect? {
+        guard markerLines.indices.contains(lineIndex) else {
+            return nil
+        }
+        let markerLine = markerLines[lineIndex]
+        let resolvedFont = font ?? .preferredFont(forTextStyle: .body)
+        let lineHeight = ceil(resolvedFont.ascender - resolvedFont.descender + resolvedFont.leading)
+        let lineY = yOffset(forLineAt: lineIndex, lineHeight: lineHeight)
+        let markerLineHeight = markerLineHeight(forLineAt: lineIndex, defaultLineHeight: lineHeight)
+        if markerLine.checkboxState != nil {
+            let markerSize = Self.scaledMarkerSize(16, forPointSize: resolvedFont.pointSize)
+            return NSRect(
+                x: Self.markerGlyphXPosition(indentationLevel: markerLine.indentationLevel, markerWidth: markerSize),
+                y: lineY + max(0, (markerLineHeight - markerSize) / 2),
+                width: markerSize,
+                height: markerSize
+            )
+        }
+        guard !markerLine.text.isEmpty else {
+            return nil
+        }
+        if let markerStyle = UnorderedMarkerStyle(text: markerLine.text) {
+            let markerSize = markerStyle.size(forPointSize: resolvedFont.pointSize)
+            return NSRect(
+                x: Self.markerGlyphXPosition(indentationLevel: markerLine.indentationLevel, markerWidth: markerSize),
+                y: lineY + max(0, (markerLineHeight - markerSize) / 2),
+                width: markerSize,
+                height: markerSize
+            )
+        }
+        let markerSize = (markerLine.text as NSString).size(withAttributes: [.font: resolvedFont])
+        return NSRect(
+            x: Self.markerGlyphXPosition(indentationLevel: markerLine.indentationLevel, markerWidth: markerSize.width),
+            y: Self.textMarkerYPosition(lineY: lineY, lineHeight: markerLineHeight, markerHeight: markerSize.height),
+            width: markerSize.width,
+            height: markerSize.height
+        )
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         guard !markerLines.isEmpty else {
             return

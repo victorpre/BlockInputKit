@@ -24,18 +24,38 @@ extension BlockInputView {
            ) {
             return true
         }
-        if selectedRange.shouldPromoteToBlockSelection(in: block.text, direction: direction) {
-            return expandBlockSelection(from: blockID, direction: direction, preferredTextContainerX: preferredTextContainerX)
+        if contractIncrementalListTextSelectionIfNeeded(
+            from: blockID,
+            selectedRange: selectedRange,
+            currentBlock: block,
+            direction: direction
+        ) {
+            return true
+        }
+        if let promoted = promoteTextSelectionToBlockIfNeeded(
+            from: blockID,
+            selectedRange: selectedRange,
+            currentBlock: block,
+            direction: direction,
+            preferredTextContainerX: preferredTextContainerX
+        ) {
+            return promoted
         }
         let expandedRange = block.text.expandingLineSelection(selectedRange, direction: direction)
-        guard expandedRange != selectedRange else {
-            return false
+        guard expandedRange != selectedRange else { return false }
+        if promoteExpandedIncrementalListTextSelectionIfNeeded(
+            from: blockID,
+            expandedRange: expandedRange,
+            currentBlock: block,
+            direction: direction
+        ) {
+            return true
         }
-        let textRange = BlockInputTextRange(blockID: blockID, range: expandedRange)
-        applySelection(.text(textRange), notify: true)
-        restoreVisibleTextSelection(textRange)
-        BlockInputSelectionDebug.emit("expanded text range=\(expandedRange)")
-        return true
+        return applyExpandedTextSelection(
+            BlockInputTextRange(blockID: blockID, range: expandedRange),
+            block: block,
+            direction: direction
+        )
     }
 
     func promoteNativeSelectionExpansionIfNeeded(
@@ -48,7 +68,22 @@ extension BlockInputView {
               selectedRange.shouldPromoteToBlockSelection(in: block.text, direction: direction) else {
             return false
         }
-        return expandBlockSelection(from: blockID, direction: direction)
+        if promoteCompletedIncrementalListTextSelectionIfNeeded(
+            from: blockID,
+            selectedRange: selectedRange,
+            currentBlock: block,
+            direction: direction
+        ) {
+            return true
+        }
+        let boundaryOffset = direction == .upward ? selectedRange.location : NSMaxRange(selectedRange)
+        let preferredTextContainerX = visibleItem(for: blockID)?
+            .textContainerX(forUTF16Offset: boundaryOffset)
+        return expandBlockSelection(
+            from: blockID,
+            direction: direction,
+            preferredTextContainerX: preferredTextContainerX
+        )
     }
 
     func expandBlockSelection(direction: BlockInputVerticalMovementDirection) -> Bool {
@@ -64,13 +99,38 @@ extension BlockInputView {
         if contractSelectionIfNeeded(direction: direction, firstIndex: firstIndex, lastIndex: lastIndex) {
             return true
         }
+        if case let .mixed(mixedSelection) = selection,
+           blockSelectionExpansion?.direction == direction,
+           expandActiveIncrementalListEndpointIfNeeded(mixedSelection, direction: direction) {
+            return true
+        }
         guard let expandedBounds = expandedBlockSelectionBounds(from: selectedBounds, direction: direction) else {
             return false
+        }
+        if case .blocks = selection,
+           expandBlockSelectionIntoIncrementalListEndpoint(
+            selectedBounds: selectedBounds,
+            expandedBounds: expandedBounds,
+            direction: direction
+           ) {
+            return true
         }
         if case let .mixed(mixedSelection) = selection,
            blockSelectionExpansion?.direction == direction {
             return expandMixedSelectionContinuing(mixedSelection, expandedBounds: expandedBounds, direction: direction)
         }
+        return applyExpandedBlockSelection(
+            selectedBounds: selectedBounds,
+            expandedBounds: expandedBounds,
+            direction: direction
+        )
+    }
+
+    private func applyExpandedBlockSelection(
+        selectedBounds: ClosedRange<Int>,
+        expandedBounds: ClosedRange<Int>,
+        direction: BlockInputVerticalMovementDirection
+    ) -> Bool {
         let expandedIDs: [BlockInputBlockID]
         if case let .mixed(mixedSelection) = selection {
             expandedIDs = expandedMixedBlockIDs(mixedSelection, expandedBounds: expandedBounds, direction: direction)
@@ -90,7 +150,9 @@ extension BlockInputView {
             applySelection(.blocks(expandedIDs), notify: true)
         }
         if blockSelectionExpansion == nil {
-            let anchorID = direction == .upward ? block(at: selectedBounds.upperBound)?.id : block(at: selectedBounds.lowerBound)?.id
+            let anchorID = direction == .upward
+                ? block(at: selectedBounds.upperBound)?.id
+                : block(at: selectedBounds.lowerBound)?.id
             blockSelectionExpansion = anchorID.map {
                 BlockInputBlockSelectionExpansion(anchorBlockID: $0, direction: direction)
             }
@@ -280,7 +342,7 @@ extension BlockInputView {
         }
     }
 
-    private func expandBlockSelection(
+    func expandBlockSelection(
         from blockID: BlockInputBlockID,
         direction: BlockInputVerticalMovementDirection,
         preferredTextContainerX: CGFloat? = nil
@@ -398,89 +460,20 @@ extension BlockInputView {
             return nil
         }
         let textLength = block.utf16Length
+        // Even when the current block is fully selected, keep it as the fixed text endpoint. The newly crossed
+        // neighboring block starts partial and only becomes a whole middle block after another Shift+Arrow press.
         switch direction {
         case .upward:
-            guard textRange.range.location <= 0, NSMaxRange(textRange.range) < textLength else {
+            guard textRange.range.location <= 0 else {
                 return nil
             }
             return textRange
         case .downward:
-            guard textRange.range.location > 0, NSMaxRange(textRange.range) >= textLength else {
+            guard NSMaxRange(textRange.range) >= textLength else {
                 return nil
             }
             return textRange
         }
     }
 
-    func applyPromotedSelection(
-        _ selection: BlockInputSelection,
-        anchorBlockID: BlockInputBlockID,
-        direction: BlockInputVerticalMovementDirection,
-        scrollIndex: Int,
-        preferredTextContainerX: CGFloat? = nil
-    ) -> Bool {
-        applySelection(selection, notify: true)
-        blockSelectionExpansion = BlockInputBlockSelectionExpansion(anchorBlockID: anchorBlockID, direction: direction)
-        preferredNavigationX = preferredTextContainerX
-        scrollBlockSelectionBoundaryToVisible(scrollIndex)
-        window?.makeFirstResponder(self)
-        publishFocusChange(true)
-        return true
-    }
-
-    func scrollBlockSelectionBoundaryToVisible(_ index: Int) {
-        guard index >= 0,
-              index < blockCount else {
-            return
-        }
-        collectionView.scrollToItems(at: [IndexPath(item: index, section: 0)], scrollPosition: .nearestVerticalEdge)
-        collectionView.layoutSubtreeIfNeeded()
-    }
-}
-
-private extension NSRange {
-    func shouldPromoteToBlockSelection(in string: String, direction: BlockInputVerticalMovementDirection) -> Bool {
-        guard length > 0 else {
-            return false
-        }
-        let textLength = (string as NSString).length
-        switch direction {
-        case .upward:
-            return location <= 0
-        case .downward:
-            return NSMaxRange(self) >= textLength
-        }
-    }
-}
-
-private extension String {
-    func expandingLineSelection(_ range: NSRange, direction: BlockInputVerticalMovementDirection) -> NSRange {
-        let text = self as NSString
-        let length = text.length
-        guard length > 0 else {
-            return NSRange(location: 0, length: 0)
-        }
-        let clampedLocation = min(max(range.location, 0), length)
-        let clampedEnd = min(max(range.location + range.length, clampedLocation), length)
-        switch direction {
-        case .upward:
-            guard clampedLocation > 0 else {
-                return NSRange(location: 0, length: clampedEnd)
-            }
-            var lineStart = 0
-            var lineEnd = 0
-            var contentsEnd = 0
-            text.getLineStart(&lineStart, end: &lineEnd, contentsEnd: &contentsEnd, for: NSRange(location: clampedLocation - 1, length: 0))
-            return NSRange(location: lineStart, length: clampedEnd - lineStart)
-        case .downward:
-            guard clampedEnd < length else {
-                return NSRange(location: clampedLocation, length: length - clampedLocation)
-            }
-            var lineStart = 0
-            var lineEnd = 0
-            var contentsEnd = 0
-            text.getLineStart(&lineStart, end: &lineEnd, contentsEnd: &contentsEnd, for: NSRange(location: clampedEnd, length: 0))
-            return NSRange(location: clampedLocation, length: lineEnd - clampedLocation)
-        }
-    }
 }

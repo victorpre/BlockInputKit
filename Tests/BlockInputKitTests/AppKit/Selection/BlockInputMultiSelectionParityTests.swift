@@ -66,6 +66,37 @@ final class BlockInputMultiSelectionParityTests: XCTestCase {
         XCTAssertEqual(shiftResult.chrome, mouseResult.chrome)
     }
 
+    func testShiftDownFromFullBlockAndMouseDragCreateMatchingPartialSelection() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let blocks = [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ]
+        let selectedRange = NSRange(location: 0, length: 5)
+
+        let shiftResult = try selectionByShiftArrow(
+            blocks: blocks,
+            sourceIndex: 0,
+            selectedRange: selectedRange,
+            direction: .downward
+        )
+        let mouseResult = try selectionByMouseDrag(
+            blocks: blocks,
+            sourceIndex: 0,
+            targetIndex: 1,
+            selectedRange: selectedRange
+        )
+
+        XCTAssertEqual(shiftResult.selection, mouseResult.selection)
+        XCTAssertEqual(shiftResult.selection, .mixed(BlockInputMixedSelection(
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: firstID, range: selectedRange),
+            trailingTextRange: BlockInputTextRange(blockID: secondID, range: NSRange(location: 0, length: 3))
+        )))
+        XCTAssertEqual(shiftResult.chrome, mouseResult.chrome)
+    }
+
     func testShiftDownFromCaretAndMouseAnchorCreateMatchingPartialSelection() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")

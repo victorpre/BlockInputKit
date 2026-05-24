@@ -178,8 +178,9 @@ extension BlockInputBlockItem {
            !imageBlockView.isHidden {
             return imageBlockView.frame
         }
-        var minX = min(textGlyphLeadingX(), standardTextSelectionLeadingX())
-        var maxX = textGlyphTrailingX()
+        let textBounds = renderedTextBoundsForSelectionChrome()
+        var minX = min(textBounds?.minX ?? textGlyphLeadingX(), standardTextSelectionLeadingX())
+        var maxX = textBounds?.maxX ?? textGlyphTrailingX()
         if !kindLabel.markerLines.isEmpty {
             minX = min(minX, kindLabel.frame.minX)
             maxX = max(maxX, kindLabel.frame.maxX)
@@ -232,10 +233,13 @@ extension BlockInputBlockItem {
                 layoutManager: layoutManager
             )
         }
+        let frames = lineFrames.mergingSelectionChromeFrames(
+            selectedLogicalListLineStartBackgroundFrames(for: clampedRange, layoutManager: layoutManager)
+        )
         guard lineFragments.count > 1 else {
-            return lineFrames.map(singleLinePartialBackgroundFrame(for:))
+            return frames.map(singleLinePartialBackgroundFrame(for:))
         }
-        return lineFrames
+        return frames
     }
 
     private func selectedPartialTextBackgroundFrame(
@@ -250,6 +254,7 @@ extension BlockInputBlockItem {
         }
         let lineStart = line.insertionRange.location
         let lineEnd = NSMaxRange(line.insertionRange)
+        let lineContentStart = line.insertionRange.selectionChromeContentStart(in: textView.string as NSString)
         let selectionStart = min(max(selectedCharacterStart, lineStart), lineEnd)
         let selectionEnd = min(max(selectedCharacterEnd, lineStart), lineEnd)
         let startX = textContainerX(forSelectionOffset: selectionStart, in: line, layoutManager: layoutManager)
@@ -265,6 +270,14 @@ extension BlockInputBlockItem {
             let leadingBounds = selectedLeadingChromeBounds()
             minX = min(minX, standardTextSelectionLeadingX(), leadingBounds?.minX ?? minX)
             maxX = max(maxX, leadingBounds?.maxX ?? maxX)
+        }
+        if selectionStart <= lineContentStart,
+           selectionEnd > lineContentStart,
+           let markerBounds = selectedMarkerLineBounds(forLineAt: line.index) {
+            // NSLayoutManager may fold the previous newline into the next line fragment. For Shift+Right across a
+            // nested list line break, include the marker only once the first visible character is selected.
+            minX = min(minX, markerBounds.minX)
+            maxX = max(maxX, markerBounds.maxX)
         }
         let lineViewRect = textView.convert(NSRect(
             x: textOrigin.x + line.lineRect.minX,
@@ -322,7 +335,7 @@ extension BlockInputBlockItem {
             fragments.append(BlockInputTextSelectionLineFragment(
                 index: fragments.count,
                 characterRange: characterRange,
-                insertionRange: characterRange.insertionRange(in: text),
+                insertionRange: characterRange.selectionChromeInsertionRange(in: text),
                 lineRect: lineRect,
                 usedRect: usedRect
             ))
@@ -377,8 +390,11 @@ extension BlockInputBlockItem {
     }
 
     private func selectedLeadingChromeBounds() -> NSRect? {
+        // Multi-line list marker views span every nested marker. Partial text selection on line 0 should include only
+        // that line's marker, or Shift+Right from the previous block paints far past the first selected character.
+        let markerBounds = !kindLabel.markerLines.isEmpty ? selectedMarkerLineBounds(forLineAt: 0) : nil
         let bounds = [
-            !kindLabel.markerLines.isEmpty ? kindLabel.frame : nil,
+            markerBounds,
             !checklistButton.isHidden ? checklistButton.frame : nil,
             !quoteBarView.isHidden ? quoteBarView.frame : nil
         ].compactMap { $0 }
@@ -419,80 +435,4 @@ extension BlockInputBlockItem {
 private struct BlockInputSelectionBackgroundLayout {
     var frame: NSRect
     var segmentFrames: [NSRect]
-}
-
-private struct BlockInputTextSelectionLineFragment {
-    var index: Int
-    var characterRange: NSRange
-    var insertionRange: NSRange
-    var lineRect: NSRect
-    var usedRect: NSRect
-}
-
-private extension NSRange {
-    func insertionRange(in text: NSString) -> NSRange {
-        var upperBound = min(NSMaxRange(self), text.length)
-        while upperBound > location {
-            let character = text.character(at: upperBound - 1)
-            guard character == 10 || character == 13 else {
-                break
-            }
-            upperBound -= 1
-        }
-        return NSRange(location: location, length: upperBound - location)
-    }
-}
-
-private extension NSRect {
-    func fallbackExtraLineFragmentRect(
-        after fragments: [BlockInputTextSelectionLineFragment],
-        in textContainer: NSTextContainer
-    ) -> NSRect {
-        guard isEmpty else {
-            return self
-        }
-        if let last = fragments.last {
-            return NSRect(
-                x: last.lineRect.minX,
-                y: last.lineRect.maxY,
-                width: max(last.lineRect.width, 1),
-                height: max(last.lineRect.height, 1)
-            )
-        }
-        return NSRect(x: 0, y: 0, width: max(textContainer.size.width, 1), height: 1)
-    }
-
-    func fallbackExtraLineFragmentUsedRect(in lineRect: NSRect) -> NSRect {
-        guard !isEmpty else {
-            return NSRect(x: lineRect.minX, y: lineRect.minY, width: 12, height: max(lineRect.height, 1))
-        }
-        return self
-    }
-}
-
-private extension NSString {
-    var trailingLineEndingRange: NSRange? {
-        guard length > 0 else {
-            return nil
-        }
-        let lastCharacter = character(at: length - 1)
-        guard lastCharacter == 10 || lastCharacter == 13 else {
-            return nil
-        }
-        if lastCharacter == 10,
-           length > 1,
-           character(at: length - 2) == 13 {
-            return NSRange(location: length - 2, length: 2)
-        }
-        return NSRange(location: length - 1, length: 1)
-    }
-}
-
-private extension String {
-    func blockInputClampedRange(_ range: NSRange) -> NSRange {
-        let text = self as NSString
-        let location = min(max(range.location, 0), text.length)
-        let length = min(max(range.length, 0), max(text.length - location, 0))
-        return NSRange(location: location, length: length)
-    }
 }

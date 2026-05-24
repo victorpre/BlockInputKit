@@ -43,7 +43,7 @@ final class BlockInputViewSelectionExpansionTests: XCTestCase {
         )))
     }
 
-    func testRepeatedShiftDownFromCaretPromotesToBlocksAfterSelectingAllLines() throws {
+    func testRepeatedShiftDownFromCaretPromotesToPartialNextBlockAfterSelectingAllLines() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let mounted = makeMountedBlockInputView(blocks: [
@@ -66,11 +66,15 @@ final class BlockInputViewSelectionExpansionTests: XCTestCase {
             range: NSRange(location: 0, length: 12)
         )))
         textView.keyDown(with: try shiftDownEvent())
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: firstID, range: NSRange(location: 0, length: 12)),
+            trailingTextRange: BlockInputTextRange(blockID: secondID, range: NSRange(location: 0, length: 5))
+        )))
         XCTAssertEqual(mounted.window.firstResponder, mounted.view)
     }
 
-    func testRepeatedShiftUpFromCaretPromotesToBlocksAfterSelectingAllLines() throws {
+    func testRepeatedShiftUpFromCaretPromotesToPartialPreviousBlockAfterSelectingAllLines() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let mounted = makeMountedBlockInputView(blocks: [
@@ -86,7 +90,11 @@ final class BlockInputViewSelectionExpansionTests: XCTestCase {
         textView.keyDown(with: try shiftUpEvent())
         textView.keyDown(with: try shiftUpEvent())
 
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: firstID, range: NSRange(location: 0, length: 5)),
+            trailingTextRange: BlockInputTextRange(blockID: secondID, range: NSRange(location: 0, length: 12))
+        )))
         XCTAssertEqual(mounted.window.firstResponder, mounted.view)
     }
 
@@ -126,45 +134,6 @@ final class BlockInputViewSelectionExpansionTests: XCTestCase {
             blockID: blockID,
             range: NSRange(location: 13, length: 5)
         )))
-    }
-
-    func testShiftDownPromotesWholeBlockSelectionToBlocks() throws {
-        let firstID = BlockInputBlockID(rawValue: "first")
-        let secondID = BlockInputBlockID(rawValue: "second")
-        let mounted = makeMountedBlockInputView(blocks: [
-            BlockInputBlock(id: firstID, text: "First"),
-            BlockInputBlock(id: secondID, text: "Second")
-        ])
-        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
-        let textView = try XCTUnwrap(item.testingTextView)
-        mounted.window.makeFirstResponder(textView)
-        textView.setSelectedRange(NSRange(location: 0, length: 5))
-
-        XCTAssertTrue(textView.performKeyEquivalent(with: try shiftDownEvent()))
-
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
-        XCTAssertEqual(itemSelectionBackgroundVisible(in: mounted.view, at: 0), true)
-        XCTAssertEqual(itemSelectionBackgroundVisible(in: mounted.view, at: 1), true)
-        XCTAssertEqual(textView.selectedRange().length, 0)
-    }
-
-    func testShiftDownAlsoPromotesWholeBlockSelectionToBlocks() throws {
-        let firstID = BlockInputBlockID(rawValue: "first")
-        let secondID = BlockInputBlockID(rawValue: "second")
-        let mounted = makeMountedBlockInputView(blocks: [
-            BlockInputBlock(id: firstID, text: "First"),
-            BlockInputBlock(id: secondID, text: "Second")
-        ])
-        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
-        let textView = try XCTUnwrap(item.testingTextView)
-        mounted.window.makeFirstResponder(textView)
-        textView.setSelectedRange(NSRange(location: 0, length: 5))
-
-        XCTAssertTrue(textView.performKeyEquivalent(with: try shiftDownEvent()))
-
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
-        XCTAssertEqual(itemSelectionBackgroundVisible(in: mounted.view, at: 0), true)
-        XCTAssertEqual(itemSelectionBackgroundVisible(in: mounted.view, at: 1), true)
     }
 
     func testShiftDownPromotesTrailingTextSelectionToPartialNextBlock() throws {
@@ -270,44 +239,6 @@ final class BlockInputViewSelectionExpansionTests: XCTestCase {
             blockID: blockID,
             range: NSRange(location: 0, length: 6)
         )))
-    }
-
-    func testMoveDownModifySelectionSelectorPromotesWholeBlockSelectionToBlocks() throws {
-        let firstID = BlockInputBlockID(rawValue: "first")
-        let secondID = BlockInputBlockID(rawValue: "second")
-        let mounted = makeMountedBlockInputView(blocks: [
-            BlockInputBlock(id: firstID, text: "First"),
-            BlockInputBlock(id: secondID, text: "Second")
-        ])
-        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
-        let textView = try XCTUnwrap(item.testingTextView)
-        mounted.window.makeFirstResponder(textView)
-        textView.setSelectedRange(NSRange(location: 0, length: 5))
-
-        textView.doCommand(by: #selector(NSResponder.moveDownAndModifySelection(_:)))
-
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
-        XCTAssertEqual(itemSelectionBackgroundVisible(in: mounted.view, at: 0), true)
-        XCTAssertEqual(itemSelectionBackgroundVisible(in: mounted.view, at: 1), true)
-    }
-
-    func testShiftUpPromotesWholeBlockSelectionToBlocksInDocumentOrder() throws {
-        let firstID = BlockInputBlockID(rawValue: "first")
-        let secondID = BlockInputBlockID(rawValue: "second")
-        let mounted = makeMountedBlockInputView(blocks: [
-            BlockInputBlock(id: firstID, text: "First"),
-            BlockInputBlock(id: secondID, text: "Second")
-        ])
-        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1))
-        let textView = try XCTUnwrap(item.testingTextView)
-        mounted.window.makeFirstResponder(textView)
-        textView.setSelectedRange(NSRange(location: 0, length: 6))
-
-        XCTAssertTrue(textView.performKeyEquivalent(with: try shiftUpEvent()))
-
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
-        XCTAssertEqual(itemSelectionBackgroundVisible(in: mounted.view, at: 0), true)
-        XCTAssertEqual(itemSelectionBackgroundVisible(in: mounted.view, at: 1), true)
     }
 
     func testShiftDownExpandsExistingBlockSelection() throws {

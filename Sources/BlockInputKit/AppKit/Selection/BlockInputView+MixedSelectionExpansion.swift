@@ -62,6 +62,16 @@ extension BlockInputView {
             )
         }
         if offset <= 0 {
+            if promoteIncrementalListBoundary(
+                targetBlock: previousBlock,
+                targetID: previousID,
+                anchorBlockID: blockID,
+                direction: .upward,
+                scrollIndex: index - 1,
+                preferredTextContainerX: preferredTextContainerX
+            ) {
+                return true
+            }
             return applyPromotedSelection(.blocks([previousID]), anchorBlockID: blockID, direction: .upward, scrollIndex: index - 1)
         }
         let range = BlockInputTextRange(blockID: blockID, range: NSRange(location: 0, length: offset))
@@ -110,6 +120,16 @@ extension BlockInputView {
             )
         }
         if offset >= textLength {
+            if promoteIncrementalListBoundary(
+                targetBlock: nextBlock,
+                targetID: nextID,
+                anchorBlockID: blockID,
+                direction: .downward,
+                scrollIndex: index + 1,
+                preferredTextContainerX: preferredTextContainerX
+            ) {
+                return true
+            }
             return applyPromotedSelection(.blocks([nextID]), anchorBlockID: blockID, direction: .downward, scrollIndex: index + 1)
         }
         let range = BlockInputTextRange(blockID: blockID, range: NSRange(location: offset, length: textLength - offset))
@@ -201,6 +221,9 @@ extension BlockInputView {
               block.kind != .horizontalRule else {
             return nil
         }
+        if let range = incrementalListBoundaryRange(for: block, direction: direction) {
+            return BlockInputTextRange(blockID: blockID, range: range)
+        }
         let targetItem = visibleItem(for: blockID)
         let linePosition: BlockInputBlockItem.TextLinePosition = direction == .upward ? .last : .first
         let offset = targetItem?.utf16Offset(
@@ -218,6 +241,42 @@ extension BlockInputView {
             return nil
         }
         return BlockInputTextRange(blockID: blockID, range: range)
+    }
+
+    private func promoteIncrementalListBoundary(
+        targetBlock: BlockInputBlock,
+        targetID: BlockInputBlockID,
+        anchorBlockID: BlockInputBlockID,
+        direction: BlockInputVerticalMovementDirection,
+        scrollIndex: Int,
+        preferredTextContainerX: CGFloat?
+    ) -> Bool {
+        guard let targetRange = incrementalListBoundaryRange(for: targetBlock, direction: direction) else {
+            return false
+        }
+        let textRange = BlockInputTextRange(blockID: targetID, range: targetRange)
+        let selection: BlockInputSelection = direction == .upward
+            ? .mixed(BlockInputMixedSelection(blockIDs: [], leadingTextRange: textRange))
+            : .mixed(BlockInputMixedSelection(blockIDs: [], trailingTextRange: textRange))
+        return applyPromotedSelection(
+            selection,
+            anchorBlockID: anchorBlockID,
+            direction: direction,
+            scrollIndex: scrollIndex,
+            preferredTextContainerX: preferredTextContainerX
+        )
+    }
+
+    private func incrementalListBoundaryRange(
+        for block: BlockInputBlock,
+        direction: BlockInputVerticalMovementDirection
+    ) -> NSRange? {
+        // Multi-line list blocks have their own row-like selection ladder. Entering one from a neighboring caret
+        // must start at the boundary list line; selecting the whole block here would skip all nested sub-items.
+        guard block.usesIncrementalListLineSelection else {
+            return nil
+        }
+        return block.incrementalListEdgeRange(direction: direction)
     }
 }
 

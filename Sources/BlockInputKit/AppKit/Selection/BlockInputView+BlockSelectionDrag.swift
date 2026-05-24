@@ -207,9 +207,8 @@ private extension BlockInputBlock {
             return nil
         }
         let clampedRange = NSRange(location: location, length: length)
-        guard !(clampedRange.location == 0 && clampedRange.length >= textLength) else {
-            return nil
-        }
+        // Preserve full selections as text endpoints so mouse drags match Shift+Arrow: crossing into the next block
+        // starts with a partial target instead of immediately selecting the whole target block.
         return clampedRange
     }
 }

@@ -149,13 +149,16 @@ extension BlockInputView {
         if state.isPromotedToWholeTable {
             return handlePromotedTableKeyboardRowSelection(state, displayRowRange: displayRowRange, direction: direction)
         }
-        let delta = direction == .upward ? -1 : 1
-        if state.focusDisplayRow == state.anchorDisplayRow,
+        let ladder = BlockInputLinearSelectionLadder(
+            anchor: state.anchorDisplayRow,
+            focus: state.focusDisplayRow,
+            bounds: displayRowRange
+        )
+        if ladder.isCollapsedAtAnchor,
            direction != state.direction {
             return restoreTableKeyboardRowSelectionOrigin(state)
         }
-        let nextFocus = state.focusDisplayRow + delta
-        guard displayRowRange.contains(nextFocus) else {
+        guard let nextFocus = ladder.focusAfterMoving(direction) else {
             if direction == state.direction {
                 return expandTableKeyboardRowSelectionPastTable(direction: direction)
             }
@@ -201,14 +204,10 @@ extension BlockInputView {
         guard direction != state.direction else {
             return expandTableKeyboardRowSelectionPastTable(direction: direction)
         }
-        let demotedFocus: Int
-        switch state.direction {
-        case .upward:
-            demotedFocus = displayRowRange.lowerBound + 1
-        case .downward:
-            demotedFocus = displayRowRange.upperBound - 1
-        }
-        guard displayRowRange.contains(demotedFocus) else {
+        guard let demotedFocus = BlockInputLinearSelectionLadder.focusAfterDemotingWholeSelection(
+            within: displayRowRange,
+            expansionDirection: state.direction
+        ) else {
             return restoreTableKeyboardRowSelectionOrigin(state)
         }
         var nextState = state
@@ -304,12 +303,20 @@ extension BlockInputView {
               let displayRowRange = tableView.keyboardDisplayRowRange else {
             return false
         }
-        if rowRangeCoversWholeTable(state, displayRowRange: displayRowRange) {
+        let ladder = BlockInputLinearSelectionLadder(
+            anchor: state.anchorDisplayRow,
+            focus: state.focusDisplayRow,
+            bounds: displayRowRange
+        )
+        if ladder.coversBounds {
             tableView.clearKeyboardCellSelection()
             applySelection(promotedTableSelection(for: state), notify: true)
             var promotedState = state
             promotedState.isPromotedToWholeTable = true
-            promotedState.focusDisplayRow = state.direction == .upward ? displayRowRange.lowerBound : displayRowRange.upperBound
+            promotedState.focusDisplayRow = BlockInputLinearSelectionLadder.promotedFocusIndex(
+                in: displayRowRange,
+                direction: state.direction
+            )
             tableKeyboardRowSelection = promotedState
             window?.makeFirstResponder(self)
             publishFocusChange(true)
@@ -333,14 +340,6 @@ extension BlockInputView {
         applySelection(state.originSelection ?? .cursor(state.originCursor), notify: true)
         restoreVisibleSelection()
         return true
-    }
-
-    private func rowRangeCoversWholeTable(
-        _ state: BlockInputTableKeyboardRowSelection,
-        displayRowRange: ClosedRange<Int>
-    ) -> Bool {
-        min(state.anchorDisplayRow, state.focusDisplayRow) == displayRowRange.lowerBound
-            && max(state.anchorDisplayRow, state.focusDisplayRow) == displayRowRange.upperBound
     }
 
     private func tableCursorSelection(for state: BlockInputTableKeyboardRowSelection) -> BlockInputSelection? {

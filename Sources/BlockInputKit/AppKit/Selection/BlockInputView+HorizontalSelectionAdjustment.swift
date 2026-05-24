@@ -401,7 +401,10 @@ extension BlockInputView {
         }
         let offset = min(max(boundary.utf16Offset, 0), block.utf16Length)
         if block.kind != .horizontalRule, offset < block.utf16Length {
-            return BlockInputDocumentTextBoundary(blockID: block.id, utf16Offset: offset + 1)
+            return BlockInputDocumentTextBoundary(
+                blockID: block.id,
+                utf16Offset: rightwardListLineBoundaryOffset(from: offset, in: block) ?? offset + 1
+            )
         }
         // Crossing right from a fully selected block lands on the next block's first character.
         guard index + 1 < blockCount, let nextBlock = self.block(at: index + 1) else {
@@ -409,6 +412,30 @@ extension BlockInputView {
         }
         let nextOffset = nextBlock.kind == .horizontalRule ? 0 : min(1, nextBlock.utf16Length)
         return BlockInputDocumentTextBoundary(blockID: nextBlock.id, utf16Offset: nextOffset)
+    }
+
+    private func rightwardListLineBoundaryOffset(from offset: Int, in block: BlockInputBlock) -> Int? {
+        // Multi-line list blocks render each source line as a visible list item. Plain Shift+Right should not appear
+        // stuck on the invisible newline between parent and nested list lines; include the next visible character too.
+        guard block.usesIncrementalListLineSelection else {
+            return nil
+        }
+        let text = block.text as NSString
+        guard offset < text.length else {
+            return nil
+        }
+        let character = text.character(at: offset)
+        if character.isCarriageReturn,
+           offset + 1 < text.length,
+           text.character(at: offset + 1).isLineFeed {
+            let nextLineStart = offset + 2
+            return nextLineStart < text.length ? nextLineStart + 1 : nextLineStart
+        }
+        if character.isLineEnding {
+            let nextLineStart = offset + 1
+            return nextLineStart < text.length ? nextLineStart + 1 : nextLineStart
+        }
+        return nil
     }
 
     func scrollHorizontalSelectionBoundaryToVisible(_ boundary: BlockInputDocumentTextBoundary) {

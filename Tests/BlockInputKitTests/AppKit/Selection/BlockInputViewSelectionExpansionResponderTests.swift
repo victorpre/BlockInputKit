@@ -72,7 +72,7 @@ final class BlockInputSelectionResponderTests: XCTestCase {
         )))
     }
 
-    func testBeginningOfDocumentSelectionActionPromotesFullySelectedBlock() throws {
+    func testBeginningOfDocumentSelectionActionPromotesFullySelectedBlockToMixedSelection() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let mounted = makeMountedBlockInputView(blocks: [
@@ -96,10 +96,14 @@ final class BlockInputSelectionResponderTests: XCTestCase {
         )))
 
         XCTAssertTrue(textView.requestSelectionExpansionFromOwningBlock(.upward))
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: firstID, range: NSRange(location: 0, length: 8)),
+            trailingTextRange: BlockInputTextRange(blockID: secondID, range: NSRange(location: 0, length: 12))
+        )))
     }
 
-    func testEndOfDocumentSelectionActionPromotesFullySelectedBlock() throws {
+    func testEndOfDocumentSelectionActionPromotesFullySelectedBlockToMixedSelection() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let mounted = makeMountedBlockInputView(blocks: [
@@ -123,7 +127,11 @@ final class BlockInputSelectionResponderTests: XCTestCase {
         )))
 
         XCTAssertTrue(textView.requestSelectionExpansionFromOwningBlock(.downward))
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: firstID, range: NSRange(location: 0, length: 12)),
+            trailingTextRange: BlockInputTextRange(blockID: secondID, range: NSRange(location: 0, length: 4))
+        )))
     }
 
     func testBeginningOfDocumentActionMovesCaretToDocumentStart() throws {
@@ -164,7 +172,7 @@ final class BlockInputSelectionResponderTests: XCTestCase {
         XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: secondID, utf16Offset: 4)))
     }
 
-    func testRepeatedNativeFullTextSelectionPromotesUpwardToBlocks() throws {
+    func testRepeatedNativeFullTextSelectionPromotesUpwardToMixedSelection() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let mounted = makeMountedBlockInputView(blocks: [
@@ -184,10 +192,14 @@ final class BlockInputSelectionResponderTests: XCTestCase {
         )))
 
         mounted.view.blockItem(secondItem, didChangeSelectionIn: secondID, selectedRange: nil)
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: firstID, range: NSRange(location: 0, length: 8)),
+            trailingTextRange: BlockInputTextRange(blockID: secondID, range: NSRange(location: 0, length: 12))
+        )))
     }
 
-    func testRepeatedNativeFullTextSelectionPromotesDownwardToBlocks() throws {
+    func testRepeatedNativeFullTextSelectionPromotesDownwardToMixedSelection() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let mounted = makeMountedBlockInputView(blocks: [
@@ -207,7 +219,11 @@ final class BlockInputSelectionResponderTests: XCTestCase {
         )))
 
         mounted.view.blockItem(firstItem, didChangeSelectionIn: firstID, selectedRange: nil)
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: firstID, range: NSRange(location: 0, length: 12)),
+            trailingTextRange: BlockInputTextRange(blockID: secondID, range: NSRange(location: 0, length: 4))
+        )))
     }
 
     func testRepeatedNativePartialLeadingSelectionPromotesUpwardToMixedSelection() throws {
@@ -231,7 +247,8 @@ final class BlockInputSelectionResponderTests: XCTestCase {
 
         mounted.view.blockItem(secondItem, didChangeSelectionIn: secondID, selectedRange: nil)
         XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
-            blockIDs: [firstID],
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: firstID, range: NSRange(location: 0, length: 8)),
             trailingTextRange: BlockInputTextRange(blockID: secondID, range: NSRange(location: 0, length: 6))
         )))
     }
@@ -257,8 +274,9 @@ final class BlockInputSelectionResponderTests: XCTestCase {
 
         mounted.view.blockItem(firstItem, didChangeSelectionIn: firstID, selectedRange: nil)
         XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
-            blockIDs: [secondID],
-            leadingTextRange: BlockInputTextRange(blockID: firstID, range: NSRange(location: 6, length: 6))
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: firstID, range: NSRange(location: 6, length: 6)),
+            trailingTextRange: BlockInputTextRange(blockID: secondID, range: NSRange(location: 0, length: 4))
         )))
     }
 

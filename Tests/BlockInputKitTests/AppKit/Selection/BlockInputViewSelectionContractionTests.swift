@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class BlockInputViewSelectionContractionTests: XCTestCase {
-    func testShiftDownShrinksBlockSelectionCreatedUpward() throws {
+    func testShiftDownShrinksSelectionCreatedUpward() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let thirdID = BlockInputBlockID(rawValue: "third")
@@ -18,7 +18,9 @@ final class BlockInputViewSelectionContractionTests: XCTestCase {
         textView.setSelectedRange(NSRange(location: 0, length: 5))
 
         XCTAssertTrue(textView.performKeyEquivalent(with: try shiftUpEvent()))
-        XCTAssertEqual(mounted.view.selection, .blocks([secondID, thirdID]))
+        // A restored full-text selection re-expands through the mixed endpoint path instead of whole-selecting
+        // the newly crossed block.
+        XCTAssertEqual(mounted.view.selection, mixedSelection(leading: textRange(secondID, 0, 6), trailing: textRange(thirdID, 0, 5)))
 
         XCTAssertTrue(textView.performKeyEquivalent(with: try shiftDownEvent()))
         XCTAssertTrue(textView.performKeyEquivalent(with: try shiftDownEvent()))
@@ -28,13 +30,17 @@ final class BlockInputViewSelectionContractionTests: XCTestCase {
         )))
 
         XCTAssertTrue(textView.performKeyEquivalent(with: try shiftNumericPadUpEvent()))
-        XCTAssertEqual(mounted.view.selection, .blocks([secondID, thirdID]))
+        XCTAssertEqual(mounted.view.selection, mixedSelection(leading: textRange(secondID, 0, 6), trailing: textRange(thirdID, 0, 5)))
 
         XCTAssertTrue(mounted.view.performKeyEquivalent(with: try shiftUpEvent()))
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID, thirdID]))
+        XCTAssertEqual(mounted.view.selection, mixedSelection(
+            blockIDs: [secondID],
+            leading: textRange(firstID, 0, 5),
+            trailing: textRange(thirdID, 0, 5)
+        ))
 
         XCTAssertTrue(mounted.view.performKeyEquivalent(with: try shiftDownEvent()))
-        XCTAssertEqual(mounted.view.selection, .blocks([secondID, thirdID]))
+        XCTAssertEqual(mounted.view.selection, mixedSelection(leading: textRange(secondID, 0, 6), trailing: textRange(thirdID, 0, 5)))
 
         XCTAssertTrue(mounted.view.performKeyEquivalent(with: try shiftDownEvent()))
         XCTAssertEqual(mounted.view.selection, .text(BlockInputTextRange(
@@ -43,10 +49,10 @@ final class BlockInputViewSelectionContractionTests: XCTestCase {
         )))
 
         XCTAssertTrue(textView.performKeyEquivalent(with: try shiftUpEvent()))
-        XCTAssertEqual(mounted.view.selection, .blocks([secondID, thirdID]))
+        XCTAssertEqual(mounted.view.selection, mixedSelection(leading: textRange(secondID, 0, 6), trailing: textRange(thirdID, 0, 5)))
     }
 
-    func testShiftUpShrinksBlockSelectionCreatedDownward() throws {
+    func testShiftUpShrinksSelectionCreatedDownward() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
         let thirdID = BlockInputBlockID(rawValue: "third")
@@ -60,13 +66,19 @@ final class BlockInputViewSelectionContractionTests: XCTestCase {
         textView.setSelectedRange(NSRange(location: 0, length: 5))
 
         XCTAssertTrue(textView.performKeyEquivalent(with: try shiftDownEvent()))
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        // A restored full-text selection re-expands through the mixed endpoint path instead of whole-selecting
+        // the newly crossed block.
+        XCTAssertEqual(mounted.view.selection, mixedSelection(leading: textRange(firstID, 0, 5), trailing: textRange(secondID, 0, 3)))
 
         XCTAssertTrue(mounted.view.performKeyEquivalent(with: try shiftDownEvent()))
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID, thirdID]))
+        XCTAssertEqual(mounted.view.selection, mixedSelection(
+            blockIDs: [secondID],
+            leading: textRange(firstID, 0, 5),
+            trailing: textRange(thirdID, 0, 4)
+        ))
 
         XCTAssertTrue(mounted.view.performKeyEquivalent(with: try shiftUpEvent()))
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        XCTAssertEqual(mounted.view.selection, mixedSelection(leading: textRange(firstID, 0, 5), trailing: textRange(secondID, 0, 3)))
 
         XCTAssertTrue(mounted.view.performKeyEquivalent(with: try shiftUpEvent()))
         XCTAssertEqual(mounted.view.selection, .text(BlockInputTextRange(
@@ -75,7 +87,7 @@ final class BlockInputViewSelectionContractionTests: XCTestCase {
         )))
 
         XCTAssertTrue(textView.performKeyEquivalent(with: try shiftDownEvent()))
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        XCTAssertEqual(mounted.view.selection, mixedSelection(leading: textRange(firstID, 0, 5), trailing: textRange(secondID, 0, 3)))
 
         XCTAssertTrue(textView.performKeyEquivalent(with: try shiftUpEvent()))
         XCTAssertTrue(textView.performKeyEquivalent(with: try shiftUpEvent()))
@@ -85,7 +97,9 @@ final class BlockInputViewSelectionContractionTests: XCTestCase {
         )))
 
         XCTAssertTrue(textView.performKeyEquivalent(with: try shiftNumericPadDownEvent()))
-        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        // A restored full-text selection re-expands through the mixed endpoint path instead of whole-selecting
+        // the newly crossed block.
+        XCTAssertEqual(mounted.view.selection, mixedSelection(leading: textRange(firstID, 0, 5), trailing: textRange(secondID, 0, 3)))
     }
 
     func testShiftUpShrinksMixedSelectionCreatedDownwardToPreviousPartialEndpoint() throws {
@@ -142,5 +156,21 @@ final class BlockInputViewSelectionContractionTests: XCTestCase {
         XCTAssertTrue(mounted.view.performKeyEquivalent(with: try shiftDownEvent()))
 
         XCTAssertEqual(mounted.view.selection, firstExpansion)
+    }
+
+    private func mixedSelection(
+        blockIDs: [BlockInputBlockID] = [],
+        leading: BlockInputTextRange? = nil,
+        trailing: BlockInputTextRange? = nil
+    ) -> BlockInputSelection {
+        .mixed(BlockInputMixedSelection(
+            blockIDs: blockIDs,
+            leadingTextRange: leading,
+            trailingTextRange: trailing
+        ))
+    }
+
+    private func textRange(_ blockID: BlockInputBlockID, _ location: Int, _ length: Int) -> BlockInputTextRange {
+        BlockInputTextRange(blockID: blockID, range: NSRange(location: location, length: length))
     }
 }

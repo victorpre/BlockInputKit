@@ -39,7 +39,7 @@ final class BlockInputFrontMatterSelectionTests: XCTestCase {
         XCTAssertEqual(mounted.view.selection, .blocks([front.id, paragraph.id]))
     }
 
-    func testShiftDownFromFullFrontMatterBodyPromotesToBlockSelection() throws {
+    func testShiftDownFromFullFrontMatterBodyPromotesToMixedSelection() throws {
         let front = BlockInputBlock(id: "front", kind: .frontMatter, text: "title: Demo")
         let paragraph = BlockInputBlock(id: "paragraph", text: "Body")
         let mounted = makeMountedBlockInputView(blocks: [front, paragraph])
@@ -54,7 +54,14 @@ final class BlockInputFrontMatterSelectionTests: XCTestCase {
 
         XCTAssertTrue(textView.performKeyEquivalent(with: try shiftDownEvent()))
 
-        XCTAssertEqual(mounted.view.selection, .blocks([front.id, paragraph.id]))
+        XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(
+                blockID: front.id,
+                range: NSRange(location: 0, length: front.utf16Length)
+            ),
+            trailingTextRange: BlockInputTextRange(blockID: paragraph.id, range: NSRange(location: 0, length: 4))
+        )))
         XCTAssertEqual(mounted.window.firstResponder, mounted.view)
     }
 
