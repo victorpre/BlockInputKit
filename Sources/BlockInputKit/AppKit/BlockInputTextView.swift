@@ -15,6 +15,12 @@ class BlockInputTextView: NSTextView {
     var isIgnoringShortcutDispatch = false
     var ignoredKeyboardShortcutEventIDs: Set<ObjectIdentifier> = []
     let fileDropCaretView = NSView()
+    let inlineHintView = BlockInputInlineHintView()
+    var inlineHint: BlockInputInlineHint? {
+        didSet {
+            updateInlineHintView()
+        }
+    }
     // Native modified-click and multi-click gestures can re-enter mouseDragged/mouseUp during AppKit tracking. Keep that
     // separate from the custom plain-drag state so native selection restoration cannot be consumed as a block drag.
     var isUsingNativeMouseSelection = false

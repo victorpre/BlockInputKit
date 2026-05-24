@@ -57,6 +57,9 @@ final class DemoModel: ObservableObject {
             placeholder: "Start writing...",
             isEditable: isEditable,
             disabledCursor: .operationNotAllowed,
+            inlineHintProvider: { [completionProvider] context in
+                completionProvider.inlineHint(for: context)
+            },
             imageBaseURL: Bundle.module.resourceURL,
             undoController: session.undoController,
             completionProvider: completionProvider,

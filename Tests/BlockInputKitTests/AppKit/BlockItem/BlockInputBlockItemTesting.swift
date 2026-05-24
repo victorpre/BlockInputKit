@@ -7,6 +7,7 @@ extension BlockInputBlockItem {
         allowsReordering: Bool,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         style: BlockInputStyle = .default,
+        inlineHint: BlockInputInlineHint? = nil,
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) -> BlockInputBlockItem {
@@ -19,6 +20,7 @@ extension BlockInputBlockItem {
             editorHorizontalInset: editorHorizontalInset,
             accentColor: .controlAccentColor,
             style: style,
+            inlineHint: inlineHint,
             isSelected: isSelected,
             delegate: delegate
         )
@@ -31,6 +33,10 @@ extension BlockInputBlockItem {
 
     var testingTextScrollView: NSScrollView? {
         view.firstDescendant(of: NSScrollView.self)
+    }
+
+    var testingInlineHintView: BlockInputInlineHintView {
+        textView.inlineHintView
     }
 
     var testingQuoteBarView: NSView? {

@@ -17,6 +17,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
 
     func blockItemDidEndEditing(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
         dismissCompletionPopup()
+        item.textView.clearInlineHint()
         publishFocusLossIfNeeded()
     }
 

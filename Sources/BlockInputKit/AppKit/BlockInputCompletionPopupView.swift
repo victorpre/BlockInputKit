@@ -375,7 +375,7 @@ private final class BlockInputCompletionPopupRowView: NSView {
             height: iconSize
         )
         let contentX: CGFloat = 32
-        let detailWidth = min(max(0, detailField.intrinsicContentSize.width), max(0, bounds.width * 0.34))
+        let detailWidth = completionDetailWidth()
         let detailX = bounds.maxX - detailWidth - 10
         detailField.frame = NSRect(
             x: detailX,
@@ -399,6 +399,14 @@ private final class BlockInputCompletionPopupRowView: NSView {
         }
         subtitleField.isHidden = !hasSubtitle
         detailField.isHidden = detailField.stringValue.isEmpty
+    }
+
+    private func completionDetailWidth() -> CGFloat {
+        guard !detailField.stringValue.isEmpty else {
+            return 0
+        }
+        let paddedIntrinsicWidth = ceil(detailField.intrinsicContentSize.width) + 8
+        return min(max(0, paddedIntrinsicWidth), max(0, bounds.width * 0.34))
     }
 
     override func updateTrackingAreas() {
@@ -458,7 +466,7 @@ private final class BlockInputCompletionPopupRowView: NSView {
         detailField.font = .systemFont(ofSize: 11)
         detailField.textColor = .tertiaryLabelColor
         detailField.alignment = .right
-        detailField.lineBreakMode = .byTruncatingMiddle
+        detailField.lineBreakMode = .byTruncatingTail
         iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
         [iconView, titleField, subtitleField, detailField].forEach(addSubview)
     }

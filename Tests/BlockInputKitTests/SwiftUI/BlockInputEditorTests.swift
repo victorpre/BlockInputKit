@@ -72,6 +72,14 @@ final class BlockInputEditorTests: XCTestCase {
         XCTAssertEqual(editor.resolvedConfiguration().disabledCursor, .operationNotAllowed)
     }
 
+    func testResolvedConfigurationPreservesInlineHintProvider() {
+        let editor = BlockInputEditor(configuration: BlockInputConfiguration(
+            inlineHintProvider: { _ in BlockInputInlineHint(text: "hint") }
+        ))
+
+        XCTAssertNotNil(editor.resolvedConfiguration().inlineHintProvider)
+    }
+
     func testFocusBindingPreservesKeyboardShortcutHandlers() {
         var isFocused = false
         var handledShortcuts: [BlockInputKeyboardShortcut] = []

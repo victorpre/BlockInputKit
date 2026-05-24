@@ -193,6 +193,11 @@ public struct BlockInputConfiguration {
     ///
     /// Link and slash-command chip cursor rects may still take precedence where those interactions remain available.
     public var disabledCursor: NSCursor?
+    /// Host hook for visual-only inline hints after the focused caret.
+    ///
+    /// Hints are never inserted into document text, Markdown export, undo, pasteboard contents, completion ranges, or
+    /// accessibility value text.
+    public var inlineHintProvider: BlockInputInlineHintProvider?
     /// Color used for editor accent affordances, including drag insertion and selected horizontal rules.
     public var dropIndicatorColor: NSColor
     /// Visual styling for editor text, code, and selection chrome.
@@ -283,6 +288,7 @@ public struct BlockInputConfiguration {
         placeholder: String? = nil,
         isEditable: Bool = true,
         disabledCursor: NSCursor? = nil,
+        inlineHintProvider: BlockInputInlineHintProvider? = nil,
         dropIndicatorColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
         heightSizing: BlockInputEditorHeightSizing? = nil,
@@ -318,6 +324,7 @@ public struct BlockInputConfiguration {
         self.placeholder = placeholder
         self.isEditable = isEditable
         self.disabledCursor = disabledCursor
+        self.inlineHintProvider = inlineHintProvider
         self.dropIndicatorColor = dropIndicatorColor
         self.style = style
         self.heightSizing = heightSizing

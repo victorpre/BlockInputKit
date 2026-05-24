@@ -380,6 +380,7 @@ extension BlockInputView {
             onSelectionChange?(selection)
         }
         updateVisibleBlockSelectionHighlights()
+        updateInlineHintsForVisibleItems()
     }
 
     func isBlockSelected(_ blockID: BlockInputBlockID) -> Bool {

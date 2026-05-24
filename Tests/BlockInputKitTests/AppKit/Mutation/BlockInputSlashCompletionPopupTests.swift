@@ -59,7 +59,7 @@ final class BlockInputSlashCompletionPopupTests: XCTestCase {
 
         XCTAssertTrue(mounted.view.handleCompletionCommand(#selector(NSResponder.insertNewline(_:))))
 
-        let expectedText = "[/table](host-app://commands/table)"
+        let expectedText = "[/table](host-app://commands/table) "
         XCTAssertEqual(mounted.view.document.blocks.map(\.text), [expectedText])
         XCTAssertNil(mounted.view.completionPopupView)
         XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(

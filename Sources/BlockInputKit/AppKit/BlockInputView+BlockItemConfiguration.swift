@@ -10,6 +10,7 @@ extension BlockInputView {
             fileBaseURL: fileBaseURL,
             isEditable: isEditable,
             disabledCursor: disabledCursor,
+            inlineHint: inlineHint(for: item, block: block),
             isSelected: isBlockSelected(block.id),
             delegate: self
         )

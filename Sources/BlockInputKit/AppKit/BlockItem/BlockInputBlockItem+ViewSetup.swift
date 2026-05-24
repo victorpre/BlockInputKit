@@ -77,6 +77,7 @@ extension BlockInputBlockItem {
         textView.delegate = self
         textView.layoutManager?.delegate = hiddenDelimiterLayoutDelegate
         textView.configureFileDropHandling()
+        textView.configureInlineHintView()
         textView.updateFileDropCaretColor(.controlAccentColor)
     }
 

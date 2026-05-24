@@ -160,6 +160,7 @@ extension BlockInputView {
         completionPopupView?.removeFromSuperview()
         completionPopupView = nil
         removeCompletionPopupDismissalMonitor()
+        updateInlineHintsForVisibleItems()
     }
 
     func positionCompletionPopup() {
@@ -424,6 +425,7 @@ extension BlockInputView {
             positionedPopupContainer.addSubview(completionPopupEventCaptureView, positioned: .above, relativeTo: nil)
         }
         installCompletionPopupDismissalMonitor()
+        updateInlineHintsForVisibleItems()
     }
 
     private func moveCompletionHighlight(delta: Int) {

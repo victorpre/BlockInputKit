@@ -34,6 +34,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertNil(configuration.placeholder)
         XCTAssertTrue(configuration.isEditable)
         XCTAssertNil(configuration.disabledCursor)
+        XCTAssertNil(configuration.inlineHintProvider)
         XCTAssertNil(configuration.heightSizing)
         XCTAssertEqual(configuration.slashCommandAvailability, .documentStart)
         XCTAssertNil(configuration.slashCommandChipClickHandler)
@@ -58,6 +59,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         let onDocumentMutation: (BlockInputDocumentChange) -> Void = { _ in }
         let onDocumentChange: (BlockInputDocument) -> Void = { _ in }
         let onFocusChange: (Bool) -> Void = { _ in }
+        let inlineHintProvider: BlockInputInlineHintProvider = { _ in BlockInputInlineHint(text: "hint") }
 
         view.configure(BlockInputConfiguration(
             allowsBlockReordering: false,
@@ -66,6 +68,7 @@ final class BlockInputConfigurationTests: XCTestCase {
             placeholder: "Message",
             isEditable: false,
             disabledCursor: .operationNotAllowed,
+            inlineHintProvider: inlineHintProvider,
             dropIndicatorColor: .systemPink,
             heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 2, maximumVisibleLineCount: 5),
             undoController: undoController,
@@ -81,6 +84,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(view.placeholder, "Message")
         XCTAssertFalse(view.isEditable)
         XCTAssertEqual(view.disabledCursor, .operationNotAllowed)
+        XCTAssertNotNil(view.inlineHintProvider)
         let sectionInset = try XCTUnwrap((view.collectionView.collectionViewLayout as? NSCollectionViewFlowLayout)?.sectionInset)
         XCTAssertEqual(sectionInset.top, 14)
         XCTAssertEqual(sectionInset.bottom, 14)

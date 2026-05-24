@@ -306,6 +306,30 @@ BlockInputCompletionSuggestion.slashCommand(
 
 `slashCommandAvailability` controls where `/` opens completion. Use `.documentStart` for only the start of the first block, or `.anywhere` for token-boundary slash commands in supported text blocks. Configure `slashCommandChipClickHandler` when slash chips should run host behavior, open their URI, or show the built-in link modal.
 
+The slash-command helper inserts the Markdown link source followed by a space so the caret lands after the accepted command chip.
+
+### Inline Argument Hints
+
+Use `inlineHintProvider` for visual-only slash-command argument hints after the active caret. Hints are not inserted into
+document text, Markdown export, undo, pasteboard contents, completion ranges, or accessibility value text.
+
+```swift
+let configuration = BlockInputConfiguration(
+    document: document,
+    slashCommandAvailability: .documentStart,
+    inlineHintProvider: { context in
+        guard context.isDocumentStartBlock,
+              context.block.text == "/review-github-pr",
+              context.cursor.utf16Offset == (context.block.text as NSString).length else {
+            return nil
+        }
+        return BlockInputInlineHint(text: " [PR URL]")
+    }
+)
+```
+
+The provider only runs for a focused, editable, inline-Markdown-capable block with a valid collapsed selection.
+
 ## File Drops
 
 Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block.

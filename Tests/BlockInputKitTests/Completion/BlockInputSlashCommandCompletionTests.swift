@@ -14,7 +14,7 @@ final class BlockInputSlashCommandCompletionTests: XCTestCase {
         XCTAssertEqual(suggestion.id, "demo-command://insert/table?size=2x2")
         XCTAssertEqual(suggestion.title, "Insert table")
         XCTAssertEqual(suggestion.subtitle, "Blocks")
-        XCTAssertEqual(suggestion.insertionText, "[/table](demo-command://insert/table?size=2x2)")
+        XCTAssertEqual(suggestion.insertionText, "[/table](demo-command://insert/table?size=2x2) ")
         XCTAssertEqual(suggestion.trigger, .slashCommand)
         XCTAssertEqual(suggestion.iconSystemName, "command")
         XCTAssertEqual(suggestion.detailText, "Command")
@@ -29,6 +29,6 @@ final class BlockInputSlashCommandCompletionTests: XCTestCase {
         )
 
         XCTAssertEqual(suggestion.id, "command:custom")
-        XCTAssertEqual(suggestion.insertionText, "[/custom](host-app://run/\\(custom\\))")
+        XCTAssertEqual(suggestion.insertionText, "[/custom](host-app://run/\\(custom\\)) ")
     }
 }

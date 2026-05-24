@@ -177,7 +177,7 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
         )
     }
 
-    /// Builds a slash-command suggestion that inserts host-owned Markdown link source.
+    /// Builds a slash-command suggestion that inserts host-owned Markdown link source followed by a space.
     ///
     /// The visible link label is normalized to begin with `/` so the inserted source renders as a slash-command chip.
     public static func slashCommand(
@@ -194,7 +194,7 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
             id: id ?? uri,
             title: title,
             subtitle: subtitle,
-            insertionText: "[\(Self.escapedMarkdownLinkLabel(chipLabel))](\(Self.escapedMarkdownLinkDestination(uri)))",
+            insertionText: "[\(Self.escapedMarkdownLinkLabel(chipLabel))](\(Self.escapedMarkdownLinkDestination(uri))) ",
             trigger: .slashCommand,
             iconSystemName: iconSystemName,
             detailText: detailText

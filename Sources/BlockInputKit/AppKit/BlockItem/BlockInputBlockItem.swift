@@ -141,6 +141,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             updateImageBlockLayout(for: renderedBlock)
         }
         updateImageCaretFrame()
+        textView.updateInlineHintView()
         view.window?.invalidateCursorRects(for: view)
     }
 
@@ -188,6 +189,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         fileBaseURL: URL? = nil,
         isEditable: Bool = true,
         disabledCursor: NSCursor? = nil,
+        inlineHint: BlockInputInlineHint? = nil,
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) {
@@ -202,6 +204,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.imageLoadingContext = imageLoadingContext
         self.fileBaseURL = fileBaseURL
         applyReadOnlyConfiguration(isEditable: isEditable, disabledCursor: disabledCursor)
+        textView.inlineHint = inlineHint
         selectionBeforeTextChange = nil
         textView.hideFileDropCaret()
         isHorizontalRule = block.kind == .horizontalRule
@@ -219,6 +222,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             textView.string = text
         }
         configureBlockKindChrome(block: block)
+        textView.updateInlineHintView()
         setBlockSelection(isSelected)
         // Frontmatter is pinned to document index 0, so keep the reorder
         // gutter width for alignment without exposing an unusable drag handle.
@@ -423,6 +427,7 @@ extension BlockInputBlockItem {
         tableView.delegate = nil
         renderedCodeColorScheme = nil
         textView.cancelBlockSelectionDrag()
+        textView.clearInlineHint()
         textView.blockItem = nil
         finishBlockSelectionDrag()
         setImageCaretOffset(nil)
