@@ -82,6 +82,7 @@ public final class BlockInputView: NSView {
     var lastNativeTextSelectionExpansion: BlockInputNativeTextSelectionExpansion?
     var blockSelectionExpansion: BlockInputBlockSelectionExpansion?
     var horizontalSelectionExpansion: BlockInputHorizontalSelectionExpansion?
+    var tableKeyboardRowSelection: BlockInputTableKeyboardRowSelection?
     // Production opens links through NSWorkspace; tests replace this hook to assert command-click and modal Open behavior.
     var linkURLOpener: BlockInputURLOpener = { NSWorkspace.shared.open($0) }
     // The link modal is editor-owned so it can be anchored to row geometry, clamped inside the editor, and snapshotted.
@@ -479,21 +480,5 @@ private extension BlockInputView {
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
-    }
-}
-
-extension BlockInputView {
-    /// Focuses the editor like a single text field, preserving valid current selections.
-    public func focusEditor() {
-        refreshDocumentFromStore()
-        if let selection, containsValidSelection(selection) {
-            restoreVisibleSelection()
-            if isEditorFirstResponder {
-                publishFocusChange(true)
-            }
-            return
-        }
-        let cursor = pendingFocus ?? cursorForRestoredFocus()
-        focus(blockID: cursor.blockID, utf16Offset: cursor.utf16Offset)
     }
 }

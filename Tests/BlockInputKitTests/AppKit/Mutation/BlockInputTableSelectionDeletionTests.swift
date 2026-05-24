@@ -34,7 +34,6 @@ final class BlockInputTableSelectionDeletionTests: XCTestCase {
         cell.keyDown(with: try shiftUpEvent())
         cell.keyDown(with: try shiftUpEvent())
         cell.keyDown(with: try shiftUpEvent())
-        cell.keyDown(with: try shiftLeftEvent())
         let focusedEditor = try XCTUnwrap(mounted.window.firstResponder as? BlockInputView)
         focusedEditor.keyDown(with: try keyDownEvent(keyCode: 117, characters: "\u{F728}"))
 
@@ -50,8 +49,7 @@ final class BlockInputTableSelectionDeletionTests: XCTestCase {
         let cell = try bodyCell(in: item, row: 0, column: 0)
         XCTAssertTrue(mounted.window.makeFirstResponder(cell))
 
-        cell.keyDown(with: try shiftRightEvent())
-        cell.keyDown(with: try shiftRightEvent())
+        cell.keyDown(with: try shiftDownEvent())
         cell.keyDown(with: try keyDownEvent(keyCode: 117, characters: "\u{F728}"))
 
         let table = try XCTUnwrap(BlockInputTable(markdown: mounted.view.document.blocks[0].text))
@@ -68,9 +66,7 @@ final class BlockInputTableSelectionDeletionTests: XCTestCase {
         let cell = try tableCell(in: item, row: 0, column: 1, columnCount: 2)
         XCTAssertTrue(mounted.window.makeFirstResponder(cell))
 
-        cell.keyDown(with: try shiftDownEvent())
-        cell.keyDown(with: try shiftDownEvent())
-        cell.keyDown(with: try shiftDownEvent())
+        cell.keyDown(with: try shiftRightEvent())
         cell.keyDown(with: try keyDownEvent(keyCode: 117, characters: "\u{F728}"))
 
         let table = try XCTUnwrap(BlockInputTable(markdown: mounted.view.document.blocks[0].text))
@@ -89,8 +85,7 @@ final class BlockInputTableSelectionDeletionTests: XCTestCase {
         let cell = try tableCell(in: item, row: 0, column: 0, columnCount: 2)
         XCTAssertTrue(mounted.window.makeFirstResponder(cell))
 
-        cell.keyDown(with: try shiftRightEvent())
-        cell.keyDown(with: try shiftRightEvent())
+        cell.keyDown(with: try shiftDownEvent())
         cell.keyDown(with: try keyDownEvent(keyCode: 117, characters: "\u{F728}"))
 
         let table = try XCTUnwrap(BlockInputTable(markdown: mounted.view.document.blocks[0].text))

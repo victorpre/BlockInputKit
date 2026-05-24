@@ -1,6 +1,27 @@
 import AppKit
 
 extension BlockInputView {
+    /// Focuses the editor like a single text field, preserving valid current selections.
+    public func focusEditor() {
+        refreshDocumentFromStore()
+        if tableKeyboardRowSelection != nil {
+            if !isBecomingFirstResponder, window?.firstResponder !== self {
+                window?.makeFirstResponder(self)
+            }
+            publishFocusChange(true)
+            return
+        }
+        if let selection, containsValidSelection(selection) {
+            restoreVisibleSelection()
+            if isEditorFirstResponder {
+                publishFocusChange(true)
+            }
+            return
+        }
+        let cursor = pendingFocus ?? cursorForRestoredFocus()
+        focus(blockID: cursor.blockID, utf16Offset: cursor.utf16Offset)
+    }
+
     var isEditorFirstResponder: Bool {
         guard let firstResponder = window?.firstResponder else {
             return false
@@ -312,6 +333,7 @@ extension BlockInputView {
         dismissLinkModalIfSelectionMovedOutside(selection)
         self.selection = selection
         horizontalSelectionExpansion = nil
+        tableKeyboardRowSelection = nil
         preferredNavigationX = nil
         switch selection {
         case let .cursor(cursor):

@@ -67,9 +67,11 @@ extension BlockInputBlockItem: BlockInputTableViewDelegate {
             return adjustTableCellSelectionVertically(.upward)
         case #selector(moveDownAndModifySelection(_:)):
             return adjustTableCellSelectionVertically(.downward)
-        case #selector(moveLeftAndModifySelection(_:)):
+        case #selector(moveLeftAndModifySelection(_:)),
+             #selector(moveBackwardAndModifySelection(_:)):
             return adjustTableCellSelectionHorizontally(.leftward)
-        case #selector(moveRightAndModifySelection(_:)):
+        case #selector(moveRightAndModifySelection(_:)),
+             #selector(moveForwardAndModifySelection(_:)):
             return adjustTableCellSelectionHorizontally(.rightward)
         default:
             return false

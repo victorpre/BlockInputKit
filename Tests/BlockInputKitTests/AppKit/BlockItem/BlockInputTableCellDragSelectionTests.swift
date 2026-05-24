@@ -76,39 +76,39 @@ final class BlockInputTableCellDragSelectionTests: XCTestCase {
         cell.keyDown(with: try shiftDownEvent())
         XCTAssertEqual(
             item.testingSelectedTableCellRange,
-            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 0))
+            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 1))
         )
         XCTAssertEqual(item.testingTableCellViews.map(\.isCellSelectedForTesting), [
             false, false,
-            true, false,
+            true, true,
             false, false
         ])
 
         cell.keyDown(with: try shiftDownEvent())
         XCTAssertEqual(
             item.testingSelectedTableCellRange,
-            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(1), column: 0))
+            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(1), column: 1))
         )
         XCTAssertEqual(item.testingTableCellViews.map(\.isCellSelectedForTesting), [
             false, false,
-            true, false,
-            true, false
+            true, true,
+            true, true
         ])
 
         cell.keyDown(with: try shiftUpEvent())
         XCTAssertEqual(
             item.testingSelectedTableCellRange,
-            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 0))
+            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 1))
         )
 
         cell.keyDown(with: try shiftUpEvent())
         XCTAssertEqual(
             item.testingSelectedTableCellRange,
-            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .header, column: 0))
+            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .header, column: 1))
         )
         XCTAssertEqual(item.testingTableCellViews.map(\.isCellSelectedForTesting), [
-            true, false,
-            true, false,
+            true, true,
+            true, true,
             false, false
         ])
     }
@@ -122,35 +122,19 @@ final class BlockInputTableCellDragSelectionTests: XCTestCase {
         cell.keyDown(with: try shiftRightEvent())
         XCTAssertEqual(
             item.testingSelectedTableCellRange,
-            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 0))
+            BlockInputTableCellSelection(anchor: .init(row: .header, column: 0), focus: .init(row: .body(1), column: 0))
         )
         XCTAssertEqual(item.testingTableCellViews.map(\.isCellSelectedForTesting), [
-            false, false,
             true, false,
-            false, false
+            true, false,
+            true, false
         ])
 
         cell.keyDown(with: try shiftRightEvent())
-        XCTAssertEqual(
-            item.testingSelectedTableCellRange,
-            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 1))
-        )
-        XCTAssertEqual(item.testingTableCellViews.map(\.isCellSelectedForTesting), [
-            false, false,
-            true, true,
-            false, false
-        ])
+        XCTAssertEqual(mounted.view.selection, .blocks(["table"]))
+        XCTAssertNil(item.testingSelectedTableCellRange)
 
-        cell.keyDown(with: try shiftLeftEvent())
-        XCTAssertEqual(
-            item.testingSelectedTableCellRange,
-            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 0))
-        )
-        XCTAssertEqual(item.testingTableCellViews.map(\.isCellSelectedForTesting), [
-            false, false,
-            true, false,
-            false, false
-        ])
+        XCTAssertTrue(mounted.window.firstResponder === mounted.view)
     }
 
     func testShiftArrowKeyEquivalentThroughEditorRoutesToCellSelection() throws {
@@ -165,7 +149,7 @@ final class BlockInputTableCellDragSelectionTests: XCTestCase {
 
         XCTAssertEqual(
             item.testingSelectedTableCellRange,
-            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 0))
+            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 1))
         )
         XCTAssertEqual(
             mounted.view.selection,
@@ -184,33 +168,59 @@ final class BlockInputTableCellDragSelectionTests: XCTestCase {
 
         XCTAssertEqual(
             item.testingSelectedTableCellRange,
-            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 0))
+            BlockInputTableCellSelection(anchor: .init(row: .header, column: 0), focus: .init(row: .body(1), column: 0))
         )
         XCTAssertNotEqual(mounted.view.selection, .blocks(["table"]))
     }
 
-    func testShiftArrowsPreserveExistingRectangleDimensionsWhenCollapsingOppositeAxis() throws {
+    func testShiftArrowForwardBackwardCommandsThroughEditorRouteToCellSelection() throws {
+        let mounted = makeMountedBlockInputView(blocks: [Self.tableBlock()])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let firstColumnCell = try bodyCell(in: item, row: 0, column: 0)
+        let secondColumnCell = try bodyCell(in: item, row: 0, column: 1)
+        XCTAssertTrue(mounted.window.makeFirstResponder(firstColumnCell))
+        mounted.view.applySelection(.blocks(["table"]), notify: true)
+
+        mounted.view.doCommand(by: #selector(NSResponder.moveForwardAndModifySelection(_:)))
+
+        XCTAssertEqual(
+            item.testingSelectedTableCellRange,
+            BlockInputTableCellSelection(anchor: .init(row: .header, column: 0), focus: .init(row: .body(1), column: 0))
+        )
+
+        item.tableView.clearKeyboardCellSelection()
+        XCTAssertTrue(mounted.window.makeFirstResponder(secondColumnCell))
+        mounted.view.applySelection(.blocks(["table"]), notify: true)
+
+        mounted.view.doCommand(by: #selector(NSResponder.moveBackwardAndModifySelection(_:)))
+
+        XCTAssertEqual(
+            item.testingSelectedTableCellRange,
+            BlockInputTableCellSelection(anchor: .init(row: .header, column: 1), focus: .init(row: .body(1), column: 1))
+        )
+    }
+
+    func testShiftArrowsSwitchBetweenRowAndColumnSelectionAxes() throws {
         let mounted = makeMountedBlockInputView(blocks: [Self.tableBlock()])
         let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
         let cell = try bodyCell(in: item, row: 0, column: 0)
         XCTAssertTrue(mounted.window.makeFirstResponder(cell))
 
         cell.keyDown(with: try shiftRightEvent())
-        cell.keyDown(with: try shiftRightEvent())
         cell.keyDown(with: try shiftDownEvent())
         XCTAssertEqual(item.testingTableCellViews.map(\.isCellSelectedForTesting), [
             false, false,
             true, true,
-            true, true
+            false, false
         ])
 
         cell.keyDown(with: try shiftLeftEvent())
         XCTAssertEqual(
             item.testingSelectedTableCellRange,
-            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(1), column: 0))
+            BlockInputTableCellSelection(anchor: .init(row: .header, column: 0), focus: .init(row: .body(1), column: 0))
         )
         XCTAssertEqual(item.testingTableCellViews.map(\.isCellSelectedForTesting), [
-            false, false,
+            true, false,
             true, false,
             true, false
         ])
@@ -225,7 +235,6 @@ final class BlockInputTableCellDragSelectionTests: XCTestCase {
         cell.keyDown(with: try shiftUpEvent())
         cell.keyDown(with: try shiftUpEvent())
         cell.keyDown(with: try shiftUpEvent())
-        cell.keyDown(with: try shiftLeftEvent())
 
         XCTAssertEqual(mounted.view.selection, .blocks(["table"]))
         XCTAssertTrue(mounted.window.firstResponder === mounted.view)

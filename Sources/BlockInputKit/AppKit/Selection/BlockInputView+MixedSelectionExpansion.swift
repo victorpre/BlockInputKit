@@ -43,8 +43,23 @@ extension BlockInputView {
         offset: Int,
         preferredTextContainerX: CGFloat?
     ) -> Bool {
-        guard index > 0, let previousID = block(at: index - 1)?.id else {
+        guard index > 0, let previousBlock = block(at: index - 1) else {
             return false
+        }
+        let previousID = previousBlock.id
+        if previousBlock.kind == .table {
+            let outsideSelection = offset > 0
+                ? BlockInputMixedSelection(
+                    blockIDs: [],
+                    trailingTextRange: BlockInputTextRange(blockID: blockID, range: NSRange(location: 0, length: offset))
+                )
+                : nil
+            return startTableKeyboardRowSelection(
+                tableBlockID: previousID,
+                originCursor: BlockInputCursor(blockID: blockID, utf16Offset: offset),
+                direction: .upward,
+                outsideTableSelection: outsideSelection
+            )
         }
         if offset <= 0 {
             return applyPromotedSelection(.blocks([previousID]), anchorBlockID: blockID, direction: .upward, scrollIndex: index - 1)
@@ -76,8 +91,23 @@ extension BlockInputView {
         textLength: Int,
         preferredTextContainerX: CGFloat?
     ) -> Bool {
-        guard index + 1 < blockCount, let nextID = block(at: index + 1)?.id else {
+        guard index + 1 < blockCount, let nextBlock = block(at: index + 1) else {
             return false
+        }
+        let nextID = nextBlock.id
+        if nextBlock.kind == .table {
+            let outsideSelection = offset < textLength
+                ? BlockInputMixedSelection(
+                    blockIDs: [],
+                    leadingTextRange: BlockInputTextRange(blockID: blockID, range: NSRange(location: offset, length: textLength - offset))
+                )
+                : nil
+            return startTableKeyboardRowSelection(
+                tableBlockID: nextID,
+                originCursor: BlockInputCursor(blockID: blockID, utf16Offset: offset),
+                direction: .downward,
+                outsideTableSelection: outsideSelection
+            )
         }
         if offset >= textLength {
             return applyPromotedSelection(.blocks([nextID]), anchorBlockID: blockID, direction: .downward, scrollIndex: index + 1)

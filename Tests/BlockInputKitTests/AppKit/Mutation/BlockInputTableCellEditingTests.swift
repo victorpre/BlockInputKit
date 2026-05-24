@@ -156,7 +156,7 @@ final class BlockInputTableCellEditingTests: XCTestCase {
 
         XCTAssertEqual(
             item.testingSelectedTableCellRange,
-            BlockInputTableCellSelection(anchor: .init(row: .body(0), column: 0), focus: .init(row: .body(0), column: 0))
+            BlockInputTableCellSelection(anchor: .init(row: .header, column: 0), focus: .init(row: .body(0), column: 0))
         )
         XCTAssertNotEqual(mounted.view.selection, .blocks(["table"]))
 

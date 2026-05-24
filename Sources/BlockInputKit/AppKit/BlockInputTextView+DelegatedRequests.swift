@@ -123,7 +123,9 @@ extension BlockInputTextView {
         case #selector(moveUpAndModifySelection(_:)),
              #selector(moveDownAndModifySelection(_:)),
              #selector(moveLeftAndModifySelection(_:)),
-             #selector(moveRightAndModifySelection(_:)):
+             #selector(moveBackwardAndModifySelection(_:)),
+             #selector(moveRightAndModifySelection(_:)),
+             #selector(moveForwardAndModifySelection(_:)):
             return blockItem?.isTableCellTextView(self) == true
                 && blockItem?.handleTableCellCommand(selector, selectedRange: selectedRange()) == true
         default:

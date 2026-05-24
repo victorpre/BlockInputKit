@@ -182,6 +182,16 @@ extension BlockInputView {
         BlockInputSelectionDebug.emit(
             "view command selector=\(selector) selection=\(String(describing: selection))"
         )
+        if shouldHandleTableKeyboardRowSelectionVertically() {
+            switch selector {
+            case #selector(moveUpAndModifySelection(_:)):
+                return handleTableKeyboardRowSelection(.upward)
+            case #selector(moveDownAndModifySelection(_:)):
+                return handleTableKeyboardRowSelection(.downward)
+            default:
+                break
+            }
+        }
         switch selection {
         case .blocks, .mixed:
             break
@@ -222,6 +232,9 @@ extension BlockInputView {
                 BlockInputSelectionDebug.emit("view key no Shift+Arrow direction")
             }
             return false
+        }
+        if shouldHandleTableKeyboardRowSelectionVertically() {
+            return handleTableKeyboardRowSelection(direction)
         }
         if let textView = window?.firstResponder as? BlockInputTextView,
            shouldRouteSelectionExpansionThroughFocusedTextView(textView) {
@@ -276,6 +289,13 @@ extension BlockInputView {
         guard let index = index(of: blockID) else {
             BlockInputSelectionDebug.emit("promote rejected missing index")
             return false
+        }
+        if startAdjacentTableRowSelectionVerticallyFromTextRange(
+            blockID: blockID,
+            index: index,
+            direction: direction
+        ) {
+            return true
         }
         if let promotion = mixedPromotionFromTextRange(
             blockID: blockID,

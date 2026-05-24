@@ -252,16 +252,6 @@ extension BlockInputTableView {
         return consumed
     }
 
-    func adjustCellSelection(from textView: NSTextView, vertically direction: BlockInputVerticalMovementDirection) -> Bool {
-        let delta = direction == .upward ? -1 : 1
-        return adjustCellSelection(from: textView, rowDelta: delta, columnDelta: 0)
-    }
-
-    func adjustCellSelection(from textView: NSTextView, horizontally direction: BlockInputHorizontalMovementDirection) -> Bool {
-        let delta = direction == .leftward ? -1 : 1
-        return adjustCellSelection(from: textView, rowDelta: 0, columnDelta: delta)
-    }
-
     var selectedWholeColumnDeletionPosition: BlockInputTable.CellPosition? {
         guard let table,
               let selectedCellRange,
@@ -318,40 +308,8 @@ extension BlockInputTableView {
         }
     }
 
-    private func adjustCellSelection(from textView: NSTextView, rowDelta: Int, columnDelta: Int) -> Bool {
-        guard let table,
-              let activePosition = cellView(containing: textView)?.position else {
-            return false
-        }
-        guard let selection = selectedCellRange else {
-            selectedRow = nil
-            selectedCellRange = BlockInputTableCellSelection(anchor: activePosition, focus: activePosition)
-            updateSelectionChrome()
-            publishActiveCellSourceSelection(from: textView)
-            return true
-        }
-        let targetRowIndex = min(
-            max(BlockInputTableCellSelection.displayRowIndex(for: selection.focus.row) + rowDelta, 0),
-            table.bodyRows.count
-        )
-        let targetColumn = min(max(selection.focus.column + columnDelta, 0), max(table.columnCount - 1, 0))
-        selectedCellRange = BlockInputTableCellSelection(
-            anchor: selection.anchor,
-            focus: BlockInputTable.CellPosition(
-                row: BlockInputTableCellSelection.row(forDisplayRowIndex: targetRowIndex),
-                column: targetColumn
-            )
-        )
-        updateSelectionChrome()
-        if promoteWholeCellSelectionToTableSelectionIfNeeded() {
-            return true
-        }
-        publishActiveCellSourceSelection(from: textView)
-        return true
-    }
-
     @discardableResult
-    private func promoteWholeCellSelectionToTableSelectionIfNeeded() -> Bool {
+    func promoteWholeCellSelectionToTableSelectionIfNeeded() -> Bool {
         guard let selectedCellRange,
               isSelectedWholeTable(selectedCellRange) else {
             return false
@@ -362,7 +320,7 @@ extension BlockInputTableView {
         return true
     }
 
-    private func publishActiveCellSourceSelection(from textView: NSTextView) {
+    func publishActiveCellSourceSelection(from textView: NSTextView) {
         guard let cell = cellView(containing: textView),
               let sourceRange = sourceRange(for: textView, localRange: textView.selectedRange()) else {
             return

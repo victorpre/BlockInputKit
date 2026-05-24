@@ -9,6 +9,9 @@ extension BlockInputView {
         guard let direction = event.horizontalSelectionAdjustmentDirection else {
             return false
         }
+        if tableKeyboardRowSelection != nil {
+            return handleTableKeyboardRowSelection(direction)
+        }
         if let textView = window?.firstResponder as? BlockInputTextView,
            textView.requestHorizontalSelectionAdjustmentFromOwningBlock(direction) {
             return true
@@ -17,10 +20,24 @@ extension BlockInputView {
     }
 
     func handleHorizontalSelectionAdjustmentCommand(_ selector: Selector) -> Bool {
+        if tableKeyboardRowSelection != nil {
+            switch selector {
+            case #selector(moveLeftAndModifySelection(_:)),
+                 #selector(moveBackwardAndModifySelection(_:)):
+                return handleTableKeyboardRowSelection(.leftward)
+            case #selector(moveRightAndModifySelection(_:)),
+                 #selector(moveForwardAndModifySelection(_:)):
+                return handleTableKeyboardRowSelection(.rightward)
+            default:
+                break
+            }
+        }
         switch selector {
-        case #selector(moveLeftAndModifySelection(_:)):
+        case #selector(moveLeftAndModifySelection(_:)),
+             #selector(moveBackwardAndModifySelection(_:)):
             return adjustSelectionHorizontally(.leftward)
-        case #selector(moveRightAndModifySelection(_:)):
+        case #selector(moveRightAndModifySelection(_:)),
+             #selector(moveForwardAndModifySelection(_:)):
             return adjustSelectionHorizontally(.rightward)
         default:
             return false
@@ -43,6 +60,15 @@ extension BlockInputView {
             return false
         }
         let clampedRange = selectedRange.clamped(to: block.utf16Length)
+        if clampedRange.length == 0,
+           startAdjacentTableRowSelectionHorizontally(
+            from: blockID,
+            block: block,
+            offset: clampedRange.location,
+            direction: direction
+           ) {
+            return true
+        }
         if clampedRange.length == 0 {
             let anchor = BlockInputDocumentTextBoundary(blockID: blockID, utf16Offset: clampedRange.location)
             return adjustSelectionHorizontally(from: anchor, direction: direction)
@@ -57,11 +83,24 @@ extension BlockInputView {
     }
 
     func adjustSelectionHorizontally(_ direction: BlockInputHorizontalMovementDirection) -> Bool {
+        // Editor-owned cursor selections bypass the text-view request path, so table edges must intercept before
+        // generic document-boundary expansion can select the table's Markdown source.
+        if case let .cursor(cursor) = selection,
+           startAdjacentTableRowSelectionHorizontally(
+            from: cursor.blockID,
+            offset: cursor.utf16Offset,
+            direction: direction
+           ) {
+            return true
+        }
         guard let span = horizontalSelectionSpan(preferredDirection: direction),
               let nextActiveBoundary = horizontalBoundary(from: span.active, moving: direction),
               nextActiveBoundary != span.active,
               let adjustedSelection = selection(from: span.anchor, to: nextActiveBoundary) else {
             return false
+        }
+        if startAdjacentTableRowSelectionHorizontally(from: span, direction: direction) {
+            return true
         }
         applyHorizontalSelection(adjustedSelection, anchor: span.anchor, active: nextActiveBoundary)
         scrollHorizontalSelectionBoundaryToVisible(nextActiveBoundary)
@@ -86,6 +125,13 @@ extension BlockInputView {
         from anchor: BlockInputDocumentTextBoundary,
         direction: BlockInputHorizontalMovementDirection
     ) -> Bool {
+        if startAdjacentTableRowSelectionHorizontally(
+            from: anchor.blockID,
+            offset: anchor.utf16Offset,
+            direction: direction
+        ) {
+            return true
+        }
         guard let active = horizontalBoundary(from: anchor, moving: direction),
               let adjustedSelection = selection(from: anchor, to: active) else {
             return false
@@ -93,6 +139,53 @@ extension BlockInputView {
         applyHorizontalSelection(adjustedSelection, anchor: anchor, active: active)
         scrollHorizontalSelectionBoundaryToVisible(active)
         return true
+    }
+
+    private func startAdjacentTableRowSelectionHorizontally(
+        from span: (anchor: BlockInputDocumentTextBoundary, active: BlockInputDocumentTextBoundary),
+        direction: BlockInputHorizontalMovementDirection
+    ) -> Bool {
+        guard let block = block(withID: span.active.blockID) else {
+            return false
+        }
+        let outsideSelection = outsideTableSelection(anchor: span.anchor, active: span.active, direction: direction)
+        return startAdjacentTableRowSelectionHorizontally(
+            from: span.active.blockID,
+            block: block,
+            offset: span.active.utf16Offset,
+            direction: direction,
+            originCursor: BlockInputCursor(blockID: span.anchor.blockID, utf16Offset: span.anchor.utf16Offset),
+            originSelection: outsideSelection == nil ? nil : selection,
+            outsideTableSelection: outsideSelection
+        )
+    }
+
+    private func outsideTableSelection(
+        anchor: BlockInputDocumentTextBoundary,
+        active: BlockInputDocumentTextBoundary,
+        direction: BlockInputHorizontalMovementDirection
+    ) -> BlockInputMixedSelection? {
+        guard anchor.blockID == active.blockID,
+              let block = block(withID: active.blockID) else {
+            return nil
+        }
+        let start = min(anchor.utf16Offset, active.utf16Offset)
+        let end = max(anchor.utf16Offset, active.utf16Offset)
+        let clampedStart = min(max(start, 0), block.utf16Length)
+        let clampedEnd = min(max(end, clampedStart), block.utf16Length)
+        guard clampedEnd > clampedStart else {
+            return nil
+        }
+        let textRange = BlockInputTextRange(
+            blockID: active.blockID,
+            range: NSRange(location: clampedStart, length: clampedEnd - clampedStart)
+        )
+        switch direction {
+        case .leftward:
+            return BlockInputMixedSelection(blockIDs: [], trailingTextRange: textRange)
+        case .rightward:
+            return BlockInputMixedSelection(blockIDs: [], leadingTextRange: textRange)
+        }
     }
 
     private func verticalBoundary(
@@ -318,120 +411,6 @@ extension BlockInputView {
         return BlockInputDocumentTextBoundary(blockID: nextBlock.id, utf16Offset: nextOffset)
     }
 
-    func selection(
-        from anchor: BlockInputDocumentTextBoundary,
-        to active: BlockInputDocumentTextBoundary
-    ) -> BlockInputSelection? {
-        guard let anchorIndex = index(of: anchor.blockID),
-              let activeIndex = index(of: active.blockID) else {
-            return nil
-        }
-        let ordered = orderedBoundaries(anchor, anchorIndex: anchorIndex, active, activeIndex: activeIndex)
-        if ordered.start == ordered.end {
-            return collapsedSelection(at: ordered.start)
-        }
-        if ordered.startIndex == ordered.endIndex {
-            return singleBlockSelection(from: ordered.start, to: ordered.end)
-        }
-        return multiBlockSelection(
-            start: ordered.start,
-            startIndex: ordered.startIndex,
-            end: ordered.end,
-            endIndex: ordered.endIndex
-        )
-    }
-
-    private func orderedBoundaries(
-        _ lhs: BlockInputDocumentTextBoundary,
-        anchorIndex lhsIndex: Int,
-        _ rhs: BlockInputDocumentTextBoundary,
-        activeIndex rhsIndex: Int
-    ) -> BlockInputOrderedTextBoundarySpan {
-        if lhsIndex < rhsIndex || (lhsIndex == rhsIndex && lhs.utf16Offset <= rhs.utf16Offset) {
-            return BlockInputOrderedTextBoundarySpan(start: lhs, startIndex: lhsIndex, end: rhs, endIndex: rhsIndex)
-        }
-        return BlockInputOrderedTextBoundarySpan(start: rhs, startIndex: rhsIndex, end: lhs, endIndex: lhsIndex)
-    }
-
-    private func collapsedSelection(at boundary: BlockInputDocumentTextBoundary) -> BlockInputSelection? {
-        guard let block = block(withID: boundary.blockID), block.kind != .horizontalRule else {
-            return .blocks([boundary.blockID])
-        }
-        return .cursor(BlockInputCursor(
-            blockID: boundary.blockID,
-            utf16Offset: min(max(boundary.utf16Offset, 0), block.utf16Length)
-        ))
-    }
-
-    private func singleBlockSelection(
-        from start: BlockInputDocumentTextBoundary,
-        to end: BlockInputDocumentTextBoundary
-    ) -> BlockInputSelection? {
-        guard let block = block(withID: start.blockID) else {
-            return nil
-        }
-        let startOffset = min(max(start.utf16Offset, 0), block.utf16Length)
-        let endOffset = min(max(end.utf16Offset, startOffset), block.utf16Length)
-        guard block.kind != .horizontalRule, endOffset > startOffset else {
-            return .blocks([block.id])
-        }
-        if startOffset == 0, endOffset == block.utf16Length {
-            return .blocks([block.id])
-        }
-        return .mixed(BlockInputMixedSelection(blockIDs: [], leadingTextRange: BlockInputTextRange(
-            blockID: block.id,
-            range: NSRange(location: startOffset, length: endOffset - startOffset)
-        )))
-    }
-
-    private func multiBlockSelection(
-        start: BlockInputDocumentTextBoundary,
-        startIndex: Int,
-        end: BlockInputDocumentTextBoundary,
-        endIndex: Int
-    ) -> BlockInputSelection? {
-        // Rebuild the narrowest canonical selection for the flattened span: fully covered blocks become `.blocks`,
-        // and partial edges around whole middle blocks become `.mixed`.
-        var blockIDs: [BlockInputBlockID] = []
-        var leadingTextRange: BlockInputTextRange?
-        var trailingTextRange: BlockInputTextRange?
-
-        for index in startIndex...endIndex {
-            guard let block = block(at: index) else {
-                return nil
-            }
-            let blockStart = index == startIndex ? min(max(start.utf16Offset, 0), block.utf16Length) : 0
-            let blockEnd = index == endIndex ? min(max(end.utf16Offset, 0), block.utf16Length) : block.utf16Length
-            let coversWholeBlock = blockStart == 0 && blockEnd == block.utf16Length
-            if block.kind == .horizontalRule || block.utf16Length == 0 || coversWholeBlock {
-                if coversWholeBlock || startIndex != endIndex {
-                    blockIDs.append(block.id)
-                }
-            } else if blockEnd > blockStart {
-                let textRange = BlockInputTextRange(
-                    blockID: block.id,
-                    range: NSRange(location: blockStart, length: blockEnd - blockStart)
-                )
-                if index == startIndex {
-                    leadingTextRange = textRange
-                } else if index == endIndex {
-                    trailingTextRange = textRange
-                } else {
-                    blockIDs.append(block.id)
-                }
-            }
-        }
-
-        if leadingTextRange == nil, trailingTextRange == nil {
-            return blockIDs.isEmpty ? nil : .blocks(blockIDs)
-        }
-        return .mixed(BlockInputMixedSelection(
-            blockIDs: blockIDs,
-            leadingTextRange: leadingTextRange,
-            trailingTextRange: trailingTextRange
-        ))
-    }
-
     func scrollHorizontalSelectionBoundaryToVisible(_ boundary: BlockInputDocumentTextBoundary) {
         guard let index = index(of: boundary.blockID) else {
             return
@@ -439,13 +418,6 @@ extension BlockInputView {
         collectionView.scrollToItems(at: [IndexPath(item: index, section: 0)], scrollPosition: .nearestVerticalEdge)
         collectionView.layoutSubtreeIfNeeded()
     }
-}
-
-private struct BlockInputOrderedTextBoundarySpan {
-    var start: BlockInputDocumentTextBoundary
-    var startIndex: Int
-    var end: BlockInputDocumentTextBoundary
-    var endIndex: Int
 }
 
 private extension BlockInputSelection {

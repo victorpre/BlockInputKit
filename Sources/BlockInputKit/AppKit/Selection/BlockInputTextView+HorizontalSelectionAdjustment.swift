@@ -3,9 +3,11 @@ import AppKit
 extension BlockInputTextView {
     func handleHorizontalSelectionAdjustmentCommand(_ selector: Selector) -> Bool {
         switch selector {
-        case #selector(moveLeftAndModifySelection(_:)):
+        case #selector(moveLeftAndModifySelection(_:)),
+             #selector(moveBackwardAndModifySelection(_:)):
             return requestHorizontalSelectionAdjustmentFromOwningBlock(.leftward)
-        case #selector(moveRightAndModifySelection(_:)):
+        case #selector(moveRightAndModifySelection(_:)),
+             #selector(moveForwardAndModifySelection(_:)):
             return requestHorizontalSelectionAdjustmentFromOwningBlock(.rightward)
         default:
             return false
