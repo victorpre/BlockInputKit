@@ -36,6 +36,26 @@ final class BlockInputEditorTests: XCTestCase {
         XCTAssertFalse(isFocused)
     }
 
+    func testHeightSizingContributesSwiftUIFittingHeight() {
+        let configuration = BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "first", text: "Short")
+            ]),
+            heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 3, maximumVisibleLineCount: 6)
+        )
+        let host = NSHostingView(rootView: BlockInputEditor(configuration: configuration).frame(width: 360))
+        host.frame = NSRect(x: 0, y: 0, width: 360, height: 200)
+
+        host.layoutSubtreeIfNeeded()
+
+        let rowHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(id: "expected", text: "x\nx\nx"),
+            textWidth: 10_000
+        )
+        let expectedHeight = ceil(rowHeight + (BlockInputConfiguration.defaultEditorVerticalInset * 2))
+        XCTAssertEqual(host.fittingSize.height, expectedHeight, accuracy: 1)
+    }
+
     func testFocusBindingPreservesKeyboardShortcutHandlers() {
         var isFocused = false
         var handledShortcuts: [BlockInputKeyboardShortcut] = []

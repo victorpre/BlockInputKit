@@ -304,8 +304,10 @@ extension BlockInputView {
                 }
                 collectionView.layoutSubtreeIfNeeded()
                 restoreVisibleSelection()
+                invalidatePreferredHeight()
             }
         }
+        invalidatePreferredHeight()
     }
 
     func reloadDataWithoutRestoringFocus() {
@@ -313,6 +315,7 @@ extension BlockInputView {
         collectionView.reloadData()
         collectionView.collectionViewLayout?.invalidateLayout()
         collectionView.layoutSubtreeIfNeeded()
+        invalidatePreferredHeight()
     }
 
     func clearStaleFocusState() {

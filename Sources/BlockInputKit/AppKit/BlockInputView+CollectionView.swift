@@ -112,6 +112,7 @@ extension BlockInputView {
             if documentStore.loadedBlockCount > loadedCountBeforeRequest,
                self.isProgressiveLoadingRowVisibleOrWithinPreloadWindow() {
                 self.scheduleProgressivePreloadCheck()
+                self.invalidatePreferredHeight()
             }
         }
     }
@@ -180,6 +181,7 @@ extension BlockInputView {
         let insertedCount = batch.blocks.count
         guard insertedCount > 0 else {
             collectionView.reloadData()
+            invalidatePreferredHeight()
             return
         }
         collectionView.performBatchUpdates {
@@ -196,6 +198,7 @@ extension BlockInputView {
                 return
             }
             self.restoreMountedSelection()
+            self.invalidatePreferredHeight()
         }
     }
 }

@@ -1,0 +1,140 @@
+import AppKit
+
+extension BlockInputView {
+    /// Provides an intrinsic height only when rendered-content height sizing is enabled.
+    public override var intrinsicContentSize: NSSize {
+        guard heightSizing != nil else {
+            return NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+        }
+        return NSSize(width: NSView.noIntrinsicMetric, height: preferredHeightForCurrentWidth())
+    }
+
+    /// Provides an AppKit fitting height only when rendered-content height sizing is enabled.
+    public override var fittingSize: NSSize {
+        guard heightSizing != nil else {
+            return super.fittingSize
+        }
+        return NSSize(width: NSView.noIntrinsicMetric, height: preferredHeightForCurrentWidth())
+    }
+
+    /// Returns the editor's preferred height for the supplied viewport width.
+    ///
+    /// When `BlockInputConfiguration.heightSizing` is set, the result is clamped between the configured default and
+    /// maximum visible line counts. When height sizing is not configured, this returns the natural rendered content height
+    /// for currently loaded blocks.
+    public func preferredHeight(forWidth width: CGFloat) -> CGFloat {
+        let viewportWidth = max(width, 0)
+        guard let heightSizing else {
+            return ceil(naturalContentHeight(forWidth: viewportWidth, stoppingAt: nil))
+        }
+        let minimumHeight = lineLimitedHeight(forLineCount: sanitizedDefaultLineCount(in: heightSizing))
+        let maximumHeight = heightSizing.maximumVisibleLineCount.map {
+            lineLimitedHeight(forLineCount: sanitizedMaximumLineCount($0, in: heightSizing))
+        }
+        let naturalHeight = naturalContentHeight(forWidth: viewportWidth, stoppingAt: maximumHeight)
+        let cappedHeight = maximumHeight.map { min(naturalHeight, $0) } ?? naturalHeight
+        return ceil(max(minimumHeight, cappedHeight))
+    }
+
+    func invalidatePreferredHeight() {
+        guard heightSizing != nil else {
+            return
+        }
+        invalidateIntrinsicContentSize()
+        guard bounds.width > 0 else {
+            return
+        }
+        schedulePreferredHeightCallback()
+    }
+
+    func preferredHeightForCurrentWidth() -> CGFloat {
+        let width = bounds.width > 0 ? bounds.width : lastMeasuredContentWidthFallback
+        return preferredHeight(forWidth: width)
+    }
+
+    func clampVerticalScrollOffsetIfNeeded() {
+        let contentHeight = collectionView.collectionViewLayout?.collectionViewContentSize.height
+            ?? collectionView.frame.height
+        let maximumY = max(0, contentHeight - scrollView.contentSize.height)
+        let origin = scrollView.contentView.bounds.origin
+        guard origin.y > maximumY + 0.5 else {
+            return
+        }
+        scrollView.contentView.scroll(to: NSPoint(x: origin.x, y: maximumY))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+    }
+
+    private var lastMeasuredContentWidthFallback: CGFloat {
+        max(collectionView.bounds.width, scrollView.contentSize.width, 0)
+    }
+
+    private func schedulePreferredHeightCallback() {
+        guard !isPreferredHeightCallbackScheduled else {
+            return
+        }
+        isPreferredHeightCallbackScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            self?.publishPreferredHeightIfNeeded()
+        }
+    }
+
+    private func publishPreferredHeightIfNeeded() {
+        isPreferredHeightCallbackScheduled = false
+        guard let onPreferredHeightChange = heightSizing?.onPreferredHeightChange,
+              bounds.width > 0 else {
+            return
+        }
+        let preferredHeight = preferredHeight(forWidth: bounds.width)
+        guard lastReportedPreferredHeight.map({ abs($0 - preferredHeight) > 0.5 }) ?? true else {
+            return
+        }
+        lastReportedPreferredHeight = preferredHeight
+        onPreferredHeightChange(preferredHeight)
+    }
+
+    private func naturalContentHeight(forWidth width: CGFloat, stoppingAt maximumHeight: CGFloat?) -> CGFloat {
+        let sectionInset = layout.sectionInset
+        let horizontalInsets = sectionInset.left + sectionInset.right + scrollView.contentInsets.left + scrollView.contentInsets.right
+        let availableWidth = max(width - horizontalInsets, 0)
+        var height = sectionInset.top + sectionInset.bottom
+        for index in 0..<blockCount {
+            guard let block = block(at: index) else {
+                continue
+            }
+            let textWidth = BlockInputBlockItem.measuredTextWidth(
+                for: availableWidth,
+                block: block,
+                allowsReordering: allowsBlockReordering,
+                editorHorizontalInset: editorHorizontalInset,
+                style: style
+            )
+            height += BlockInputBlockItem.height(for: block, textWidth: textWidth, style: style, fileBaseURL: fileBaseURL)
+            if let maximumHeight, height >= maximumHeight {
+                return height
+            }
+        }
+        if showsProgressiveLoadingRow {
+            height += progressiveLoadingRowHeight
+        }
+        return height
+    }
+
+    private func lineLimitedHeight(forLineCount lineCount: Int) -> CGFloat {
+        let text = Array(repeating: "x", count: lineCount).joined(separator: "\n")
+        let rowHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(id: "__heightSizingReference__", text: text),
+            textWidth: 10_000,
+            style: style,
+            fileBaseURL: fileBaseURL
+        )
+        return rowHeight + (editorVerticalInset * 2)
+    }
+
+    private func sanitizedDefaultLineCount(in heightSizing: BlockInputEditorHeightSizing) -> Int {
+        max(1, heightSizing.defaultVisibleLineCount)
+    }
+
+    private func sanitizedMaximumLineCount(_ maximumLineCount: Int, in heightSizing: BlockInputEditorHeightSizing) -> Int {
+        max(sanitizedDefaultLineCount(in: heightSizing), maximumLineCount)
+    }
+}

@@ -31,8 +31,21 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.document.blocks.map(\.id), [blockID])
         XCTAssertEqual(configuration.editorHorizontalInset, BlockInputConfiguration.defaultEditorHorizontalInset)
         XCTAssertEqual(configuration.editorVerticalInset, BlockInputConfiguration.defaultEditorVerticalInset)
+        XCTAssertNil(configuration.heightSizing)
         XCTAssertEqual(configuration.slashCommandAvailability, .documentStart)
         XCTAssertNil(configuration.slashCommandChipClickHandler)
+    }
+
+    func testHeightSizingInitializerPreservesValues() {
+        let sizing = BlockInputEditorHeightSizing(
+            defaultVisibleLineCount: 3,
+            maximumVisibleLineCount: 8,
+            onPreferredHeightChange: { _ in }
+        )
+
+        XCTAssertEqual(sizing.defaultVisibleLineCount, 3)
+        XCTAssertEqual(sizing.maximumVisibleLineCount, 8)
+        XCTAssertNotNil(sizing.onPreferredHeightChange)
     }
 
     @MainActor
@@ -48,6 +61,7 @@ final class BlockInputConfigurationTests: XCTestCase {
             editorHorizontalInset: 28,
             editorVerticalInset: 14,
             dropIndicatorColor: .systemPink,
+            heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 2, maximumVisibleLineCount: 5),
             undoController: undoController,
             onDocumentMutation: onDocumentMutation,
             onDocumentChange: onDocumentChange,
@@ -64,6 +78,8 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(sectionInset.left, 0)
         XCTAssertEqual(sectionInset.right, 0)
         XCTAssertEqual(view.dropIndicatorColor, .systemPink)
+        XCTAssertEqual(view.heightSizing?.defaultVisibleLineCount, 2)
+        XCTAssertEqual(view.heightSizing?.maximumVisibleLineCount, 5)
         XCTAssertTrue(view.undoController === undoController)
         XCTAssertNotNil(view.onDocumentMutation)
         XCTAssertNotNil(view.onDocumentChange)

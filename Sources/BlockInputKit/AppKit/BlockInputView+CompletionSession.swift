@@ -25,10 +25,18 @@ extension BlockInputView {
 
     /// Dismisses the completion popup when the editor view changes size.
     public override func setFrameSize(_ newSize: NSSize) {
+        let previousWidth = frame.width
         let sizeChanged = frame.size != newSize
         super.setFrameSize(newSize)
         if sizeChanged {
             dismissCompletionPopup()
+        }
+        guard heightSizing != nil else {
+            return
+        }
+        clampVerticalScrollOffsetIfNeeded()
+        if abs(previousWidth - newSize.width) > 0.5 {
+            invalidatePreferredHeight()
         }
     }
 

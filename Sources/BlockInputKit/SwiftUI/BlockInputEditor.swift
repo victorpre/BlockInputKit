@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// SwiftUI wrapper around `BlockInputView`.
@@ -34,6 +35,18 @@ public struct BlockInputEditor: NSViewRepresentable {
     /// Applies the current SwiftUI configuration and focus binding to the wrapped AppKit editor view.
     public func updateNSView(_ nsView: BlockInputView, context: Context) {
         updateView(nsView)
+    }
+
+    /// Returns the AppKit editor's preferred rendered height when height sizing is enabled.
+    public func sizeThatFits(_ proposal: ProposedViewSize, nsView: BlockInputView, context: Context) -> CGSize? {
+        guard nsView.heightSizing != nil else {
+            return nil
+        }
+        guard let width = proposal.width ?? (nsView.bounds.width > 0 ? nsView.bounds.width : nil) else {
+            return nil
+        }
+        let height = nsView.preferredHeight(forWidth: width)
+        return CGSize(width: width, height: height)
     }
 
     func updateView(_ view: BlockInputView) {

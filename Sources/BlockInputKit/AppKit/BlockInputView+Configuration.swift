@@ -25,10 +25,7 @@ extension BlockInputView {
         let configuredDocument = reusesLargeDocumentCache ? previousDocument : configuration.document.detachedStorage()
         document = configuredDocument
         isDocumentCacheSynchronized = reusesLargeDocumentCache ? wasDocumentCacheSynchronized : true
-        allowsBlockReordering = configuration.allowsBlockReordering
-        editorHorizontalInset = configuration.editorHorizontalInset
-        editorVerticalInset = configuration.editorVerticalInset
-        dropIndicatorColor = configuration.dropIndicatorColor
+        configureEditorSurface(configuration)
         configureImageLoading(configuration)
         configureUndoController(
             previousDocumentStore: previousDocumentStore,
@@ -57,6 +54,24 @@ extension BlockInputView {
             reloadDataWithoutRestoringFocus()
         }
         attachDocumentStoreObservationIfNeeded()
+        invalidatePreferredHeight()
+    }
+
+    private func configureHeightSizing(_ sizing: BlockInputEditorHeightSizing?) {
+        heightSizing = sizing
+        if sizing == nil {
+            lastReportedPreferredHeight = nil
+            isPreferredHeightCallbackScheduled = false
+            invalidateIntrinsicContentSize()
+        }
+    }
+
+    private func configureEditorSurface(_ configuration: BlockInputConfiguration) {
+        allowsBlockReordering = configuration.allowsBlockReordering
+        editorHorizontalInset = configuration.editorHorizontalInset
+        editorVerticalInset = configuration.editorVerticalInset
+        dropIndicatorColor = configuration.dropIndicatorColor
+        configureHeightSizing(configuration.heightSizing)
     }
 
     private func configureCommandDispatcher(_ dispatcher: BlockInputEditorCommandDispatcher?) {

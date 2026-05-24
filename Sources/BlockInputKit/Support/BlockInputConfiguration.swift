@@ -125,6 +125,38 @@ public struct BlockInputSlashCommandChipClickContext {
     }
 }
 
+/// Preferred editor height behavior for hosts that want the editor to size itself from rendered content.
+public struct BlockInputEditorHeightSizing {
+    /// Minimum/default viewport height expressed as a rendered line count.
+    ///
+    /// Empty and short documents use at least this much vertical space. The line count is converted through the current
+    /// paragraph font metrics and editor vertical inset, so the resulting point height follows the configured style.
+    public var defaultVisibleLineCount: Int
+    /// Maximum viewport height expressed as a rendered line count.
+    ///
+    /// A `nil` value allows the editor to grow to its rendered content height. When non-nil, extra content remains in the
+    /// editor and scrolls vertically.
+    public var maximumVisibleLineCount: Int?
+    /// Called when the editor's clamped preferred height changes.
+    ///
+    /// The value is the height a host should assign to the editor viewport, not the unlimited natural document height.
+    public var onPreferredHeightChange: (@MainActor (CGFloat) -> Void)?
+
+    /// Creates preferred editor height behavior.
+    ///
+    /// Counts less than one are sanitized by the editor when measuring. If `maximumVisibleLineCount` is smaller than
+    /// `defaultVisibleLineCount`, the editor treats the maximum as equal to the default.
+    public init(
+        defaultVisibleLineCount: Int,
+        maximumVisibleLineCount: Int? = nil,
+        onPreferredHeightChange: (@MainActor (CGFloat) -> Void)? = nil
+    ) {
+        self.defaultVisibleLineCount = defaultVisibleLineCount
+        self.maximumVisibleLineCount = maximumVisibleLineCount
+        self.onPreferredHeightChange = onPreferredHeightChange
+    }
+}
+
 /// Runtime options and host integration points for a block input editor.
 public struct BlockInputConfiguration {
     /// Default visual horizontal inset for block content.
@@ -151,6 +183,12 @@ public struct BlockInputConfiguration {
     public var dropIndicatorColor: NSColor
     /// Visual styling for editor text, code, and selection chrome.
     public var style: BlockInputStyle
+    /// Optional rendered-content height sizing for hosts that want the editor to provide its preferred height.
+    ///
+    /// When nil, the editor keeps its historical behavior and exposes no intrinsic height. When set, the editor reports a
+    /// preferred height that starts at `defaultVisibleLineCount`, grows with rendered content, and caps at
+    /// `maximumVisibleLineCount` when provided.
+    public var heightSizing: BlockInputEditorHeightSizing?
     /// Image loader used for image block bytes and natural dimensions.
     public var imageLoader: any BlockInputImageLoading
     /// Optional disk cache used by the default loader for remote image bytes and dimensions.
@@ -230,6 +268,7 @@ public struct BlockInputConfiguration {
         editorVerticalInset: CGFloat = BlockInputConfiguration.defaultEditorVerticalInset,
         dropIndicatorColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
+        heightSizing: BlockInputEditorHeightSizing? = nil,
         imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader(),
         imageDiskCache: (any BlockInputImageDiskCaching)? = BlockInputDefaultImageDiskCache(),
         imageBaseURL: URL? = nil,
@@ -261,6 +300,7 @@ public struct BlockInputConfiguration {
         self.editorVerticalInset = editorVerticalInset
         self.dropIndicatorColor = dropIndicatorColor
         self.style = style
+        self.heightSizing = heightSizing
         self.imageLoader = imageLoader
         self.imageDiskCache = imageDiskCache
         self.imageBaseURL = imageBaseURL

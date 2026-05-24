@@ -22,6 +22,9 @@ public final class BlockInputView: NSView {
     public internal(set) var dropIndicatorColor = NSColor.controlAccentColor
     /// Visual styling used for text, code, and selection chrome.
     public internal(set) var style = BlockInputStyle.default
+    var heightSizing: BlockInputEditorHeightSizing?
+    var isPreferredHeightCallbackScheduled = false
+    var lastReportedPreferredHeight: CGFloat?
     var imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader()
     var imageDiskCache: (any BlockInputImageDiskCaching)?
     var imageBaseURL: URL?
@@ -31,7 +34,7 @@ public final class BlockInputView: NSView {
     var maximumImagePixelDimension = 8_192
     var defaultImagePlaceholderAspectRatio: CGFloat = 16.0 / 9.0
 
-    private let scrollView = BlockInputDocumentScrollView()
+    let scrollView = BlockInputDocumentScrollView()
     let collectionView = BlockInputCollectionView()
     let dropIndicatorView = NSView()
     let layout = BlockInputCollectionViewFlowLayout()

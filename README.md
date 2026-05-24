@@ -97,6 +97,43 @@ let configuration = BlockInputConfiguration(
 
 `dropIndicatorColor`, selection colors, inline code, code block, and image block styling are also configurable.
 
+### Editor Height Sizing
+
+Height sizing is opt-in. When enabled, the editor reports a rendered-content preferred height that starts at a default
+visible line count, grows as content wraps or new blocks are added, and caps at a maximum visible line count when supplied.
+Extra content remains in the editor and scrolls vertically.
+
+```swift
+let configuration = BlockInputConfiguration(
+    document: document,
+    heightSizing: BlockInputEditorHeightSizing(
+        defaultVisibleLineCount: 2,
+        maximumVisibleLineCount: 8
+    )
+)
+```
+
+AppKit hosts can use intrinsic/fitting size, call `preferredHeight(forWidth:)`, or listen for clamped preferred-height
+changes:
+
+```swift
+let editor = BlockInputView()
+editor.configure(BlockInputConfiguration(
+    document: document,
+    heightSizing: BlockInputEditorHeightSizing(
+        defaultVisibleLineCount: 2,
+        maximumVisibleLineCount: 8,
+        onPreferredHeightChange: { height in
+            editorHeightConstraint.constant = height
+        }
+    )
+))
+```
+
+SwiftUI hosts can pass the same configuration to `BlockInputEditor`; fixed `.frame(height:)` values remain authoritative.
+Sizing is based on rendered height, so wrapping, block chrome, tables, images, and code blocks can affect growth. Callback
+measurement is reliable after the editor has a real width.
+
 ### Commands
 
 Semantic commands let toolbar buttons, menu items, and host UI use the same paths as keyboard shortcuts and editor menus:

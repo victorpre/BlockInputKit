@@ -103,6 +103,7 @@ extension BlockInputView {
             resizeVisibleItem(editedItem, for: block)
         }
         reflowVisibleItemsAfterHeightChange(startingAt: index)
+        invalidatePreferredHeight()
     }
 
     func deleteVisibleBlock(at index: Int, deletedBlockIDs: [BlockInputBlockID] = []) {
@@ -114,6 +115,7 @@ extension BlockInputView {
         collectionView.deleteItems(at: [indexPath])
         collectionView.layoutSubtreeIfNeeded()
         restoreMountedSelection()
+        invalidatePreferredHeight()
     }
 
     var shouldDeferGranularCountLayout: Bool {
@@ -155,6 +157,7 @@ extension BlockInputView {
             applySelection(intendedSelection, notify: false)
         }
         restoreMountedSelection()
+        invalidatePreferredHeight()
     }
 
     @discardableResult
@@ -177,6 +180,7 @@ extension BlockInputView {
             reflowVisibleItemsAfterHeightChange(startingAt: index)
         }
         restoreMountedSelection()
+        invalidatePreferredHeight()
         return true
     }
 
@@ -378,12 +382,14 @@ extension BlockInputView {
         // Image dimensions can resolve or undo after mounting; refresh flow metrics so scroll bounds include the full block height.
         if reconfigureVisibleReplacement(block, at: index, requiresDeferredLayout: false, invalidatesLayoutMetrics: block.kind.isImage) {
             publishDocumentChange()
+            invalidatePreferredHeight()
             return true
         }
         collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
         collectionView.layoutSubtreeIfNeeded()
         restoreMountedSelection()
         publishDocumentChange()
+        invalidatePreferredHeight()
         return true
     }
 
@@ -405,6 +411,7 @@ extension BlockInputView {
         applySelection(validUndoSelection(selection), notify: true)
         reloadDataKeepingFocus()
         publishDocumentChange()
+        invalidatePreferredHeight()
         return true
     }
 
