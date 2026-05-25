@@ -1,5 +1,6 @@
 extension BlockInputView {
-    func configureBlockItem(_ item: BlockInputBlockItem, block: BlockInputBlock) {
+    func configureBlockItem(_ item: BlockInputBlockItem, block: BlockInputBlock, blockIndex: Int? = nil) {
+        let resolvedBlockIndex = blockIndex ?? index(of: block.id)
         item.configure(
             block: block,
             allowsReordering: allowsBlockReordering,
@@ -10,10 +11,10 @@ extension BlockInputView {
             fileBaseURL: fileBaseURL,
             isEditable: isEditable,
             disabledCursor: disabledCursor,
-            inlineHint: inlineHint(for: item, block: block),
+            inlineHint: inlineHint(for: item, block: block, blockIndex: resolvedBlockIndex),
             rawSlashCommandChips: rawSlashCommandChips,
             slashCommandAvailability: slashCommandAvailability,
-            isDocumentStartBlock: index(of: block.id) == 0,
+            isDocumentStartBlock: resolvedBlockIndex == 0,
             isSelected: isBlockSelected(block.id),
             delegate: self
         )

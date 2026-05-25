@@ -12,12 +12,12 @@ extension BlockInputView {
         }
     }
 
-    func inlineHint(for item: BlockInputBlockItem, block: BlockInputBlock) -> BlockInputInlineHint? {
+    func inlineHint(for item: BlockInputBlockItem, block: BlockInputBlock, blockIndex: Int? = nil) -> BlockInputInlineHint? {
         guard let inlineHintProvider,
               isEditable,
               BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind),
               window?.firstResponder === item.textView,
-              let context = inlineHintContext(for: item, block: block) else {
+              let context = inlineHintContext(for: item, block: block, blockIndex: blockIndex) else {
             return nil
         }
         let hint = inlineHintProvider(context)
@@ -29,9 +29,10 @@ extension BlockInputView {
 
     private func inlineHintContext(
         for item: BlockInputBlockItem,
-        block: BlockInputBlock
+        block: BlockInputBlock,
+        blockIndex: Int? = nil
     ) -> BlockInputInlineHintContext? {
-        guard let blockIndex = collectionView.indexPath(for: item)?.item ?? index(of: block.id),
+        guard let blockIndex = blockIndex ?? collectionView.indexPath(for: item)?.item ?? index(of: block.id),
               case let .cursor(cursor) = selection,
               cursor.blockID == block.id,
               containsValidCursor(cursor) else {

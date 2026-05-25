@@ -132,15 +132,7 @@ extension BlockInputView {
                   let block = block(at: itemIndex) else {
                 return nil
             }
-            blockItem.configure(
-                block: block,
-                allowsReordering: allowsBlockReordering,
-                editorHorizontalInset: editorHorizontalInset,
-                accentColor: dropIndicatorColor,
-                style: style,
-                isSelected: isBlockSelected(block.id),
-                delegate: self
-            )
+            configureBlockItem(blockItem, block: block, blockIndex: itemIndex)
             // The mounted item may now represent a different block kind; keep
             // its frame height in sync before manually reflowing visible rows.
             resizeVisibleItem(blockItem, for: block)
@@ -173,7 +165,7 @@ extension BlockInputView {
               let item = collectionView.item(at: indexPath) as? BlockInputBlockItem else {
             return false
         }
-        configureBlockItem(item, block: block)
+        configureBlockItem(item, block: block, blockIndex: index)
         if invalidatesLayoutMetrics {
             invalidateLayoutForBlock(at: index, editedItem: item, block: block)
         } else {

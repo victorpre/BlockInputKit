@@ -39,7 +39,7 @@ extension BlockInputView: NSCollectionViewDataSource {
             blockItem.clearConfiguration()
             return blockItem
         }
-        configureBlockItem(blockItem, block: block)
+        configureBlockItem(blockItem, block: block, blockIndex: indexPath.item)
         return blockItem
     }
 }

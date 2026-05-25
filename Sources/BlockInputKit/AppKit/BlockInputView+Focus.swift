@@ -134,7 +134,7 @@ extension BlockInputView {
             return nil
         }
         if refreshConfiguration {
-            configureBlockItem(item, block: block)
+            configureBlockItem(item, block: block, blockIndex: index)
         }
         return item
     }
@@ -285,7 +285,7 @@ extension BlockInputView {
         guard let item = collectionView.item(at: indexPath) as? BlockInputBlockItem else {
             return nil
         }
-        configureBlockItem(item, block: block)
+        configureBlockItem(item, block: block, blockIndex: index)
         return item
     }
 
