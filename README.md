@@ -90,12 +90,37 @@ let configuration = BlockInputConfiguration(
     editorHorizontalInset: 20,
     editorVerticalInset: 8,
     style: BlockInputStyle(
-        imageBlock: BlockInputImageBlockStyle(cornerRadius: 8)
+        editorSurface: BlockInputEditorSurfaceStyle(
+            editorBackgroundColor: nil,
+            scrollBackgroundColor: nil,
+            collectionBackgroundColor: nil
+        ),
+        imageBlock: BlockInputImageBlockStyle(cornerRadius: 8),
+        fileChip: BlockInputInlineChipStyle(
+            fillColor: NSColor.controlAccentColor.withAlphaComponent(0.14),
+            strokeColor: NSColor.controlAccentColor.withAlphaComponent(0.24),
+            foregroundColor: .labelColor,
+            cornerRadius: 5
+        ),
+        slashCommandChip: BlockInputInlineChipStyle(
+            fillColor: NSColor.controlAccentColor.withAlphaComponent(0.14),
+            strokeColor: NSColor.controlAccentColor.withAlphaComponent(0.24),
+            foregroundColor: .labelColor,
+            cornerRadius: 5
+        ),
+        rawSlashCommandChip: BlockInputInlineChipStyle(
+            fillColor: NSColor.controlAccentColor.withAlphaComponent(0.14),
+            strokeColor: NSColor.controlAccentColor.withAlphaComponent(0.24),
+            foregroundColor: .labelColor,
+            cornerRadius: 5
+        )
     )
 )
 ```
 
-`dropIndicatorColor`, selection colors, inline code, code block, and image block styling are also configurable.
+`nil` editor surface colors are transparent so the host can draw its own rounded background. `dropIndicatorColor`,
+selection colors, inline code, code block, image block, and inline chip styling are also configurable. Link-backed
+chips use their chip foreground color instead of the system link text color.
 
 ### Placeholder
 

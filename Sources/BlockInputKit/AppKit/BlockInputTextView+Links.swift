@@ -235,6 +235,9 @@ extension BlockInputTextView {
         }
         layoutManager.ensureLayout(for: textContainer)
         for chipRange in inlineChipVisualRangesForCurrentText() {
+            guard let chipStyle = inlineChipStyle(for: chipRange) else {
+                continue
+            }
             let characterRange = string.linkCursorClampedRange(chipRange.contentRange)
             let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
                 .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
@@ -246,7 +249,7 @@ extension BlockInputTextView {
                 layoutManager: layoutManager,
                 textContainer: textContainer
             ) where drawRect.intersects(dirtyRect) {
-                drawInlineChipBackground(in: drawRect)
+                drawInlineChipBackground(in: drawRect, style: chipStyle)
             }
         }
     }
@@ -284,6 +287,13 @@ extension BlockInputTextView {
 
     private func inlineChipVisualRangesForCurrentText() -> [BlockInputInlineMarkdownRange] {
         inlineMarkdownRangesForCurrentText().filter { $0.inlineChipKind(in: string) != nil }
+    }
+
+    private func inlineChipStyle(for range: BlockInputInlineMarkdownRange) -> BlockInputInlineChipStyle? {
+        guard let kind = range.inlineChipKind(in: string) else {
+            return nil
+        }
+        return blockItem?.style.inlineChipStyle(for: kind)
     }
 
     private func inlineMarkdownRangesForCurrentText() -> [BlockInputInlineMarkdownRange] {
@@ -331,13 +341,21 @@ extension BlockInputTextView {
         return rects
     }
 
-    private func drawInlineChipBackground(in rect: NSRect) {
-        NSColor.controlAccentColor.withAlphaComponent(0.11).setFill()
-        NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
-        NSColor.controlAccentColor.withAlphaComponent(0.18).setStroke()
-        let stroke = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
-        stroke.lineWidth = 1
-        stroke.stroke()
+    private func drawInlineChipBackground(in rect: NSRect, style: BlockInputInlineChipStyle) {
+        if let fillColor = style.fillColor {
+            fillColor.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: style.cornerRadius, yRadius: style.cornerRadius).fill()
+        }
+        if let strokeColor = style.strokeColor {
+            strokeColor.setStroke()
+            let stroke = NSBezierPath(
+                roundedRect: rect.insetBy(dx: 0.5, dy: 0.5),
+                xRadius: style.cornerRadius,
+                yRadius: style.cornerRadius
+            )
+            stroke.lineWidth = 1
+            stroke.stroke()
+        }
     }
 }
 

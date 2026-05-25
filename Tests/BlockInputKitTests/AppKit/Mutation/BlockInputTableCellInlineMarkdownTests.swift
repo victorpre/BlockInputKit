@@ -21,6 +21,55 @@ final class BlockInputTableCellInlineMarkdownTests: XCTestCase {
         XCTAssertTrue(font.fontDescriptor.symbolicTraits.contains(.bold))
     }
 
+    func testTableCellLinkBackedChipsUseConfiguredForegroundStyles() throws {
+        let table = BlockInputBlock(
+            id: "table",
+            kind: .table,
+            text: BlockInputTable.normalized(
+                header: ["H1", "H2"],
+                bodyRows: [["[file](file:///tmp/demo.md)", "[/table](host-app://commands/table)"]],
+                alignments: [.left, .left]
+            ).markdown
+        )
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [table]),
+            style: BlockInputStyle(
+                fileChip: BlockInputInlineChipStyle(foregroundColor: .systemRed),
+                slashCommandChip: BlockInputInlineChipStyle(foregroundColor: .systemGreen)
+            )
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let fileCell = try XCTUnwrap(item.testingTableCellTextViews.first { $0.string.contains("file") })
+        let slashCell = try XCTUnwrap(item.testingTableCellTextViews.first { $0.string.contains("/table") })
+
+        XCTAssertEqual(fileCell.textStorage?.attribute(.foregroundColor, at: 1, effectiveRange: nil) as? NSColor, .systemRed)
+        XCTAssertEqual(slashCell.textStorage?.attribute(.foregroundColor, at: 1, effectiveRange: nil) as? NSColor, .systemGreen)
+    }
+
+    func testTableCellStillDoesNotRenderRawSlashCommandChip() throws {
+        let table = BlockInputBlock(
+            id: "table",
+            kind: .table,
+            text: BlockInputTable.normalized(
+                header: ["H1", "H2"],
+                bodyRows: [["/table", "two"]],
+                alignments: [.left, .left]
+            ).markdown
+        )
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [table]),
+            rawSlashCommandChips: true,
+            style: BlockInputStyle(rawSlashCommandChip: BlockInputInlineChipStyle(foregroundColor: .systemBlue)),
+            slashCommandAvailability: .anywhere
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let cell = try XCTUnwrap(item.testingTableCellTextViews.first { $0.string == "/table" })
+        let textStorage = try XCTUnwrap(cell.textStorage)
+
+        XCTAssertNil(textStorage.attribute(.blockInputInlineChip, at: 0, effectiveRange: nil))
+        XCTAssertNotEqual(textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .systemBlue)
+    }
+
     private func bodyCell(in item: BlockInputBlockItem) throws -> BlockInputTableCellTextView {
         try XCTUnwrap(item.testingTableCellTextViews.indices.contains(2) ? item.testingTableCellTextViews[2] : nil)
     }

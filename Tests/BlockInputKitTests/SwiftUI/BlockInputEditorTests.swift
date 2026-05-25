@@ -86,6 +86,30 @@ final class BlockInputEditorTests: XCTestCase {
         XCTAssertTrue(editor.resolvedConfiguration().rawSlashCommandChips)
     }
 
+    func testResolvedConfigurationPreservesExpandedStyle() {
+        let style = BlockInputStyle(
+            editorSurface: BlockInputEditorSurfaceStyle(
+                editorBackgroundColor: nil,
+                scrollBackgroundColor: nil,
+                collectionBackgroundColor: nil
+            ),
+            fileChip: BlockInputInlineChipStyle(fillColor: nil, strokeColor: nil, foregroundColor: .systemRed),
+            slashCommandChip: BlockInputInlineChipStyle(foregroundColor: .systemGreen),
+            rawSlashCommandChip: BlockInputInlineChipStyle(foregroundColor: .systemBlue)
+        )
+        let editor = BlockInputEditor(configuration: BlockInputConfiguration(style: style))
+        let resolvedStyle = editor.resolvedConfiguration().style
+
+        XCTAssertNil(resolvedStyle.editorSurface.editorBackgroundColor)
+        XCTAssertNil(resolvedStyle.editorSurface.scrollBackgroundColor)
+        XCTAssertNil(resolvedStyle.editorSurface.collectionBackgroundColor)
+        XCTAssertNil(resolvedStyle.fileChip.fillColor)
+        XCTAssertNil(resolvedStyle.fileChip.strokeColor)
+        XCTAssertEqual(resolvedStyle.fileChip.foregroundColor, .systemRed)
+        XCTAssertEqual(resolvedStyle.slashCommandChip.foregroundColor, .systemGreen)
+        XCTAssertEqual(resolvedStyle.rawSlashCommandChip.foregroundColor, .systemBlue)
+    }
+
     func testResolvedConfigurationPreservesCompletionReturnBehavior() {
         let editor = BlockInputEditor(configuration: BlockInputConfiguration(
             completionReturnBehavior: .passthroughExactMatch

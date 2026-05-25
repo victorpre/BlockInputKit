@@ -69,6 +69,7 @@ extension BlockInputBlockItem {
         textView.textContainerInset = Self.standardTextContainerInset
         textView.backgroundColor = .clear
         textView.drawsBackground = false
+        textView.linkTextAttributes = [:]
         textView.isSelectable = true
         textView.selectedTextAttributes = BlockInputBlockSelectionChrome.nativeSelectedTextAttributes
         textView.isRichText = true

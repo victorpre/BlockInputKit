@@ -24,6 +24,7 @@ extension BlockInputView {
         let configuredDocument = reusesLargeDocumentCache ? previousDocument : configuration.document.detachedStorage()
         document = configuredDocument
         isDocumentCacheSynchronized = reusesLargeDocumentCache ? wasDocumentCacheSynchronized : true
+        configureStyle(configuration)
         configureEditorSurface(configuration)
         dismissMutationUIIfNeeded(wasEditable: wasEditable)
         configureImageLoading(configuration)
@@ -78,6 +79,7 @@ extension BlockInputView {
         rawSlashCommandChips = configuration.rawSlashCommandChips
         completionReturnBehavior = configuration.completionReturnBehavior
         dropIndicatorColor = configuration.dropIndicatorColor
+        applyEditorSurfaceStyle()
         configureHeightSizing(configuration.heightSizing)
     }
 
@@ -122,11 +124,14 @@ extension BlockInputView {
         }
     }
 
-    private func configureImageLoading(_ configuration: BlockInputConfiguration) {
+    private func configureStyle(_ configuration: BlockInputConfiguration) {
         style = configuration.style
         if style.imageBlock.placeholderAspectRatio == nil {
             style.imageBlock.placeholderAspectRatio = configuration.defaultImagePlaceholderAspectRatio
         }
+    }
+
+    private func configureImageLoading(_ configuration: BlockInputConfiguration) {
         imageLoader = configuration.imageLoader
         imageDiskCache = configuration.imageDiskCache
         imageBaseURL = configuration.imageBaseURL

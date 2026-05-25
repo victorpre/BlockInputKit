@@ -24,7 +24,7 @@ extension BlockInputView: NSCollectionViewDataSource {
                 withIdentifier: BlockInputLoadingItem.reuseIdentifier,
                 for: indexPath
             )
-            (item as? BlockInputLoadingItem)?.configure(error: progressiveStoreError)
+            (item as? BlockInputLoadingItem)?.configure(error: progressiveStoreError, surfaceStyle: style.editorSurface)
             scheduleProgressivePreloadCheck(requiresMountedPreloadWindow: false)
             return item
         }

@@ -19,6 +19,30 @@ final class BlockInputLinkClickReliabilityTests: XCTestCase {
         XCTAssertEqual(modal.urlField.stringValue, "file:///tmp/demo.md")
     }
 
+    func testPlainClickFileChipTrailingPaddingStillWorksWithTransparentCustomChipStyle() throws {
+        let text = "Open [file](file:///tmp/demo.md) now"
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: text)
+            ]),
+            style: BlockInputStyle(fileChip: BlockInputInlineChipStyle(
+                fillColor: nil,
+                strokeColor: nil,
+                foregroundColor: .systemRed,
+                cornerRadius: 0
+            ))
+        ))
+        let textView = try textView(in: mounted.view)
+        let location = try trailingChipPaddingLocation(content: "file", in: text, textView: textView)
+
+        try plainClick(textView, at: location, in: mounted)
+
+        let modal = try XCTUnwrap(mounted.view.linkModalView)
+        XCTAssertEqual(modal.textField.stringValue, "file")
+        XCTAssertEqual(modal.urlField.stringValue, "file:///tmp/demo.md")
+        XCTAssertEqual(mounted.view.document.markdown, text)
+    }
+
     func testPlainClickSlashCommandChipTrailingPaddingRoutesHandler() throws {
         let text = "Run [/table](host-app://commands/table) now"
         var contexts: [BlockInputSlashCommandChipClickContext] = []

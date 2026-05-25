@@ -15,6 +15,14 @@ public struct BlockInputStyle: @unchecked Sendable {
     public var codeBlock: BlockInputCodeBlockStyle
     /// Styling for image block surfaces.
     public var imageBlock: BlockInputImageBlockStyle
+    /// Styling for editor-owned background surfaces.
+    public var editorSurface: BlockInputEditorSurfaceStyle
+    /// Styling for inline file-link chips.
+    public var fileChip: BlockInputInlineChipStyle
+    /// Styling for link-backed slash-command chips.
+    public var slashCommandChip: BlockInputInlineChipStyle
+    /// Styling for raw `/command` visual chips.
+    public var rawSlashCommandChip: BlockInputInlineChipStyle
 
     /// Creates editor styling with optional overrides for built-in visual defaults.
     public init(
@@ -22,13 +30,80 @@ public struct BlockInputStyle: @unchecked Sendable {
         selectionBackgroundColor: NSColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.72),
         inlineCode: BlockInputInlineCodeStyle = BlockInputInlineCodeStyle(),
         codeBlock: BlockInputCodeBlockStyle = BlockInputCodeBlockStyle(),
-        imageBlock: BlockInputImageBlockStyle = BlockInputImageBlockStyle()
+        imageBlock: BlockInputImageBlockStyle = BlockInputImageBlockStyle(),
+        editorSurface: BlockInputEditorSurfaceStyle = BlockInputEditorSurfaceStyle(),
+        fileChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
+        slashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
+        rawSlashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle()
     ) {
         self.baseText = baseText
         self.selectionBackgroundColor = selectionBackgroundColor
         self.inlineCode = inlineCode
         self.codeBlock = codeBlock
         self.imageBlock = imageBlock
+        self.editorSurface = editorSurface
+        self.fileChip = fileChip
+        self.slashCommandChip = slashCommandChip
+        self.rawSlashCommandChip = rawSlashCommandChip
+    }
+}
+
+/// Background styling for editor-owned AppKit surfaces.
+///
+/// Each color defaults to `NSColor.textBackgroundColor`. Set a color to nil when the host should draw that surface.
+public struct BlockInputEditorSurfaceStyle: @unchecked Sendable {
+    /// Root editor view background color. When nil, the root view layer is transparent.
+    public var editorBackgroundColor: NSColor?
+    /// Document scroll view background color. When nil, the scroll and clip views do not draw their backgrounds.
+    public var scrollBackgroundColor: NSColor?
+    /// Collection view background color. When nil, the collection view uses an empty `backgroundColors` array.
+    public var collectionBackgroundColor: NSColor?
+
+    /// Creates editor surface styling overrides.
+    public init(
+        editorBackgroundColor: NSColor? = .textBackgroundColor,
+        scrollBackgroundColor: NSColor? = .textBackgroundColor,
+        collectionBackgroundColor: NSColor? = .textBackgroundColor
+    ) {
+        self.editorBackgroundColor = editorBackgroundColor
+        self.scrollBackgroundColor = scrollBackgroundColor
+        self.collectionBackgroundColor = collectionBackgroundColor
+    }
+}
+
+/// Fill, stroke, foreground, and rounding styling for inline chips.
+///
+/// This is visual-only styling for file, link-backed slash-command, and raw slash-command chips. Regular Markdown links
+/// keep the editor's normal link styling unless they resolve to a chip kind.
+public struct BlockInputInlineChipStyle: @unchecked Sendable {
+    /// Chip fill color. When nil, the chip fill is not drawn.
+    public var fillColor: NSColor?
+    /// Chip stroke color. When nil, the chip stroke is not drawn.
+    public var strokeColor: NSColor?
+    /// Chip text foreground color, including for link-backed chips that would otherwise use the system link color.
+    public var foregroundColor: NSColor
+    /// Chip corner radius. Negative values are clamped to zero.
+    public var cornerRadius: CGFloat {
+        didSet {
+            cornerRadius = Self.validCornerRadius(cornerRadius)
+        }
+    }
+
+    /// Creates inline chip styling overrides.
+    public init(
+        fillColor: NSColor? = NSColor.controlAccentColor.withAlphaComponent(0.11),
+        strokeColor: NSColor? = NSColor.controlAccentColor.withAlphaComponent(0.18),
+        foregroundColor: NSColor = .labelColor,
+        cornerRadius: CGFloat = 6
+    ) {
+        self.fillColor = fillColor
+        self.strokeColor = strokeColor
+        self.foregroundColor = foregroundColor
+        self.cornerRadius = Self.validCornerRadius(cornerRadius)
+    }
+
+    private static func validCornerRadius(_ value: CGFloat) -> CGFloat {
+        max(0, value)
     }
 }
 

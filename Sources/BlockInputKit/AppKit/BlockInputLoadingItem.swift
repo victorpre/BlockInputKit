@@ -10,7 +10,6 @@ final class BlockInputLoadingItem: NSCollectionViewItem {
     override func loadView() {
         let view = NSView()
         view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
 
         progress.style = .spinning
         progress.controlSize = .small
@@ -35,7 +34,8 @@ final class BlockInputLoadingItem: NSCollectionViewItem {
         self.view = view
     }
 
-    func configure(error: String?) {
+    func configure(error: String?, surfaceStyle: BlockInputEditorSurfaceStyle) {
+        applySurfaceStyle(surfaceStyle)
         if let error {
             progress.stopAnimation(nil)
             progress.isHidden = true
@@ -44,6 +44,13 @@ final class BlockInputLoadingItem: NSCollectionViewItem {
             progress.isHidden = false
             progress.startAnimation(nil)
             label.stringValue = "Loading..."
+        }
+    }
+
+    func applySurfaceStyle(_ surfaceStyle: BlockInputEditorSurfaceStyle) {
+        view.wantsLayer = true
+        view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            view.layer?.backgroundColor = surfaceStyle.collectionBackgroundColor?.cgColor
         }
     }
 }

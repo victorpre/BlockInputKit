@@ -155,6 +155,7 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
         textView.isSelectable = true
         textView.selectedTextAttributes = BlockInputBlockSelectionChrome.nativeSelectedTextAttributes
         textView.drawsBackground = false
+        textView.linkTextAttributes = [:]
         textView.backgroundColor = .clear
         textView.textContainerInset = .zero
         textView.textContainer?.lineFragmentPadding = 0

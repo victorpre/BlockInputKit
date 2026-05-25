@@ -39,21 +39,17 @@ extension BlockInputBlockItem {
         )
         let baseFont = Self.font(for: block.kind, style: style)
         for markdownRange in markdownRanges {
-            let rendersInlineChip = markdownRange.inlineChipKind(in: textStorage.string) != nil
-            for contentRange in markdownRange.contentRange.subtractingSorted(inlineCodeRanges) {
-                let clampedContentRange = NSIntersectionRange(contentRange, fullRange)
-                if clampedContentRange.length > 0 {
-                    if rendersInlineChip {
-                        Self.applyInlineChip(to: clampedContentRange, in: textStorage, baseFont: baseFont)
-                    } else {
-                        Self.apply(markdownRange.style, to: clampedContentRange, in: textStorage, baseFont: baseFont)
-                    }
-                    if let destination = markdownRange.linkDestination {
-                        textStorage.addAttribute(.link, value: destination, range: clampedContentRange)
-                        textStorage.addAttribute(.toolTip, value: destination.absoluteString, range: clampedContentRange)
-                    }
-                }
-            }
+            let inlineChipStyle = markdownRange
+                .inlineChipKind(in: textStorage.string)
+                .map { style.inlineChipStyle(for: $0) }
+            Self.applyInlineMarkdownContentAttributes(
+                for: markdownRange,
+                excluding: inlineCodeRanges,
+                fullRange: fullRange,
+                textStorage: textStorage,
+                baseFont: baseFont,
+                inlineChipStyle: inlineChipStyle
+            )
             for delimiterRange in markdownRange.delimiterRanges {
                 let clampedDelimiterRange = NSIntersectionRange(delimiterRange, fullRange)
                 guard clampedDelimiterRange.length > 0 else {
@@ -68,8 +64,33 @@ extension BlockInputBlockItem {
                     range: clampedDelimiterRange
                 )
             }
-            if rendersInlineChip {
+            if inlineChipStyle != nil {
                 Self.applyInlineChipAdjacentWhitespaceSpacers(for: markdownRange, in: textStorage)
+            }
+        }
+    }
+
+    private static func applyInlineMarkdownContentAttributes(
+        for markdownRange: BlockInputInlineMarkdownRange,
+        excluding inlineCodeRanges: [NSRange],
+        fullRange: NSRange,
+        textStorage: NSTextStorage,
+        baseFont: NSFont,
+        inlineChipStyle: BlockInputInlineChipStyle?
+    ) {
+        for contentRange in markdownRange.contentRange.subtractingSorted(inlineCodeRanges) {
+            let clampedContentRange = NSIntersectionRange(contentRange, fullRange)
+            guard clampedContentRange.length > 0 else {
+                continue
+            }
+            if let inlineChipStyle {
+                Self.applyInlineChip(to: clampedContentRange, in: textStorage, baseFont: baseFont, style: inlineChipStyle)
+            } else {
+                Self.apply(markdownRange.style, to: clampedContentRange, in: textStorage, baseFont: baseFont)
+            }
+            if let destination = markdownRange.linkDestination {
+                textStorage.addAttribute(.link, value: destination, range: clampedContentRange)
+                textStorage.addAttribute(.toolTip, value: destination.absoluteString, range: clampedContentRange)
             }
         }
     }
@@ -129,19 +150,20 @@ extension BlockInputBlockItem {
                 range: range
             )
         case .rawSlashCommand:
-            applyInlineChip(to: range, in: textStorage, baseFont: baseFont)
+            applyInlineChip(to: range, in: textStorage, baseFont: baseFont, style: .init())
         }
     }
 
     private static func applyInlineChip(
         to range: NSRange,
         in textStorage: NSTextStorage,
-        baseFont: NSFont
+        baseFont: NSFont,
+        style: BlockInputInlineChipStyle
     ) {
         textStorage.addAttributes(
             [
                 .font: NSFont.monospacedSystemFont(ofSize: max(baseFont.pointSize * 0.94, 1), weight: .regular),
-                .foregroundColor: NSColor.labelColor,
+                .foregroundColor: style.foregroundColor,
                 .blockInputInlineChip: true
             ],
             range: range

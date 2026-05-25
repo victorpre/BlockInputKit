@@ -3,7 +3,7 @@ import AppKit
 extension BlockInputView {
     func setupCollectionView() {
         wantsLayer = true
-        layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
+        applyEditorSurfaceStyle()
 
         layout.minimumLineSpacing = 0
         layout.minimumInteritemSpacing = 0
@@ -14,7 +14,6 @@ extension BlockInputView {
         collectionView.delegate = self
         collectionView.blockInputView = self
         collectionView.isSelectable = false
-        collectionView.backgroundColors = [.textBackgroundColor]
         collectionView.register(
             BlockInputBlockItem.self,
             forItemWithIdentifier: BlockInputBlockItem.reuseIdentifier
@@ -40,8 +39,6 @@ extension BlockInputView {
         scrollView.borderType = .noBorder
         scrollView.hasHorizontalScroller = false
         scrollView.hasVerticalScroller = true
-        scrollView.drawsBackground = true
-        scrollView.backgroundColor = .textBackgroundColor
         scrollView.blockInputView = self
         scrollView.documentView = collectionView
         scrollView.onContentBoundsDidChange = { [weak self] in

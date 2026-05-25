@@ -258,6 +258,54 @@ final class BlockInputBlockItemInlineChipTests: XCTestCase {
         XCTAssertFalse(try font(at: contentOffset, in: textStorage).isFixedPitch)
     }
 
+    func testFileSlashAndRawSlashChipsUseConfiguredForegroundStyles() throws {
+        let text = "[file](file:///tmp/demo.md) [/table](host-app://commands/table) /review"
+        let style = BlockInputStyle(
+            fileChip: BlockInputInlineChipStyle(foregroundColor: .systemRed),
+            slashCommandChip: BlockInputInlineChipStyle(foregroundColor: .systemGreen),
+            rawSlashCommandChip: BlockInputInlineChipStyle(foregroundColor: .systemBlue)
+        )
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: text),
+            allowsReordering: true,
+            style: style,
+            rawSlashCommandChips: true,
+            slashCommandAvailability: .anywhere,
+            delegate: BlockInputView()
+        )
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentLocation("file", in: text), effectiveRange: nil) as? NSColor, .systemRed)
+        XCTAssertEqual(
+            textStorage.attribute(.foregroundColor, at: contentLocation("/table", in: text), effectiveRange: nil) as? NSColor,
+            .systemGreen
+        )
+        XCTAssertEqual(
+            textStorage.attribute(.foregroundColor, at: contentLocation("/review", in: text), effectiveRange: nil) as? NSColor,
+            .systemBlue
+        )
+    }
+
+    func testReconfiguringItemReplacesStaleChipForegroundStyle() throws {
+        let text = "[file](file:///tmp/demo.md)"
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: text),
+            allowsReordering: true,
+            style: BlockInputStyle(fileChip: BlockInputInlineChipStyle(foregroundColor: .systemRed)),
+            delegate: BlockInputView()
+        )
+
+        item.configure(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: text),
+            allowsReordering: true,
+            style: BlockInputStyle(fileChip: BlockInputInlineChipStyle(foregroundColor: .systemBlue)),
+            delegate: BlockInputView()
+        )
+
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentLocation("file", in: text), effectiveRange: nil) as? NSColor, .systemBlue)
+    }
+
     private func font(at location: Int, in textStorage: NSTextStorage) throws -> NSFont {
         try XCTUnwrap(textStorage.attribute(.font, at: location, effectiveRange: nil) as? NSFont)
     }

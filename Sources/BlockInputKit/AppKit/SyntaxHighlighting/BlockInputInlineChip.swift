@@ -39,3 +39,16 @@ extension BlockInputInlineMarkdownRange {
             .blockInputUnescapedLinkLabel
     }
 }
+
+extension BlockInputStyle {
+    func inlineChipStyle(for kind: BlockInputInlineChipKind) -> BlockInputInlineChipStyle {
+        switch kind {
+        case .fileLink:
+            return fileChip
+        case .slashCommand:
+            return slashCommandChip
+        case .rawSlashCommand:
+            return rawSlashCommandChip
+        }
+    }
+}

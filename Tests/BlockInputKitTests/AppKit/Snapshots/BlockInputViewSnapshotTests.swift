@@ -66,6 +66,14 @@ final class BlockInputViewSnapshotTests: XCTestCase {
         }
     }
 
+    func testCustomYellowChipStyleSnapshot() {
+        assertSnapshot(
+            of: makeCustomYellowChipStyleSnapshotView(),
+            as: appKitSnapshotImage(),
+            named: "custom-yellow-chip-style"
+        )
+    }
+
     private func makeSnapshotView(for snapshotCase: SnapshotCase) -> NSView {
         let view = BlockInputView(frame: NSRect(origin: .zero, size: snapshotCase.size))
         view.appearance = NSAppearance(named: snapshotCase.appearance)

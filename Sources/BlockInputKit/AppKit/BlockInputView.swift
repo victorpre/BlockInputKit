@@ -116,6 +116,16 @@ public final class BlockInputView: NSView {
     let completionPopupEventCaptureView = BlockInputCompletionEventCaptureView()
     nonisolated(unsafe) var completionPopupMouseDownMonitor: Any?
     var completionPopupConsumesNextMouseUp = false
+
+    /// Reapplies appearance-dependent surface colors when AppKit changes the effective appearance.
+    public override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyEditorSurfaceStyle()
+        collectionView.visibleItems().forEach { item in
+            (item as? BlockInputLoadingItem)?.applySurfaceStyle(style.editorSurface)
+        }
+    }
+
     /// Creates an editor view and installs its collection-view-backed editing surface.
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
