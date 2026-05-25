@@ -4,10 +4,14 @@ import Foundation
 enum BlockInputInlineChipKind: Equatable {
     case fileLink
     case slashCommand
+    case rawSlashCommand
 }
 
 extension BlockInputInlineMarkdownRange {
     func inlineChipKind(in text: String) -> BlockInputInlineChipKind? {
+        if style == .rawSlashCommand {
+            return .rawSlashCommand
+        }
         guard style == .link,
               let linkDestination else {
             return nil
@@ -19,6 +23,9 @@ extension BlockInputInlineMarkdownRange {
     }
 
     func slashCommandChipLabel(in text: String) -> String? {
+        if style == .rawSlashCommand {
+            return linkLabel(in: text)
+        }
         let label = linkLabel(in: text)
         guard label.hasPrefix("/") else {
             return nil

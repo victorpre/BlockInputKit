@@ -260,6 +260,7 @@ extension BlockInputBlockItem {
         textStorage.removeAttribute(.link, range: fullRange)
         textStorage.removeAttribute(.toolTip, range: fullRange)
         textStorage.removeAttribute(.kern, range: fullRange)
+        textStorage.removeAttribute(.blockInputInlineChip, range: fullRange)
         textStorage.removeAttribute(.blockInputHiddenDelimiter, range: fullRange)
         textStorage.removeAttribute(.paragraphStyle, range: fullRange)
         applyCodeBlockAttributes(for: block, textStorage: textStorage)
@@ -288,6 +289,7 @@ extension BlockInputBlockItem {
         attributes.removeValue(forKey: .link)
         attributes.removeValue(forKey: .toolTip)
         attributes.removeValue(forKey: .kern)
+        attributes.removeValue(forKey: .blockInputInlineChip)
         attributes.removeValue(forKey: .blockInputHiddenDelimiter)
         if let foregroundColor = typingForegroundColor(for: block.kind) {
             attributes[.foregroundColor] = foregroundColor

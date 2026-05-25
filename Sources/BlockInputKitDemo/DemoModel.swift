@@ -60,6 +60,7 @@ final class DemoModel: ObservableObject {
             inlineHintProvider: { [completionProvider] context in
                 completionProvider.inlineHint(for: context)
             },
+            rawSlashCommandChips: true,
             imageBaseURL: Bundle.module.resourceURL,
             undoController: session.undoController,
             completionProvider: completionProvider,

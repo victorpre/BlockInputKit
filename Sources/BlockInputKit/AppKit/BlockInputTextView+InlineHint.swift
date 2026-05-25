@@ -123,6 +123,9 @@ extension BlockInputTextView {
             if textStorage.attribute(.blockInputHiddenDelimiter, at: location, effectiveRange: nil) as? Bool == true {
                 continue
             }
+            if textStorage.attribute(.blockInputInlineChip, at: location, effectiveRange: nil) as? Bool == true {
+                continue
+            }
             guard let font = textStorage.attribute(.font, at: location, effectiveRange: nil) as? NSFont,
                   font.pointSize >= 4 else {
                 continue

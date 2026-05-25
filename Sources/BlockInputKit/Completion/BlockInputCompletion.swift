@@ -16,6 +16,14 @@ public enum BlockInputSlashCommandAvailability: String, CaseIterable, Equatable,
     case anywhere
 }
 
+/// Source inserted when accepting a slash-command completion suggestion.
+public enum BlockInputSlashCommandInsertionStyle: String, CaseIterable, Equatable, Codable, Sendable {
+    /// Insert a Markdown link whose label renders as a slash-command chip.
+    case markdownLink
+    /// Insert the raw slash-command token text.
+    case rawToken
+}
+
 /// Where the editor-owned completion popup should be shown.
 public enum BlockInputCompletionPopupPlacement: String, CaseIterable, Equatable, Codable, Sendable {
     /// Anchor the popup near the active text caret.
@@ -177,15 +185,17 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
         )
     }
 
-    /// Builds a slash-command suggestion that inserts host-owned Markdown link source followed by a space.
+    /// Builds a slash-command suggestion that inserts slash-command source followed by a space.
     ///
-    /// The visible link label is normalized to begin with `/` so the inserted source renders as a slash-command chip.
+    /// The visible label is normalized to begin with `/`. By default the inserted source is a Markdown link that
+    /// renders as a slash-command chip; use `.rawToken` when the underlying Markdown should stay as raw `/command` text.
     public static func slashCommand(
         id: String? = nil,
         title: String,
         subtitle: String? = nil,
         uri: String,
         label: String? = nil,
+        insertionStyle: BlockInputSlashCommandInsertionStyle = .markdownLink,
         iconSystemName: String? = "command",
         detailText: String? = nil
     ) -> BlockInputCompletionSuggestion {
@@ -194,7 +204,7 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
             id: id ?? uri,
             title: title,
             subtitle: subtitle,
-            insertionText: "[\(Self.escapedMarkdownLinkLabel(chipLabel))](\(Self.escapedMarkdownLinkDestination(uri))) ",
+            insertionText: Self.slashCommandInsertionText(label: chipLabel, uri: uri, insertionStyle: insertionStyle),
             trigger: .slashCommand,
             iconSystemName: iconSystemName,
             detailText: detailText
@@ -230,5 +240,18 @@ private extension BlockInputCompletionSuggestion {
 
     static func normalizedSlashCommandLabel(_ label: String) -> String {
         label.hasPrefix("/") ? label : "/\(label)"
+    }
+
+    static func slashCommandInsertionText(
+        label: String,
+        uri: String,
+        insertionStyle: BlockInputSlashCommandInsertionStyle
+    ) -> String {
+        switch insertionStyle {
+        case .markdownLink:
+            return "[\(escapedMarkdownLinkLabel(label))](\(escapedMarkdownLinkDestination(uri))) "
+        case .rawToken:
+            return "\(label) "
+        }
     }
 }

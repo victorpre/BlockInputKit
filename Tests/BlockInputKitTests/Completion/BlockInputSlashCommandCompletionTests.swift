@@ -31,4 +31,15 @@ final class BlockInputSlashCommandCompletionTests: XCTestCase {
         XCTAssertEqual(suggestion.id, "command:custom")
         XCTAssertEqual(suggestion.insertionText, "[/custom](host-app://run/\\(custom\\)) ")
     }
+
+    func testSlashCommandSuggestionCanInsertRawToken() {
+        let suggestion = BlockInputCompletionSuggestion.slashCommand(
+            title: "Review GitHub PR",
+            uri: "host-app://commands/review-github-pr",
+            label: "review-github-pr",
+            insertionStyle: .rawToken
+        )
+
+        XCTAssertEqual(suggestion.insertionText, "/review-github-pr ")
+    }
 }

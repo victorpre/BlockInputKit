@@ -306,7 +306,29 @@ BlockInputCompletionSuggestion.slashCommand(
 
 `slashCommandAvailability` controls where `/` opens completion. Use `.documentStart` for only the start of the first block, or `.anywhere` for token-boundary slash commands in supported text blocks. Configure `slashCommandChipClickHandler` when slash chips should run host behavior, open their URI, or show the built-in link modal.
 
-The slash-command helper inserts the Markdown link source followed by a space so the caret lands after the accepted command chip.
+The slash-command helper inserts command source followed by a space so the caret lands after the accepted command chip.
+By default that source is a Markdown link.
+
+Set `rawSlashCommandChips` and use `.rawToken` insertion when the underlying Markdown should stay as `/command` text while
+still rendering the token as a chip:
+
+```swift
+let configuration = BlockInputConfiguration(
+    document: document,
+    rawSlashCommandChips: true,
+    slashCommandAvailability: .documentStart
+)
+
+BlockInputCompletionSuggestion.slashCommand(
+    title: "Review GitHub PR",
+    uri: "myapp://commands/review-github-pr",
+    label: "review-github-pr",
+    insertionStyle: .rawToken
+)
+```
+
+Raw slash chips are visual only. They keep editing, selection, copy, accessibility text, and Markdown export behavior as
+normal text. Link-backed slash chips and `slashCommandChipClickHandler` routing are unchanged.
 
 ### Inline Argument Hints
 

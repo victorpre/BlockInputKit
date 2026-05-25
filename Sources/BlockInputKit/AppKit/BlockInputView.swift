@@ -28,6 +28,8 @@ public final class BlockInputView: NSView {
     public internal(set) var disabledCursor: NSCursor?
     /// Host hook for visual-only inline hints after the focused caret.
     public internal(set) var inlineHintProvider: BlockInputInlineHintProvider?
+    /// Whether raw slash-command tokens render as visual chips.
+    public internal(set) var rawSlashCommandChips = false
     /// Visual styling used for text, code, and selection chrome.
     public internal(set) var style = BlockInputStyle.default
     var heightSizing: BlockInputEditorHeightSizing?

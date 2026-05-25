@@ -234,8 +234,8 @@ extension BlockInputTextView {
             return
         }
         layoutManager.ensureLayout(for: textContainer)
-        for linkRange in linkRangesForCurrentText() where linkRange.inlineChipKind(in: string) != nil {
-            let characterRange = string.linkCursorClampedRange(linkRange.contentRange)
+        for chipRange in inlineChipVisualRangesForCurrentText() {
+            let characterRange = string.linkCursorClampedRange(chipRange.contentRange)
             let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
                 .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
             guard glyphRange.length > 0 else {
@@ -279,16 +279,33 @@ extension BlockInputTextView {
     }
 
     private func linkRangesForCurrentText() -> [BlockInputInlineMarkdownRange] {
+        inlineMarkdownRangesForCurrentText().filter { $0.style == .link }
+    }
+
+    private func inlineChipVisualRangesForCurrentText() -> [BlockInputInlineMarkdownRange] {
+        inlineMarkdownRangesForCurrentText().filter { $0.inlineChipKind(in: string) != nil }
+    }
+
+    private func inlineMarkdownRangesForCurrentText() -> [BlockInputInlineMarkdownRange] {
         BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: string,
             excluding: BlockInputCodeParsing.inlineCodeRanges(in: string).map(\.fullRange),
-            fileBaseURL: blockItem?.fileBaseURL
+            fileBaseURL: blockItem?.fileBaseURL,
+            rawSlashCommandChips: rendersRawSlashCommandChips,
+            slashCommandAvailability: blockItem?.slashCommandAvailability ?? .documentStart,
+            isDocumentStartBlock: blockItem?.isDocumentStartBlock == true
         )
-        .filter { $0.style == .link }
     }
 
     private var supportsInlineMarkdownLinkRendering: Bool {
         blockItem?.supportsInlineMarkdownLinkRendering(for: self) == true
+    }
+
+    private var rendersRawSlashCommandChips: Bool {
+        guard blockItem?.isTableCellTextView(self) != true else {
+            return false
+        }
+        return blockItem?.rawSlashCommandChips == true
     }
 
     private func inlineChipBackgroundRects(

@@ -8,6 +8,9 @@ extension BlockInputBlockItem {
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         style: BlockInputStyle = .default,
         inlineHint: BlockInputInlineHint? = nil,
+        rawSlashCommandChips: Bool = false,
+        slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
+        isDocumentStartBlock: Bool = false,
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) -> BlockInputBlockItem {
@@ -21,6 +24,9 @@ extension BlockInputBlockItem {
             accentColor: .controlAccentColor,
             style: style,
             inlineHint: inlineHint,
+            rawSlashCommandChips: rawSlashCommandChips,
+            slashCommandAvailability: slashCommandAvailability,
+            isDocumentStartBlock: isDocumentStartBlock,
             isSelected: isSelected,
             delegate: delegate
         )

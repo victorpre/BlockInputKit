@@ -18,7 +18,10 @@ extension BlockInputBlockItem {
         return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: textView.string,
             excluding: inlineCodeRanges,
-            fileBaseURL: fileBaseURL
+            fileBaseURL: fileBaseURL,
+            rawSlashCommandChips: rawSlashCommandChips,
+            slashCommandAvailability: slashCommandAvailability,
+            isDocumentStartBlock: isDocumentStartBlock
         )
         .contains { $0.inlineChipKind(in: textView.string) != nil }
     }

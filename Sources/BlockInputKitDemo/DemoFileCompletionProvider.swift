@@ -91,6 +91,7 @@ final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked
                     title: command.title,
                     uri: command.uri,
                     label: command.label,
+                    insertionStyle: .rawToken,
                     detailText: "Command"
                 )
             }

@@ -67,6 +67,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var allowsReordering = true
     var isEditable = true
     var disabledCursor: NSCursor?
+    var rawSlashCommandChips = false
+    var slashCommandAvailability = BlockInputSlashCommandAvailability.documentStart
+    var isDocumentStartBlock = false
     var editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
     var handleLeadingConstraint: NSLayoutConstraint?
     var handleWidthConstraint: NSLayoutConstraint?
@@ -190,6 +193,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         isEditable: Bool = true,
         disabledCursor: NSCursor? = nil,
         inlineHint: BlockInputInlineHint? = nil,
+        rawSlashCommandChips: Bool = false,
+        slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
+        isDocumentStartBlock: Bool = false,
         isSelected: Bool = false,
         delegate: BlockInputBlockItemDelegate
     ) {
@@ -203,6 +209,11 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.style = style
         self.imageLoadingContext = imageLoadingContext
         self.fileBaseURL = fileBaseURL
+        applySlashCommandConfiguration(
+            rawSlashCommandChips: rawSlashCommandChips,
+            slashCommandAvailability: slashCommandAvailability,
+            isDocumentStartBlock: isDocumentStartBlock
+        )
         applyReadOnlyConfiguration(isEditable: isEditable, disabledCursor: disabledCursor)
         textView.inlineHint = inlineHint
         selectionBeforeTextChange = nil
@@ -227,12 +238,36 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         // Frontmatter is pinned to document index 0, so keep the reorder
         // gutter width for alignment without exposing an unusable drag handle.
         let canReorderBlock = isEditable && allowsReordering && block.kind != .frontMatter
+        configureReorderHandle(canReorderBlock: canReorderBlock)
+        view.window?.invalidateCursorRects(for: view)
+        invalidateCursorRects()
+        updateHorizontalConstraints(allowsReordering: allowsReordering, editorHorizontalInset: editorHorizontalInset)
+    }
+
+    func updateTextDependentChrome(for block: BlockInputBlock) {
+        renderedBlock = block
+        configureBlockKindChrome(block: block)
+        updateSelectionChromeFrame()
+    }
+
+    func applySlashCommandConfiguration(
+        rawSlashCommandChips: Bool,
+        slashCommandAvailability: BlockInputSlashCommandAvailability,
+        isDocumentStartBlock: Bool
+    ) {
+        self.rawSlashCommandChips = rawSlashCommandChips
+        self.slashCommandAvailability = slashCommandAvailability
+        self.isDocumentStartBlock = isDocumentStartBlock
+    }
+
+    func configureReorderHandle(canReorderBlock: Bool) {
         handleView.isEnabled = canReorderBlock
         handleView.isHidden = !canReorderBlock
         handleView.alphaValue = 0
         handleView.toolTip = canReorderBlock ? "Drag to reorder block" : nil
-        view.window?.invalidateCursorRects(for: view)
-        invalidateCursorRects()
+    }
+
+    func updateHorizontalConstraints(allowsReordering: Bool, editorHorizontalInset: CGFloat) {
         handleLeadingConstraint?.constant = Self.handleLeadingInset(
             allowsReordering: allowsReordering,
             editorHorizontalInset: editorHorizontalInset
@@ -244,12 +279,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         )
         horizontalRuleTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: allowsReordering)
         frontMatterDividerTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: allowsReordering)
-    }
-
-    func updateTextDependentChrome(for block: BlockInputBlock) {
-        renderedBlock = block
-        configureBlockKindChrome(block: block)
-        updateSelectionChromeFrame()
     }
 
     func updateTableCellEditState(for block: BlockInputBlock) {
@@ -426,6 +455,9 @@ extension BlockInputBlockItem {
         tableView.blockItem = nil
         tableView.delegate = nil
         renderedCodeColorScheme = nil
+        rawSlashCommandChips = false
+        slashCommandAvailability = .documentStart
+        isDocumentStartBlock = false
         textView.cancelBlockSelectionDrag()
         textView.clearInlineHint()
         textView.blockItem = nil

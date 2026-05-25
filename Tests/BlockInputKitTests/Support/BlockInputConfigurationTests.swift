@@ -35,6 +35,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertTrue(configuration.isEditable)
         XCTAssertNil(configuration.disabledCursor)
         XCTAssertNil(configuration.inlineHintProvider)
+        XCTAssertFalse(configuration.rawSlashCommandChips)
         XCTAssertNil(configuration.heightSizing)
         XCTAssertEqual(configuration.slashCommandAvailability, .documentStart)
         XCTAssertNil(configuration.slashCommandChipClickHandler)
@@ -69,6 +70,7 @@ final class BlockInputConfigurationTests: XCTestCase {
             isEditable: false,
             disabledCursor: .operationNotAllowed,
             inlineHintProvider: inlineHintProvider,
+            rawSlashCommandChips: true,
             dropIndicatorColor: .systemPink,
             heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 2, maximumVisibleLineCount: 5),
             undoController: undoController,
@@ -85,6 +87,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertFalse(view.isEditable)
         XCTAssertEqual(view.disabledCursor, .operationNotAllowed)
         XCTAssertNotNil(view.inlineHintProvider)
+        XCTAssertTrue(view.rawSlashCommandChips)
         let sectionInset = try XCTUnwrap((view.collectionView.collectionViewLayout as? NSCollectionViewFlowLayout)?.sectionInset)
         XCTAssertEqual(sectionInset.top, 14)
         XCTAssertEqual(sectionInset.bottom, 14)

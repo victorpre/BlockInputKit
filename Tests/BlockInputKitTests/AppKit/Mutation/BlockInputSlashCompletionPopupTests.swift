@@ -72,6 +72,34 @@ final class BlockInputSlashCompletionPopupTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["/tab"])
     }
 
+    func testAcceptingRawSlashCommandCompletionPreservesRawMarkdown() async throws {
+        let provider = slashProvider(insertionStyle: .rawToken)
+        let mounted = try await startCompletion(text: "/tab", provider: provider)
+
+        XCTAssertTrue(mounted.view.handleCompletionCommand(#selector(NSResponder.insertNewline(_:))))
+
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["/table "])
+        XCTAssertEqual(mounted.view.document.markdown, "/table ")
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: "block", utf16Offset: 7)))
+
+        _ = mounted.view.undoTextEditInActiveBlock()
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["/tab"])
+    }
+
+    func testRawSlashCommandCompletionUsesUTF16ReplacementRange() async throws {
+        let provider = slashProvider(insertionStyle: .rawToken)
+        let mounted = try await startCompletion(
+            text: "🙂 /tab",
+            provider: provider,
+            selectedOffset: ("🙂 /tab" as NSString).length,
+            slashCommandAvailability: .anywhere
+        )
+
+        XCTAssertTrue(mounted.view.handleCompletionCommand(#selector(NSResponder.insertNewline(_:))))
+
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["🙂 /table "])
+    }
+
     func testSlashCommandPopupDoesNotOpenInsideInlineCodeLinksOrUnsupportedBlocks() async throws {
         let provider = slashProvider()
 
@@ -85,9 +113,9 @@ final class BlockInputSlashCompletionPopupTests: XCTestCase {
         XCTAssertNil(code.view.completionPopupView)
     }
 
-    private func slashProvider() -> PopupCompletionProvider {
+    private func slashProvider(insertionStyle: BlockInputSlashCommandInsertionStyle = .markdownLink) -> PopupCompletionProvider {
         PopupCompletionProvider(suggestions: [
-            .slashCommand(title: "Table", uri: "host-app://commands/table", label: "table")
+            .slashCommand(title: "Table", uri: "host-app://commands/table", label: "table", insertionStyle: insertionStyle)
         ])
     }
 

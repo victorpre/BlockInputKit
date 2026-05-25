@@ -80,6 +80,12 @@ final class BlockInputEditorTests: XCTestCase {
         XCTAssertNotNil(editor.resolvedConfiguration().inlineHintProvider)
     }
 
+    func testResolvedConfigurationPreservesRawSlashCommandChips() {
+        let editor = BlockInputEditor(configuration: BlockInputConfiguration(rawSlashCommandChips: true))
+
+        XCTAssertTrue(editor.resolvedConfiguration().rawSlashCommandChips)
+    }
+
     func testFocusBindingPreservesKeyboardShortcutHandlers() {
         var isFocused = false
         var handledShortcuts: [BlockInputKeyboardShortcut] = []

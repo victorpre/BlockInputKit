@@ -78,6 +78,52 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
         XCTAssertEqual(range.slashCommandChipLabel(in: text), "/table")
     }
 
+    func testParsesRawSlashCommandChipsWhenEnabled() throws {
+        let text = "Run /table now"
+        let range = try XCTUnwrap(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: text,
+            rawSlashCommandChips: true,
+            slashCommandAvailability: .anywhere
+        ).first { $0.style == .rawSlashCommand })
+
+        XCTAssertEqual(range.fullRange, NSRange(location: 4, length: 6))
+        XCTAssertEqual(range.contentRange, range.fullRange)
+        XCTAssertEqual(range.delimiterRanges, [])
+        XCTAssertEqual(range.inlineChipKind(in: text), .rawSlashCommand)
+        XCTAssertEqual(range.slashCommandChipLabel(in: text), "/table")
+    }
+
+    func testRawSlashCommandChipsFollowDocumentStartAvailability() {
+        XCTAssertEqual(
+            BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+                in: "/table and /quote",
+                rawSlashCommandChips: true,
+                slashCommandAvailability: .documentStart,
+                isDocumentStartBlock: true
+            ).filter { $0.style == .rawSlashCommand }.map(\.contentRange),
+            [NSRange(location: 0, length: 6)]
+        )
+        XCTAssertTrue(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: "/table",
+            rawSlashCommandChips: true,
+            slashCommandAvailability: .documentStart,
+            isDocumentStartBlock: false
+        ).filter { $0.style == .rawSlashCommand }.isEmpty)
+    }
+
+    func testRawSlashCommandChipsAreExcludedInsideLinksImagesAndInlineCode() {
+        let text = "Skip [/link](demo://command) ![/image](image.png) `/code` but keep /table"
+        let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
+        let ranges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: text,
+            excluding: inlineCodeRanges,
+            rawSlashCommandChips: true,
+            slashCommandAvailability: .anywhere
+        ).filter { $0.style == .rawSlashCommand }
+
+        XCTAssertEqual(ranges.map { content(in: text, range: $0.contentRange) }, ["/table"])
+    }
+
     func testNonSlashCustomSchemeLinksStayUnsupported() {
         let text = "Run [table](host-app://commands/table)"
 

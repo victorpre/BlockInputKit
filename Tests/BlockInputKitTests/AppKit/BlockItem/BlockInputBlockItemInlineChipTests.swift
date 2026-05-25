@@ -66,6 +66,120 @@ final class BlockInputBlockItemInlineChipTests: XCTestCase {
         XCTAssertEqual(textStorage.attribute(.kern, at: trailingSpaceOffset, effectiveRange: nil) as? CGFloat, 5)
     }
 
+    func testRawSlashCommandRendersAsVisualOnlyChipWhenEnabled() throws {
+        let text = "Run /table today"
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: text),
+            allowsReordering: true,
+            rawSlashCommandChips: true,
+            slashCommandAvailability: .anywhere,
+            delegate: BlockInputView()
+        )
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+        let contentOffset = contentLocation("/table", in: text)
+
+        XCTAssertNil(textStorage.attribute(.link, at: contentOffset, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.underlineStyle, at: contentOffset, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputHiddenDelimiter, at: contentOffset, effectiveRange: nil))
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentOffset, effectiveRange: nil) as? NSColor, .labelColor)
+        XCTAssertTrue(try font(at: contentOffset, in: textStorage).isFixedPitch)
+    }
+
+    func testRawSlashCommandDoesNotRenderAsChipByDefault() throws {
+        let text = "Run /table today"
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: text),
+            allowsReordering: true,
+            rawSlashCommandChips: false,
+            slashCommandAvailability: .anywhere,
+            delegate: BlockInputView()
+        )
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+        let contentOffset = contentLocation("/table", in: text)
+
+        XCTAssertFalse(try font(at: contentOffset, in: textStorage).isFixedPitch)
+    }
+
+    func testRawAndLinkBackedSlashCommandChipsCoexist() throws {
+        let text = "/review [/table](host-app://commands/table)"
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: text),
+            allowsReordering: true,
+            rawSlashCommandChips: true,
+            slashCommandAvailability: .documentStart,
+            isDocumentStartBlock: true,
+            delegate: BlockInputView()
+        )
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+        let rawOffset = contentLocation("/review", in: text)
+        let linkOffset = contentLocation("/table", in: text)
+
+        XCTAssertNil(textStorage.attribute(.link, at: rawOffset, effectiveRange: nil))
+        XCTAssertTrue(try font(at: rawOffset, in: textStorage).isFixedPitch)
+        XCTAssertEqual(
+            (textStorage.attribute(.link, at: linkOffset, effectiveRange: nil) as? URL)?.absoluteString,
+            "host-app://commands/table"
+        )
+        XCTAssertTrue(try font(at: linkOffset, in: textStorage).isFixedPitch)
+    }
+
+    func testRawSlashCommandChipPreservesAccessibilityText() throws {
+        let text = "/table"
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: text),
+            allowsReordering: true,
+            rawSlashCommandChips: true,
+            delegate: BlockInputView()
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        XCTAssertEqual(textView.accessibilityValue(), text)
+        XCTAssertEqual(textView.string, text)
+    }
+
+    func testRawSlashCommandDoesNotRenderAsChipInsideTables() throws {
+        let table = BlockInputBlock(id: "table", kind: .table, text: """
+        | Command |
+        | --- |
+        | /table |
+        """)
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: table,
+            allowsReordering: true,
+            rawSlashCommandChips: true,
+            slashCommandAvailability: .anywhere,
+            delegate: BlockInputView()
+        )
+        item.view.frame = NSRect(x: 0, y: 0, width: 480, height: BlockInputBlockItem.height(for: table, textWidth: 420))
+        item.view.layoutSubtreeIfNeeded()
+        let cell = try XCTUnwrap(item.testingTableCellTextViews.first { $0.string == "/table" })
+        let textStorage = try XCTUnwrap(cell.textStorage)
+
+        XCTAssertFalse(try font(at: 0, in: textStorage).isFixedPitch)
+    }
+
+    func testRawSlashCommandDoesNotRenderAsChipInUnsupportedBlockKinds() throws {
+        let cases: [(BlockInputBlockKind, String)] = [
+            (.code(language: nil), "/table"),
+            (.frontMatter, "command: /table"),
+            (.rawMarkdown, "/table")
+        ]
+        for (kind, text) in cases {
+            let item = BlockInputBlockItem.configuredForTesting(
+                block: BlockInputBlock(id: BlockInputBlockID(rawValue: String(describing: kind)), kind: kind, text: text),
+                allowsReordering: true,
+                rawSlashCommandChips: true,
+                slashCommandAvailability: .anywhere,
+                delegate: BlockInputView()
+            )
+            let textView = try XCTUnwrap(item.testingTextView)
+            let textStorage = try XCTUnwrap(textView.textStorage)
+            let offset = contentLocation("/table", in: textView.string)
+
+            XCTAssertNil(textStorage.attribute(.blockInputInlineChip, at: offset, effectiveRange: nil))
+        }
+    }
+
     func testFileLinkChipStaysVisibleWhenCaretIsInsideSource() throws {
         let text = "[README.md](file:///tmp/README.md) trailing"
         let mounted = makeMountedBlockInputView(blocks: [

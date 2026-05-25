@@ -321,6 +321,31 @@ final class BlockInputLinkClickTests: XCTestCase {
         XCTAssertEqual(openedURL?.absoluteString, "host-app://commands/table")
     }
 
+    func testRawSlashCommandChipDoesNotRouteAsLinkClick() throws {
+        let text = "/table"
+        var didRouteSlashCommand = false
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: text)
+            ]),
+            rawSlashCommandChips: true,
+            slashCommandChipClickHandler: { _ in
+                didRouteSlashCommand = true
+                return .hostHandled
+            }
+        ))
+        let textView = try textView(in: mounted.view)
+        let location = try windowLocation(forUTF16Offset: 1, in: textView)
+
+        XCTAssertFalse(mounted.view.handleLinkClick(
+            blockID: "block",
+            selectedRange: NSRange(location: 1, length: 0),
+            event: try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber)
+        ))
+        XCTAssertFalse(didRouteSlashCommand)
+        XCTAssertNil(mounted.view.linkModalView)
+    }
+
     func testFileLinkFullSourceResolvesForChipClickButRegularLinkDoesNot() throws {
         let fileText = "Open [file](file:///tmp/demo.md) now"
         let regularText = "Open [docs](https://example.com) now"

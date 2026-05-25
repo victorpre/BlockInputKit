@@ -267,14 +267,19 @@ extension BlockInputView {
               BlockInputBlockItem.supportsInlineMarkdownStyling(blockKind) else {
             return nil
         }
-        let textLength = (text as NSString).length
+        let nsText = text as NSString
+        let textLength = nsText.length
         let caretOffset = min(max(selectedRange.location, 0), textLength)
-        let tokenStart = completionTokenStart(before: caretOffset, in: text)
+        let tokenStart = BlockInputCompletionTokenParsing.tokenStart(before: caretOffset, in: nsText)
         guard tokenStart < caretOffset,
               let trigger = completionTrigger(at: tokenStart, in: text) else {
             return nil
         }
-        guard trigger != .slashCommand || allowsSlashCommandToken(startingAt: tokenStart, blockID: blockID) else {
+        guard trigger != .slashCommand || BlockInputCompletionTokenParsing.allowsSlashCommandToken(
+            startingAt: tokenStart,
+            availability: slashCommandAvailability,
+            isDocumentStartBlock: index(of: blockID) == 0
+        ) else {
             return nil
         }
         let replacementRange = NSRange(location: tokenStart, length: caretOffset - tokenStart)
@@ -292,20 +297,6 @@ extension BlockInputView {
         )
     }
 
-    private func completionTokenStart(before utf16Offset: Int, in text: String) -> Int {
-        let nsText = text as NSString
-        var location = min(max(utf16Offset, 0), nsText.length)
-        while location > 0 {
-            let previousLocation = location - 1
-            let character = nsText.character(at: previousLocation)
-            if Self.isCompletionTokenBoundary(character) {
-                return location
-            }
-            location = previousLocation
-        }
-        return 0
-    }
-
     private func completionTrigger(at tokenStart: Int, in text: String) -> BlockInputCompletionTrigger? {
         switch (text as NSString).substring(with: NSRange(location: tokenStart, length: 1)) {
         case "@":
@@ -315,25 +306,6 @@ extension BlockInputView {
         default:
             return nil
         }
-    }
-
-    private func allowsSlashCommandToken(startingAt tokenStart: Int, blockID: BlockInputBlockID) -> Bool {
-        switch slashCommandAvailability {
-        case .anywhere:
-            return true
-        case .documentStart:
-            return tokenStart == 0 && index(of: blockID) == 0
-        }
-    }
-
-    private static func isCompletionTokenBoundary(_ character: unichar) -> Bool {
-        guard let scalar = UnicodeScalar(Int(character)) else {
-            return false
-        }
-        if CharacterSet.whitespacesAndNewlines.contains(scalar) {
-            return true
-        }
-        return ["(", "[", "{", "<", "\"", "'"].contains(Character(scalar))
     }
 
     private func completionRangeIntersectsExcludedInlineRanges(_ range: NSRange, in text: String) -> Bool {

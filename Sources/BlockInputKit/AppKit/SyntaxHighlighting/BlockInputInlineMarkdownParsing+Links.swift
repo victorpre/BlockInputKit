@@ -65,7 +65,7 @@ extension BlockInputInlineMarkdownParsing {
         )
     }
 
-    private static func linkSourceRanges(
+    static func linkSourceRanges(
         in text: NSString,
         excluding excludedRangeLookup: BlockInputExcludedRangeLookup
     ) -> [NSRange] {

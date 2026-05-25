@@ -7,6 +7,7 @@ enum BlockInputInlineMarkdownStyle: Hashable {
     case underline
     case strikethrough
     case link
+    case rawSlashCommand
 }
 
 /// UTF-16 ranges for one visual inline Markdown span.
@@ -48,7 +49,10 @@ enum BlockInputInlineMarkdownParsing {
     static func inlineMarkdownRanges(
         in text: String,
         excluding excludedRanges: [NSRange] = [],
-        fileBaseURL: URL? = nil
+        fileBaseURL: URL? = nil,
+        rawSlashCommandChips: Bool = false,
+        slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
+        isDocumentStartBlock: Bool = false
     ) -> [BlockInputInlineMarkdownRange] {
         let nsText = text as NSString
         guard nsText.length > 0 else {
@@ -58,8 +62,18 @@ enum BlockInputInlineMarkdownParsing {
             textLength: nsText.length,
             ranges: excludedRanges
         )
+        let rawSlashRanges: [BlockInputInlineMarkdownRange] = rawSlashCommandChips ? {
+            let linkSourceRanges = linkSourceRanges(in: nsText, excluding: excludedRangeLookup)
+            return rawSlashCommandRanges(
+                in: nsText,
+                excluding: BlockInputExcludedRangeLookup(textLength: nsText.length, ranges: excludedRanges + linkSourceRanges),
+                availability: slashCommandAvailability,
+                isDocumentStartBlock: isDocumentStartBlock
+            )
+        }() : []
         return mergedByContentLocation([
             linkRanges(in: nsText, excluding: excludedRangeLookup, fileBaseURL: fileBaseURL),
+            rawSlashRanges,
             composedDelimiterRanges(in: nsText, delimiter: tripleAsterisk, styles: [.bold, .italic], excluding: excludedRangeLookup),
             delimiterRanges(in: nsText, delimiter: doubleAsterisk, style: .bold, excluding: excludedRangeLookup),
             delimiterRanges(in: nsText, delimiter: doubleTilde, style: .strikethrough, excluding: excludedRangeLookup),
@@ -68,6 +82,39 @@ enum BlockInputInlineMarkdownParsing {
             delimiterRanges(in: nsText, delimiter: singleAsterisk, style: .italic, excluding: excludedRangeLookup),
             delimiterRanges(in: nsText, delimiter: singleUnderscore, style: .italic, excluding: excludedRangeLookup)
         ])
+    }
+
+    private static func rawSlashCommandRanges(
+        in text: NSString,
+        excluding excludedRangeLookup: BlockInputExcludedRangeLookup,
+        availability: BlockInputSlashCommandAvailability,
+        isDocumentStartBlock: Bool
+    ) -> [BlockInputInlineMarkdownRange] {
+        var ranges: [BlockInputInlineMarkdownRange] = []
+        var location = 0
+        while location < text.length {
+            guard let tokenRange = BlockInputCompletionTokenParsing.rawSlashCommandTokenRange(
+                startingAt: location,
+                in: text,
+                availability: availability,
+                isDocumentStartBlock: isDocumentStartBlock
+            ) else {
+                location += 1
+                continue
+            }
+            guard !excludedRangeLookup.intersects(tokenRange) else {
+                location = NSMaxRange(tokenRange)
+                continue
+            }
+            ranges.append(BlockInputInlineMarkdownRange(
+                style: .rawSlashCommand,
+                fullRange: tokenRange,
+                contentRange: tokenRange,
+                delimiterRanges: []
+            ))
+            location = NSMaxRange(tokenRange)
+        }
+        return ranges
     }
 
     private static let asterisk: unichar = 0x2A

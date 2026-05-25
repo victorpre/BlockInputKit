@@ -11,6 +11,9 @@ extension BlockInputView {
             isEditable: isEditable,
             disabledCursor: disabledCursor,
             inlineHint: inlineHint(for: item, block: block),
+            rawSlashCommandChips: rawSlashCommandChips,
+            slashCommandAvailability: slashCommandAvailability,
+            isDocumentStartBlock: index(of: block.id) == 0,
             isSelected: isBlockSelected(block.id),
             delegate: self
         )

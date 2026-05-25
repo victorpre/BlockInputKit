@@ -75,6 +75,7 @@ extension BlockInputView {
         isEditable = configuration.isEditable
         disabledCursor = configuration.disabledCursor
         inlineHintProvider = configuration.inlineHintProvider
+        rawSlashCommandChips = configuration.rawSlashCommandChips
         dropIndicatorColor = configuration.dropIndicatorColor
         configureHeightSizing(configuration.heightSizing)
     }

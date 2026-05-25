@@ -45,6 +45,8 @@ final class BlockInputDelimiterGlyphs: NSObject, NSLayoutManagerDelegate {
 }
 
 extension NSAttributedString.Key {
+    /// Marks visual inline chip content so adjacent virtual hints can fall back to the normal typing font.
+    static let blockInputInlineChip = NSAttributedString.Key("BlockInputInlineChip")
     /// Marks source delimiters/tags that should stay in storage but collapse out of visual layout.
     static let blockInputHiddenDelimiter = NSAttributedString.Key("BlockInputHiddenDelimiter")
 }

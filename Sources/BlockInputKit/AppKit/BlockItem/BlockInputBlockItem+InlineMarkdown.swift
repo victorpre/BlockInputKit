@@ -4,14 +4,25 @@ private let inlineChipAdjacentWhitespaceKern: CGFloat = 5
 
 extension BlockInputBlockItem {
     func applyInlineMarkdownAttributes(for block: BlockInputBlock, textStorage: NSTextStorage) {
-        Self.applyInlineMarkdownAttributes(for: block, textStorage: textStorage, style: style, fileBaseURL: fileBaseURL)
+        Self.applyInlineMarkdownAttributes(
+            for: block,
+            textStorage: textStorage,
+            style: style,
+            fileBaseURL: fileBaseURL,
+            rawSlashCommandChips: rawSlashCommandChips,
+            slashCommandAvailability: slashCommandAvailability,
+            isDocumentStartBlock: isDocumentStartBlock
+        )
     }
 
     static func applyInlineMarkdownAttributes(
         for block: BlockInputBlock,
         textStorage: NSTextStorage,
         style: BlockInputStyle,
-        fileBaseURL: URL? = nil
+        fileBaseURL: URL? = nil,
+        rawSlashCommandChips: Bool = false,
+        slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
+        isDocumentStartBlock: Bool = false
     ) {
         guard Self.supportsInlineMarkdownStyling(block.kind) else {
             return
@@ -21,7 +32,10 @@ extension BlockInputBlockItem {
         let markdownRanges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: textStorage.string,
             excluding: inlineCodeRanges,
-            fileBaseURL: fileBaseURL
+            fileBaseURL: fileBaseURL,
+            rawSlashCommandChips: rawSlashCommandChips,
+            slashCommandAvailability: slashCommandAvailability,
+            isDocumentStartBlock: isDocumentStartBlock
         )
         let baseFont = Self.font(for: block.kind, style: style)
         for markdownRange in markdownRanges {
@@ -114,6 +128,8 @@ extension BlockInputBlockItem {
                 ],
                 range: range
             )
+        case .rawSlashCommand:
+            applyInlineChip(to: range, in: textStorage, baseFont: baseFont)
         }
     }
 
@@ -125,7 +141,8 @@ extension BlockInputBlockItem {
         textStorage.addAttributes(
             [
                 .font: NSFont.monospacedSystemFont(ofSize: max(baseFont.pointSize * 0.94, 1), weight: .regular),
-                .foregroundColor: NSColor.labelColor
+                .foregroundColor: NSColor.labelColor,
+                .blockInputInlineChip: true
             ],
             range: range
         )
@@ -195,6 +212,8 @@ extension BlockInputBlockItem {
             case .link:
                 attributes[.foregroundColor] = NSColor.linkColor
                 attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+            case .rawSlashCommand:
+                break
             }
         }
         return attributes
@@ -207,7 +226,7 @@ extension BlockInputBlockItem {
 
 private extension Set where Element == BlockInputInlineMarkdownStyle {
     var sortedByAttributeOrder: [BlockInputInlineMarkdownStyle] {
-        [.bold, .italic, .underline, .strikethrough, .link].filter { contains($0) }
+        [.bold, .italic, .underline, .strikethrough, .link, .rawSlashCommand].filter { contains($0) }
     }
 }
 

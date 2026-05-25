@@ -198,6 +198,11 @@ public struct BlockInputConfiguration {
     /// Hints are never inserted into document text, Markdown export, undo, pasteboard contents, completion ranges, or
     /// accessibility value text.
     public var inlineHintProvider: BlockInputInlineHintProvider?
+    /// Whether raw `/command` tokens render as visual slash-command chips.
+    ///
+    /// Raw slash-command chips remain normal document text for editing, selection, copy, accessibility, and Markdown
+    /// export.
+    public var rawSlashCommandChips: Bool
     /// Color used for editor accent affordances, including drag insertion and selected horizontal rules.
     public var dropIndicatorColor: NSColor
     /// Visual styling for editor text, code, and selection chrome.
@@ -289,6 +294,7 @@ public struct BlockInputConfiguration {
         isEditable: Bool = true,
         disabledCursor: NSCursor? = nil,
         inlineHintProvider: BlockInputInlineHintProvider? = nil,
+        rawSlashCommandChips: Bool = false,
         dropIndicatorColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
         heightSizing: BlockInputEditorHeightSizing? = nil,
@@ -325,6 +331,7 @@ public struct BlockInputConfiguration {
         self.isEditable = isEditable
         self.disabledCursor = disabledCursor
         self.inlineHintProvider = inlineHintProvider
+        self.rawSlashCommandChips = rawSlashCommandChips
         self.dropIndicatorColor = dropIndicatorColor
         self.style = style
         self.heightSizing = heightSizing
