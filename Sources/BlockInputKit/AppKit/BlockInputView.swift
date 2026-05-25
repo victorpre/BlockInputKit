@@ -30,6 +30,8 @@ public final class BlockInputView: NSView {
     public internal(set) var inlineHintProvider: BlockInputInlineHintProvider?
     /// Whether raw slash-command tokens render as visual chips.
     public internal(set) var rawSlashCommandChips = false
+    /// Return-key behavior while the editor-owned completion popup is active.
+    public internal(set) var completionReturnBehavior = BlockInputCompletionReturnBehavior.acceptHighlightedSuggestion
     /// Visual styling used for text, code, and selection chrome.
     public internal(set) var style = BlockInputStyle.default
     var heightSizing: BlockInputEditorHeightSizing?

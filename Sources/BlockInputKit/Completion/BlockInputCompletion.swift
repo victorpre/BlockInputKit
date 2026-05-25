@@ -24,6 +24,14 @@ public enum BlockInputSlashCommandInsertionStyle: String, CaseIterable, Equatabl
     case rawToken
 }
 
+/// Return-key behavior while the editor-owned completion popup is active.
+public enum BlockInputCompletionReturnBehavior: String, CaseIterable, Equatable, Codable, Sendable {
+    /// Return accepts the highlighted suggestion when one is available.
+    case acceptHighlightedSuggestion
+    /// Return passes through when the replacement text already exactly matches the highlighted suggestion.
+    case passthroughExactMatch
+}
+
 /// Where the editor-owned completion popup should be shown.
 public enum BlockInputCompletionPopupPlacement: String, CaseIterable, Equatable, Codable, Sendable {
     /// Anchor the popup near the active text caret.
@@ -114,6 +122,8 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
     public var subtitle: String?
     /// Text inserted when the suggestion is accepted.
     public var insertionText: String
+    /// Optional text used for `.passthroughExactMatch`; defaults to `insertionText`.
+    public var exactMatchText: String?
     /// Trigger this suggestion is intended to satisfy.
     public var trigger: BlockInputCompletionTrigger
     /// Optional SF Symbol name shown by built-in completion UI.
@@ -127,6 +137,7 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
         title: String,
         subtitle: String? = nil,
         insertionText: String,
+        exactMatchText: String? = nil,
         trigger: BlockInputCompletionTrigger,
         iconSystemName: String? = nil,
         detailText: String? = nil
@@ -135,6 +146,7 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
         self.title = title
         self.subtitle = subtitle
         self.insertionText = insertionText
+        self.exactMatchText = exactMatchText
         self.trigger = trigger
         self.iconSystemName = iconSystemName
         self.detailText = detailText
@@ -205,6 +217,7 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
             title: title,
             subtitle: subtitle,
             insertionText: Self.slashCommandInsertionText(label: chipLabel, uri: uri, insertionStyle: insertionStyle),
+            exactMatchText: chipLabel,
             trigger: .slashCommand,
             iconSystemName: iconSystemName,
             detailText: detailText

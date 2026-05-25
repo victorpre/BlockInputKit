@@ -44,8 +44,10 @@ extension BlockInputView {
         activeBlockOverride: BlockInputBlock?,
         performDefault: ((BlockInputKeyboardShortcut) -> Bool)? = nil
     ) -> BlockInputKeyboardShortcutDispatchResult {
+        let allowsActiveCompletion = completionSession == nil ||
+            (shortcut == .returnKey && shouldPassthroughCompletionReturn())
         guard !isPerformingDefaultKeyboardShortcut,
-              completionSession == nil,
+              allowsActiveCompletion,
               let handler = keyboardShortcuts[shortcut] else {
             return .notRegistered
         }

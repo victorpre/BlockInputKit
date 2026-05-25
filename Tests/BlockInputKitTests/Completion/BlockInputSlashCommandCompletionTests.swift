@@ -15,6 +15,7 @@ final class BlockInputSlashCommandCompletionTests: XCTestCase {
         XCTAssertEqual(suggestion.title, "Insert table")
         XCTAssertEqual(suggestion.subtitle, "Blocks")
         XCTAssertEqual(suggestion.insertionText, "[/table](demo-command://insert/table?size=2x2) ")
+        XCTAssertEqual(suggestion.exactMatchText, "/table")
         XCTAssertEqual(suggestion.trigger, .slashCommand)
         XCTAssertEqual(suggestion.iconSystemName, "command")
         XCTAssertEqual(suggestion.detailText, "Command")
@@ -30,6 +31,7 @@ final class BlockInputSlashCommandCompletionTests: XCTestCase {
 
         XCTAssertEqual(suggestion.id, "command:custom")
         XCTAssertEqual(suggestion.insertionText, "[/custom](host-app://run/\\(custom\\)) ")
+        XCTAssertEqual(suggestion.exactMatchText, "/custom")
     }
 
     func testSlashCommandSuggestionCanInsertRawToken() {
@@ -41,5 +43,6 @@ final class BlockInputSlashCommandCompletionTests: XCTestCase {
         )
 
         XCTAssertEqual(suggestion.insertionText, "/review-github-pr ")
+        XCTAssertEqual(suggestion.exactMatchText, "/review-github-pr")
     }
 }

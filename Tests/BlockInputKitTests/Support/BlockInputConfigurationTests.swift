@@ -37,6 +37,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertNil(configuration.inlineHintProvider)
         XCTAssertFalse(configuration.rawSlashCommandChips)
         XCTAssertNil(configuration.heightSizing)
+        XCTAssertEqual(configuration.completionReturnBehavior, .acceptHighlightedSuggestion)
         XCTAssertEqual(configuration.slashCommandAvailability, .documentStart)
         XCTAssertNil(configuration.slashCommandChipClickHandler)
     }
@@ -111,6 +112,7 @@ final class BlockInputConfigurationTests: XCTestCase {
 
         view.configure(BlockInputConfiguration(
             completionProvider: provider,
+            completionReturnBehavior: .passthroughExactMatch,
             slashCommandAvailability: .anywhere,
             slashCommandChipClickHandler: { _ in .hostHandled },
             completionPopupConfiguration: BlockInputCompletionPopupConfiguration(
@@ -122,6 +124,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         ))
 
         XCTAssertTrue(view.completionProvider === provider)
+        XCTAssertEqual(view.completionReturnBehavior, .passthroughExactMatch)
         XCTAssertEqual(view.slashCommandAvailability, .anywhere)
         XCTAssertNotNil(view.slashCommandChipClickHandler)
         XCTAssertEqual(view.completionPopupPlacement, .overlay)

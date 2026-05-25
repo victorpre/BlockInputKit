@@ -251,6 +251,11 @@ The provider receives a `BlockInputCompletionContext` with:
 - `rawQuery`: the text after `@` or `/`.
 - `fileQuery`: parsed file intent for `.`, `..`, and `...` prefixes.
 
+Set `completionReturnBehavior: .passthroughExactMatch` when Return should pass through to host shortcuts or normal editor
+Return handling if the active replacement text already exactly matches the highlighted suggestion. Suggestions match against
+`exactMatchText` when set, otherwise `insertionText`. Slash-command helpers set this to the visible `/command` token while
+still inserting the configured source plus a trailing space. Tab continues accepting the highlighted suggestion.
+
 ### Popup Placement
 
 `completionPopupConfiguration` controls popup placement:

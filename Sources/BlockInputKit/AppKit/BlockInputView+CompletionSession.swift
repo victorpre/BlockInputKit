@@ -111,7 +111,7 @@ extension BlockInputView {
             return acceptHighlightedCompletionSuggestion(consumesWhenMissing: true)
         case #selector(NSResponder.insertNewline(_:)),
              #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)):
-            return acceptHighlightedCompletionSuggestion(consumesWhenMissing: false)
+            return acceptHighlightedCompletionSuggestion(consumesWhenMissing: false, allowsExactMatchPassthrough: true)
         default:
             return false
         }
@@ -146,7 +146,7 @@ extension BlockInputView {
         case "\t":
             return acceptHighlightedCompletionSuggestion(consumesWhenMissing: true)
         case "\r", "\n":
-            return acceptHighlightedCompletionSuggestion(consumesWhenMissing: false)
+            return acceptHighlightedCompletionSuggestion(consumesWhenMissing: false, allowsExactMatchPassthrough: true)
         default:
             return false
         }
@@ -421,12 +421,19 @@ extension BlockInputView {
         showCompletionPopup(for: session)
     }
 
-    private func acceptHighlightedCompletionSuggestion(consumesWhenMissing: Bool) -> Bool {
+    private func acceptHighlightedCompletionSuggestion(
+        consumesWhenMissing: Bool,
+        allowsExactMatchPassthrough: Bool = false
+    ) -> Bool {
         guard let session = completionSession else {
             return false
         }
         guard let suggestion = session.suggestions[safe: session.highlightedIndex] else {
             return consumesWhenMissing
+        }
+        if allowsExactMatchPassthrough,
+           shouldPassthroughCompletionReturn() {
+            return false
         }
         acceptCompletionSuggestionFromPopup(suggestion)
         return true
@@ -441,6 +448,9 @@ extension BlockInputView {
         guard let block = block(withID: session.blockID),
               block.text == session.sourceText,
               block.kind == session.sourceKind else {
+            return
+        }
+        guard completionReplacementText(in: session) != nil else {
             return
         }
         guard acceptCompletionSuggestion(

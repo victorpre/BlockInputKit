@@ -86,6 +86,14 @@ final class BlockInputEditorTests: XCTestCase {
         XCTAssertTrue(editor.resolvedConfiguration().rawSlashCommandChips)
     }
 
+    func testResolvedConfigurationPreservesCompletionReturnBehavior() {
+        let editor = BlockInputEditor(configuration: BlockInputConfiguration(
+            completionReturnBehavior: .passthroughExactMatch
+        ))
+
+        XCTAssertEqual(editor.resolvedConfiguration().completionReturnBehavior, .passthroughExactMatch)
+    }
+
     func testFocusBindingPreservesKeyboardShortcutHandlers() {
         var isFocused = false
         var handledShortcuts: [BlockInputKeyboardShortcut] = []

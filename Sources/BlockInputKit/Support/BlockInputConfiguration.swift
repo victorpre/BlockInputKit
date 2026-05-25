@@ -245,6 +245,8 @@ public struct BlockInputConfiguration {
     public var completionProvider: (any BlockInputCompletionProvider)?
     /// Optional host hook for resolving local file drops before insertion.
     public var fileDropHandler: BlockInputFileDropHandler?
+    /// Return-key behavior while the editor-owned completion popup is active.
+    public var completionReturnBehavior: BlockInputCompletionReturnBehavior
     /// Where live slash-command completion is allowed to open.
     public var slashCommandAvailability: BlockInputSlashCommandAvailability
     /// Optional host router for slash-command chip clicks.
@@ -311,6 +313,7 @@ public struct BlockInputConfiguration {
         keyboardShortcuts: [BlockInputKeyboardShortcut: BlockInputKeyboardShortcutHandler] = [:],
         completionProvider: (any BlockInputCompletionProvider)? = nil,
         fileDropHandler: BlockInputFileDropHandler? = nil,
+        completionReturnBehavior: BlockInputCompletionReturnBehavior = .acceptHighlightedSuggestion,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
         slashCommandChipClickHandler:
             (@MainActor (BlockInputSlashCommandChipClickContext) -> BlockInputSlashCommandChipClickAction)? = nil,
@@ -348,6 +351,7 @@ public struct BlockInputConfiguration {
         self.keyboardShortcuts = keyboardShortcuts
         self.completionProvider = completionProvider
         self.fileDropHandler = fileDropHandler
+        self.completionReturnBehavior = completionReturnBehavior
         self.slashCommandAvailability = slashCommandAvailability
         self.slashCommandChipClickHandler = slashCommandChipClickHandler
         self.completionPopupConfiguration = completionPopupConfiguration ?? BlockInputCompletionPopupConfiguration(

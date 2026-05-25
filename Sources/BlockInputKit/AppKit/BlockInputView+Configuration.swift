@@ -76,6 +76,7 @@ extension BlockInputView {
         disabledCursor = configuration.disabledCursor
         inlineHintProvider = configuration.inlineHintProvider
         rawSlashCommandChips = configuration.rawSlashCommandChips
+        completionReturnBehavior = configuration.completionReturnBehavior
         dropIndicatorColor = configuration.dropIndicatorColor
         configureHeightSizing(configuration.heightSizing)
     }

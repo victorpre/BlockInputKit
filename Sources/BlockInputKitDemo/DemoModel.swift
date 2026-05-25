@@ -64,6 +64,7 @@ final class DemoModel: ObservableObject {
             imageBaseURL: Bundle.module.resourceURL,
             undoController: session.undoController,
             completionProvider: completionProvider,
+            completionReturnBehavior: .passthroughExactMatch,
             slashCommandAvailability: .anywhere,
             completionPopupConfiguration: completionPopupConfiguration(),
             onDocumentMutation: { [weak self, itemID = session.id] change in
