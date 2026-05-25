@@ -32,7 +32,6 @@ extension BlockInputBlockItem {
                     [
                         .font: delimiterFont,
                         .foregroundColor: NSColor.clear,
-                        .backgroundColor: backgroundColor,
                         .blockInputHiddenDelimiter: true
                     ],
                     range: clampedDelimiterRange

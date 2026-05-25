@@ -58,6 +58,8 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(textStorage.attribute(.font, at: 5, effectiveRange: nil) as? NSFont).pointSize, inlineFont.pointSize)
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 5, effectiveRange: nil) as? NSColor, .systemRed)
         XCTAssertEqual(textStorage.attribute(.backgroundColor, at: 5, effectiveRange: nil) as? NSColor, .systemYellow)
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 15, effectiveRange: nil))
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .systemGreen)
 
         item.setSelectedRange(NSRange(location: 7, length: 0))
@@ -79,12 +81,32 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         XCTAssertEqual(textView.string, "Use `git status` now")
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 4, effectiveRange: nil) as? NSColor, .clear)
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 15, effectiveRange: nil) as? NSColor, .clear)
+        XCTAssertEqual(textStorage.attribute(.blockInputHiddenDelimiter, at: 4, effectiveRange: nil) as? Bool, true)
+        XCTAssertEqual(textStorage.attribute(.blockInputHiddenDelimiter, at: 15, effectiveRange: nil) as? Bool, true)
         XCTAssertNotEqual(textStorage.attribute(.foregroundColor, at: 5, effectiveRange: nil) as? NSColor, .clear)
-        XCTAssertEqual(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil) as? NSColor, BlockInputBlockItem.inlineCodeBackgroundColor)
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 15, effectiveRange: nil))
+    }
+
+    @MainActor
+    func testInlineCodeBackgroundOnlyCoversVisibleContent() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "and `inline code.` now"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+        var effectiveRange = NSRange(location: NSNotFound, length: 0)
+
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 3, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil))
         XCTAssertEqual(
-            textStorage.attribute(.backgroundColor, at: 15, effectiveRange: nil) as? NSColor,
+            textStorage.attribute(.backgroundColor, at: 5, effectiveRange: &effectiveRange) as? NSColor,
             BlockInputBlockItem.inlineCodeBackgroundColor
         )
+        XCTAssertEqual(effectiveRange, NSRange(location: 5, length: 12))
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 17, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 18, effectiveRange: nil))
     }
 
     @MainActor
