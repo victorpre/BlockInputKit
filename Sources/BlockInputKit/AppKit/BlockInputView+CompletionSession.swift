@@ -407,6 +407,7 @@ extension BlockInputView {
         }
         session.highlightedIndex = min(max(0, session.highlightedIndex + delta), session.suggestions.count - 1)
         completionSession = session
+        completionPopupView?.suppressHoverUntilPointerMoves()
         showCompletionPopup(for: session)
     }
 

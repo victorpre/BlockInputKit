@@ -1,7 +1,6 @@
 import AppKit
 
 private let completionPopupCornerRadius: CGFloat = 10
-private let completionRowCornerRadius: CGFloat = 6
 private let completionRowHeight: CGFloat = 36
 private let completionRowSpacing: CGFloat = 4
 private let completionPopupInset: CGFloat = 8
@@ -26,6 +25,8 @@ final class BlockInputCompletionPopupView: NSView {
     private let emptyField = NSTextField(labelWithString: "No matches")
     private var visibleStartIndex = 0
     private var visibleSuggestionIDs: [String] = []
+    private var lastMouseWindowLocation: NSPoint?
+    private var suppressedHoverWindowLocation: NSPoint?
     private var onSelect: (BlockInputCompletionSuggestion) -> Void = { _ in }
     private var onHighlight: (Int) -> Void = { _ in }
 
@@ -133,6 +134,7 @@ final class BlockInputCompletionPopupView: NSView {
         guard !isHidden, bounds.contains(point) else {
             return false
         }
+        updateHoverSuppression(for: event)
         row(at: point)?.mouseMoved(with: event)
         return true
     }
@@ -142,6 +144,7 @@ final class BlockInputCompletionPopupView: NSView {
         guard !isHidden, bounds.contains(point) else {
             return false
         }
+        clearHoverSuppression(for: event)
         row(at: point)?.mouseDown(with: event)
         return true
     }
@@ -151,6 +154,7 @@ final class BlockInputCompletionPopupView: NSView {
         guard !isHidden, bounds.contains(point) else {
             return false
         }
+        clearHoverSuppression(for: event)
         row(at: point)?.mouseUp(with: event)
         return true
     }
@@ -162,6 +166,11 @@ final class BlockInputCompletionPopupView: NSView {
         }
         scrollVisibleSuggestions(deltaY: event.scrollingDeltaY)
         return true
+    }
+
+    func suppressHoverUntilPointerMoves() {
+        // Rebuilding rows can emit mouseEntered for a stationary pointer; keep keyboard selection until movement.
+        suppressedHoverWindowLocation = lastMouseWindowLocation ?? window?.mouseLocationOutsideOfEventStream
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -274,10 +283,53 @@ final class BlockInputCompletionPopupView: NSView {
             index: index,
             isHighlighted: index == state.highlightedIndex,
             onSelect: { [weak self] in self?.onSelect(suggestion) },
+            shouldHighlight: { [weak self] event, ignoresHoverSuppression in
+                self?.allowsPointerHighlight(for: event, ignoresHoverSuppression: ignoresHoverSuppression) == true
+            },
             onHighlight: { [weak self] index in self?.onHighlight(index) }
         )
         addSubview(row)
         return row
+    }
+
+    private func updateHoverSuppression(for event: NSEvent) {
+        let location = event.locationInWindow
+        if let suppressedHoverWindowLocation,
+           !Self.windowLocationsMatch(location, suppressedHoverWindowLocation) {
+            self.suppressedHoverWindowLocation = nil
+        }
+        lastMouseWindowLocation = location
+    }
+
+    private func clearHoverSuppression(for event: NSEvent) {
+        suppressedHoverWindowLocation = nil
+        lastMouseWindowLocation = event.locationInWindow
+    }
+
+    private func allowsPointerHighlight(
+        for event: NSEvent,
+        ignoresHoverSuppression: Bool
+    ) -> Bool {
+        let location = event.locationInWindow
+        defer {
+            lastMouseWindowLocation = location
+        }
+        if ignoresHoverSuppression {
+            suppressedHoverWindowLocation = nil
+            return true
+        }
+        guard let suppressedHoverWindowLocation else {
+            return true
+        }
+        if Self.windowLocationsMatch(location, suppressedHoverWindowLocation) {
+            return false
+        }
+        self.suppressedHoverWindowLocation = nil
+        return true
+    }
+
+    private static func windowLocationsMatch(_ lhs: NSPoint, _ rhs: NSPoint) -> Bool {
+        abs(lhs.x - rhs.x) < 0.5 && abs(lhs.y - rhs.y) < 0.5
     }
 
     private func visibleSuggestionRows(
@@ -314,184 +366,5 @@ final class BlockInputCompletionPopupView: NSView {
         default:
             return NSColor(calibratedRed: 0.96, green: 0.96, blue: 0.97, alpha: 1)
         }
-    }
-}
-
-@MainActor
-private final class BlockInputCompletionPopupRowView: NSView {
-    private let iconView = NSImageView()
-    private let titleField = NSTextField(labelWithString: "")
-    private let subtitleField = NSTextField(labelWithString: "")
-    private let detailField = NSTextField(labelWithString: "")
-    private var trackingArea: NSTrackingArea?
-    private var index = 0
-    private var isHighlighted = false
-    private var onSelect: () -> Void = {}
-    private var onHighlight: (Int) -> Void = { _ in }
-
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
-        true
-    }
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        setup()
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setup()
-    }
-
-    func configure(
-        suggestion: BlockInputCompletionSuggestion,
-        index: Int,
-        isHighlighted: Bool,
-        onSelect: @escaping () -> Void,
-        onHighlight: @escaping (Int) -> Void
-    ) {
-        self.index = index
-        self.isHighlighted = isHighlighted
-        self.onSelect = onSelect
-        self.onHighlight = onHighlight
-        titleField.stringValue = suggestion.title
-        subtitleField.stringValue = suggestion.subtitle ?? ""
-        detailField.stringValue = suggestion.detailText ?? ""
-        let iconSystemName = suggestion.iconSystemName ?? Self.fallbackIconSystemName(for: suggestion)
-        iconView.image = NSImage(systemSymbolName: iconSystemName, accessibilityDescription: suggestion.title) ??
-            NSImage(systemSymbolName: Self.fallbackIconSystemName(for: suggestion), accessibilityDescription: suggestion.title)
-        setAccessibilityLabel(accessibilityLabel(for: suggestion))
-        needsLayout = true
-        needsDisplay = true
-    }
-
-    override func layout() {
-        super.layout()
-        let iconSize: CGFloat = 14
-        iconView.frame = NSRect(
-            x: 10,
-            y: floor((bounds.height - iconSize) / 2),
-            width: iconSize,
-            height: iconSize
-        )
-        let contentX: CGFloat = 32
-        let detailWidth = completionDetailWidth()
-        let detailX = bounds.maxX - detailWidth - 10
-        detailField.frame = NSRect(
-            x: detailX,
-            y: floor((bounds.height - detailField.intrinsicContentSize.height) / 2),
-            width: detailWidth,
-            height: detailField.intrinsicContentSize.height
-        )
-        let titleWidth = max(0, detailX - contentX - 8)
-        let hasSubtitle = !subtitleField.stringValue.isEmpty
-        if hasSubtitle {
-            titleField.frame = NSRect(x: contentX, y: 19, width: titleWidth, height: 16)
-            subtitleField.frame = NSRect(x: contentX, y: 5, width: titleWidth, height: 13)
-        } else {
-            titleField.frame = NSRect(
-                x: contentX,
-                y: floor((bounds.height - titleField.intrinsicContentSize.height) / 2),
-                width: titleWidth,
-                height: titleField.intrinsicContentSize.height
-            )
-            subtitleField.frame = NSRect(x: contentX, y: bounds.maxY, width: titleWidth, height: 0)
-        }
-        subtitleField.isHidden = !hasSubtitle
-        detailField.isHidden = detailField.stringValue.isEmpty
-    }
-
-    private func completionDetailWidth() -> CGFloat {
-        guard !detailField.stringValue.isEmpty else {
-            return 0
-        }
-        let paddedIntrinsicWidth = ceil(detailField.intrinsicContentSize.width) + 8
-        return min(max(0, paddedIntrinsicWidth), max(0, bounds.width * 0.34))
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let area = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow, .inVisibleRect],
-            owner: self
-        )
-        trackingArea = area
-        addTrackingArea(area)
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        highlightPointerRow()
-    }
-
-    override func mouseMoved(with event: NSEvent) {
-        highlightPointerRow()
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        highlightPointerRow()
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        highlightPointerRow()
-        onSelect()
-    }
-
-    override func accessibilityPerformPress() -> Bool {
-        onSelect()
-        return true
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard isHighlighted else {
-            return
-        }
-        NSColor.controlAccentColor.withAlphaComponent(0.13).setFill()
-        NSBezierPath(roundedRect: bounds, xRadius: completionRowCornerRadius, yRadius: completionRowCornerRadius).fill()
-    }
-
-    private func setup() {
-        setAccessibilityElement(true)
-        setAccessibilityRole(.button)
-        titleField.font = .systemFont(ofSize: 13, weight: .medium)
-        titleField.textColor = .labelColor
-        titleField.lineBreakMode = .byTruncatingMiddle
-        subtitleField.font = .systemFont(ofSize: 11)
-        subtitleField.textColor = .secondaryLabelColor
-        subtitleField.lineBreakMode = .byTruncatingMiddle
-        detailField.font = .systemFont(ofSize: 11)
-        detailField.textColor = .tertiaryLabelColor
-        detailField.alignment = .right
-        detailField.lineBreakMode = .byTruncatingTail
-        iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
-        [iconView, titleField, subtitleField, detailField].forEach(addSubview)
-    }
-
-    private func highlightPointerRow() {
-        guard !isHighlighted else {
-            return
-        }
-        isHighlighted = true
-        onHighlight(index)
-        needsDisplay = true
-    }
-
-    private static func fallbackIconSystemName(for suggestion: BlockInputCompletionSuggestion) -> String {
-        switch suggestion.trigger {
-        case .mention:
-            return "text.cursor"
-        case .slashCommand:
-            return "command"
-        }
-    }
-
-    private func accessibilityLabel(for suggestion: BlockInputCompletionSuggestion) -> String {
-        [suggestion.title, suggestion.subtitle, suggestion.detailText]
-            .compactMap { $0?.isEmpty == false ? $0 : nil }
-            .joined(separator: ", ")
     }
 }
