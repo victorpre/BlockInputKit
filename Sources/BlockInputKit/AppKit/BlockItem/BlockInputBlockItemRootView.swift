@@ -7,6 +7,23 @@ final class BlockInputBlockItemRootView: NSView {
     // to the image view so resize does not depend on which view AppKit chose for mouse-down.
     private weak var activeImageResizeView: BlockInputImageBlockView?
 
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        updateHorizontalMetrics()
+    }
+
+    override func layout() {
+        updateHorizontalMetrics()
+        super.layout()
+    }
+
+    private func updateHorizontalMetrics() {
+        guard let renderedBlock = blockItem?.renderedBlock else {
+            return
+        }
+        blockItem?.updateHorizontalConstraints(for: renderedBlock)
+    }
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         guard let event else {
             return false

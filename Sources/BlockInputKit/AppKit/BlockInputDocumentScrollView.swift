@@ -34,6 +34,11 @@ final class BlockInputDocumentScrollView: NSScrollView {
         blockInputView?.addDisabledCursorRectIfNeeded(to: self)
     }
 
+    override func layout() {
+        super.layout()
+        blockInputView?.updateCollectionViewWidthForVisibleBounds()
+    }
+
     @objc
     private func contentBoundsDidChange() {
         defer {

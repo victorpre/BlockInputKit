@@ -34,10 +34,14 @@ extension BlockInputView {
 
         let textLineFrame = placeholderTextLineFrame()
         let textLeading = textLineFrame?.minX ?? placeholderFallbackTextLeadingEdge()
-        let labelX = max(textLeading - BlockInputPlaceholderLabel.caretAlignmentCompensation, 0)
+        let labelX = min(
+            max(textLeading - BlockInputPlaceholderLabel.caretAlignmentCompensation, 0),
+            collectionView.bounds.maxX
+        )
         let metrics = BlockInputBlockItem.verticalMetrics(for: BlockInputBlock(kind: .paragraph))
-        let maxWidth = textLineFrame.map { max($0.maxX - labelX, 0) }
-            ?? max(collectionView.bounds.width - labelX - editorHorizontalInset, 0)
+        let maxLabelX = textLineFrame.map { min($0.maxX, collectionView.bounds.maxX) }
+            ?? collectionView.bounds.maxX
+        let maxWidth = max(maxLabelX - labelX, 0)
         placeholderLabel.preferredMaxLayoutWidth = maxWidth
         let fittingHeight = placeholderLabel.cell?.cellSize(
             forBounds: NSRect(x: 0, y: 0, width: maxWidth, height: CGFloat.greatestFiniteMagnitude)
@@ -89,10 +93,14 @@ extension BlockInputView {
     }
 
     private func placeholderFallbackTextLeadingEdge() -> CGFloat {
-        return BlockInputBlockItem.visualContentInset(
+        let block = BlockInputBlock(kind: .paragraph)
+        return BlockInputBlockItem.horizontalMetrics(
+            for: collectionView.bounds.width,
+            block: block,
             allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset
-        )
+            editorHorizontalInset: editorHorizontalInset,
+            style: style
+        ).glyphLeadingX
     }
 }
 

@@ -1,8 +1,107 @@
 import AppKit
 
+struct BlockInputBlockItemHorizontalMetrics {
+    var handleLeading: CGFloat
+    var handleWidth: CGFloat
+    var kindLabelLeading: CGFloat
+    var kindLabelWidth: CGFloat
+    var scrollViewLeading: CGFloat
+    var scrollViewTrailingInset: CGFloat
+    var scrollViewWidth: CGFloat
+    var textContainerWidth: CGFloat
+    var glyphLeadingX: CGFloat
+}
+
 extension BlockInputBlockItem {
     static let tableSurfaceLeadingInset: CGFloat = textContainerContentLeading
     static let tableSurfaceTrailingInset: CGFloat = max((2 * textContainerLineFragmentPadding) - tableSurfaceLeadingInset, 0)
+    private static let minimumWrappingViewportWidth: CGFloat = 24
+
+    static func horizontalMetrics(
+        for itemWidth: CGFloat,
+        block: BlockInputBlock,
+        allowsReordering: Bool,
+        editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
+        style: BlockInputStyle = .default
+    ) -> BlockInputBlockItemHorizontalMetrics {
+        let clampedItemWidth = max(itemWidth, 0)
+        let handleLeading = handleLeadingInset(
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
+        let handleWidth = allowsReordering ? Self.handleWidth : 0
+        let kindLabelLeading = kindLabelLeadingConstant(
+            for: block,
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
+        let kindLabelWidth = kindLabelWidthConstant(for: block, style: style)
+        let scrollViewLeading = textLeadingConstant(
+            for: block,
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
+        let scrollViewTrailingInset = horizontalContentTrailingInset(
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset
+        )
+        let scrollViewMinX = handleLeading + handleWidth + kindLabelLeading + kindLabelWidth + scrollViewLeading
+        guard clampedItemWidth > 0 else {
+            return BlockInputBlockItemHorizontalMetrics(
+                handleLeading: handleLeading,
+                handleWidth: handleWidth,
+                kindLabelLeading: kindLabelLeading,
+                kindLabelWidth: kindLabelWidth,
+                scrollViewLeading: scrollViewLeading,
+                scrollViewTrailingInset: scrollViewTrailingInset,
+                scrollViewWidth: 0,
+                textContainerWidth: 1,
+                glyphLeadingX: scrollViewMinX + textContainerContentLeading
+            )
+        }
+        let normalScrollViewWidth = clampedItemWidth - scrollViewMinX - scrollViewTrailingInset
+        guard normalScrollViewWidth >= minimumWrappingViewportWidth else {
+            return collapsedHorizontalMetrics(for: block, itemWidth: clampedItemWidth)
+        }
+
+        return BlockInputBlockItemHorizontalMetrics(
+            handleLeading: handleLeading,
+            handleWidth: handleWidth,
+            kindLabelLeading: kindLabelLeading,
+            kindLabelWidth: kindLabelWidth,
+            scrollViewLeading: scrollViewLeading,
+            scrollViewTrailingInset: scrollViewTrailingInset,
+            scrollViewWidth: normalScrollViewWidth,
+            textContainerWidth: max(normalScrollViewWidth - 2 * textContainerLineFragmentPadding, 1),
+            glyphLeadingX: scrollViewMinX + textContainerContentLeading
+        )
+    }
+
+    private static func collapsedHorizontalMetrics(
+        for block: BlockInputBlock,
+        itemWidth: CGFloat
+    ) -> BlockInputBlockItemHorizontalMetrics {
+        BlockInputBlockItemHorizontalMetrics(
+            handleLeading: 0,
+            handleWidth: 0,
+            kindLabelLeading: 0,
+            kindLabelWidth: 0,
+            scrollViewLeading: 0,
+            scrollViewTrailingInset: 0,
+            scrollViewWidth: itemWidth,
+            textContainerWidth: collapsedTextContainerWidth(for: block, scrollViewWidth: itemWidth),
+            glyphLeadingX: min(textContainerContentLeading, max(itemWidth - 1, 0))
+        )
+    }
+
+    private static func collapsedTextContainerWidth(for block: BlockInputBlock, scrollViewWidth: CGFloat) -> CGFloat {
+        switch block.kind {
+        case .heading, .quote:
+            return max(scrollViewWidth - 2 * textContainerContentLeading, 1)
+        case .paragraph, .code, .horizontalRule, .frontMatter, .bulletedListItem, .numberedListItem, .checklistItem, .table, .image, .rawMarkdown:
+            return max(scrollViewWidth - 2 * textContainerLineFragmentPadding, 1)
+        }
+    }
 
     static func horizontalContentTrailingInset(
         allowsReordering: Bool,
@@ -31,10 +130,13 @@ extension BlockInputBlockItem {
         if block.kind.isImage {
             return max(scrollViewWidth - (2 * imageSurfaceHorizontalInset), 120)
         }
-        return max(
-            scrollViewWidth - 2 * textContainerLineFragmentPadding,
-            120
-        )
+        return horizontalMetrics(
+            for: itemWidth,
+            block: block,
+            allowsReordering: allowsReordering,
+            editorHorizontalInset: editorHorizontalInset,
+            style: style
+        ).textContainerWidth
     }
 
     static func codeBackgroundLeadingInset(
@@ -68,43 +170,13 @@ extension BlockInputBlockItem {
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         style: BlockInputStyle = .default
     ) -> CGFloat {
-        max(
-            itemWidth
-                - textScrollViewLeadingInset(
-                    for: block,
-                    allowsReordering: allowsReordering,
-                    editorHorizontalInset: editorHorizontalInset,
-                    style: style
-                )
-                - horizontalContentTrailingInset(
-                    allowsReordering: allowsReordering,
-                    editorHorizontalInset: editorHorizontalInset
-                ),
-            120
-        )
-    }
-
-    private static func textScrollViewLeadingInset(
-        for block: BlockInputBlock,
-        allowsReordering: Bool,
-        editorHorizontalInset: CGFloat,
-        style: BlockInputStyle
-    ) -> CGFloat {
-        handleTrailingX(
+        horizontalMetrics(
+            for: itemWidth,
+            block: block,
             allowsReordering: allowsReordering,
-            editorHorizontalInset: editorHorizontalInset
-        )
-            + kindLabelLeadingConstant(
-                for: block,
-                allowsReordering: allowsReordering,
-                editorHorizontalInset: editorHorizontalInset
-            )
-            + kindLabelWidthConstant(for: block, style: style)
-            + textLeadingConstant(
-                for: block,
-                allowsReordering: allowsReordering,
-                editorHorizontalInset: editorHorizontalInset
-            )
+            editorHorizontalInset: editorHorizontalInset,
+            style: style
+        ).scrollViewWidth
     }
 
     private static func kindLabelLeadingConstant(

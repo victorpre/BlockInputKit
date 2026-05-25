@@ -24,6 +24,10 @@ final class BlockInputBlockItemScrollView: NSScrollView {
         NotificationCenter.default.removeObserver(self)
     }
 
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+    }
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         guard let event else {
             return false

@@ -27,6 +27,8 @@ extension BlockInputBlockItem {
         codeBackgroundView.isHidden = true
         codeBackgroundView.alphaValue = 0
         scrollViewLeadingConstraint?.constant = Self.defaultTextLeading
+        scrollViewWidthConstraint?.priority = .defaultLow
+        scrollViewWidthConstraint?.constant = 120
         scrollViewTrailingConstraint?.constant = -Self.horizontalContentTrailingInset(allowsReordering: true)
         scrollViewTopConstraint?.constant = 0
         scrollViewBottomConstraint?.constant = 0

@@ -77,6 +77,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var kindLabelWidthConstraint: NSLayoutConstraint?
     var checklistButtonLeadingConstraint: NSLayoutConstraint?
     var scrollViewLeadingConstraint: NSLayoutConstraint?
+    var scrollViewWidthConstraint: NSLayoutConstraint?
     var scrollViewTrailingConstraint: NSLayoutConstraint?
     var scrollViewTopConstraint: NSLayoutConstraint?
     var scrollViewBottomConstraint: NSLayoutConstraint?
@@ -132,6 +133,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        if let renderedBlock {
+            updateHorizontalConstraints(for: renderedBlock)
+        }
         refreshCodeAppearanceIfNeeded()
         updateTextViewDocumentFrame()
         tableView.needsLayout = true
@@ -241,12 +245,13 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         configureReorderHandle(canReorderBlock: canReorderBlock)
         view.window?.invalidateCursorRects(for: view)
         invalidateCursorRects()
-        updateHorizontalConstraints(allowsReordering: allowsReordering, editorHorizontalInset: editorHorizontalInset)
+        updateHorizontalConstraints(for: block)
     }
 
     func updateTextDependentChrome(for block: BlockInputBlock) {
         renderedBlock = block
         configureBlockKindChrome(block: block)
+        updateHorizontalConstraints(for: block)
         updateSelectionChromeFrame()
     }
 
@@ -267,18 +272,36 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         handleView.toolTip = canReorderBlock ? "Drag to reorder block" : nil
     }
 
-    func updateHorizontalConstraints(allowsReordering: Bool, editorHorizontalInset: CGFloat) {
-        handleLeadingConstraint?.constant = Self.handleLeadingInset(
+    func updateHorizontalConstraints(for block: BlockInputBlock) {
+        let metrics = Self.horizontalMetrics(
+            for: view.bounds.width,
+            block: block,
             allowsReordering: allowsReordering,
-            editorHorizontalInset: editorHorizontalInset
+            editorHorizontalInset: editorHorizontalInset,
+            style: style
         )
-        handleWidthConstraint?.constant = allowsReordering ? Self.handleWidth : 0
-        scrollViewTrailingConstraint?.constant = -Self.horizontalContentTrailingInset(
-            allowsReordering: allowsReordering,
-            editorHorizontalInset: editorHorizontalInset
-        )
-        horizontalRuleTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: allowsReordering)
-        frontMatterDividerTrailingConstraint?.constant = -Self.horizontalRuleTrailingInset(allowsReordering: allowsReordering)
+        handleLeadingConstraint?.constant = metrics.handleLeading
+        handleWidthConstraint?.constant = metrics.handleWidth
+        kindLabelLeadingConstraint?.constant = metrics.kindLabelLeading
+        kindLabelWidthConstraint?.constant = metrics.kindLabelWidth
+        scrollViewLeadingConstraint?.constant = metrics.scrollViewLeading
+        let usesCollapsedWidth = view.bounds.width > 0 &&
+            metrics.handleWidth == 0 &&
+            metrics.scrollViewTrailingInset == 0 &&
+            abs(metrics.scrollViewWidth - view.bounds.width) <= 0.5
+        scrollViewWidthConstraint?.priority = usesCollapsedWidth ? .required : .defaultLow
+        scrollViewWidthConstraint?.constant = metrics.scrollViewWidth
+        scrollViewTrailingConstraint?.constant = -metrics.scrollViewTrailingInset
+        let horizontalRuleInset = min(Self.horizontalRuleInnerInset, max(metrics.scrollViewWidth / 2, 0))
+        horizontalRuleLeadingConstraint?.constant = horizontalRuleInset
+        horizontalRuleTrailingConstraint?.constant = -horizontalRuleInset
+        frontMatterDividerLeadingConstraint?.constant = horizontalRuleInset
+        frontMatterDividerTrailingConstraint?.constant = -horizontalRuleInset
+        if !block.kind.isImage {
+            imageBlockLeadingConstraint?.constant = 0
+            imageBlockTrailingConstraint?.constant = 0
+            imageBlockWidthConstraint?.constant = metrics.scrollViewWidth
+        }
     }
 
     func updateTableCellEditState(for block: BlockInputBlock) {

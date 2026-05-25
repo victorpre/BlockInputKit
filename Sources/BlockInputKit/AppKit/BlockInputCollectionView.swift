@@ -7,6 +7,7 @@ final class BlockInputCollectionView: NSCollectionView {
 
     override func layout() {
         super.layout()
+        blockInputView?.updateVisibleItemWidthsForCurrentWidth()
         blockInputView?.scheduleProgressivePreloadCheck()
         blockInputView?.updatePlaceholderLayout()
     }

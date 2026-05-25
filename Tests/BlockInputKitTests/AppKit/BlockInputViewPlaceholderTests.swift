@@ -49,6 +49,64 @@ final class BlockInputViewPlaceholderTests: XCTestCase {
         )
     }
 
+    func testPlaceholderStaysInsideBoundsAtNarrowWidths() throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "empty", text: "")
+            ]),
+            placeholder: "Ask anything"
+        ), size: NSSize(width: 16, height: 160), styleMask: [.borderless])
+
+        mounted.view.layoutSubtreeIfNeeded()
+        mounted.view.collectionView.layoutSubtreeIfNeeded()
+        mounted.view.updatePlaceholderLayout()
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+
+        XCTAssertGreaterThanOrEqual(mounted.view.placeholderLabel.frame.minX, mounted.view.collectionView.bounds.minX - 0.5)
+        XCTAssertLessThanOrEqual(mounted.view.placeholderLabel.frame.maxX, mounted.view.collectionView.bounds.maxX + 0.5)
+        XCTAssertEqual(
+            mounted.view.placeholderLabel.frame.minX + BlockInputPlaceholderLabel.caretAlignmentCompensation,
+            textLeadingEdge(for: item, in: mounted.view),
+            accuracy: 0.5
+        )
+    }
+
+    func testPlaceholderStaysInsideBoundsAfterNarrowWindowResize() throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "empty", text: "")
+            ]),
+            placeholder: "Ask anything"
+        ), size: NSSize(width: 720, height: 160), styleMask: [.borderless])
+
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 16, height: 160))
+        mounted.view.updatePlaceholderLayout()
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+
+        XCTAssertGreaterThanOrEqual(mounted.view.placeholderLabel.frame.minX, mounted.view.collectionView.bounds.minX - 0.5)
+        XCTAssertLessThanOrEqual(mounted.view.placeholderLabel.frame.maxX, mounted.view.collectionView.bounds.maxX + 0.5)
+        XCTAssertEqual(
+            mounted.view.placeholderLabel.frame.minX + BlockInputPlaceholderLabel.caretAlignmentCompensation,
+            textLeadingEdge(for: item, in: mounted.view),
+            accuracy: 0.5
+        )
+    }
+
+    func testPlaceholderFallbackStaysInsideBoundsWithoutMountedRows() {
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 12, height: 80))
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: []),
+            placeholder: "Empty"
+        ))
+        view.collectionView.frame = view.bounds
+        view.layoutSubtreeIfNeeded()
+        view.collectionView.layoutSubtreeIfNeeded()
+        view.updatePlaceholderLayout()
+
+        XCTAssertGreaterThanOrEqual(view.placeholderLabel.frame.minX, view.collectionView.bounds.minX - 0.5)
+        XCTAssertLessThanOrEqual(view.placeholderLabel.frame.maxX, view.collectionView.bounds.maxX + 0.5)
+    }
+
     func testPlaceholderShowsForCompleteStoreWithNoLoadedRows() {
         let store = EmptyLoadedStore(isComplete: true)
         let view = BlockInputView()

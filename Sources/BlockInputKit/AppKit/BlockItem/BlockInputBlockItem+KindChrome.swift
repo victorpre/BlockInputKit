@@ -13,7 +13,6 @@ extension BlockInputBlockItem {
             usesImageSurface = false
         }
         let contentIndent = Self.contentIndent(for: block)
-        let perLineContentIndent = Self.perLineContentIndent(for: block)
         let verticalMetrics = Self.verticalMetrics(for: block)
         textView.textContainerInset = textContainerInset(for: kind, metrics: verticalMetrics)
         textView.isEditable = isEditable && !isHorizontalRule && !usesTableSurface
@@ -37,17 +36,12 @@ extension BlockInputBlockItem {
             font: Self.font(for: block.kind, style: style),
             checkboxHeight: Self.checklistButtonHeight
         )
-        kindLabelLeadingConstraint?.constant = kindLabelLeadingConstant(for: block, contentIndent: contentIndent)
-        kindLabelWidthConstraint?.constant = kindLabelWidthConstant(for: block, perLineContentIndent: perLineContentIndent)
-        scrollViewLeadingConstraint?.constant = textLeadingConstant(
-            for: kind,
-            perLineContentIndent: perLineContentIndent
-        )
         horizontalRuleLeadingConstraint?.constant = Self.horizontalRuleInnerInset
         quoteBarView.isHidden = kind != .quote || isHorizontalRule
         quoteBarView.alphaValue = quoteBarView.isHidden ? 0 : 1
         horizontalRuleView.setVisible(isHorizontalRule)
         applyKindLabelAttributes(for: block)
+        updateHorizontalConstraints(for: block)
         updateQuoteBarVerticalExtent()
         configureChecklistButton(for: block, contentIndent: contentIndent)
         updateImageBlockLayout(for: block)
@@ -86,57 +80,6 @@ extension BlockInputBlockItem {
             checklistButton.state = .off
             checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
         }
-    }
-
-    func kindLabelLeadingConstant(for block: BlockInputBlock, contentIndent: CGFloat) -> CGFloat {
-        switch block.kind {
-        case .quote, .bulletedListItem, .numberedListItem, .checklistItem:
-            return markerAlignmentLeading() + contentIndent
-        case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
-            return contentIndent
-        }
-    }
-
-    func kindLabelWidthConstant(
-        for block: BlockInputBlock,
-        perLineContentIndent: CGFloat
-    ) -> CGFloat {
-        guard block.kind.needsVisibleMarkerLane else {
-            return 0
-        }
-        if block.kind == .quote {
-            return 0
-        }
-        return Self.markerGutterWidth(for: block, style: style) + perLineContentIndent
-    }
-
-    func textLeadingConstant(
-        for kind: BlockInputBlockKind,
-        perLineContentIndent: CGFloat
-    ) -> CGFloat {
-        if kind == .quote {
-            return Self.quoteTextLeading
-        }
-        if kind.supportsIndentation {
-            return Self.listTextLeading - perLineContentIndent
-        }
-        return Self.textScrollViewEdgeInset(
-            allowsReordering: allowsReordering,
-            editorHorizontalInset: editorHorizontalInset
-        ) - Self.handleTrailingX(
-            allowsReordering: allowsReordering,
-            editorHorizontalInset: editorHorizontalInset
-        )
-    }
-
-    private func markerAlignmentLeading() -> CGFloat {
-        Self.visualContentInset(
-            allowsReordering: allowsReordering,
-            editorHorizontalInset: editorHorizontalInset
-        ) - Self.handleTrailingX(
-            allowsReordering: allowsReordering,
-            editorHorizontalInset: editorHorizontalInset
-        )
     }
 
     func textContainerInset(

@@ -57,6 +57,8 @@ extension BlockInputBlockItem {
         scrollView.hasHorizontalScroller = false
         scrollView.borderType = .noBorder
         scrollView.documentView = textView
+        scrollView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        scrollView.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
@@ -83,11 +85,13 @@ extension BlockInputBlockItem {
 
     private func setupTableView() {
         tableView.isHidden = true
+        tableView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     }
 
     private func setupImageBlockView() {
         imageBlockView.blockItem = self
         imageBlockView.isHidden = true
+        imageBlockView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     }
 
     private func setupImageCaretView() {
@@ -196,6 +200,8 @@ extension BlockInputBlockItem {
             constant: Self.defaultTextLeading
         )
         self.scrollViewLeadingConstraint = scrollViewLeadingConstraint
+        let scrollViewWidthConstraint = makeScrollViewWidthConstraint()
+        self.scrollViewWidthConstraint = scrollViewWidthConstraint
         let scrollViewTopConstraint = scrollView.topAnchor.constraint(equalTo: view.topAnchor)
         self.scrollViewTopConstraint = scrollViewTopConstraint
         let scrollViewBottomConstraint = scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
@@ -230,6 +236,7 @@ extension BlockInputBlockItem {
             quoteBarBottomConstraint,
             quoteBarView.widthAnchor.constraint(equalToConstant: Self.quoteBarWidth),
             scrollViewLeadingConstraint,
+            scrollViewWidthConstraint,
             scrollViewTrailingConstraint,
             scrollViewTopConstraint,
             scrollViewBottomConstraint,
@@ -300,6 +307,12 @@ extension BlockInputBlockItem {
             equalTo: view.trailingAnchor,
             constant: -Self.horizontalContentTrailingInset(allowsReordering: true)
         )
+    }
+
+    private func makeScrollViewWidthConstraint() -> NSLayoutConstraint {
+        let constraint = scrollView.widthAnchor.constraint(equalToConstant: 120)
+        constraint.priority = .defaultLow
+        return constraint
     }
 
     private func makeHorizontalRuleTrailingConstraint() -> NSLayoutConstraint {

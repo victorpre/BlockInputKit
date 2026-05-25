@@ -60,6 +60,22 @@ final class BlockInputViewHeightSizingTests: XCTestCase {
         XCTAssertGreaterThan(view.preferredHeight(forWidth: 720), wideHeight)
     }
 
+    func testSizingUsesActualVeryNarrowWrappingWidth() {
+        let block = BlockInputBlock(id: "first", text: Array(repeating: "a", count: 40).joined(separator: " "))
+        let narrowTextWidth = BlockInputBlockItem.measuredTextWidth(
+            for: 16,
+            block: block,
+            allowsReordering: true
+        )
+        let widerTextWidth = BlockInputBlockItem.measuredTextWidth(
+            for: 140,
+            block: block,
+            allowsReordering: true
+        )
+
+        XCTAssertLessThan(narrowTextWidth, widerTextWidth)
+    }
+
     func testMaximumLineCountCannotShrinkBelowDefaultLineCount() {
         let view = configuredView(text: "Short", defaultLines: 5, maxLines: 2)
 

@@ -45,8 +45,7 @@ extension BlockInputView {
         scrollView.blockInputView = self
         scrollView.documentView = collectionView
         scrollView.onContentBoundsDidChange = { [weak self] in
-            self?.scheduleProgressivePreloadCheck()
-            self?.dismissCompletionPopup()
+            self?.handleDocumentScrollContentBoundsChange()
         }
 
         addSubview(scrollView)
@@ -57,5 +56,11 @@ extension BlockInputView {
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
+    }
+
+    private func handleDocumentScrollContentBoundsChange() {
+        updateCollectionViewWidthForVisibleBounds()
+        scheduleProgressivePreloadCheck()
+        dismissCompletionPopup()
     }
 }
