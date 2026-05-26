@@ -254,6 +254,28 @@ extension BlockInputTextView {
         }
     }
 
+    func inlineChipBackgroundRectsForTesting() -> [NSRect] {
+        guard supportsInlineMarkdownLinkRendering,
+              let layoutManager,
+              let textContainer else {
+            return []
+        }
+        layoutManager.ensureLayout(for: textContainer)
+        return inlineChipVisualRangesForCurrentText().flatMap { chipRange -> [NSRect] in
+            let characterRange = string.linkCursorClampedRange(chipRange.contentRange)
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
+                .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
+            guard glyphRange.length > 0 else {
+                return []
+            }
+            return inlineChipBackgroundRects(
+                glyphRange: glyphRange,
+                layoutManager: layoutManager,
+                textContainer: textContainer
+            )
+        }
+    }
+
     private func linkCursorRects(
         glyphRange: NSRange,
         layoutManager: NSLayoutManager,
@@ -324,21 +346,39 @@ extension BlockInputTextView {
         textContainer: NSTextContainer
     ) -> [NSRect] {
         let drawingOffset = textContainerOrigin
-        let selectedGlyphRange = NSRange(location: NSNotFound, length: 0)
+        let baseLineHeight = inlineChipBaseLineHeight(layoutManager: layoutManager)
         var rects: [NSRect] = []
-        layoutManager.enumerateEnclosingRects(
-            forGlyphRange: glyphRange,
-            withinSelectedGlyphRange: selectedGlyphRange,
-            in: textContainer
-        ) { enclosingRect, _ in
-            rects.append(NSRect(
-                x: enclosingRect.minX + drawingOffset.x - 2,
-                y: enclosingRect.minY + drawingOffset.y - 2,
-                width: enclosingRect.width + 4,
-                height: enclosingRect.height + 4
-            ))
+        var glyphIndex = glyphRange.location
+        while glyphIndex < NSMaxRange(glyphRange) {
+            var lineGlyphRange = NSRange()
+            let lineFragmentRect = layoutManager.lineFragmentUsedRect(forGlyphAt: glyphIndex, effectiveRange: &lineGlyphRange)
+            let lineChipGlyphRange = NSIntersectionRange(glyphRange, lineGlyphRange)
+            if lineChipGlyphRange.length > 0 {
+                let labelRect = layoutManager.boundingRect(forGlyphRange: lineChipGlyphRange, in: textContainer)
+                let visualHeight = max(baseLineHeight, labelRect.height)
+                let centeredYOffset = floor(max(lineFragmentRect.height - visualHeight, 0) / 2)
+                let visualY = lineFragmentRect.minY + centeredYOffset
+
+                rects.append(NSRect(
+                    x: labelRect.minX + drawingOffset.x - 2,
+                    y: visualY + drawingOffset.y - 2,
+                    width: labelRect.width + 4,
+                    height: visualHeight + 4
+                ))
+            }
+            glyphIndex = max(glyphIndex + 1, NSMaxRange(lineGlyphRange))
         }
         return rects
+    }
+
+    private func inlineChipBaseLineHeight(layoutManager: NSLayoutManager) -> CGFloat {
+        let baseFont = blockItem?.renderedBlock.map {
+            BlockInputBlockItem.font(for: $0.kind, style: blockItem?.style ?? .default)
+        } ?? font
+        guard let baseFont else {
+            return 0
+        }
+        return ceil(max(layoutManager.defaultLineHeight(for: baseFont), baseFont.boundingRectForFont.height))
     }
 
     private func drawInlineChipBackground(in rect: NSRect, style: BlockInputInlineChipStyle) {

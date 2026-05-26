@@ -160,14 +160,24 @@ extension BlockInputBlockItem {
         baseFont: NSFont,
         style: BlockInputInlineChipStyle
     ) {
+        let chipFont = inlineChipFont(for: baseFont)
         textStorage.addAttributes(
             [
-                .font: NSFont.monospacedSystemFont(ofSize: max(baseFont.pointSize * 0.94, 1), weight: .regular),
+                .font: chipFont,
                 .foregroundColor: style.foregroundColor,
+                .baselineOffset: inlineChipBaselineOffset(baseFont: baseFont, chipFont: chipFont),
                 .blockInputInlineChip: true
             ],
             range: range
         )
+    }
+
+    private static func inlineChipFont(for baseFont: NSFont) -> NSFont {
+        .monospacedSystemFont(ofSize: max(baseFont.pointSize * 0.94, 1), weight: .regular)
+    }
+
+    private static func inlineChipBaselineOffset(baseFont: NSFont, chipFont: NSFont) -> CGFloat {
+        max(0, ceil(baseFont.ascender - chipFont.ascender))
     }
 
     private static func applyInlineChipAdjacentWhitespaceSpacers(

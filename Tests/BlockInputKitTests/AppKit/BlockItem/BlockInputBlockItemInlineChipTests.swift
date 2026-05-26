@@ -43,6 +43,42 @@ final class BlockInputBlockItemInlineChipTests: XCTestCase {
         XCTAssertNil(textStorage.attribute(.kern, at: closingParenthesisOffset, effectiveRange: nil))
     }
 
+    func testFileLinkChipBackgroundHeightStaysStableWhenFollowingTextAppears() throws {
+        let link = "[.agents/skills/watermark-portfolio-images/gingerink.ttf](<file:///tmp/gingerink.ttf>)"
+        let chipOnlyRect = try onlyChipBackgroundRect(for: link)
+        let trailingSpaceRect = try onlyChipBackgroundRect(for: "\(link) ")
+        let trailingTextRect = try onlyChipBackgroundRect(for: "\(link) x")
+
+        XCTAssertEqual(trailingSpaceRect.height, chipOnlyRect.height, accuracy: 0.001)
+        XCTAssertEqual(trailingTextRect.height, chipOnlyRect.height, accuracy: 0.001)
+        XCTAssertEqual(trailingSpaceRect.minY, chipOnlyRect.minY, accuracy: 0.001)
+        XCTAssertEqual(trailingTextRect.minY, chipOnlyRect.minY, accuracy: 0.001)
+    }
+
+    func testFileLinkChipTextPositionStaysStableWhenFollowingTextAppears() throws {
+        let link = "[.agents/skills/watermark-portfolio-images/gingerink.ttf](<file:///tmp/gingerink.ttf>)"
+        let chipOnlyRect = try onlyChipRenderedTextBounds(for: link)
+        let trailingSpaceRect = try onlyChipRenderedTextBounds(for: "\(link) ")
+        let trailingTextRect = try onlyChipRenderedTextBounds(for: "\(link) x")
+
+        XCTAssertEqual(trailingSpaceRect.minY, chipOnlyRect.minY, accuracy: 0.001)
+        XCTAssertEqual(trailingTextRect.minY, chipOnlyRect.minY, accuracy: 0.001)
+    }
+
+    func testFileLinkChipTextPositionStaysStableWithCustomBaseFontWhenFollowingTextAppears() throws {
+        let link = "[.agents/skills/watermark-portfolio-images/gingerink.ttf](<file:///tmp/gingerink.ttf>)"
+        let style = BlockInputStyle(
+            baseText: BlockInputTextStyle(font: .systemFont(ofSize: 18, weight: .medium)),
+            fileChip: BlockInputInlineChipStyle(fillColor: nil, strokeColor: nil, foregroundColor: .black)
+        )
+        let chipOnlyRect = try onlyChipRenderedTextBounds(for: link, style: style)
+        let trailingSpaceRect = try onlyChipRenderedTextBounds(for: "\(link) ", style: style)
+        let trailingTextRect = try onlyChipRenderedTextBounds(for: "\(link) x", style: style)
+
+        XCTAssertEqual(trailingSpaceRect.minY, chipOnlyRect.minY, accuracy: 0.001)
+        XCTAssertEqual(trailingTextRect.minY, chipOnlyRect.minY, accuracy: 0.001)
+    }
+
     func testSlashCommandLinkRendersAsReusableChip() throws {
         let text = "Run [/table](host-app://commands/table) today"
         let item = BlockInputBlockItem.configuredForTesting(
@@ -306,11 +342,129 @@ final class BlockInputBlockItemInlineChipTests: XCTestCase {
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentLocation("file", in: text), effectiveRange: nil) as? NSColor, .systemBlue)
     }
 
+    func testReconfiguringItemClearsStaleChipBaselineOffset() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "[file](file:///tmp/demo.md)"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        var textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+        XCTAssertNotNil(textStorage.attribute(.baselineOffset, at: contentLocation("file", in: textStorage.string), effectiveRange: nil))
+
+        item.configure(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "plain file"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+
+        textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+        XCTAssertNil(textStorage.attribute(.baselineOffset, at: 0, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineChip, at: 0, effectiveRange: nil))
+    }
+
     private func font(at location: Int, in textStorage: NSTextStorage) throws -> NSFont {
         try XCTUnwrap(textStorage.attribute(.font, at: location, effectiveRange: nil) as? NSFont)
     }
 
     private func contentLocation(_ content: String, in text: String) -> Int {
         (text as NSString).range(of: content).location
+    }
+
+    private func onlyChipBackgroundRect(for text: String) throws -> NSRect {
+        let mounted = makeMountedBlockInputView(
+            blocks: [BlockInputBlock(id: "paragraph", kind: .paragraph, text: text)]
+        )
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 1_400, height: 240))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.layoutManager?.ensureLayout(for: try XCTUnwrap(textView.textContainer))
+        let rects = textView.inlineChipBackgroundRectsForTesting()
+
+        return try XCTUnwrap(rects.only)
+    }
+
+    private func onlyChipRenderedTextBounds(
+        for text: String,
+        style: BlockInputStyle = BlockInputStyle(fileChip: BlockInputInlineChipStyle(fillColor: nil, strokeColor: nil, foregroundColor: .black))
+    ) throws -> NSRect {
+        let chipLabel = ".agents/skills/watermark-portfolio-images/gingerink.ttf"
+        let link = "[\(chipLabel)](<file:///tmp/gingerink.ttf>)"
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [BlockInputBlock(id: "paragraph", kind: .paragraph, text: text)]),
+            style: style
+        ))
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 1_400, height: 240))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        if text.utf16.count > link.utf16.count {
+            textView.textStorage?.addAttribute(
+                .foregroundColor,
+                value: NSColor.clear,
+                range: NSRange(location: link.utf16.count, length: text.utf16.count - link.utf16.count)
+            )
+        }
+        textView.layoutManager?.ensureLayout(for: try XCTUnwrap(textView.textContainer))
+        return try renderedForegroundBounds(in: textView)
+    }
+
+}
+
+@MainActor
+private func renderedForegroundBounds(in textView: NSTextView) throws -> NSRect {
+    let scale: CGFloat = 2
+    let bounds = textView.bounds
+    let pixelWidth = max(1, Int(ceil(bounds.width * scale)))
+    let pixelHeight = max(1, Int(ceil(bounds.height * scale)))
+    let bitmap = try XCTUnwrap(NSBitmapImageRep(
+        bitmapDataPlanes: nil,
+        pixelsWide: pixelWidth,
+        pixelsHigh: pixelHeight,
+        bitsPerSample: 8,
+        samplesPerPixel: 4,
+        hasAlpha: true,
+        isPlanar: false,
+        colorSpaceName: .deviceRGB,
+        bytesPerRow: 0,
+        bitsPerPixel: 0
+    ))
+    bitmap.size = bounds.size
+    let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = context
+    NSColor.white.setFill()
+    bounds.fill()
+    textView.displayIgnoringOpacity(bounds, in: context)
+    NSGraphicsContext.restoreGraphicsState()
+
+    var minX = pixelWidth
+    var minY = pixelHeight
+    var maxX = -1
+    var maxY = -1
+    for pixelY in 0..<pixelHeight {
+        for pixelX in 0..<pixelWidth {
+            guard let color = bitmap.colorAt(x: pixelX, y: pixelY)?.usingColorSpace(.deviceRGB),
+                  color.redComponent < 0.95 || color.greenComponent < 0.95 || color.blueComponent < 0.95 else {
+                continue
+            }
+            minX = min(minX, pixelX)
+            minY = min(minY, pixelY)
+            maxX = max(maxX, pixelX)
+            maxY = max(maxY, pixelY)
+        }
+    }
+    guard maxX >= minX, maxY >= minY else {
+        return try XCTUnwrap(Optional<NSRect>.none)
+    }
+    return NSRect(
+        x: CGFloat(minX) / scale,
+        y: CGFloat(minY) / scale,
+        width: CGFloat(maxX - minX + 1) / scale,
+        height: CGFloat(maxY - minY + 1) / scale
+    )
+}
+
+private extension Array {
+    var only: Element? {
+        count == 1 ? first : nil
     }
 }
