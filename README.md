@@ -306,6 +306,23 @@ BlockInputCompletionPopupConfiguration(placement: .overlay) { context in
 }
 ```
 
+Pass `style:` to customize the built-in popup chrome without replacing the editor-owned interaction model:
+
+```swift
+BlockInputCompletionPopupConfiguration(
+    placement: .overlay,
+    style: BlockInputCompletionPopupStyle(
+        backgroundColor: popupBackground,
+        borderColor: popupBorder,
+        highlightedRowBackgroundColor: selectedRowBackground,
+        highlightedRowCornerRadius: selectedRowCornerRadius
+    ),
+    overlayProvider: overlayProvider
+)
+```
+
+When `highlightedRowCornerRadius` is omitted, selected rows use the popup `cornerRadius`.
+
 ### File Mentions
 
 For file mentions in paragraphs or headings, return a file-link suggestion:

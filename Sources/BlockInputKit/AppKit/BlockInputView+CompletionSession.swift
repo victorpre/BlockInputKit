@@ -371,6 +371,14 @@ extension BlockInputView {
         }
     }
 
+    func refreshCompletionPopupPresentation() {
+        guard let completionSession else {
+            positionCompletionPopup()
+            return
+        }
+        showCompletionPopup(for: completionSession)
+    }
+
     private func showCompletionPopup(for session: BlockInputCompletionSession) {
         let popup = completionPopupView ?? BlockInputCompletionPopupView()
         completionPopupView = popup
@@ -383,6 +391,7 @@ extension BlockInputView {
         )
         popup.configure(
             state: state,
+            style: completionPopupConfiguration.style,
             onSelect: { [weak self] suggestion in
                 self?.acceptCompletionSuggestionFromPopup(suggestion)
             },

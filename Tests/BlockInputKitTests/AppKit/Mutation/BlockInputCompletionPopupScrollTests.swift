@@ -34,6 +34,7 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
                 isLoading: false,
                 sessionID: UUID()
             ),
+            style: .default,
             onSelect: { _ in },
             onHighlight: { _ in }
         )
@@ -55,6 +56,7 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
                     isLoading: false,
                     sessionID: sessionID
                 ),
+                style: .default,
                 onSelect: { _ in },
                 onHighlight: { index in configurePopup(highlightedIndex: index) }
             )
@@ -89,6 +91,7 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
                     isLoading: false,
                     sessionID: sessionID
                 ),
+                style: .default,
                 onSelect: { _ in },
                 onHighlight: { index in configurePopup(highlightedIndex: index) }
             )
@@ -156,6 +159,7 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
 
         popup.configure(
             state: BlockInputCompletionPopupState(suggestions: [], highlightedIndex: 0, isLoading: false),
+            style: .default,
             onSelect: { _ in },
             onHighlight: { _ in }
         )
@@ -166,6 +170,7 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
 
         popup.configure(
             state: BlockInputCompletionPopupState(suggestions: [], highlightedIndex: 0, isLoading: true),
+            style: .default,
             onSelect: { _ in },
             onHighlight: { _ in }
         )
@@ -200,6 +205,7 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
         let sessionID = UUID()
         popup.configure(
             state: BlockInputCompletionPopupState(suggestions: [], highlightedIndex: 0, isLoading: true, sessionID: sessionID),
+            style: .default,
             onSelect: { _ in },
             onHighlight: { _ in }
         )
@@ -213,6 +219,7 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
                 isLoading: false,
                 sessionID: sessionID
             ),
+            style: .default,
             onSelect: { _ in },
             onHighlight: { _ in XCTFail("Stationary hover should not update highlight") }
         )
@@ -346,6 +353,7 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
                 isLoading: false,
                 sessionID: sessionID
             ),
+            style: .default,
             onSelect: { _ in },
             onHighlight: onHighlight
         )

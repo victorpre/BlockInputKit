@@ -171,7 +171,7 @@ extension BlockInputView {
             !Self.sameCompletionProvider(previousCompletionProvider, completionProvider) {
             dismissCompletionPopup()
         } else {
-            positionCompletionPopup()
+            refreshCompletionPopupPresentation()
         }
     }
 

@@ -1,6 +1,5 @@
 import AppKit
 
-private let completionPopupCornerRadius: CGFloat = 10
 private let completionRowHeight: CGFloat = 36
 private let completionRowSpacing: CGFloat = 4
 private let completionPopupInset: CGFloat = 8
@@ -24,6 +23,7 @@ final class BlockInputCompletionPopupView: NSView {
     private let loadingIndicator = NSProgressIndicator()
     private let loadingField = NSTextField(labelWithString: "Loading suggestions...")
     private let emptyField = NSTextField(labelWithString: "No matches")
+    private var popupStyle = BlockInputCompletionPopupStyle.default
     private var visibleStartIndex = 0
     private var visibleSessionID: UUID?
     private var visibleSuggestionIDs: [String] = []
@@ -43,6 +43,10 @@ final class BlockInputCompletionPopupView: NSView {
 
     var visibleSuggestionIndexesForTesting: [Int] {
         Array(visibleStartIndex..<(visibleStartIndex + rowViews.count))
+    }
+
+    var popupStyleForTesting: BlockInputCompletionPopupStyle {
+        popupStyle
     }
 
     func visibleSuggestionPointForTesting(title: String) -> NSPoint? {
@@ -70,14 +74,17 @@ final class BlockInputCompletionPopupView: NSView {
 
     func configure(
         state: BlockInputCompletionPopupState,
+        style: BlockInputCompletionPopupStyle,
         onSelect: @escaping (BlockInputCompletionSuggestion) -> Void,
         onHighlight: @escaping (Int) -> Void
     ) {
         let previousState = self.state
         self.state = state
+        popupStyle = style
         self.onSelect = onSelect
         self.onHighlight = onHighlight
         guard previousState != state else {
+            applyPopupStyleWithoutRebuild()
             return
         }
         rebuild()
@@ -199,15 +206,20 @@ final class BlockInputCompletionPopupView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        completionPopupFillColor().setFill()
-        NSBezierPath(roundedRect: bounds, xRadius: completionPopupCornerRadius, yRadius: completionPopupCornerRadius).fill()
-        NSColor.separatorColor.withAlphaComponent(0.24).setStroke()
+        popupStyle.backgroundColor.setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: popupStyle.cornerRadius, yRadius: popupStyle.cornerRadius).fill()
+        guard let borderColor = popupStyle.borderColor,
+              popupStyle.borderWidth > 0 else {
+            return
+        }
+        borderColor.setStroke()
+        let borderInset = popupStyle.borderWidth / 2
         let stroke = NSBezierPath(
-            roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
-            xRadius: completionPopupCornerRadius,
-            yRadius: completionPopupCornerRadius
+            roundedRect: bounds.insetBy(dx: borderInset, dy: borderInset),
+            xRadius: popupStyle.cornerRadius,
+            yRadius: popupStyle.cornerRadius
         )
-        stroke.lineWidth = 1
+        stroke.lineWidth = popupStyle.borderWidth
         stroke.stroke()
     }
 
@@ -307,6 +319,7 @@ final class BlockInputCompletionPopupView: NSView {
         suggestion: BlockInputCompletionSuggestion
     ) -> BlockInputCompletionPopupRowView {
         let row = BlockInputCompletionPopupRowView()
+        row.applyPopupStyle(popupStyle)
         row.configure(
             suggestion: suggestion,
             index: index,
@@ -339,6 +352,11 @@ final class BlockInputCompletionPopupView: NSView {
             preserveVisibleWindowOnNextHighlight = true
         }
         onHighlight(index)
+    }
+
+    private func applyPopupStyleWithoutRebuild() {
+        rowViews.forEach { $0.applyPopupStyle(popupStyle) }
+        needsDisplay = true
     }
 
     private func updateHoverSuppression(for event: NSEvent) {
@@ -412,12 +430,4 @@ final class BlockInputCompletionPopupView: NSView {
         event.scrollingDeltaY != 0 ? event.scrollingDeltaY : event.deltaY
     }
 
-    private func completionPopupFillColor() -> NSColor {
-        switch effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) {
-        case .darkAqua:
-            return NSColor(calibratedRed: 0.16, green: 0.16, blue: 0.17, alpha: 1)
-        default:
-            return NSColor(calibratedRed: 0.96, green: 0.96, blue: 0.97, alpha: 1)
-        }
-    }
 }

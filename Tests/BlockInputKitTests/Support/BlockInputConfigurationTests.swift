@@ -109,6 +109,14 @@ final class BlockInputConfigurationTests: XCTestCase {
         let provider = ConfigurationCompletionProvider()
         let view = BlockInputView()
         let container = NSView()
+        let popupStyle = BlockInputCompletionPopupStyle(
+            backgroundColor: .systemRed,
+            borderColor: .systemBlue,
+            highlightedRowBackgroundColor: .systemGreen,
+            highlightedRowCornerRadius: 8,
+            cornerRadius: 12,
+            borderWidth: 2
+        )
 
         view.configure(BlockInputConfiguration(
             completionProvider: provider,
@@ -117,6 +125,7 @@ final class BlockInputConfigurationTests: XCTestCase {
             slashCommandChipClickHandler: { _ in .hostHandled },
             completionPopupConfiguration: BlockInputCompletionPopupConfiguration(
                 placement: .overlay,
+                style: popupStyle,
                 overlayProvider: { context in
                     BlockInputCompletionPopupOverlay(container: container, frame: context.defaultFrame)
                 }
@@ -128,6 +137,12 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(view.slashCommandAvailability, .anywhere)
         XCTAssertNotNil(view.slashCommandChipClickHandler)
         XCTAssertEqual(view.completionPopupPlacement, .overlay)
+        XCTAssertEqual(view.completionPopupConfiguration.style.backgroundColor, .systemRed)
+        XCTAssertEqual(view.completionPopupConfiguration.style.borderColor, .systemBlue)
+        XCTAssertEqual(view.completionPopupConfiguration.style.highlightedRowBackgroundColor, .systemGreen)
+        XCTAssertEqual(view.completionPopupConfiguration.style.highlightedRowCornerRadius, 8)
+        XCTAssertEqual(view.completionPopupConfiguration.style.cornerRadius, 12)
+        XCTAssertEqual(view.completionPopupConfiguration.style.borderWidth, 2)
         let overlay = view.completionPopupConfiguration.overlayProvider?(BlockInputCompletionPopupOverlayContext(
             editorView: view,
             defaultContainer: view,
@@ -146,6 +161,25 @@ final class BlockInputConfigurationTests: XCTestCase {
         configuration.completionPopupPlacement = .caret
 
         XCTAssertEqual(configuration.completionPopupConfiguration.placement, .caret)
+    }
+
+    func testCompletionPopupStyleClampsNegativeMetrics() {
+        let style = BlockInputCompletionPopupStyle(highlightedRowCornerRadius: -6, cornerRadius: -4, borderWidth: -1)
+
+        XCTAssertEqual(style.highlightedRowCornerRadius, 0)
+        XCTAssertEqual(style.cornerRadius, 0)
+        XCTAssertEqual(style.borderWidth, 0)
+    }
+
+    func testCompletionPopupStyleDefaultsHighlightedRowCornerRadiusToPopupRadius() {
+        var style = BlockInputCompletionPopupStyle(cornerRadius: 12)
+
+        XCTAssertNil(style.highlightedRowCornerRadius)
+        XCTAssertEqual(style.resolvedHighlightedRowCornerRadius, 12)
+
+        style.cornerRadius = 7
+
+        XCTAssertEqual(style.resolvedHighlightedRowCornerRadius, 7)
     }
 
     @MainActor

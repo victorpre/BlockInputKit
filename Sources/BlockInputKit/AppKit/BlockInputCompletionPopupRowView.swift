@@ -1,7 +1,5 @@
 import AppKit
 
-private let completionRowCornerRadius: CGFloat = 6
-
 @MainActor
 final class BlockInputCompletionPopupRowView: NSView {
     private let iconView = NSImageView()
@@ -11,10 +9,15 @@ final class BlockInputCompletionPopupRowView: NSView {
     private var trackingArea: NSTrackingArea?
     private var index = 0
     private var isHighlighted = false
+    private var popupStyle = BlockInputCompletionPopupStyle.default
     private var onSelect: () -> Void = {}
     private var onScrollWheel: (NSEvent) -> Bool = { _ in false }
     private var shouldHighlight: (NSEvent, Bool) -> Bool = { _, _ in true }
     private var onHighlight: (Int) -> Void = { _ in }
+
+    var highlightedRowCornerRadiusForTesting: CGFloat {
+        popupStyle.resolvedHighlightedRowCornerRadius
+    }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
@@ -53,6 +56,11 @@ final class BlockInputCompletionPopupRowView: NSView {
             NSImage(systemSymbolName: Self.fallbackIconSystemName(for: suggestion), accessibilityDescription: suggestion.title)
         setAccessibilityLabel(accessibilityLabel(for: suggestion))
         needsLayout = true
+        needsDisplay = true
+    }
+
+    func applyPopupStyle(_ popupStyle: BlockInputCompletionPopupStyle) {
+        self.popupStyle = popupStyle
         needsDisplay = true
     }
 
@@ -140,8 +148,9 @@ final class BlockInputCompletionPopupRowView: NSView {
         guard isHighlighted else {
             return
         }
-        NSColor.controlAccentColor.withAlphaComponent(0.13).setFill()
-        NSBezierPath(roundedRect: bounds, xRadius: completionRowCornerRadius, yRadius: completionRowCornerRadius).fill()
+        popupStyle.highlightedRowBackgroundColor.setFill()
+        let cornerRadius = popupStyle.resolvedHighlightedRowCornerRadius
+        NSBezierPath(roundedRect: bounds, xRadius: cornerRadius, yRadius: cornerRadius).fill()
     }
 
     private func completionDetailWidth() -> CGFloat {
