@@ -41,6 +41,74 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
         XCTAssertEqual(popup.visibleSuggestionTitlesForTesting.first, "File0.md")
     }
 
+    func testPointerHoverPreservesVisibleWindowWhenHighlightChanges() throws {
+        let suggestions = popupFileSuggestions(count: 10)
+        let popup = BlockInputCompletionPopupView(frame: NSRect(x: 0, y: 0, width: 320, height: 256))
+        let sessionID = UUID()
+        var currentHighlight = 0
+        func configurePopup(highlightedIndex: Int) {
+            currentHighlight = highlightedIndex
+            popup.configure(
+                state: BlockInputCompletionPopupState(
+                    suggestions: suggestions,
+                    highlightedIndex: highlightedIndex,
+                    isLoading: false,
+                    sessionID: sessionID
+                ),
+                onSelect: { _ in },
+                onHighlight: { index in configurePopup(highlightedIndex: index) }
+            )
+            popup.layoutSubtreeIfNeeded()
+            popup.layout()
+        }
+        configurePopup(highlightedIndex: 0)
+        scrollPopupDownTwice(popup)
+        XCTAssertEqual(popup.visibleSuggestionIndexesForTesting, [2, 3, 4, 5, 6, 7])
+        let point = try XCTUnwrap(popup.visibleSuggestionPointForTesting(title: "File7.md"))
+
+        XCTAssertTrue(popup.routeMouseMoved(
+            at: point,
+            event: try mouseMovedEvent(location: NSPoint(x: point.x + 1, y: point.y), windowNumber: 0)
+        ))
+
+        XCTAssertEqual(currentHighlight, 7)
+        XCTAssertEqual(popup.visibleSuggestionIndexesForTesting, [2, 3, 4, 5, 6, 7])
+    }
+
+    func testMouseDownPreservesVisibleWindowWhenHighlightChanges() throws {
+        let suggestions = popupFileSuggestions(count: 10)
+        let popup = BlockInputCompletionPopupView(frame: NSRect(x: 0, y: 0, width: 320, height: 256))
+        let sessionID = UUID()
+        var currentHighlight = 0
+        func configurePopup(highlightedIndex: Int) {
+            currentHighlight = highlightedIndex
+            popup.configure(
+                state: BlockInputCompletionPopupState(
+                    suggestions: suggestions,
+                    highlightedIndex: highlightedIndex,
+                    isLoading: false,
+                    sessionID: sessionID
+                ),
+                onSelect: { _ in },
+                onHighlight: { index in configurePopup(highlightedIndex: index) }
+            )
+            popup.layoutSubtreeIfNeeded()
+            popup.layout()
+        }
+        configurePopup(highlightedIndex: 0)
+        scrollPopupDownTwice(popup)
+        XCTAssertEqual(popup.visibleSuggestionIndexesForTesting, [2, 3, 4, 5, 6, 7])
+        let point = try XCTUnwrap(popup.visibleSuggestionPointForTesting(title: "File6.md"))
+
+        XCTAssertTrue(popup.routeMouseDown(
+            at: point,
+            event: try mouseDownEvent(location: point, windowNumber: 0)
+        ))
+
+        XCTAssertEqual(currentHighlight, 6)
+        XCTAssertEqual(popup.visibleSuggestionIndexesForTesting, [2, 3, 4, 5, 6, 7])
+    }
+
     func testPopupRowScrollWheelRoutesToPopup() throws {
         let popup = makePopup(suggestions: popupFileSuggestions(count: 8))
         let row = try rowView(label: "File5.md", in: popup)
@@ -105,6 +173,8 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
             at: NSPoint(x: popup.bounds.midX, y: popup.bounds.midY),
             event: TestScrollWheelEvent(deltaY: -1)
         ))
+        popup.layoutSubtreeIfNeeded()
+        popup.layout()
     }
 
     func testPopupUsesDeltaYFallbackForWheelDirection() {
@@ -151,6 +221,117 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
         bottomRow.mouseEntered(with: try mouseMovedEvent(location: bottomRowWindowPoint, windowNumber: window.windowNumber))
     }
 
+    func testPopupMouseMonitorConsumesScrollWheelInsidePopup() async throws {
+        let mounted = try await startCompletion()
+        let popup = try XCTUnwrap(mounted.view.completionPopupView)
+        let row = try rowView(label: "File5.md", in: popup)
+        let rowWindowPoint = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+        let initialScrollOrigin = mounted.view.scrollView.contentView.bounds.origin
+
+        let result = mounted.view.handleCompletionPopupMouseEvent(TestScrollWheelEvent(
+            window: mounted.window,
+            location: rowWindowPoint,
+            deltaY: -1
+        ))
+
+        XCTAssertNil(result)
+        XCTAssertEqual(popup.visibleSuggestionTitlesForTesting.first, "File1.md")
+        XCTAssertEqual(mounted.view.scrollView.contentView.bounds.origin, initialScrollOrigin)
+    }
+
+    func testPopupMouseMonitorConsumesBoundaryScrollWheelInsidePopup() async throws {
+        let mounted = try await startCompletion()
+        let popup = try XCTUnwrap(mounted.view.completionPopupView)
+        let row = try rowView(label: "File0.md", in: popup)
+        let rowWindowPoint = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+        let initialScrollOrigin = mounted.view.scrollView.contentView.bounds.origin
+
+        let result = mounted.view.handleCompletionPopupMouseEvent(TestScrollWheelEvent(
+            window: mounted.window,
+            location: rowWindowPoint,
+            deltaY: 1
+        ))
+
+        XCTAssertNil(result)
+        XCTAssertEqual(popup.visibleSuggestionTitlesForTesting.first, "File0.md")
+        XCTAssertEqual(mounted.view.scrollView.contentView.bounds.origin, initialScrollOrigin)
+    }
+
+    func testPopupMouseMonitorConsumesScrollWheelInsideOverlayPopup() async throws {
+        let mounted = try await startCompletion(placement: .overlay)
+        let popup = try XCTUnwrap(mounted.view.completionPopupView)
+        let row = try rowView(label: "File5.md", in: popup)
+        let rowWindowPoint = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+        let initialScrollOrigin = mounted.view.scrollView.contentView.bounds.origin
+
+        let result = mounted.view.handleCompletionPopupMouseEvent(TestScrollWheelEvent(
+            window: mounted.window,
+            location: rowWindowPoint,
+            deltaY: -1
+        ))
+
+        XCTAssertNil(result)
+        XCTAssertEqual(popup.visibleSuggestionTitlesForTesting.first, "File1.md")
+        XCTAssertEqual(mounted.view.scrollView.contentView.bounds.origin, initialScrollOrigin)
+    }
+
+    func testPopupCaptureViewConsumesOverlayScrollWheelInsidePopup() async throws {
+        let mounted = try await startCompletion(placement: .overlay)
+        let popup = try XCTUnwrap(mounted.view.completionPopupView)
+        let row = try rowView(label: "File5.md", in: popup)
+        let rowWindowPoint = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+        let initialScrollOrigin = mounted.view.scrollView.contentView.bounds.origin
+
+        mounted.view.completionPopupEventCaptureView.scrollWheel(with: TestScrollWheelEvent(
+            window: mounted.window,
+            location: rowWindowPoint,
+            deltaY: -1
+        ))
+
+        XCTAssertEqual(popup.visibleSuggestionTitlesForTesting.first, "File1.md")
+        XCTAssertEqual(mounted.view.scrollView.contentView.bounds.origin, initialScrollOrigin)
+    }
+
+    func testPopupMouseMonitorLeavesOutsideScrollWheelAndDoesNotDismiss() async throws {
+        let mounted = try await startCompletion(suggestionCount: 1)
+        let event = TestScrollWheelEvent(
+            window: mounted.window,
+            location: NSPoint(x: mounted.view.bounds.maxX + 80, y: mounted.view.bounds.maxY + 80),
+            deltaY: -1
+        )
+
+        let result = mounted.view.handleCompletionPopupMouseEvent(event)
+
+        XCTAssertTrue(result === event)
+        XCTAssertNotNil(mounted.view.completionPopupView)
+    }
+
+    func testPopupMouseMonitorDoesNotUseLiveMouseLocationForScrollWheel() async throws {
+        let window = CompletionPopupMouseLocationWindow(
+            contentRect: NSRect(origin: .zero, size: NSSize(width: 720, height: 480)),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        let mounted = try await startCompletion(window: window)
+        let popup = try XCTUnwrap(mounted.view.completionPopupView)
+        let row = try rowView(label: "File5.md", in: popup)
+        let livePoint = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+        let outsidePoint = NSPoint(x: mounted.view.bounds.maxX + 80, y: mounted.view.bounds.maxY + 80)
+        let initialScrollOrigin = mounted.view.scrollView.contentView.bounds.origin
+        window.testMouseLocationOutsideOfEventStream = livePoint
+
+        let result = mounted.view.handleCompletionPopupMouseEvent(TestScrollWheelEvent(
+            window: mounted.window,
+            location: outsidePoint,
+            deltaY: -1
+        ))
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(popup.visibleSuggestionTitlesForTesting.first, "File0.md")
+        XCTAssertEqual(mounted.view.scrollView.contentView.bounds.origin, initialScrollOrigin)
+    }
+
     private func makePopup(
         suggestions: [BlockInputCompletionSuggestion],
         highlightedIndex: Int = 0,
@@ -172,8 +353,51 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
         return popup
     }
 
+    private func startCompletion(
+        suggestionCount: Int = 8,
+        window customWindow: NSWindow? = nil,
+        placement: BlockInputCompletionPopupPlacement = .caret
+    ) async throws -> (view: BlockInputView, window: NSWindow) {
+        let configuration = BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: "@read")
+            ]),
+            completionProvider: PopupCompletionProvider(suggestions: popupFileSuggestions(count: suggestionCount)),
+            completionPopupPlacement: placement
+        )
+        let mounted: (view: BlockInputView, window: NSWindow)
+        if let customWindow {
+            let view = BlockInputView(frame: customWindow.contentView?.bounds ?? customWindow.frame)
+            customWindow.contentView = view
+            view.configure(configuration)
+            view.layoutSubtreeIfNeeded()
+            view.collectionView.layoutSubtreeIfNeeded()
+            mounted = (view, customWindow)
+        } else {
+            mounted = makeMountedBlockInputView(configuration: configuration)
+        }
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: ("@read" as NSString).length, length: 0))
+        mounted.view.refreshCompletionSession(item: item, blockID: "block")
+        await mounted.view.completionRequestTask?.value
+        mounted.view.layoutSubtreeIfNeeded()
+        return mounted
+    }
+
     private func rowView(label: String, in popup: NSView) throws -> NSView {
         try XCTUnwrap(popup.subviews.first { $0.accessibilityLabel() == label })
+    }
+
+    private func scrollPopupDownTwice(_ popup: BlockInputCompletionPopupView) {
+        XCTAssertTrue(popup.routeScrollWheel(
+            at: NSPoint(x: popup.bounds.midX, y: popup.bounds.midY),
+            event: TestScrollWheelEvent(deltaY: -1)
+        ))
+        XCTAssertTrue(popup.routeScrollWheel(
+            at: NSPoint(x: popup.bounds.midX, y: popup.bounds.midY),
+            event: TestScrollWheelEvent(deltaY: -1)
+        ))
     }
 
     private func popupFileSuggestions(count: Int) -> [BlockInputCompletionSuggestion] {

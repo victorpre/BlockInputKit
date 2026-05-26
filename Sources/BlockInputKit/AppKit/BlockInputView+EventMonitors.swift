@@ -92,15 +92,12 @@ extension BlockInputView {
     }
 
     private func handleCompletionPopupScrollWheel(_ event: NSEvent, popup: BlockInputCompletionPopupView) -> NSEvent? {
-        for windowPoint in completionWheelEventWindowPoints(event) {
-            let locationInPopup = popup.convert(windowPoint, from: nil)
-            guard popup.bounds.contains(locationInPopup) else {
-                continue
-            }
-            _ = popup.routeScrollWheel(at: locationInPopup, event: event)
-            return nil
+        let locationInPopup = popup.convert(event.locationInWindow, from: nil)
+        guard popup.bounds.contains(locationInPopup) else {
+            return event
         }
-        return event
+        _ = popup.routeScrollWheel(at: locationInPopup, event: event)
+        return nil
     }
 
     private func eventBelongsToEditorWindow(_ event: NSEvent) -> Bool {
@@ -111,18 +108,6 @@ extension BlockInputView {
     }
 
     private func completionMouseEventWindowPoints(_ event: NSEvent) -> [NSPoint] {
-        guard let editorWindow = window,
-              event.window === editorWindow || event.windowNumber == editorWindow.windowNumber else {
-            return [event.locationInWindow]
-        }
-        let livePoint = editorWindow.mouseLocationOutsideOfEventStream
-        guard livePoint != event.locationInWindow else {
-            return [event.locationInWindow]
-        }
-        return [event.locationInWindow, livePoint]
-    }
-
-    private func completionWheelEventWindowPoints(_ event: NSEvent) -> [NSPoint] {
         guard let editorWindow = window,
               event.window === editorWindow || event.windowNumber == editorWindow.windowNumber else {
             return [event.locationInWindow]

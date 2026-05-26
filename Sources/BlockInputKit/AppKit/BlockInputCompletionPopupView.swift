@@ -45,6 +45,15 @@ final class BlockInputCompletionPopupView: NSView {
         Array(visibleStartIndex..<(visibleStartIndex + rowViews.count))
     }
 
+    func visibleSuggestionPointForTesting(title: String) -> NSPoint? {
+        layoutSubtreeIfNeeded()
+        layout()
+        guard let row = rowViews.first(where: { $0.accessibilityLabel()?.components(separatedBy: ", ").first == title }) else {
+            return nil
+        }
+        return NSPoint(x: row.frame.midX, y: row.frame.midY)
+    }
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
     }
@@ -277,8 +286,7 @@ final class BlockInputCompletionPopupView: NSView {
             let nextHighlightedIndex = direction > 0
                 ? nextStartIndex
                 : min(nextStartIndex + completionMaxVisibleRows - 1, state.suggestions.count - 1)
-            preserveVisibleWindowOnNextHighlight = true
-            onHighlight(nextHighlightedIndex)
+            requestHighlight(nextHighlightedIndex, preservesVisibleWindow: true)
             state.highlightedIndex = nextHighlightedIndex
         }
         rowViews.forEach { $0.removeFromSuperview() }
@@ -314,10 +322,19 @@ final class BlockInputCompletionPopupView: NSView {
             shouldHighlight: { [weak self] event, ignoresHoverSuppression in
                 self?.allowsPointerHighlight(for: event, ignoresHoverSuppression: ignoresHoverSuppression) == true
             },
-            onHighlight: { [weak self] index in self?.onHighlight(index) }
+            onHighlight: { [weak self] index in
+                self?.requestHighlight(index, preservesVisibleWindow: true)
+            }
         )
         addSubview(row)
         return row
+    }
+
+    private func requestHighlight(_ index: Int, preservesVisibleWindow: Bool) {
+        if preservesVisibleWindow {
+            preserveVisibleWindowOnNextHighlight = true
+        }
+        onHighlight(index)
     }
 
     private func updateHoverSuppression(for event: NSEvent) {
