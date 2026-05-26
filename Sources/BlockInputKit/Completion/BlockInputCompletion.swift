@@ -152,7 +152,7 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
         self.detailText = detailText
     }
 
-    /// Builds a mention suggestion that inserts a Markdown file link.
+    /// Builds a mention suggestion that inserts a Markdown file link followed by a space.
     public static func fileLink(
         id: String? = nil,
         title: String? = nil,
@@ -168,14 +168,14 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
             id: id ?? destination,
             title: title ?? label,
             subtitle: subtitle,
-            insertionText: "[\(Self.escapedMarkdownLinkLabel(label))](\(Self.escapedMarkdownLinkDestination(destination)))",
+            insertionText: "[\(Self.escapedMarkdownLinkLabel(label))](\(Self.escapedMarkdownLinkDestination(destination))) ",
             trigger: trigger,
             iconSystemName: iconSystemName,
             detailText: detailText
         )
     }
 
-    /// Builds a mention suggestion that inserts a Markdown file link labeled with the file name.
+    /// Builds a mention suggestion that inserts a Markdown file link labeled with the file name followed by a space.
     public static func fileLink(
         id: String? = nil,
         title: String? = nil,

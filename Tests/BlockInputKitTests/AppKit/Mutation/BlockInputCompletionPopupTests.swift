@@ -121,9 +121,9 @@ final class BlockInputCompletionPopupTests: XCTestCase {
 
         XCTAssertTrue(mounted.view.handleCompletionCommand(#selector(NSResponder.insertNewline(_:))))
 
-        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [../README.md](file:///tmp/README.md)"])
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [../README.md](file:///tmp/README.md) "])
         XCTAssertNil(mounted.view.completionPopupView)
-        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: "block", utf16Offset: 41)))
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: "block", utf16Offset: 42)))
         XCTAssertEqual(mounted.window.firstResponder, mounted.view.visibleBlockItemForTesting(at: 0)?.testingTextView)
 
         _ = mounted.view.undoTextEditInActiveBlock()
@@ -142,7 +142,7 @@ final class BlockInputCompletionPopupTests: XCTestCase {
 
         XCTAssertTrue(mounted.view.handleCompletionCommand(#selector(NSResponder.insertNewline(_:))))
 
-        let expectedText = "See [README.md](file:///tmp/README.md)"
+        let expectedText = "See [README.md](file:///tmp/README.md) "
         let block = try XCTUnwrap(mounted.view.document.blocks.first)
         XCTAssertEqual(block.kind, .heading(level: 2))
         XCTAssertEqual(block.text, expectedText)
@@ -292,7 +292,7 @@ final class BlockInputCompletionPopupTests: XCTestCase {
             event: try mouseUpEvent(location: .zero, windowNumber: mounted.window.windowNumber)
         ))
 
-        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [README.md](file:///tmp/README.md)"])
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [README.md](file:///tmp/README.md) "])
         XCTAssertNil(mounted.view.completionPopupView)
     }
 
@@ -329,7 +329,7 @@ final class BlockInputCompletionPopupTests: XCTestCase {
 
         XCTAssertEqual(mounted.view.completionSession?.highlightedIndex, 1)
         XCTAssertTrue(mounted.view.handleCompletionCommand(#selector(NSResponder.insertNewline(_:))))
-        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["[File1.md](file:///tmp/File1.md)"])
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["[File1.md](file:///tmp/File1.md) "])
     }
 
     func testReconfigureWithNewDocumentDismissesPopup() async throws {

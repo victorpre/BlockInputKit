@@ -314,11 +314,13 @@ For file mentions in paragraphs or headings, return a file-link suggestion:
 BlockInputCompletionSuggestion.fileLink(fileURL: readmeURL)
 ```
 
-The helper inserts a Markdown file link and renders it as a chip:
+The helper inserts a Markdown file link followed by a space and renders the link as a chip:
 
 ```markdown
 [README.md](file:///resolved/README.md)
 ```
+
+The trailing space leaves the caret after the accepted file chip.
 
 Plain click opens the link modal. Cmd-click opens through the editor URL opener hook.
 

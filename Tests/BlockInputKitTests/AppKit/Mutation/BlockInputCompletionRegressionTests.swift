@@ -13,7 +13,7 @@ final class BlockInputCompletionRegressionTests: XCTestCase {
         XCTAssertTrue(mounted.view.handleCompletionCommand(#selector(NSResponder.insertNewline(_:))))
         let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
         let textView = try XCTUnwrap(item.testingTextView)
-        textView.insertText(" test", replacementRange: textView.selectedRange())
+        textView.insertText("test", replacementRange: textView.selectedRange())
 
         let expectedText = "See [default.profraw](file:///tmp/default.profraw) test"
         XCTAssertEqual(mounted.view.document.blocks.map(\.text), [expectedText])
@@ -177,7 +177,7 @@ final class BlockInputCompletionRegressionTests: XCTestCase {
         ))
 
         XCTAssertNil(mouseUpResult)
-        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [README.md](file:///tmp/README.md)"])
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [README.md](file:///tmp/README.md) "])
         XCTAssertNil(mounted.view.completionPopupView)
     }
 
@@ -206,7 +206,7 @@ final class BlockInputCompletionRegressionTests: XCTestCase {
         ))
 
         XCTAssertNil(mouseUpResult)
-        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [Second.md](file:///tmp/Second.md)"])
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [Second.md](file:///tmp/Second.md) "])
         XCTAssertNil(mounted.view.completionPopupView)
     }
 
@@ -237,7 +237,7 @@ final class BlockInputCompletionRegressionTests: XCTestCase {
             windowNumber: mounted.window.windowNumber
         ))
 
-        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [README.md](file:///tmp/README.md)"])
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["See [README.md](file:///tmp/README.md) "])
         XCTAssertNil(mounted.view.completionPopupView)
     }
 
