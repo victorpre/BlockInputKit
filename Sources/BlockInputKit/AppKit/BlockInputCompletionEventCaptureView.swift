@@ -58,10 +58,10 @@ final class BlockInputCompletionEventCaptureView: NSView {
     override func otherMouseUp(with event: NSEvent) {}
 
     override func scrollWheel(with event: NSEvent) {
-        guard let popup,
-              let popupPoint = popupPoint(for: event, in: popup) else {
+        guard let popup else {
             return
         }
+        let popupPoint = popupPointForWheelEvent(event, in: popup)
         _ = popup.routeScrollWheel(at: popupPoint, event: event)
     }
 
@@ -80,5 +80,12 @@ final class BlockInputCompletionEventCaptureView: NSView {
             return nil
         }
         return popupPoint
+    }
+
+    private func popupPointForWheelEvent(_ event: NSEvent, in popup: BlockInputCompletionPopupView) -> NSPoint {
+        if let popupPoint = popupPoint(for: event, in: popup) {
+            return popupPoint
+        }
+        return popup.convert(NSPoint(x: bounds.midX, y: bounds.midY), from: self)
     }
 }

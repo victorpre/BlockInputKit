@@ -10,6 +10,7 @@ struct BlockInputCompletionPopupState: Equatable {
     var suggestions: [BlockInputCompletionSuggestion]
     var highlightedIndex: Int
     var isLoading: Bool
+    var sessionID: UUID?
 }
 
 /// AppKit-rendered completion popup with explicit event-routing entry points.
@@ -24,7 +25,9 @@ final class BlockInputCompletionPopupView: NSView {
     private let loadingField = NSTextField(labelWithString: "Loading suggestions...")
     private let emptyField = NSTextField(labelWithString: "No matches")
     private var visibleStartIndex = 0
+    private var visibleSessionID: UUID?
     private var visibleSuggestionIDs: [String] = []
+    private var preserveVisibleWindowOnNextHighlight = false
     private var lastMouseWindowLocation: NSPoint?
     private var suppressedHoverWindowLocation: NSPoint?
     private var onSelect: (BlockInputCompletionSuggestion) -> Void = { _ in }
@@ -32,6 +35,14 @@ final class BlockInputCompletionPopupView: NSView {
 
     override var intrinsicContentSize: NSSize {
         NSSize(width: NSView.noIntrinsicMetric, height: Self.measuredHeight(for: state))
+    }
+
+    var visibleSuggestionTitlesForTesting: [String] {
+        rowViews.compactMap { $0.accessibilityLabel()?.components(separatedBy: ", ").first }
+    }
+
+    var visibleSuggestionIndexesForTesting: [Int] {
+        Array(visibleStartIndex..<(visibleStartIndex + rowViews.count))
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
@@ -164,7 +175,7 @@ final class BlockInputCompletionPopupView: NSView {
         guard !isHidden, bounds.contains(point) else {
             return false
         }
-        scrollVisibleSuggestions(deltaY: event.scrollingDeltaY)
+        scrollVisibleSuggestions(deltaY: Self.verticalScrollDelta(for: event))
         return true
     }
 
@@ -220,6 +231,7 @@ final class BlockInputCompletionPopupView: NSView {
     }
 
     private func rebuild() {
+        let previousRowCount = rowViews.count
         rowViews.forEach { $0.removeFromSuperview() }
         rowViews = []
         isHidden = false
@@ -231,6 +243,9 @@ final class BlockInputCompletionPopupView: NSView {
             rowViews = visibleSuggestionRows(anchorHighlightedSuggestion: true).map { index, suggestion in
                 makeRow(index: index, suggestion: suggestion)
             }
+        }
+        if previousRowCount == 0 || state.isLoading || !state.suggestions.isEmpty {
+            suppressHoverUntilPointerMoves()
         }
 
         invalidateIntrinsicContentSize()
@@ -262,13 +277,15 @@ final class BlockInputCompletionPopupView: NSView {
             let nextHighlightedIndex = direction > 0
                 ? nextStartIndex
                 : min(nextStartIndex + completionMaxVisibleRows - 1, state.suggestions.count - 1)
+            preserveVisibleWindowOnNextHighlight = true
             onHighlight(nextHighlightedIndex)
-            return
+            state.highlightedIndex = nextHighlightedIndex
         }
         rowViews.forEach { $0.removeFromSuperview() }
         rowViews = visibleSuggestionRows(anchorHighlightedSuggestion: false).map { index, suggestion in
             makeRow(index: index, suggestion: suggestion)
         }
+        suppressHoverUntilPointerMoves()
         needsLayout = true
         needsDisplay = true
     }
@@ -283,6 +300,17 @@ final class BlockInputCompletionPopupView: NSView {
             index: index,
             isHighlighted: index == state.highlightedIndex,
             onSelect: { [weak self] in self?.onSelect(suggestion) },
+            onScrollWheel: { [weak self, weak row] event in
+                guard let self,
+                      let row else {
+                    return false
+                }
+                let eventPoint = convert(event.locationInWindow, from: nil)
+                let popupPoint = bounds.contains(eventPoint)
+                    ? eventPoint
+                    : row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: self)
+                return routeScrollWheel(at: popupPoint, event: event)
+            },
             shouldHighlight: { [weak self] event, ignoresHoverSuppression in
                 self?.allowsPointerHighlight(for: event, ignoresHoverSuppression: ignoresHoverSuppression) == true
             },
@@ -337,8 +365,9 @@ final class BlockInputCompletionPopupView: NSView {
     ) -> ArraySlice<(Int, BlockInputCompletionSuggestion)> {
         let indexedSuggestions = state.suggestions.enumerated().map { ($0.offset, $0.element) }
         let suggestionIDs = state.suggestions.map(\.id)
-        if visibleSuggestionIDs != suggestionIDs {
+        if visibleSessionID != state.sessionID || visibleSuggestionIDs != suggestionIDs {
             visibleStartIndex = 0
+            visibleSessionID = state.sessionID
             visibleSuggestionIDs = suggestionIDs
         }
 
@@ -348,15 +377,18 @@ final class BlockInputCompletionPopupView: NSView {
         }
 
         let maximumStartIndex = max(0, indexedSuggestions.count - completionMaxVisibleRows)
-        if anchorHighlightedSuggestion {
-            if state.highlightedIndex < visibleStartIndex {
-                visibleStartIndex = state.highlightedIndex
-            } else if state.highlightedIndex >= visibleStartIndex + completionMaxVisibleRows {
-                visibleStartIndex = state.highlightedIndex - completionMaxVisibleRows + 1
-            }
+        if anchorHighlightedSuggestion, preserveVisibleWindowOnNextHighlight {
+            preserveVisibleWindowOnNextHighlight = false
+        } else if anchorHighlightedSuggestion {
+            let highlightedIndex = min(max(0, state.highlightedIndex), indexedSuggestions.count - 1)
+            visibleStartIndex = highlightedIndex - (completionMaxVisibleRows / 2)
         }
         visibleStartIndex = min(max(0, visibleStartIndex), maximumStartIndex)
         return indexedSuggestions[visibleStartIndex..<(visibleStartIndex + completionMaxVisibleRows)]
+    }
+
+    private static func verticalScrollDelta(for event: NSEvent) -> CGFloat {
+        event.scrollingDeltaY != 0 ? event.scrollingDeltaY : event.deltaY
     }
 
     private func completionPopupFillColor() -> NSColor {

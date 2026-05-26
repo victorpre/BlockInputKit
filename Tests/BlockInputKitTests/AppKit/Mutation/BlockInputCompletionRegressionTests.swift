@@ -269,6 +269,72 @@ final class BlockInputCompletionRegressionTests: XCTestCase {
         XCTAssertNotNil(mounted.view.completionPopupView)
     }
 
+    func testPopupMouseMonitorConsumesScrollWheelInsidePopup() async throws {
+        let provider = RegressionCompletionProvider(suggestions: (0..<8).map { index in
+            .fileLink(label: "File\(index).md", fileURL: URL(fileURLWithPath: "/tmp/File\(index).md"))
+        })
+        let mounted = try await startCompletion(text: "See @read", provider: provider)
+        let popup = try XCTUnwrap(mounted.view.completionPopupView)
+        let row = try rowView(label: "File5.md", in: popup)
+        let rowWindowPoint = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+
+        let result = mounted.view.handleCompletionPopupMouseEvent(TestScrollWheelEvent(
+            window: mounted.window,
+            location: rowWindowPoint,
+            deltaY: -1
+        ))
+
+        XCTAssertNil(result)
+        XCTAssertEqual(popup.visibleSuggestionTitlesForTesting.first, "File1.md")
+    }
+
+    func testPopupMouseMonitorLeavesOutsideScrollWheelAndDoesNotDismiss() async throws {
+        let provider = RegressionCompletionProvider(suggestions: [
+            .fileLink(label: "README.md", fileURL: URL(fileURLWithPath: "/tmp/README.md"))
+        ])
+        let mounted = try await startCompletion(text: "See @read", provider: provider)
+        let event = TestScrollWheelEvent(
+            window: mounted.window,
+            location: NSPoint(x: mounted.view.bounds.maxX + 80, y: mounted.view.bounds.maxY + 80),
+            deltaY: -1
+        )
+
+        let result = mounted.view.handleCompletionPopupMouseEvent(event)
+
+        XCTAssertTrue(result === event)
+        XCTAssertNotNil(mounted.view.completionPopupView)
+    }
+
+    func testPopupMouseMonitorUsesLiveMouseLocationForScrollWheel() async throws {
+        let provider = RegressionCompletionProvider(suggestions: (0..<8).map { index in
+            .fileLink(label: "File\(index).md", fileURL: URL(fileURLWithPath: "/tmp/File\(index).md"))
+        })
+        let mounted = try await startCompletion(
+            text: "See @read",
+            provider: provider,
+            window: CompletionPopupMouseLocationWindow(
+                contentRect: NSRect(origin: .zero, size: NSSize(width: 720, height: 480)),
+                styleMask: [.titled],
+                backing: .buffered,
+                defer: false
+            )
+        )
+        let popup = try XCTUnwrap(mounted.view.completionPopupView)
+        let row = try rowView(label: "File5.md", in: popup)
+        let livePoint = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+        let outsidePoint = NSPoint(x: mounted.view.bounds.maxX + 80, y: mounted.view.bounds.maxY + 80)
+        (mounted.window as? CompletionPopupMouseLocationWindow)?.testMouseLocationOutsideOfEventStream = livePoint
+
+        let result = mounted.view.handleCompletionPopupMouseEvent(TestScrollWheelEvent(
+            window: mounted.window,
+            location: outsidePoint,
+            deltaY: -1
+        ))
+
+        XCTAssertNil(result)
+        XCTAssertEqual(popup.visibleSuggestionTitlesForTesting.first, "File1.md")
+    }
+
     private func activeTextView(
         in mounted: (view: BlockInputView, window: NSWindow),
         text: String
@@ -285,19 +351,46 @@ final class BlockInputCompletionRegressionTests: XCTestCase {
         text: String,
         provider: any BlockInputCompletionProvider
     ) async throws -> (view: BlockInputView, window: NSWindow) {
+        try await startCompletion(text: text, provider: provider, window: nil)
+    }
+
+    private func startCompletion(
+        text: String,
+        provider: any BlockInputCompletionProvider,
+        window: NSWindow?
+    ) async throws -> (view: BlockInputView, window: NSWindow) {
         try await startCompletion(blocks: [
             BlockInputBlock(id: "block", text: text)
-        ], provider: provider)
+        ], provider: provider, window: window)
     }
 
     private func startCompletion(
         blocks: [BlockInputBlock],
         provider: any BlockInputCompletionProvider
     ) async throws -> (view: BlockInputView, window: NSWindow) {
-        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+        try await startCompletion(blocks: blocks, provider: provider, window: nil)
+    }
+
+    private func startCompletion(
+        blocks: [BlockInputBlock],
+        provider: any BlockInputCompletionProvider,
+        window customWindow: NSWindow?
+    ) async throws -> (view: BlockInputView, window: NSWindow) {
+        let configuration = BlockInputConfiguration(
             document: BlockInputDocument(blocks: blocks),
             completionProvider: provider
-        ))
+        )
+        let mounted: (view: BlockInputView, window: NSWindow)
+        if let customWindow {
+            let view = BlockInputView(frame: customWindow.contentView?.bounds ?? customWindow.frame)
+            customWindow.contentView = view
+            view.configure(configuration)
+            view.layoutSubtreeIfNeeded()
+            view.collectionView.layoutSubtreeIfNeeded()
+            mounted = (view, customWindow)
+        } else {
+            mounted = makeMountedBlockInputView(configuration: configuration)
+        }
         let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
         let textView = try XCTUnwrap(item.testingTextView)
         let text = blocks[0].text

@@ -3,10 +3,27 @@ import Darwin
 @testable import BlockInputKit
 
 final class TestScrollWheelEvent: NSEvent {
+    private weak var testWindow: NSWindow?
+    private let testWindowNumber: Int
+    private let testLocationInWindow: NSPoint
     private let testScrollingDeltaY: CGFloat
+    private let testScrollingDeltaX: CGFloat
+    private let testDeltaY: CGFloat
 
-    init(deltaY: CGFloat) {
+    init(
+        window: NSWindow? = nil,
+        windowNumber: Int = 0,
+        location: NSPoint = .zero,
+        deltaY: CGFloat,
+        deltaX: CGFloat = 0,
+        fallbackDeltaY: CGFloat? = nil
+    ) {
+        testWindow = window
+        testWindowNumber = windowNumber
+        testLocationInWindow = location
         testScrollingDeltaY = deltaY
+        testScrollingDeltaX = deltaX
+        testDeltaY = fallbackDeltaY ?? deltaY
         super.init()
     }
 
@@ -16,6 +33,38 @@ final class TestScrollWheelEvent: NSEvent {
 
     override var scrollingDeltaY: CGFloat {
         testScrollingDeltaY
+    }
+
+    override var scrollingDeltaX: CGFloat {
+        testScrollingDeltaX
+    }
+
+    override var deltaY: CGFloat {
+        testDeltaY
+    }
+
+    override var type: NSEvent.EventType {
+        .scrollWheel
+    }
+
+    override var window: NSWindow? {
+        testWindow
+    }
+
+    override var windowNumber: Int {
+        testWindowNumber
+    }
+
+    override var locationInWindow: NSPoint {
+        testLocationInWindow
+    }
+}
+
+final class CompletionPopupMouseLocationWindow: NSWindow {
+    var testMouseLocationOutsideOfEventStream: NSPoint = .zero
+
+    override var mouseLocationOutsideOfEventStream: NSPoint {
+        testMouseLocationOutsideOfEventStream
     }
 }
 

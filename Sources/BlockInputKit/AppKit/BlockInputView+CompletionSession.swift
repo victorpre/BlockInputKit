@@ -171,7 +171,8 @@ extension BlockInputView {
         let state = BlockInputCompletionPopupState(
             suggestions: session.suggestions,
             highlightedIndex: session.highlightedIndex,
-            isLoading: session.isLoading
+            isLoading: session.isLoading,
+            sessionID: session.id
         )
         let popupLayout = completionPopupLayout(for: session, state: state)
         let popupContainer = popupLayout.container
@@ -189,7 +190,11 @@ extension BlockInputView {
             completionPopupEventCaptureView.removeFromSuperview()
             popupContainer.addSubview(completionPopupEventCaptureView, positioned: .above, relativeTo: nil)
         }
+        let previousFrame = popup.frame
         popup.frame = popupLayout.frame
+        if previousFrame != popup.frame {
+            popup.suppressHoverUntilPointerMoves()
+        }
         if completionPopupEventCaptureView.superview === popupContainer {
             completionPopupEventCaptureView.frame = popupContainer.bounds
         }
@@ -372,7 +377,8 @@ extension BlockInputView {
         let state = BlockInputCompletionPopupState(
             suggestions: session.suggestions,
             highlightedIndex: session.highlightedIndex,
-            isLoading: session.isLoading
+            isLoading: session.isLoading,
+            sessionID: session.id
         )
         popup.configure(
             state: state,

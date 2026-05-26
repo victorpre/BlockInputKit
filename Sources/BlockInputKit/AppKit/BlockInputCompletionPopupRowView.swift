@@ -12,6 +12,7 @@ final class BlockInputCompletionPopupRowView: NSView {
     private var index = 0
     private var isHighlighted = false
     private var onSelect: () -> Void = {}
+    private var onScrollWheel: (NSEvent) -> Bool = { _ in false }
     private var shouldHighlight: (NSEvent, Bool) -> Bool = { _, _ in true }
     private var onHighlight: (Int) -> Void = { _ in }
 
@@ -34,12 +35,14 @@ final class BlockInputCompletionPopupRowView: NSView {
         index: Int,
         isHighlighted: Bool,
         onSelect: @escaping () -> Void,
+        onScrollWheel: @escaping (NSEvent) -> Bool,
         shouldHighlight: @escaping (NSEvent, Bool) -> Bool,
         onHighlight: @escaping (Int) -> Void
     ) {
         self.index = index
         self.isHighlighted = isHighlighted
         self.onSelect = onSelect
+        self.onScrollWheel = onScrollWheel
         self.shouldHighlight = shouldHighlight
         self.onHighlight = onHighlight
         titleField.stringValue = suggestion.title
@@ -118,6 +121,13 @@ final class BlockInputCompletionPopupRowView: NSView {
     override func mouseUp(with event: NSEvent) {
         highlightPointerRow(with: event, ignoresHoverSuppression: true)
         onSelect()
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        if onScrollWheel(event) {
+            return
+        }
+        super.scrollWheel(with: event)
     }
 
     override func accessibilityPerformPress() -> Bool {
