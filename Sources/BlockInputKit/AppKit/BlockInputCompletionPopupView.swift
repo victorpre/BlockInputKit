@@ -73,9 +73,13 @@ final class BlockInputCompletionPopupView: NSView {
         onSelect: @escaping (BlockInputCompletionSuggestion) -> Void,
         onHighlight: @escaping (Int) -> Void
     ) {
+        let previousState = self.state
         self.state = state
         self.onSelect = onSelect
         self.onHighlight = onHighlight
+        guard previousState != state else {
+            return
+        }
         rebuild()
     }
 

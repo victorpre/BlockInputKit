@@ -65,27 +65,28 @@ extension BlockInputView {
         }
 
         let anchorWindowRect = item.anchorWindowRect(forUTF16Offset: selectedRange.location)
-        if var session = completionSession,
-           session.blockID == blockID,
-           session.token == token,
-           session.sourceText == text,
-           session.sourceKind == block.kind {
-            session.anchorWindowRect = anchorWindowRect
+        if updateUnchangedCompletionSession(blockID: blockID, block: block, token: token, sourceText: text, anchorWindowRect: anchorWindowRect) {
+            return
+        }
+        if let session = continuousCompletionSession(
+            blockID: blockID,
+            block: block,
+            token: token,
+            sourceText: text,
+            anchorWindowRect: anchorWindowRect
+        ) {
             completionSession = session
-            positionCompletionPopup()
+            showCompletionPopup(for: session)
+            requestCompletionSuggestions(for: session)
             return
         }
 
-        let session = BlockInputCompletionSession(
-            id: UUID(),
+        let session = newCompletionSession(
             blockID: blockID,
+            block: block,
             token: token,
             sourceText: text,
-            sourceKind: block.kind,
-            anchorWindowRect: anchorWindowRect,
-            suggestions: [],
-            highlightedIndex: 0,
-            isLoading: true
+            anchorWindowRect: anchorWindowRect
         )
         completionSession = session
         showCompletionPopup(for: session)

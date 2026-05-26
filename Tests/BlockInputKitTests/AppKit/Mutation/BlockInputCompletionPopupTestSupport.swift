@@ -123,3 +123,32 @@ final class DelayedPopupCompletionProvider: BlockInputCompletionProvider, @unche
         continuation = nil
     }
 }
+
+final class DelayedRefreshPopupCompletionProvider: BlockInputCompletionProvider, @unchecked Sendable {
+    private let initialSuggestions: [BlockInputCompletionSuggestion]
+    private var refreshContinuation: CheckedContinuation<[BlockInputCompletionSuggestion], Never>?
+    private(set) var contexts: [BlockInputCompletionContext] = []
+
+    var isWaitingForRefresh: Bool {
+        refreshContinuation != nil
+    }
+
+    init(initialSuggestions: [BlockInputCompletionSuggestion]) {
+        self.initialSuggestions = initialSuggestions
+    }
+
+    func suggestions(for context: BlockInputCompletionContext) async -> [BlockInputCompletionSuggestion] {
+        contexts.append(context)
+        guard contexts.count > 1 else {
+            return initialSuggestions
+        }
+        return await withCheckedContinuation { continuation in
+            refreshContinuation = continuation
+        }
+    }
+
+    func resumeRefresh(with suggestions: [BlockInputCompletionSuggestion]) {
+        refreshContinuation?.resume(returning: suggestions)
+        refreshContinuation = nil
+    }
+}
