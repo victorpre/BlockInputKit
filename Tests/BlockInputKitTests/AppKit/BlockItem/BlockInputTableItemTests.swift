@@ -64,6 +64,28 @@ final class BlockInputTableItemTests: XCTestCase {
         )
     }
 
+    func testTableSurfaceUsesScaledVerticalInsets() throws {
+        let multiplier: CGFloat = 0.5
+        let item = configuredItem(block: Self.compactTable(), blockVerticalInsetMultiplier: multiplier)
+        let textView = try XCTUnwrap(item.testingTableCellTextViews.first)
+
+        XCTAssertEqual(
+            item.testingTableView.frame.minY,
+            BlockInputBlockItem.tableExternalVerticalInset * multiplier,
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            item.view.bounds.height - item.testingTableView.frame.maxY,
+            BlockInputBlockItem.tableExternalVerticalInset * multiplier,
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            textView.frame.minY,
+            BlockInputTableView.cellVerticalPadding * multiplier,
+            accuracy: 0.5
+        )
+    }
+
     func testWholeTableSelectionChromeMatchesVisibleTableFrame() {
         let item = configuredItem(block: Self.compactTable(), isSelected: true)
         let expectedFrame = item.testingTableView
@@ -282,6 +304,7 @@ final class BlockInputTableItemTests: XCTestCase {
         textWidth: CGFloat = 280,
         allowsReordering: Bool = true,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
+        blockVerticalInsetMultiplier: CGFloat = 1,
         isSelected: Bool = false,
         embeddedInVerticalScrollView: Bool = false
     ) -> BlockInputBlockItem {
@@ -289,6 +312,7 @@ final class BlockInputTableItemTests: XCTestCase {
             block: block,
             allowsReordering: allowsReordering,
             editorHorizontalInset: editorHorizontalInset,
+            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier,
             isSelected: isSelected,
             delegate: BlockInputView()
         )
@@ -296,7 +320,11 @@ final class BlockInputTableItemTests: XCTestCase {
             x: 0,
             y: 0,
             width: itemWidth,
-            height: BlockInputBlockItem.height(for: block, textWidth: textWidth)
+            height: BlockInputBlockItem.height(
+                for: block,
+                textWidth: textWidth,
+                blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+            )
         )
         item.view.layoutSubtreeIfNeeded()
         if embeddedInVerticalScrollView {

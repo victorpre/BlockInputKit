@@ -1,19 +1,24 @@
 import AppKit
 
 extension BlockInputBlockItem {
-    static func verticalMetrics(for block: BlockInputBlock) -> BlockInputBlockItemVerticalMetrics {
+    static func verticalMetrics(
+        for block: BlockInputBlock,
+        blockVerticalInsetMultiplier: CGFloat = 1
+    ) -> BlockInputBlockItemVerticalMetrics {
+        let metrics: BlockInputBlockItemVerticalMetrics
         switch block.kind {
         case .bulletedListItem, .numberedListItem:
-            return .textList
+            metrics = .textList
         case .checklistItem:
-            return .checklist
+            metrics = .checklist
         case .paragraph:
-            return .textBlock
+            metrics = .textBlock
         case .quote:
-            return .quote
+            metrics = .quote
         case .heading, .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
-            return .standard
+            metrics = .standard
         }
+        return metrics.scaled(by: blockVerticalInsetMultiplier)
     }
 
     static func prefix(for kind: BlockInputBlockKind, indentationLevel: Int) -> String {

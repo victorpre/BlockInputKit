@@ -42,6 +42,16 @@ struct BlockInputBlockItemVerticalMetrics {
         minimumHeight: 28
     )
 
+    func scaled(by multiplier: CGFloat) -> BlockInputBlockItemVerticalMetrics {
+        let multiplier = BlockInputConfiguration.sanitizedBlockVerticalInsetMultiplier(multiplier)
+        return BlockInputBlockItemVerticalMetrics(
+            textContainerInset: NSSize(width: textContainerInset.width, height: textContainerInset.height * multiplier),
+            topContentInset: topContentInset * multiplier,
+            bottomContentInset: bottomContentInset * multiplier,
+            minimumHeight: minimumHeight * multiplier
+        )
+    }
+
     func chromeTopConstant(font: NSFont, chromeHeight: CGFloat) -> CGFloat {
         topContentInset + (font.blockInputLineHeight - chromeHeight) / 2
     }
@@ -65,6 +75,22 @@ extension BlockInputBlockItem {
         style: BlockInputStyle = .default
     ) -> CGFloat {
         metrics.chromeTopConstant(font: font(for: kind, style: style), chromeHeight: dragHandleHeight)
+    }
+
+    static func scaledVerticalInset(_ value: CGFloat, blockVerticalInsetMultiplier: CGFloat) -> CGFloat {
+        value * BlockInputConfiguration.sanitizedBlockVerticalInsetMultiplier(blockVerticalInsetMultiplier)
+    }
+
+    static func scaledFrontMatterDividerVerticalInset(for blockVerticalInsetMultiplier: CGFloat) -> CGFloat {
+        scaledVerticalInset(frontMatterDividerVerticalInset, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
+    }
+
+    static func scaledTableExternalVerticalInset(for blockVerticalInsetMultiplier: CGFloat) -> CGFloat {
+        scaledVerticalInset(tableExternalVerticalInset, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
+    }
+
+    static func scaledImageExternalVerticalInset(for blockVerticalInsetMultiplier: CGFloat) -> CGFloat {
+        scaledVerticalInset(imageExternalVerticalInset, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
     }
 }
 

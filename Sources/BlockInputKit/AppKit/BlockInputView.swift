@@ -34,6 +34,8 @@ public final class BlockInputView: NSView {
     public internal(set) var completionReturnBehavior = BlockInputCompletionReturnBehavior.acceptHighlightedSuggestion
     /// Visual styling used for text, code, and selection chrome.
     public internal(set) var style = BlockInputStyle.default
+    /// Multiplier applied to vertical padding inside rendered block rows.
+    public internal(set) var blockVerticalInsetMultiplier: CGFloat = 1
     var heightSizing: BlockInputEditorHeightSizing?
     var isPreferredHeightCallbackScheduled = false
     var lastReportedPreferredHeight: CGFloat?

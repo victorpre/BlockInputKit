@@ -56,7 +56,7 @@ extension BlockInputBlockItem {
         guard !codeBackgroundView.isHidden else {
             return
         }
-        let verticalInset: CGFloat = 2
+        let verticalInset = Self.scaledVerticalInset(2, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
         let minX = min(scrollView.frame.minX + Self.textContainerContentLeading, view.bounds.maxX)
         let maxX = max(minX, scrollView.frame.maxX - Self.textContainerContentLeading)
         let availableWidth = max(0, maxX - minX)

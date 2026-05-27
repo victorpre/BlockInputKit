@@ -5,6 +5,7 @@ struct BlockInputTableCellConfiguration {
     var isHeader: Bool
     var alignment: NSTextAlignment
     var style: BlockInputStyle
+    var blockVerticalInsetMultiplier: CGFloat
     var isEditable: Bool
     var position: BlockInputTable.CellPosition
     var tableView: BlockInputTableView?
@@ -22,6 +23,7 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
     private var isHeader = false
     private var alignment: NSTextAlignment = .left
     private var style = BlockInputStyle.default
+    private var blockVerticalInsetMultiplier: CGFloat = 1
     private var isEditable = true
     private var isRowSelected = false
     private var isCellSelected = false
@@ -43,7 +45,10 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
 
     override func layout() {
         super.layout()
-        textView.frame = bounds.insetBy(dx: BlockInputTableView.cellHorizontalPadding, dy: BlockInputTableView.cellVerticalPadding)
+        textView.frame = bounds.insetBy(
+            dx: BlockInputTableView.cellHorizontalPadding,
+            dy: BlockInputTableView.scaledCellVerticalPadding(for: blockVerticalInsetMultiplier)
+        )
         textView.textContainer?.containerSize = NSSize(width: textView.frame.width, height: CGFloat.greatestFiniteMagnitude)
         textView.layoutSubtreeIfNeeded()
     }
@@ -54,6 +59,9 @@ final class BlockInputTableCellView: NSView, NSTextViewDelegate {
         isHeader = configuration.isHeader
         alignment = configuration.alignment
         style = configuration.style
+        blockVerticalInsetMultiplier = BlockInputConfiguration.sanitizedBlockVerticalInsetMultiplier(
+            configuration.blockVerticalInsetMultiplier
+        )
         isEditable = configuration.isEditable
         position = configuration.position
         tableView = configuration.tableView

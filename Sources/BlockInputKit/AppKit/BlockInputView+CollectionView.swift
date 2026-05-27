@@ -62,15 +62,7 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
         guard let block = block(at: indexPath.item) else {
             return NSSize(width: availableWidth, height: 32)
         }
-        let textWidth = BlockInputBlockItem.measuredTextWidth(
-            for: availableWidth,
-            block: block,
-            allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset,
-            style: style
-        )
-        let height = BlockInputBlockItem.height(for: block, textWidth: textWidth, style: style, fileBaseURL: fileBaseURL)
-        return NSSize(width: availableWidth, height: height)
+        return NSSize(width: availableWidth, height: measuredBlockItemHeight(for: block, itemWidth: availableWidth))
     }
 }
 

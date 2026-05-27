@@ -21,6 +21,7 @@ extension BlockInputBlockItem {
     func resetLayoutForReuse() {
         allowsReordering = true
         editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
+        blockVerticalInsetMultiplier = 1
         scrollView.isHidden = false
         tableView.resetForReuse()
         imageBlockView.resetForReuse()
@@ -50,6 +51,8 @@ extension BlockInputBlockItem {
         imageBlockTrailingConstraint?.constant = -Self.imageSurfaceHorizontalInset
         imageBlockTopConstraint?.constant = Self.imageExternalVerticalInset
         imageBlockBottomConstraint?.constant = -Self.imageExternalVerticalInset
+        tableViewTopConstraint?.constant = Self.tableExternalVerticalInset
+        tableViewBottomConstraint?.constant = -Self.tableExternalVerticalInset
         imageBlockWidthConstraint?.constant = 120
         imageBlockView.maximumResizeWidth = Int.max
         setImageCaretOffset(nil)

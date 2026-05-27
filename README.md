@@ -89,6 +89,7 @@ let configuration = BlockInputConfiguration(
     allowsBlockReordering: true,
     editorHorizontalInset: 20,
     editorVerticalInset: 8,
+    blockVerticalInsetMultiplier: 0.75,
     style: BlockInputStyle(
         editorSurface: BlockInputEditorSurfaceStyle(
             editorBackgroundColor: nil,
@@ -121,6 +122,10 @@ let configuration = BlockInputConfiguration(
 `nil` editor surface colors are transparent so the host can draw its own rounded background. `dropIndicatorColor`,
 selection colors, inline code, code block, image block, and inline chip styling are also configurable. Link-backed
 chips use their chip foreground color instead of the system link text color.
+
+`blockVerticalInsetMultiplier` adjusts vertical padding inside rendered block rows without changing horizontal layout or
+the editor's outer `editorVerticalInset`. `1` preserves the built-in spacing, values below `1` make rows denser, and
+values above `1` add more breathing room.
 
 ### Placeholder
 
@@ -180,6 +185,30 @@ editor.configure(BlockInputConfiguration(
         maximumVisibleLineCount: 8,
         onPreferredHeightChange: { height in
             editorHeightConstraint.constant = height
+        }
+    )
+))
+```
+
+Use transition callbacks when the host wants to animate height changes:
+
+```swift
+editor.configure(BlockInputConfiguration(
+    document: document,
+    heightSizing: BlockInputEditorHeightSizing(
+        defaultVisibleLineCount: 2,
+        maximumVisibleLineCount: 8,
+        animation: .default,
+        onPreferredHeightTransition: { transition in
+            editorHeightConstraint.constant = transition.targetHeight
+            guard let animation = transition.animation else {
+                editor.superview?.layoutSubtreeIfNeeded()
+                return
+            }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = animation.duration
+                editor.superview?.layoutSubtreeIfNeeded()
+            }
         }
     )
 ))

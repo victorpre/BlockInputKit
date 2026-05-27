@@ -225,6 +225,15 @@ public struct BlockInputEditorHeightSizing {
     ///
     /// The value is the height a host should assign to the editor viewport, not the unlimited natural document height.
     public var onPreferredHeightChange: (@MainActor (CGFloat) -> Void)?
+    /// Animation metadata used for non-initial preferred-height transition callbacks.
+    ///
+    /// Set this to nil when transition callbacks should request immediate layout.
+    public var animation: BlockInputEditorHeightAnimation?
+    /// Called when the editor's clamped preferred height changes, including transition metadata.
+    ///
+    /// Hosts still own frame or constraint mutation. The transition reports the target height and, for non-initial
+    /// changes, an optional animation to apply while resizing the editor container.
+    public var onPreferredHeightTransition: (@MainActor (BlockInputEditorHeightTransition) -> Void)?
 
     /// Creates preferred editor height behavior.
     ///
@@ -238,6 +247,25 @@ public struct BlockInputEditorHeightSizing {
         self.defaultVisibleLineCount = defaultVisibleLineCount
         self.maximumVisibleLineCount = maximumVisibleLineCount
         self.onPreferredHeightChange = onPreferredHeightChange
+        animation = .default
+        onPreferredHeightTransition = nil
+    }
+
+    /// Creates preferred editor height behavior with transition metadata for animated hosts.
+    ///
+    /// Counts less than one are sanitized by the editor when measuring. If `maximumVisibleLineCount` is smaller than
+    /// `defaultVisibleLineCount`, the editor treats the maximum as equal to the default.
+    public init(
+        defaultVisibleLineCount: Int,
+        maximumVisibleLineCount: Int? = nil,
+        animation: BlockInputEditorHeightAnimation?,
+        onPreferredHeightTransition: @escaping @MainActor (BlockInputEditorHeightTransition) -> Void
+    ) {
+        self.defaultVisibleLineCount = defaultVisibleLineCount
+        self.maximumVisibleLineCount = maximumVisibleLineCount
+        onPreferredHeightChange = nil
+        self.animation = animation
+        self.onPreferredHeightTransition = onPreferredHeightTransition
     }
 }
 
@@ -263,6 +291,16 @@ public struct BlockInputConfiguration {
     public var editorHorizontalInset: CGFloat
     /// Visual vertical inset used above and below editor content.
     public var editorVerticalInset: CGFloat
+    /// Multiplier applied to vertical padding inside rendered block rows.
+    ///
+    /// A value of `1` preserves built-in block spacing. Values below `1` make block rows denser, values above `1`
+    /// increase block row spacing, negative values are clamped to `0`, and non-finite values fall back to `1`.
+    /// Horizontal layout and the editor's outer `editorVerticalInset` are not affected.
+    public var blockVerticalInsetMultiplier: CGFloat {
+        didSet {
+            blockVerticalInsetMultiplier = Self.sanitizedBlockVerticalInsetMultiplier(blockVerticalInsetMultiplier)
+        }
+    }
     /// Subtle text shown when the editor has no meaningful document content.
     ///
     /// The placeholder is visual only. It is not inserted into the document, exported as Markdown, or reported through
@@ -376,6 +414,7 @@ public struct BlockInputConfiguration {
         allowsBlockReordering: Bool = true,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         editorVerticalInset: CGFloat = BlockInputConfiguration.defaultEditorVerticalInset,
+        blockVerticalInsetMultiplier: CGFloat = 1,
         placeholder: String? = nil,
         isEditable: Bool = true,
         disabledCursor: NSCursor? = nil,
@@ -414,6 +453,7 @@ public struct BlockInputConfiguration {
         self.allowsBlockReordering = allowsBlockReordering
         self.editorHorizontalInset = editorHorizontalInset
         self.editorVerticalInset = editorVerticalInset
+        self.blockVerticalInsetMultiplier = Self.sanitizedBlockVerticalInsetMultiplier(blockVerticalInsetMultiplier)
         self.placeholder = placeholder
         self.isEditable = isEditable
         self.disabledCursor = disabledCursor
@@ -446,5 +486,9 @@ public struct BlockInputConfiguration {
         self.documentChangeSnapshotDelay = documentChangeSnapshotDelay
         self.onSelectionChange = onSelectionChange
         self.onFocusChange = onFocusChange
+    }
+
+    static func sanitizedBlockVerticalInsetMultiplier(_ value: CGFloat) -> CGFloat {
+        value.isFinite ? max(0, value) : 1
     }
 }

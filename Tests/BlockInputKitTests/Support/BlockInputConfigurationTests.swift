@@ -31,6 +31,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.document.blocks.map(\.id), [blockID])
         XCTAssertEqual(configuration.editorHorizontalInset, BlockInputConfiguration.defaultEditorHorizontalInset)
         XCTAssertEqual(configuration.editorVerticalInset, BlockInputConfiguration.defaultEditorVerticalInset)
+        XCTAssertEqual(configuration.blockVerticalInsetMultiplier, 1)
         XCTAssertNil(configuration.placeholder)
         XCTAssertTrue(configuration.isEditable)
         XCTAssertNil(configuration.disabledCursor)
@@ -42,16 +43,61 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertNil(configuration.slashCommandChipClickHandler)
     }
 
+    @MainActor
     func testHeightSizingInitializerPreservesValues() {
+        var reportedHeight: CGFloat?
+        let trailingClosureSizing = BlockInputEditorHeightSizing(defaultVisibleLineCount: 2) { height in
+            reportedHeight = height
+        }
         let sizing = BlockInputEditorHeightSizing(
             defaultVisibleLineCount: 3,
             maximumVisibleLineCount: 8,
             onPreferredHeightChange: { _ in }
         )
 
+        trailingClosureSizing.onPreferredHeightChange?(42)
+        XCTAssertEqual(reportedHeight, 42)
         XCTAssertEqual(sizing.defaultVisibleLineCount, 3)
         XCTAssertEqual(sizing.maximumVisibleLineCount, 8)
         XCTAssertNotNil(sizing.onPreferredHeightChange)
+        XCTAssertEqual(sizing.animation, .default)
+        XCTAssertNil(sizing.onPreferredHeightTransition)
+    }
+
+    @MainActor
+    func testHeightSizingTransitionInitializerPreservesValues() {
+        var reportedTransition: BlockInputEditorHeightTransition?
+        let sizing = BlockInputEditorHeightSizing(
+            defaultVisibleLineCount: 3,
+            maximumVisibleLineCount: 8,
+            animation: BlockInputEditorHeightAnimation(duration: 0.1, curve: .linear),
+            onPreferredHeightTransition: { reportedTransition = $0 }
+        )
+
+        XCTAssertEqual(sizing.defaultVisibleLineCount, 3)
+        XCTAssertEqual(sizing.maximumVisibleLineCount, 8)
+        XCTAssertNil(sizing.onPreferredHeightChange)
+        XCTAssertEqual(sizing.animation, BlockInputEditorHeightAnimation(duration: 0.1, curve: .linear))
+        XCTAssertNotNil(sizing.onPreferredHeightTransition)
+
+        let transition = BlockInputEditorHeightTransition(
+            previousHeight: 20,
+            targetHeight: 40,
+            animation: .default,
+            isInitial: false
+        )
+        sizing.onPreferredHeightTransition?(transition)
+        XCTAssertEqual(reportedTransition, transition)
+    }
+
+    func testBlockVerticalInsetMultiplierSanitizesInvalidValues() {
+        XCTAssertEqual(BlockInputConfiguration(blockVerticalInsetMultiplier: 0.5).blockVerticalInsetMultiplier, 0.5)
+        XCTAssertEqual(BlockInputConfiguration(blockVerticalInsetMultiplier: -1).blockVerticalInsetMultiplier, 0)
+        XCTAssertEqual(BlockInputConfiguration(blockVerticalInsetMultiplier: .nan).blockVerticalInsetMultiplier, 1)
+
+        var configuration = BlockInputConfiguration()
+        configuration.blockVerticalInsetMultiplier = -CGFloat.infinity
+        XCTAssertEqual(configuration.blockVerticalInsetMultiplier, 1)
     }
 
     @MainActor
@@ -67,6 +113,7 @@ final class BlockInputConfigurationTests: XCTestCase {
             allowsBlockReordering: false,
             editorHorizontalInset: 28,
             editorVerticalInset: 14,
+            blockVerticalInsetMultiplier: 0.75,
             placeholder: "Message",
             isEditable: false,
             disabledCursor: .operationNotAllowed,
@@ -84,6 +131,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertFalse(view.allowsBlockReordering)
         XCTAssertEqual(view.editorHorizontalInset, 28)
         XCTAssertEqual(view.editorVerticalInset, 14)
+        XCTAssertEqual(view.blockVerticalInsetMultiplier, 0.75)
         XCTAssertEqual(view.placeholder, "Message")
         XCTAssertFalse(view.isEditable)
         XCTAssertEqual(view.disabledCursor, .operationNotAllowed)

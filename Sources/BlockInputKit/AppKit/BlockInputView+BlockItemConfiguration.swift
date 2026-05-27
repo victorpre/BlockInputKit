@@ -7,6 +7,7 @@ extension BlockInputView {
             editorHorizontalInset: editorHorizontalInset,
             accentColor: dropIndicatorColor,
             style: style,
+            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier,
             imageLoadingContext: imageLoadingContext,
             fileBaseURL: fileBaseURL,
             isEditable: isEditable,

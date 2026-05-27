@@ -31,14 +31,15 @@ extension BlockInputBlockItem {
     static func imageHeight(
         for image: BlockInputImage,
         textWidth: CGFloat,
-        defaultAspectRatio: CGFloat
+        defaultAspectRatio: CGFloat,
+        blockVerticalInsetMultiplier: CGFloat = 1
     ) -> CGFloat {
         let contentHeight = imageDisplaySize(
             for: image,
             textWidth: textWidth,
             defaultAspectRatio: defaultAspectRatio
         ).height
-        return max(44, ceil(contentHeight)) + (imageExternalVerticalInset * 2)
+        return max(44, ceil(contentHeight)) + (scaledImageExternalVerticalInset(for: blockVerticalInsetMultiplier) * 2)
     }
 
     static func imageDisplaySize(
@@ -277,13 +278,19 @@ extension BlockInputBlockItem {
             x: imageBlockView.frame.minX,
             y: imageBlockView.frame.maxY,
             width: imageBlockView.frame.width,
-            height: max(view.bounds.maxY - imageBlockView.frame.maxY, Self.imageExternalVerticalInset)
+            height: max(
+                view.bounds.maxY - imageBlockView.frame.maxY,
+                Self.scaledImageExternalVerticalInset(for: blockVerticalInsetMultiplier)
+            )
         )
         let bottomZone = NSRect(
             x: imageBlockView.frame.minX,
             y: view.bounds.minY,
             width: imageBlockView.frame.width,
-            height: max(imageBlockView.frame.minY - view.bounds.minY, Self.imageExternalVerticalInset)
+            height: max(
+                imageBlockView.frame.minY - view.bounds.minY,
+                Self.scaledImageExternalVerticalInset(for: blockVerticalInsetMultiplier)
+            )
         )
         if topZone.contains(rootPoint) {
             return 0

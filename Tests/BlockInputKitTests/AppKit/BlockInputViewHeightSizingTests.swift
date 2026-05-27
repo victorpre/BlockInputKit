@@ -60,6 +60,19 @@ final class BlockInputViewHeightSizingTests: XCTestCase {
         XCTAssertGreaterThan(view.preferredHeight(forWidth: 720), wideHeight)
     }
 
+    func testPreferredHeightUsesBlockVerticalInsetMultiplier() {
+        let text = "One\nTwo\nThree\nFour"
+        let defaultView = configuredView(text: text, defaultLines: 1, maxLines: nil)
+        let compactView = configuredView(text: text, defaultLines: 1, maxLines: nil, blockVerticalInsetMultiplier: 0.5)
+
+        XCTAssertLessThan(compactView.preferredHeight(forWidth: 360), defaultView.preferredHeight(forWidth: 360))
+        XCTAssertEqual(
+            compactView.preferredHeight(forWidth: 360),
+            expectedLineHeight(lines: 4, in: compactView),
+            accuracy: 0.5
+        )
+    }
+
     func testSizingUsesActualVeryNarrowWrappingWidth() {
         let block = BlockInputBlock(id: "first", text: Array(repeating: "a", count: 40).joined(separator: " "))
         let narrowTextWidth = BlockInputBlockItem.measuredTextWidth(
@@ -140,6 +153,114 @@ final class BlockInputViewHeightSizingTests: XCTestCase {
         XCTAssertGreaterThan(reportedHeights.last ?? 0, reportedHeights.first ?? 0)
     }
 
+    func testPreferredHeightTransitionPublishesInitialAndAnimatedChanges() async {
+        var transitions: [BlockInputEditorHeightTransition] = []
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 360, height: 200))
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [BlockInputBlock(id: "first", text: "Short")]),
+            heightSizing: BlockInputEditorHeightSizing(
+                defaultVisibleLineCount: 1,
+                maximumVisibleLineCount: 6,
+                animation: .default,
+                onPreferredHeightTransition: { transitions.append($0) }
+            )
+        ))
+        view.layoutSubtreeIfNeeded()
+        await Task.yield()
+
+        XCTAssertEqual(transitions.count, 1)
+        XCTAssertTrue(transitions[0].isInitial)
+        XCTAssertNil(transitions[0].previousHeight)
+        XCTAssertNil(transitions[0].animation)
+
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "first", text: (0..<5).map { "Line \($0)" }.joined(separator: "\n"))
+            ]),
+            heightSizing: BlockInputEditorHeightSizing(
+                defaultVisibleLineCount: 1,
+                maximumVisibleLineCount: 6,
+                animation: .default,
+                onPreferredHeightTransition: { transitions.append($0) }
+            )
+        ))
+        view.layoutSubtreeIfNeeded()
+        await Task.yield()
+
+        XCTAssertGreaterThan(transitions.count, 1)
+        XCTAssertFalse(transitions.last?.isInitial ?? true)
+        XCTAssertNotNil(transitions.last?.previousHeight)
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            XCTAssertNil(transitions.last?.animation)
+        } else {
+            XCTAssertEqual(transitions.last?.animation, .default)
+        }
+        XCTAssertGreaterThan(transitions.last?.targetHeight ?? 0, transitions.first?.targetHeight ?? 0)
+    }
+
+    func testHeightSizingWithoutCallbacksDoesNotConsumeInitialTransition() async {
+        let document = BlockInputDocument(blocks: [BlockInputBlock(id: "first", text: "Short")])
+        var transitions: [BlockInputEditorHeightTransition] = []
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 360, height: 200))
+        view.configure(BlockInputConfiguration(
+            document: document,
+            heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 1)
+        ))
+        view.layoutSubtreeIfNeeded()
+        await Task.yield()
+
+        view.configure(BlockInputConfiguration(
+            document: document,
+            heightSizing: BlockInputEditorHeightSizing(
+                defaultVisibleLineCount: 1,
+                animation: .default,
+                onPreferredHeightTransition: { transitions.append($0) }
+            )
+        ))
+        view.layoutSubtreeIfNeeded()
+        await Task.yield()
+
+        XCTAssertEqual(transitions.count, 1)
+        XCTAssertTrue(transitions[0].isInitial)
+        XCTAssertNil(transitions[0].previousHeight)
+        XCTAssertNil(transitions[0].animation)
+    }
+
+    func testPreferredHeightTransitionCanPublishWithLegacyCallbackAndNoAnimation() async {
+        var reportedHeights: [CGFloat] = []
+        var transitions: [BlockInputEditorHeightTransition] = []
+        var heightSizing = BlockInputEditorHeightSizing(
+            defaultVisibleLineCount: 1,
+            maximumVisibleLineCount: 6,
+            onPreferredHeightChange: { reportedHeights.append($0) }
+        )
+        heightSizing.animation = nil
+        heightSizing.onPreferredHeightTransition = { transitions.append($0) }
+
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 360, height: 200))
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [BlockInputBlock(id: "first", text: "Short")]),
+            heightSizing: heightSizing
+        ))
+        view.layoutSubtreeIfNeeded()
+        await Task.yield()
+
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "first", text: (0..<5).map { "Line \($0)" }.joined(separator: "\n"))
+            ]),
+            heightSizing: heightSizing
+        ))
+        view.layoutSubtreeIfNeeded()
+        await Task.yield()
+
+        XCTAssertEqual(reportedHeights.count, transitions.count)
+        XCTAssertGreaterThan(transitions.count, 1)
+        XCTAssertNil(transitions.last?.animation)
+        XCTAssertFalse(transitions.last?.isInitial ?? true)
+        XCTAssertEqual(reportedHeights.last, transitions.last?.targetHeight)
+    }
+
     func testHostViewCanResizeEditorFromFittingSize() {
         let host = HeightSizingHostView(frame: NSRect(x: 0, y: 0, width: 360, height: 260))
         host.configure(text: "Short", defaultLines: 1, maxLines: 3)
@@ -191,12 +312,18 @@ final class BlockInputViewHeightSizingTests: XCTestCase {
         XCTAssertEqual(reportedHeights.last ?? 0, view.preferredHeight(forWidth: 360), accuracy: 0.5)
     }
 
-    private func configuredView(text: String, defaultLines: Int, maxLines: Int?) -> BlockInputView {
+    private func configuredView(
+        text: String,
+        defaultLines: Int,
+        maxLines: Int?,
+        blockVerticalInsetMultiplier: CGFloat = 1
+    ) -> BlockInputView {
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 360, height: 200))
         view.configure(BlockInputConfiguration(
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: "first", text: text)
             ]),
+            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier,
             heightSizing: BlockInputEditorHeightSizing(
                 defaultVisibleLineCount: defaultLines,
                 maximumVisibleLineCount: maxLines
@@ -211,7 +338,8 @@ final class BlockInputViewHeightSizingTests: XCTestCase {
         let rowHeight = BlockInputBlockItem.height(
             for: BlockInputBlock(id: "expected", text: text),
             textWidth: 10_000,
-            style: view.style
+            style: view.style,
+            blockVerticalInsetMultiplier: view.blockVerticalInsetMultiplier
         )
         return ceil(rowHeight + (view.editorVerticalInset * 2))
     }

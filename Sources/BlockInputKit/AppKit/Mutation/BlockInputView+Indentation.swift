@@ -186,22 +186,8 @@ extension BlockInputView {
         afterBlock: BlockInputBlock
     ) -> Bool {
         let itemWidth = item.view.bounds.width > 0 ? item.view.bounds.width : collectionView.bounds.width
-        let beforeTextWidth = BlockInputBlockItem.measuredTextWidth(
-            for: itemWidth,
-            block: beforeBlock,
-            allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset,
-            style: style
-        )
-        let afterTextWidth = BlockInputBlockItem.measuredTextWidth(
-            for: itemWidth,
-            block: afterBlock,
-            allowsReordering: allowsBlockReordering,
-            editorHorizontalInset: editorHorizontalInset,
-            style: style
-        )
-        let beforeHeight = BlockInputBlockItem.height(for: beforeBlock, textWidth: beforeTextWidth, style: style, fileBaseURL: fileBaseURL)
-        let afterHeight = BlockInputBlockItem.height(for: afterBlock, textWidth: afterTextWidth, style: style, fileBaseURL: fileBaseURL)
+        let beforeHeight = measuredBlockItemHeight(for: beforeBlock, itemWidth: itemWidth)
+        let afterHeight = measuredBlockItemHeight(for: afterBlock, itemWidth: itemWidth)
         return abs(beforeHeight - afterHeight) > 0.5
     }
 

@@ -5,30 +5,37 @@ extension BlockInputBlockItem {
         for block: BlockInputBlock,
         textWidth: CGFloat,
         style: BlockInputStyle = .default,
-        fileBaseURL: URL? = nil
+        fileBaseURL: URL? = nil,
+        blockVerticalInsetMultiplier: CGFloat = 1
     ) -> CGFloat {
         let text = block.text.isEmpty ? " " : block.text
         let availableTextWidth = max(textWidth - perLineContentIndent(for: block), 120)
         let font = font(for: block.kind, style: style)
-        let metrics = verticalMetrics(for: block)
+        let metrics = verticalMetrics(for: block, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
         let hiddenDelimiterRanges = hiddenInlineDelimiterRanges(for: block, text: text, fileBaseURL: fileBaseURL)
         let inlineCodeRanges = inlineCodeRangesForHeight(for: block, text: text)
         let frontMatterReserve = block.kind == .frontMatter
-            ? (frontMatterDividerVerticalInset * 2) + frontMatterDividerHeight
+            ? (scaledFrontMatterDividerVerticalInset(for: blockVerticalInsetMultiplier) * 2) + frontMatterDividerHeight
             : 0
         if block.kind == .table,
            let table = BlockInputTable(markdown: block.text) {
             return max(
                 metrics.minimumHeight,
-                BlockInputTableView.height(for: table, width: availableTextWidth, style: style)
-                    + (tableExternalVerticalInset * 2)
+                BlockInputTableView.height(
+                    for: table,
+                    width: availableTextWidth,
+                    style: style,
+                    blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+                )
+                    + (scaledTableExternalVerticalInset(for: blockVerticalInsetMultiplier) * 2)
             )
         }
         if case let .image(image) = block.kind {
             return imageHeight(
                 for: image,
                 textWidth: availableTextWidth,
-                defaultAspectRatio: style.imageBlock.placeholderAspectRatio ?? 16.0 / 9.0
+                defaultAspectRatio: style.imageBlock.placeholderAspectRatio ?? 16.0 / 9.0,
+                blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
             )
         }
         if case .code = block.kind {

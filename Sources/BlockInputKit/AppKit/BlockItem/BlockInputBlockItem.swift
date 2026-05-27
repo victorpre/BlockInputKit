@@ -71,6 +71,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var slashCommandAvailability = BlockInputSlashCommandAvailability.documentStart
     var isDocumentStartBlock = false
     var editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
+    var blockVerticalInsetMultiplier: CGFloat = 1
     var handleLeadingConstraint: NSLayoutConstraint?
     var handleWidthConstraint: NSLayoutConstraint?
     var kindLabelLeadingConstraint: NSLayoutConstraint?
@@ -89,6 +90,8 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var quoteBarBottomConstraint: NSLayoutConstraint?
     var horizontalRuleLeadingConstraint: NSLayoutConstraint?
     var horizontalRuleTrailingConstraint: NSLayoutConstraint?
+    var tableViewTopConstraint: NSLayoutConstraint?
+    var tableViewBottomConstraint: NSLayoutConstraint?
     var frontMatterDividerLeadingConstraint: NSLayoutConstraint?
     var frontMatterDividerTrailingConstraint: NSLayoutConstraint?
     var frontMatterDividerBottomConstraint: NSLayoutConstraint?
@@ -192,6 +195,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         accentColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
+        blockVerticalInsetMultiplier: CGFloat = 1,
         imageLoadingContext: BlockInputImageBlockLoadingContext = BlockInputImageBlockLoadingContext(),
         fileBaseURL: URL? = nil,
         isEditable: Bool = true,
@@ -210,6 +214,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.delegate = delegate
         self.allowsReordering = allowsReordering
         self.editorHorizontalInset = editorHorizontalInset
+        self.blockVerticalInsetMultiplier = BlockInputConfiguration.sanitizedBlockVerticalInsetMultiplier(blockVerticalInsetMultiplier)
         self.style = style
         self.imageLoadingContext = imageLoadingContext
         self.fileBaseURL = fileBaseURL

@@ -7,7 +7,8 @@ extension BlockInputTableView {
     static func layoutMetrics(
         for table: BlockInputTable,
         viewportWidth: CGFloat,
-        style: BlockInputStyle
+        style: BlockInputStyle,
+        blockVerticalInsetMultiplier: CGFloat = 1
     ) -> BlockInputTableLayoutMetrics {
         let rows = rowModels(for: table)
         let columnWidths = (0..<table.columnCount).map { columnIndex in
@@ -22,7 +23,8 @@ extension BlockInputTableView {
                     isHeader: rowIndex == 0,
                     width: columnWidths[columnIndex],
                     alignment: textAlignment(for: table.alignments[columnIndex]),
-                    style: style
+                    style: style,
+                    blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
                 )
             }.max() ?? 0
         }
@@ -69,12 +71,14 @@ extension BlockInputTableView {
         isHeader: Bool,
         width: CGFloat,
         alignment: NSTextAlignment,
-        style: BlockInputStyle
+        style: BlockInputStyle,
+        blockVerticalInsetMultiplier: CGFloat = 1
     ) -> CGFloat {
         let attributed = attributedString(text, isHeader: isHeader, alignment: alignment, style: style)
         let textWidth = max(width - cellHorizontalPadding * 2, 0)
         let minimumHeight = lineHeight(isHeader: isHeader, style: style)
-        return ceil(max(measuredTextRect(for: attributed, width: textWidth).height, minimumHeight) + cellVerticalPadding * 2)
+        let verticalPadding = scaledCellVerticalPadding(for: blockVerticalInsetMultiplier)
+        return ceil(max(measuredTextRect(for: attributed, width: textWidth).height, minimumHeight) + verticalPadding * 2)
     }
 
     static func attributedString(
@@ -137,6 +141,13 @@ extension BlockInputTableView {
     static func lineHeight(isHeader: Bool, style: BlockInputStyle) -> CGFloat {
         let font = font(isHeader: isHeader, style: style)
         return ceil(font.ascender - font.descender + font.leading)
+    }
+
+    static func scaledCellVerticalPadding(for blockVerticalInsetMultiplier: CGFloat) -> CGFloat {
+        BlockInputBlockItem.scaledVerticalInset(
+            cellVerticalPadding,
+            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+        )
     }
 
     static func displayText(_ text: String) -> String {

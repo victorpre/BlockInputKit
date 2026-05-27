@@ -38,7 +38,10 @@ extension BlockInputView {
             max(textLeading - BlockInputPlaceholderLabel.caretAlignmentCompensation, 0),
             collectionView.bounds.maxX
         )
-        let metrics = BlockInputBlockItem.verticalMetrics(for: BlockInputBlock(kind: .paragraph))
+        let metrics = BlockInputBlockItem.verticalMetrics(
+            for: BlockInputBlock(kind: .paragraph),
+            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+        )
         let maxLabelX = textLineFrame.map { min($0.maxX, collectionView.bounds.maxX) }
             ?? collectionView.bounds.maxX
         let maxWidth = max(maxLabelX - labelX, 0)

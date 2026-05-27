@@ -45,6 +45,7 @@ final class BlockInputTableView: NSView {
     var cellRows: [[BlockInputTableCellView]] = []
     var table: BlockInputTable?
     var style = BlockInputStyle.default
+    var blockVerticalInsetMultiplier: CGFloat = 1
     var hasAppliedInitialScrollPosition = false
     var configuredBlockID: BlockInputBlockID?
     var selectedRow: BlockInputTable.Row?
@@ -96,7 +97,11 @@ final class BlockInputTableView: NSView {
         cellRows.flatMap { $0 }.forEach { $0.updateColors() }
     }
 
-    func configure(block: BlockInputBlock, style: BlockInputStyle) {
+    func configure(
+        block: BlockInputBlock,
+        style: BlockInputStyle,
+        blockVerticalInsetMultiplier: CGFloat = 1
+    ) {
         guard block.kind == .table,
               let table = BlockInputTable(markdown: block.text) else {
             resetForReuse()
@@ -108,6 +113,9 @@ final class BlockInputTableView: NSView {
         }
         self.table = table
         self.style = style
+        self.blockVerticalInsetMultiplier = BlockInputConfiguration.sanitizedBlockVerticalInsetMultiplier(
+            blockVerticalInsetMultiplier
+        )
         selectedRow = nil
         selectedCellRange = nil
         cellSelectionDragAnchor = nil
@@ -127,6 +135,7 @@ final class BlockInputTableView: NSView {
         table = nil
         configuredBlockID = nil
         style = .default
+        blockVerticalInsetMultiplier = 1
         hasAppliedInitialScrollPosition = false
         selectedRow = nil
         selectedCellRange = nil
@@ -186,8 +195,18 @@ final class BlockInputTableView: NSView {
         appendColumnButton
     }
 
-    static func height(for table: BlockInputTable, width: CGFloat, style: BlockInputStyle = .default) -> CGFloat {
-        layoutMetrics(for: table, viewportWidth: width, style: style).height
+    static func height(
+        for table: BlockInputTable,
+        width: CGFloat,
+        style: BlockInputStyle = .default,
+        blockVerticalInsetMultiplier: CGFloat = 1
+    ) -> CGFloat {
+        layoutMetrics(
+            for: table,
+            viewportWidth: width,
+            style: style,
+            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+        ).height
     }
 
     static func naturalWidth(for table: BlockInputTable, style: BlockInputStyle = .default) -> CGFloat {
@@ -254,6 +273,7 @@ final class BlockInputTableView: NSView {
                     isHeader: rowIndex == 0,
                     alignment: Self.textAlignment(for: table.alignments[columnIndex]),
                     style: style,
+                    blockVerticalInsetMultiplier: blockVerticalInsetMultiplier,
                     isEditable: isEditable,
                     position: Self.cellPosition(rowIndex: rowIndex, columnIndex: columnIndex),
                     tableView: self,
@@ -279,7 +299,12 @@ final class BlockInputTableView: NSView {
             return
         }
         let previousOrigin = scrollView.contentView.bounds.origin
-        let metrics = Self.layoutMetrics(for: table, viewportWidth: bounds.width, style: style)
+        let metrics = Self.layoutMetrics(
+            for: table,
+            viewportWidth: bounds.width,
+            style: style,
+            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+        )
         var currentY: CGFloat = 0
         for (rowIndex, row) in cellRows.enumerated() {
             var currentX: CGFloat = 0

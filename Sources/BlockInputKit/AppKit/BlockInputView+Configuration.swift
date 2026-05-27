@@ -72,6 +72,7 @@ extension BlockInputView {
         allowsBlockReordering = configuration.allowsBlockReordering
         editorHorizontalInset = configuration.editorHorizontalInset
         editorVerticalInset = configuration.editorVerticalInset
+        blockVerticalInsetMultiplier = configuration.blockVerticalInsetMultiplier
         placeholder = configuration.placeholder
         isEditable = configuration.isEditable
         disabledCursor = configuration.disabledCursor

@@ -13,7 +13,7 @@ extension BlockInputBlockItem {
             usesImageSurface = false
         }
         let contentIndent = Self.contentIndent(for: block)
-        let verticalMetrics = Self.verticalMetrics(for: block)
+        let verticalMetrics = Self.verticalMetrics(for: block, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
         textView.textContainerInset = textContainerInset(for: kind, metrics: verticalMetrics)
         textView.isEditable = isEditable && !isHorizontalRule && !usesTableSurface
         textView.isSelectable = !isHorizontalRule && !usesTableSurface
@@ -21,7 +21,11 @@ extension BlockInputBlockItem {
         applyTextAttributes(for: block)
         scrollView.isHidden = isHorizontalRule || usesTableSurface || usesImageSurface
         if usesTableSurface {
-            tableView.configure(block: block, style: style)
+            tableView.configure(
+                block: block,
+                style: style,
+                blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+            )
         } else {
             tableView.resetForReuse()
         }
@@ -29,6 +33,7 @@ extension BlockInputBlockItem {
         configureImageBlockIfNeeded(for: block)
         configureCodeBackground(for: block)
         scrollViewTopConstraint?.constant = 0
+        applyScaledSurfaceInsets()
         configureFrontMatterDivider(isVisible: isFrontMatter)
         handleTopConstraint?.constant = Self.dragHandleTopConstant(for: block.kind, metrics: verticalMetrics, style: style)
         kindLabelTopConstraint?.constant = 0
@@ -47,6 +52,13 @@ extension BlockInputBlockItem {
         updateImageBlockLayout(for: block)
     }
 
+    private func applyScaledSurfaceInsets() {
+        tableViewTopConstraint?.constant = Self.scaledTableExternalVerticalInset(for: blockVerticalInsetMultiplier)
+        tableViewBottomConstraint?.constant = -Self.scaledTableExternalVerticalInset(for: blockVerticalInsetMultiplier)
+        imageBlockTopConstraint?.constant = Self.scaledImageExternalVerticalInset(for: blockVerticalInsetMultiplier)
+        imageBlockBottomConstraint?.constant = -Self.scaledImageExternalVerticalInset(for: blockVerticalInsetMultiplier)
+    }
+
     private func configureImageSurfaceVisibility(_ usesImageSurface: Bool) {
         imageBlockView.isHidden = !usesImageSurface
         if !usesImageSurface {
@@ -56,8 +68,9 @@ extension BlockInputBlockItem {
 
     private func configureFrontMatterDivider(isVisible: Bool) {
         scrollViewBottomConstraint?.constant = isVisible
-            ? -((Self.frontMatterDividerVerticalInset * 2) + Self.frontMatterDividerHeight)
+            ? -((Self.scaledFrontMatterDividerVerticalInset(for: blockVerticalInsetMultiplier) * 2) + Self.frontMatterDividerHeight)
             : 0
+        frontMatterDividerBottomConstraint?.constant = -Self.scaledFrontMatterDividerVerticalInset(for: blockVerticalInsetMultiplier)
         frontMatterDividerView.isHidden = !isVisible
         frontMatterDividerView.alphaValue = isVisible
             ? BlockInputReadOnlyStyle.alpha(isEditable: isEditable, readOnly: BlockInputReadOnlyStyle.chromeAlpha)

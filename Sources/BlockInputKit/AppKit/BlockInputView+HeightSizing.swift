@@ -80,16 +80,40 @@ extension BlockInputView {
 
     private func publishPreferredHeightIfNeeded() {
         isPreferredHeightCallbackScheduled = false
-        guard let onPreferredHeightChange = heightSizing?.onPreferredHeightChange,
+        guard let heightSizing,
               bounds.width > 0 else {
             return
         }
-        let preferredHeight = preferredHeight(forWidth: bounds.width)
-        guard lastReportedPreferredHeight.map({ abs($0 - preferredHeight) > 0.5 }) ?? true else {
+        guard heightSizing.onPreferredHeightChange != nil || heightSizing.onPreferredHeightTransition != nil else {
             return
         }
+        let preferredHeight = preferredHeight(forWidth: bounds.width)
+        let previousHeight = lastReportedPreferredHeight
+        guard previousHeight.map({ abs($0 - preferredHeight) > 0.5 }) ?? true else {
+            return
+        }
+        let isInitial = previousHeight == nil
         lastReportedPreferredHeight = preferredHeight
-        onPreferredHeightChange(preferredHeight)
+        heightSizing.onPreferredHeightChange?(preferredHeight)
+        heightSizing.onPreferredHeightTransition?(BlockInputEditorHeightTransition(
+            previousHeight: previousHeight,
+            targetHeight: preferredHeight,
+            animation: resolvedPreferredHeightAnimation(heightSizing.animation, isInitial: isInitial),
+            isInitial: isInitial
+        ))
+    }
+
+    private func resolvedPreferredHeightAnimation(
+        _ animation: BlockInputEditorHeightAnimation?,
+        isInitial: Bool
+    ) -> BlockInputEditorHeightAnimation? {
+        guard !isInitial,
+              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+              let animation,
+              animation.duration > 0 else {
+            return nil
+        }
+        return animation
     }
 
     private func naturalContentHeight(forWidth width: CGFloat, stoppingAt maximumHeight: CGFloat?) -> CGFloat {
@@ -108,7 +132,13 @@ extension BlockInputView {
                 editorHorizontalInset: editorHorizontalInset,
                 style: style
             )
-            height += BlockInputBlockItem.height(for: block, textWidth: textWidth, style: style, fileBaseURL: fileBaseURL)
+            height += BlockInputBlockItem.height(
+                for: block,
+                textWidth: textWidth,
+                style: style,
+                fileBaseURL: fileBaseURL,
+                blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+            )
             if let maximumHeight, height >= maximumHeight {
                 return height
             }
@@ -125,7 +155,8 @@ extension BlockInputView {
             for: BlockInputBlock(id: "__heightSizingReference__", text: text),
             textWidth: 10_000,
             style: style,
-            fileBaseURL: fileBaseURL
+            fileBaseURL: fileBaseURL,
+            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
         )
         return rowHeight + (editorVerticalInset * 2)
     }

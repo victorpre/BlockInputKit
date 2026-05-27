@@ -141,7 +141,7 @@ extension BlockInputBlockItem {
         }
         let leadingPadding: CGFloat = 0
         let trailingPadding: CGFloat = 6
-        let verticalInset: CGFloat = 2
+        let verticalInset = Self.scaledVerticalInset(2, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
         let bounds = selectedContentBounds()
         let xPosition = max(0, bounds.minX - leadingPadding)
         let maxWidth = max(0, view.bounds.maxX - xPosition - trailingPadding)
@@ -299,7 +299,7 @@ extension BlockInputBlockItem {
     }
 
     private func singleLinePartialBackgroundFrame(for bounds: NSRect) -> NSRect {
-        let verticalInset: CGFloat = 2
+        let verticalInset = Self.scaledVerticalInset(2, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
         return NSRect(
             x: bounds.minX,
             y: verticalInset,
