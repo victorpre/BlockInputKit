@@ -32,11 +32,14 @@ final class BlockInputLinkFirstClickTests: XCTestCase {
         XCTAssertTrue(mounted.view.collectionView.acceptsFirstMouse(for: event))
     }
 
-    func testTextViewDoesNotBroadenFirstMouseAwayFromLinks() throws {
+    func testReadOnlyTextViewDoesNotBroadenFirstMouseAwayFromLinks() throws {
         let text = "Open [docs](https://example.com)"
-        let mounted = makeMountedBlockInputView(blocks: [
-            BlockInputBlock(id: "block", text: text)
-        ])
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: text)
+            ]),
+            isEditable: false
+        ))
         let textView = try textView(in: mounted.view)
         let location = try windowLocation(forUTF16Offset: 0, in: textView)
         let event = try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber)
@@ -44,11 +47,14 @@ final class BlockInputLinkFirstClickTests: XCTestCase {
         XCTAssertFalse(textView.acceptsFirstMouse(for: event))
     }
 
-    func testBlockContainersDoNotBroadenFirstMouseAwayFromLinks() throws {
+    func testReadOnlyBlockContainersDoNotBroadenFirstMouseAwayFromLinks() throws {
         let text = "Open [docs](https://example.com)"
-        let mounted = makeMountedBlockInputView(blocks: [
-            BlockInputBlock(id: "block", text: text)
-        ])
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: text)
+            ]),
+            isEditable: false
+        ))
         let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
         let textView = try XCTUnwrap(item.testingTextView)
         let location = try windowLocation(forUTF16Offset: 0, in: textView)

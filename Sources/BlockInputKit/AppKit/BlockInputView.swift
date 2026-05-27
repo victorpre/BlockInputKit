@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 
 /// Primary AppKit editor surface for a structured block document.
 @MainActor
@@ -52,6 +53,9 @@ public final class BlockInputView: NSView {
     let collectionView = BlockInputCollectionView()
     let placeholderLabel = BlockInputPlaceholderLabel(labelWithString: "")
     let dropIndicatorView = NSView()
+    let editorChromeFillLayer = CAShapeLayer()
+    let editorChromeStrokeLayer = CAShapeLayer()
+    let editorChromeMaskLayer = CAShapeLayer()
     let layout = BlockInputCollectionViewFlowLayout()
     var documentStore: (any BlockInputDocumentStore)?
     var documentStoreObservation: BlockInputDocumentStoreObservation?
@@ -153,6 +157,11 @@ public final class BlockInputView: NSView {
 
     /// Returns whether the editor can become the first responder.
     public override var acceptsFirstResponder: Bool { true }
+
+    public override func setBoundsSize(_ newSize: NSSize) {
+        super.setBoundsSize(newSize)
+        updateEditorChromeLayers()
+    }
 
     public override func resetCursorRects() {
         super.resetCursorRects()

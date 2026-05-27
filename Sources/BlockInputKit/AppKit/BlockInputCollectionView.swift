@@ -16,12 +16,21 @@ final class BlockInputCollectionView: NSCollectionView {
         guard let event else {
             return false
         }
-        return blockInputView?.linkClickTarget(for: event) != nil
+        return blockInputView?.isEditable == true || blockInputView?.linkClickTarget(for: event) != nil
     }
 
     override func resetCursorRects() {
         super.resetCursorRects()
+        blockInputView?.addEditableSurfaceCursorRectIfNeeded(to: self)
         blockInputView?.addDisabledCursorRectIfNeeded(to: self)
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        guard blockInputView?.isEditable == true else {
+            super.cursorUpdate(with: event)
+            return
+        }
+        NSCursor.iBeam.set()
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -30,6 +39,13 @@ final class BlockInputCollectionView: NSCollectionView {
             return
         }
         blockSelectionDragItem = itemForBlockSelectionDrag(at: event.locationInWindow)
+        guard blockSelectionDragItem != nil else {
+            guard blockInputView?.focusEditorFromEditableSurfaceClick() == true else {
+                super.mouseDown(with: event)
+                return
+            }
+            return
+        }
         blockSelectionDragItem?.beginBlockSelectionDrag()
         super.mouseDown(with: event)
     }

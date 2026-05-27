@@ -31,7 +31,7 @@ class BlockInputTextView: NSTextView {
         guard let event else {
             return false
         }
-        return linkHitResult(for: event) != nil
+        return blockItem?.isEditable == true || linkHitResult(for: event) != nil
     }
 
     override func mouseDown(with event: NSEvent) {

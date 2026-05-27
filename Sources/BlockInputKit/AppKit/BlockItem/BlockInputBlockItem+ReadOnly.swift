@@ -19,7 +19,7 @@ extension BlockInputBlockItem {
         guard let window = view.window else {
             return
         }
-        for view in [view, textView, tableView, imageBlockView] {
+        for view in [view, scrollView, scrollView.contentView, textView, tableView, imageBlockView] {
             window.invalidateCursorRects(for: view)
         }
         for cellTextView in tableView.cellRows.flatMap({ $0 }).map(\.textView) {

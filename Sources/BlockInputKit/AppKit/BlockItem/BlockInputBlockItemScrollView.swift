@@ -32,7 +32,7 @@ final class BlockInputBlockItemScrollView: NSScrollView {
         guard let event else {
             return false
         }
-        return blockItem?.textView.linkHitResult(for: event) != nil
+        return blockItem?.usesEditableTextSurfaceCursor == true || blockItem?.textView.linkHitResult(for: event) != nil
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -40,7 +40,23 @@ final class BlockInputBlockItemScrollView: NSScrollView {
             blockItem?.textView.mouseDown(with: event)
             return
         }
+        if blockItem?.routeEditableTextSurfaceMouseDown(event) == true {
+            return
+        }
         super.mouseDown(with: event)
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        blockItem?.addEditableTextSurfaceCursorRectIfNeeded(to: self)
+        blockItem?.addDisabledCursorRectIfNeeded(to: self)
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        guard blockItem?.applyEditableTextSurfaceCursor(at: nil) == true else {
+            super.cursorUpdate(with: event)
+            return
+        }
     }
 
     override func scrollWheel(with event: NSEvent) {
@@ -196,15 +212,39 @@ private final class BlockInputBlockItemClipView: NSClipView {
               let scrollView = superview as? BlockInputBlockItemScrollView else {
             return false
         }
-        return scrollView.blockItem?.textView.linkHitResult(for: event) != nil
+        return scrollView.blockItem?.usesEditableTextSurfaceCursor == true ||
+            scrollView.blockItem?.textView.linkHitResult(for: event) != nil
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard let scrollView = superview as? BlockInputBlockItemScrollView,
-              scrollView.blockItem?.textView.linkHitResult(for: event) != nil else {
+        guard let scrollView = superview as? BlockInputBlockItemScrollView else {
             super.mouseDown(with: event)
             return
         }
-        scrollView.blockItem?.textView.mouseDown(with: event)
+        if scrollView.blockItem?.textView.linkHitResult(for: event) != nil {
+            scrollView.blockItem?.textView.mouseDown(with: event)
+            return
+        }
+        if scrollView.blockItem?.routeEditableTextSurfaceMouseDown(event) == true {
+            return
+        }
+        super.mouseDown(with: event)
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        guard let scrollView = superview as? BlockInputBlockItemScrollView else {
+            return
+        }
+        scrollView.blockItem?.addEditableTextSurfaceCursorRectIfNeeded(to: self)
+        scrollView.blockItem?.addDisabledCursorRectIfNeeded(to: self)
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        guard let scrollView = superview as? BlockInputBlockItemScrollView,
+              scrollView.blockItem?.applyEditableTextSurfaceCursor(at: nil) == true else {
+            super.cursorUpdate(with: event)
+            return
+        }
     }
 }

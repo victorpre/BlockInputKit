@@ -9,6 +9,7 @@ final class BlockInputStyleTests: XCTestCase {
         XCTAssertEqual(style.editorSurface.editorBackgroundColor, .textBackgroundColor)
         XCTAssertEqual(style.editorSurface.scrollBackgroundColor, .textBackgroundColor)
         XCTAssertEqual(style.editorSurface.collectionBackgroundColor, .textBackgroundColor)
+        XCTAssertNil(style.editorSurface.chrome)
         XCTAssertEqual(style.fileChip.foregroundColor, .labelColor)
         XCTAssertEqual(style.slashCommandChip.foregroundColor, .labelColor)
         XCTAssertEqual(style.rawSlashCommandChip.foregroundColor, .labelColor)
@@ -57,5 +58,12 @@ final class BlockInputStyleTests: XCTestCase {
         let chip = BlockInputInlineChipStyle(cornerRadius: -8)
 
         XCTAssertEqual(chip.cornerRadius, 0)
+    }
+
+    func testEditorChromeStyleClampsNegativeValues() {
+        let chrome = BlockInputEditorChromeStyle(borderWidth: -1, cornerRadius: -8)
+
+        XCTAssertEqual(chrome.borderWidth, 0)
+        XCTAssertEqual(chrome.cornerRadius, 0)
     }
 }

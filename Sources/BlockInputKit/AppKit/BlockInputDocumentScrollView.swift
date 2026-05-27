@@ -31,7 +31,27 @@ final class BlockInputDocumentScrollView: NSScrollView {
 
     override func resetCursorRects() {
         super.resetCursorRects()
+        blockInputView?.addEditableSurfaceCursorRectIfNeeded(to: self)
         blockInputView?.addDisabledCursorRectIfNeeded(to: self)
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        blockInputView?.isEditable == true
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        guard blockInputView?.isEditable == true else {
+            super.cursorUpdate(with: event)
+            return
+        }
+        NSCursor.iBeam.set()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard blockInputView?.focusEditorFromEditableSurfaceClick() != true else {
+            return
+        }
+        super.mouseDown(with: event)
     }
 
     override func layout() {

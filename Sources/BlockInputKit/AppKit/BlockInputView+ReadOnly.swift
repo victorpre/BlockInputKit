@@ -36,6 +36,22 @@ extension BlockInputView {
         view.addCursorRect(view.bounds, cursor: cursor)
     }
 
+    func addEditableSurfaceCursorRectIfNeeded(to view: NSView) {
+        guard isEditable else {
+            return
+        }
+        view.addCursorRect(view.bounds, cursor: .iBeam)
+    }
+
+    @discardableResult
+    func focusEditorFromEditableSurfaceClick() -> Bool {
+        guard isEditable else {
+            return false
+        }
+        focusEditor()
+        return true
+    }
+
     func discardReadOnlyTextChangeIfNeeded(item: BlockInputBlockItem, block: BlockInputBlock) -> Bool {
         guard !isEditable else {
             return false

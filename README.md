@@ -94,7 +94,14 @@ let configuration = BlockInputConfiguration(
         editorSurface: BlockInputEditorSurfaceStyle(
             editorBackgroundColor: nil,
             scrollBackgroundColor: nil,
-            collectionBackgroundColor: nil
+            collectionBackgroundColor: nil,
+            chrome: BlockInputEditorChromeStyle(
+                fillColor: NSColor.labelColor.withAlphaComponent(0.08),
+                strokeColor: NSColor.labelColor.withAlphaComponent(0.18),
+                borderWidth: 1,
+                cornerRadius: 18,
+                clipsContentToShape: true
+            )
         ),
         imageBlock: BlockInputImageBlockStyle(cornerRadius: 8),
         fileChip: BlockInputInlineChipStyle(
@@ -119,9 +126,11 @@ let configuration = BlockInputConfiguration(
 )
 ```
 
-`nil` editor surface colors are transparent so the host can draw its own rounded background. `dropIndicatorColor`,
-selection colors, inline code, code block, image block, and inline chip styling are also configurable. Link-backed
-chips use their chip foreground color instead of the system link text color.
+`nil` editor surface colors are transparent so the host can draw its own background. Use
+`BlockInputEditorChromeStyle` when the editor should draw its own rounded fill, stroke, and optional clipping. Chrome
+can round all corners, top corners, bottom corners, or an explicit corner set. `dropIndicatorColor`, selection colors,
+inline code, code block, image block, and inline chip styling are also configurable. Link-backed chips use their chip
+foreground color instead of the system link text color.
 
 `blockVerticalInsetMultiplier` adjusts vertical padding inside rendered block rows without changing horizontal layout or
 the editor's outer `editorVerticalInset`. `1` preserves the built-in spacing, values below `1` make rows denser, and

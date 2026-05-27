@@ -191,4 +191,101 @@ final class BlockInputViewFocusTests: XCTestCase {
         XCTAssertEqual(focusValues, [true, false])
     }
 
+    func testEditableCollectionBackgroundClickFocusesEditor() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: blockID, text: "First")
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let point = try backgroundPoint(in: mounted.view.collectionView)
+        let event = try mouseDownEvent(
+            location: mounted.view.collectionView.convert(point, to: nil),
+            windowNumber: mounted.window.windowNumber
+        )
+
+        mounted.view.collectionView.mouseDown(with: event)
+
+        XCTAssertTrue(mounted.window.firstResponder === textView)
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)))
+    }
+
+    func testEditableRowScrollSurfaceClickFocusesTextView() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: blockID, text: "First")
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let scrollView = try XCTUnwrap(item.testingTextScrollView)
+        let textView = try XCTUnwrap(item.testingTextView)
+        let localPoint = NSPoint(x: scrollView.bounds.maxX - 4, y: scrollView.bounds.midY)
+        let windowPoint = scrollView.convert(localPoint, to: nil)
+        let mouseDown = try mouseDownEvent(location: windowPoint, windowNumber: mounted.window.windowNumber)
+        let mouseUp = try mouseUpEvent(location: windowPoint, windowNumber: mounted.window.windowNumber)
+
+        scrollView.mouseDown(with: mouseDown)
+        textView.mouseUp(with: mouseUp)
+
+        XCTAssertTrue(mounted.window.firstResponder === textView)
+    }
+
+    func testEditableSurfacesAcceptFirstMouse() throws {
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(text: "First")
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let scrollView = try XCTUnwrap(item.testingTextScrollView)
+        let textView = try XCTUnwrap(item.testingTextView)
+        let event = try mouseDownEvent(
+            location: scrollView.convert(NSPoint(x: scrollView.bounds.midX, y: scrollView.bounds.midY), to: nil),
+            windowNumber: mounted.window.windowNumber
+        )
+
+        XCTAssertTrue(mounted.view.collectionView.acceptsFirstMouse(for: event))
+        XCTAssertTrue(scrollView.acceptsFirstMouse(for: event))
+        XCTAssertTrue(textView.acceptsFirstMouse(for: event))
+    }
+
+    func testEditableSurfaceAddsIBeamCursorRectOnlyWhenEditable() {
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(text: "First")
+        ])
+        let editableProbe = FocusCursorRectProbeView(frame: NSRect(x: 0, y: 0, width: 32, height: 12))
+
+        mounted.view.addEditableSurfaceCursorRectIfNeeded(to: editableProbe)
+
+        XCTAssertEqual(editableProbe.addedCursorRects.count, 1)
+        XCTAssertEqual(editableProbe.addedCursorRects.first?.rect, editableProbe.bounds)
+        XCTAssertEqual(editableProbe.addedCursorRects.first?.cursor, .iBeam)
+
+        mounted.view.configure(BlockInputConfiguration(
+            document: mounted.view.document,
+            isEditable: false
+        ))
+        let readOnlyProbe = FocusCursorRectProbeView(frame: editableProbe.frame)
+        mounted.view.addEditableSurfaceCursorRectIfNeeded(to: readOnlyProbe)
+
+        XCTAssertTrue(readOnlyProbe.addedCursorRects.isEmpty)
+    }
+
+    private func backgroundPoint(in collectionView: NSCollectionView) throws -> NSPoint {
+        let bounds = collectionView.bounds.insetBy(dx: 4, dy: 4)
+        let candidates = [
+            NSPoint(x: bounds.midX, y: bounds.maxY),
+            NSPoint(x: bounds.midX, y: bounds.minY),
+            NSPoint(x: bounds.maxX, y: bounds.midY),
+            NSPoint(x: bounds.minX, y: bounds.midY)
+        ]
+        return try XCTUnwrap(candidates.first { collectionView.indexPathForItem(at: $0) == nil })
+    }
+
+}
+
+private final class FocusCursorRectProbeView: NSView {
+    var addedCursorRects: [(rect: NSRect, cursor: NSCursor)] = []
+
+    override func addCursorRect(_ rect: NSRect, cursor object: NSCursor) {
+        addedCursorRects.append((rect, object))
+        super.addCursorRect(rect, cursor: object)
+    }
 }

@@ -28,6 +28,7 @@ extension BlockInputView {
         let previousWidth = frame.width
         let sizeChanged = frame.size != newSize
         super.setFrameSize(newSize)
+        updateEditorChromeLayers()
         if sizeChanged {
             dismissCompletionPopup()
         }

@@ -58,17 +58,84 @@ public struct BlockInputEditorSurfaceStyle: @unchecked Sendable {
     public var scrollBackgroundColor: NSColor?
     /// Collection view background color. When nil, the collection view uses an empty `backgroundColors` array.
     public var collectionBackgroundColor: NSColor?
+    /// Optional rounded editor chrome drawn by the root editor view.
+    public var chrome: BlockInputEditorChromeStyle?
 
     /// Creates editor surface styling overrides.
     public init(
         editorBackgroundColor: NSColor? = .textBackgroundColor,
         scrollBackgroundColor: NSColor? = .textBackgroundColor,
-        collectionBackgroundColor: NSColor? = .textBackgroundColor
+        collectionBackgroundColor: NSColor? = .textBackgroundColor,
+        chrome: BlockInputEditorChromeStyle? = nil
     ) {
         self.editorBackgroundColor = editorBackgroundColor
         self.scrollBackgroundColor = scrollBackgroundColor
         self.collectionBackgroundColor = collectionBackgroundColor
+        self.chrome = chrome
     }
+}
+
+/// Root editor chrome drawn behind the editor's scrollable document surface.
+public struct BlockInputEditorChromeStyle: @unchecked Sendable {
+    /// Chrome fill color. When nil, the root editor background color is used.
+    public var fillColor: NSColor?
+    /// Optional chrome stroke color. When nil, no stroke is drawn.
+    public var strokeColor: NSColor?
+    /// Chrome stroke width. Negative values are clamped to zero.
+    public var borderWidth: CGFloat {
+        didSet {
+            borderWidth = Self.validNonNegative(borderWidth)
+        }
+    }
+    /// Chrome corner radius. Negative values are clamped to zero.
+    public var cornerRadius: CGFloat {
+        didSet {
+            cornerRadius = Self.validNonNegative(cornerRadius)
+        }
+    }
+    /// Corners that should use `cornerRadius`.
+    public var roundedCorners: BlockInputEditorChromeCorners
+    /// Whether editor content should be clipped to the rounded chrome shape.
+    public var clipsContentToShape: Bool
+
+    /// Creates rounded editor chrome styling.
+    public init(
+        fillColor: NSColor? = nil,
+        strokeColor: NSColor? = nil,
+        borderWidth: CGFloat = 0,
+        cornerRadius: CGFloat = 0,
+        roundedCorners: BlockInputEditorChromeCorners = .all,
+        clipsContentToShape: Bool = false
+    ) {
+        self.fillColor = fillColor
+        self.strokeColor = strokeColor
+        self.borderWidth = Self.validNonNegative(borderWidth)
+        self.cornerRadius = Self.validNonNegative(cornerRadius)
+        self.roundedCorners = roundedCorners
+        self.clipsContentToShape = clipsContentToShape
+    }
+
+    private static func validNonNegative(_ value: CGFloat) -> CGFloat {
+        max(0, value)
+    }
+}
+
+/// Corners that can be rounded by `BlockInputEditorChromeStyle`.
+public struct BlockInputEditorChromeCorners: OptionSet, Sendable {
+    public let rawValue: Int
+
+    public init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    public static let topLeft = BlockInputEditorChromeCorners(rawValue: 1 << 0)
+    public static let topRight = BlockInputEditorChromeCorners(rawValue: 1 << 1)
+    public static let bottomLeft = BlockInputEditorChromeCorners(rawValue: 1 << 2)
+    public static let bottomRight = BlockInputEditorChromeCorners(rawValue: 1 << 3)
+
+    public static let top: BlockInputEditorChromeCorners = [.topLeft, .topRight]
+    public static let bottom: BlockInputEditorChromeCorners = [.bottomLeft, .bottomRight]
+    public static let all: BlockInputEditorChromeCorners = [.top, .bottom]
 }
 
 /// Fill, stroke, foreground, and rounding styling for inline chips.

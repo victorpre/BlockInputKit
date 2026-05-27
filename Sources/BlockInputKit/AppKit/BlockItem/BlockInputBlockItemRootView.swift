@@ -32,7 +32,7 @@ final class BlockInputBlockItemRootView: NSView {
         if blockItem?.imageResizeHitView(containing: point) != nil {
             return true
         }
-        return blockItem?.textView.linkHitResult(for: event) != nil
+        return blockItem?.usesEditableTextSurfaceCursor == true || blockItem?.textView.linkHitResult(for: event) != nil
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -48,6 +48,9 @@ final class BlockInputBlockItemRootView: NSView {
         }
         if blockItem?.textView.linkHitResult(for: event) != nil {
             blockItem?.textView.mouseDown(with: event)
+            return
+        }
+        if blockItem?.routeEditableTextSurfaceMouseDown(event, atRootPoint: point) == true {
             return
         }
         super.mouseDown(with: event)
@@ -79,6 +82,7 @@ final class BlockInputBlockItemRootView: NSView {
 
     override func resetCursorRects() {
         super.resetCursorRects()
+        blockItem?.addEditableTextSurfaceCursorRectIfNeeded(to: self)
         blockItem?.addDisabledCursorRectIfNeeded(to: self)
         blockItem?.addImageResizeCursorRects(to: self)
         guard let blockItem,
@@ -97,6 +101,9 @@ final class BlockInputBlockItemRootView: NSView {
         guard let blockItem,
               let cursor = blockItem.reorderHandleCursor,
               blockItem.containsReorderHandleHitTarget(point) else {
+            if self.blockItem?.applyEditableTextSurfaceCursor(at: point) == true {
+                return
+            }
             super.cursorUpdate(with: event)
             return
         }
