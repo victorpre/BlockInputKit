@@ -67,6 +67,13 @@ extension BlockInputView {
     }
 
     func scrollActiveTextSelectionToVisibleIfNeeded() {
+        scrollActiveTextSelectionToVisibleNow()
+        DispatchQueue.main.async { [weak self] in
+            self?.scrollActiveTextSelectionToVisibleNow()
+        }
+    }
+
+    private func scrollActiveTextSelectionToVisibleNow() {
         guard heightSizing != nil,
               window != nil,
               let caret = activeTextSelectionCaret,
@@ -220,15 +227,14 @@ extension BlockInputView {
     }
 
     private func lineLimitedHeight(forLineCount lineCount: Int) -> CGFloat {
-        let text = Array(repeating: "x", count: lineCount).joined(separator: "\n")
         let rowHeight = BlockInputBlockItem.height(
-            for: BlockInputBlock(id: "__heightSizingReference__", text: text),
+            for: BlockInputBlock(id: "__heightSizingReference__", text: "x"),
             textWidth: 10_000,
             style: style,
             fileBaseURL: fileBaseURL,
             blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
         )
-        return rowHeight + (editorVerticalInset * 2)
+        return (rowHeight * CGFloat(lineCount)) + (editorVerticalInset * 2)
     }
 
     private func sanitizedDefaultLineCount(in heightSizing: BlockInputEditorHeightSizing) -> Int {

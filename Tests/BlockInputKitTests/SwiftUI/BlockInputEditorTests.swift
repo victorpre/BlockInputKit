@@ -49,10 +49,10 @@ final class BlockInputEditorTests: XCTestCase {
         host.layoutSubtreeIfNeeded()
 
         let rowHeight = BlockInputBlockItem.height(
-            for: BlockInputBlock(id: "expected", text: "x\nx\nx"),
+            for: BlockInputBlock(id: "expected", text: "x"),
             textWidth: 10_000
         )
-        let expectedHeight = ceil(rowHeight + (BlockInputConfiguration.defaultEditorVerticalInset * 2))
+        let expectedHeight = ceil((rowHeight * 3) + (BlockInputConfiguration.defaultEditorVerticalInset * 2))
         XCTAssertEqual(host.fittingSize.height, expectedHeight, accuracy: 1)
     }
 

@@ -320,6 +320,7 @@ extension BlockInputView {
         collectionView.reloadItems(at: [indexPath])
         collectionView.layoutSubtreeIfNeeded()
         restoreVisibleSelection()
+        invalidatePreferredHeight()
     }
 
     private static func removingOneTrailingLineEnding(_ text: String) -> String {
@@ -336,11 +337,14 @@ extension BlockInputView {
         let indexPath = IndexPath(item: index, section: 0)
         if shouldDeferGranularCountLayout {
             reconfigureMountedBlocksAfterGranularCountChange(startingAt: index)
+            scrollActiveTextSelectionToVisibleIfNeeded()
             return
         }
         collectionView.insertItems(at: [indexPath])
         collectionView.layoutSubtreeIfNeeded()
         restoreMountedSelection()
+        invalidatePreferredHeight()
+        scrollActiveTextSelectionToVisibleIfNeeded()
     }
 
     private func currentReturnSelection(for blockID: BlockInputBlockID) -> ReturnSelection? {

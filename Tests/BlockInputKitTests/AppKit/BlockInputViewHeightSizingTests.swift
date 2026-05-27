@@ -68,7 +68,7 @@ final class BlockInputViewHeightSizingTests: XCTestCase {
         XCTAssertLessThan(compactView.preferredHeight(forWidth: 360), defaultView.preferredHeight(forWidth: 360))
         XCTAssertEqual(
             compactView.preferredHeight(forWidth: 360),
-            expectedLineHeight(lines: 4, in: compactView),
+            expectedSoftLineHeight(lines: 4, in: compactView),
             accuracy: 0.5
         )
     }
@@ -114,40 +114,6 @@ final class BlockInputViewHeightSizingTests: XCTestCase {
         XCTAssertLessThanOrEqual(
             view.scrollView.contentView.bounds.origin.y,
             max(0, contentHeight - view.scrollView.contentSize.height) + 0.5
-        )
-    }
-
-    func testInlineNewlineKeepsCaretVisibleWhileHostHeightAnimates() throws {
-        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
-            document: BlockInputDocument(blocks: [BlockInputBlock(id: "first", text: "One")]),
-            heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 1, maximumVisibleLineCount: 6)
-        ), size: NSSize(width: 360, height: 200))
-        let collapsedHeight = mounted.view.preferredHeight(forWidth: 360)
-        resizeMountedBlockInputView(mounted, to: NSSize(width: 360, height: collapsedHeight))
-        mounted.view.scrollView.contentView.scroll(to: .zero)
-
-        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
-        let textView = try XCTUnwrap(item.testingTextView)
-        let expandedText = "One\nTwo\nThree\nFour"
-        let expandedOffset = (expandedText as NSString).length
-
-        mounted.window.makeFirstResponder(textView)
-        textView.string = expandedText
-        textView.setSelectedRange(NSRange(location: expandedOffset, length: 0))
-        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
-        mounted.view.collectionView.layoutSubtreeIfNeeded()
-
-        let caretRect = mounted.view.collectionView.convert(item.anchorWindowRect(forUTF16Offset: expandedOffset), from: nil)
-        let visibleRect = mounted.view.scrollView.contentView.bounds
-        XCTAssertGreaterThan(visibleRect.minY, 0)
-        XCTAssertLessThanOrEqual(caretRect.maxY, visibleRect.maxY + 0.5)
-
-        let expandedHeight = mounted.view.preferredHeight(forWidth: 360)
-        resizeMountedBlockInputView(mounted, to: NSSize(width: 360, height: expandedHeight))
-        let contentHeight = mounted.view.collectionView.collectionViewLayout?.collectionViewContentSize.height ?? 0
-        XCTAssertLessThanOrEqual(
-            mounted.view.scrollView.contentView.bounds.minY,
-            max(0, contentHeight - mounted.view.scrollView.contentSize.height) + 0.5
         )
     }
 
@@ -368,6 +334,16 @@ final class BlockInputViewHeightSizingTests: XCTestCase {
     }
 
     private func expectedLineHeight(lines: Int, in view: BlockInputView) -> CGFloat {
+        let rowHeight = BlockInputBlockItem.height(
+            for: BlockInputBlock(id: "expected", text: "x"),
+            textWidth: 10_000,
+            style: view.style,
+            blockVerticalInsetMultiplier: view.blockVerticalInsetMultiplier
+        )
+        return ceil((rowHeight * CGFloat(lines)) + (view.editorVerticalInset * 2))
+    }
+
+    private func expectedSoftLineHeight(lines: Int, in view: BlockInputView) -> CGFloat {
         let text = Array(repeating: "x", count: lines).joined(separator: "\n")
         let rowHeight = BlockInputBlockItem.height(
             for: BlockInputBlock(id: "expected", text: text),

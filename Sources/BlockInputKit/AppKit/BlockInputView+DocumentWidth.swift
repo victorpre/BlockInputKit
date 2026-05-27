@@ -16,6 +16,7 @@ extension BlockInputView {
         updateVisibleItemWidthsForCurrentWidth()
         collectionView.needsLayout = true
         updatePlaceholderLayout()
+        invalidatePreferredHeight()
     }
 
     func updateVisibleItemWidthsForCurrentWidth() {

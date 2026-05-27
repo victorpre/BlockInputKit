@@ -161,7 +161,8 @@ when they do not mutate the document.
 
 Height sizing is opt-in. When enabled, the editor reports a rendered-content preferred height that starts at a default
 visible line count, grows as content wraps or new blocks are added, and caps at a maximum visible line count when supplied.
-Extra content remains in the editor and scrolls vertically.
+Visible line counts are measured as one-line paragraph row equivalents, so `defaultVisibleLineCount: 3` leaves room for
+three paragraph blocks created by Return. Extra content remains in the editor and scrolls vertically.
 
 ```swift
 let configuration = BlockInputConfiguration(

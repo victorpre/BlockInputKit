@@ -110,15 +110,18 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             selectionAfter: afterSelection
         )
         item.updateTextDependentChrome(for: afterBlock)
-        if shouldInvalidateLayoutForTextChange(
+        let invalidatesLayout = shouldInvalidateLayoutForTextChange(
             item: item,
             beforeBlock: change.beforeBlock,
             afterBlock: afterBlock
-        ) {
+        )
+        if invalidatesLayout {
             resizeVisibleItem(item, for: afterBlock)
             invalidateLayoutForBlock(at: index, editedItem: item, block: afterBlock)
         }
-        scrollActiveTextSelectionToVisibleIfNeeded()
+        if invalidatesLayout {
+            scrollActiveTextSelectionToVisibleIfNeeded()
+        }
         syncDocumentStore(.replaceBlock(afterBlock))
         if !didReplaceCachedBlock && isDocumentCacheSynchronized {
             refreshDocumentFromStore()

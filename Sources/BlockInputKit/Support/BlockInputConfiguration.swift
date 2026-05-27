@@ -214,12 +214,13 @@ public struct BlockInputEditorHeightSizing {
     /// Minimum/default viewport height expressed as a rendered line count.
     ///
     /// Empty and short documents use at least this much vertical space. The line count is converted through the current
-    /// paragraph font metrics and editor vertical inset, so the resulting point height follows the configured style.
+    /// paragraph row metrics and editor vertical inset, so the resulting point height follows the configured style and
+    /// leaves room for the same number of one-line paragraph blocks.
     public var defaultVisibleLineCount: Int
     /// Maximum viewport height expressed as a rendered line count.
     ///
-    /// A `nil` value allows the editor to grow to its rendered content height. When non-nil, extra content remains in the
-    /// editor and scrolls vertically.
+    /// A `nil` value allows the editor to grow to its rendered content height. When non-nil, the line count uses the same
+    /// paragraph row metrics as `defaultVisibleLineCount`, and extra content remains in the editor and scrolls vertically.
     public var maximumVisibleLineCount: Int?
     /// Called when the editor's clamped preferred height changes.
     ///
