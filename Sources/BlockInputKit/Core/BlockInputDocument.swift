@@ -319,9 +319,13 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
     }
 
     /// Implements Cmd+A escalation from current block text selection to all blocks.
+    ///
+    /// The default behavior selects the current block contents before promoting to all blocks. `.document` selects all
+    /// blocks immediately after confirming `currentBlockID` is valid, unless all blocks are already selected.
     public func selectAll(
         currentBlockID: BlockInputBlockID,
-        currentSelection: BlockInputSelection?
+        currentSelection: BlockInputSelection?,
+        behavior: BlockInputSelectAllBehavior = .focusedContentThenDocument
     ) -> BlockInputSelection? {
         let allBlockIDs = blocks.map(\.id)
         if currentSelection == .blocks(allBlockIDs) {
@@ -329,6 +333,9 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         }
         guard let block = block(withID: currentBlockID) else {
             return nil
+        }
+        if behavior == .document {
+            return .blocks(allBlockIDs)
         }
         if block.kind == .horizontalRule,
            currentSelection == .blocks([currentBlockID]) {
@@ -338,6 +345,9 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
             blockID: currentBlockID,
             range: NSRange(location: 0, length: block.utf16Length)
         )
+        if block.kind != .frontMatter, block.utf16Length == 0 {
+            return .blocks(allBlockIDs)
+        }
         if block.kind == .frontMatter {
             let blockSelection = BlockInputSelection.blocks([currentBlockID])
             if currentSelection == blockSelection {

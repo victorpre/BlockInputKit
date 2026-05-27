@@ -72,6 +72,43 @@ final class BlockInputTextCommandTests: XCTestCase {
         XCTAssertTrue(mounted.window.firstResponder === mounted.view)
     }
 
+    func testCommandASelectsAllBlocksImmediatelyFromEmptyTextFocus() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: firstID, text: ""),
+            BlockInputBlock(id: secondID, text: "Second")
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandAEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        XCTAssertTrue(mounted.window.firstResponder === mounted.view)
+    }
+
+    func testCommandAWithDocumentBehaviorSelectsAllBlocksFromTextFocus() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: firstID, text: "First"),
+                BlockInputBlock(id: secondID, text: "Second")
+            ]),
+            selectAllBehavior: .document
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandAEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+        XCTAssertTrue(mounted.window.firstResponder === mounted.view)
+    }
+
     func testSelectAllActionSelectsCurrentBlockThenAllBlocksFromTextFocus() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
@@ -111,6 +148,24 @@ final class BlockInputTextCommandTests: XCTestCase {
             blockID: secondID,
             range: NSRange(location: 0, length: 6)
         )))
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandAEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .blocks([firstID, secondID]))
+    }
+
+    func testCommandAWithDocumentBehaviorSelectsAllBlocksFromBlockSelectionFocus() throws {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: firstID, text: "First"),
+                BlockInputBlock(id: secondID, text: "Second")
+            ]),
+            selectAllBehavior: .document
+        ))
+        mounted.view.applySelection(.blocks([secondID]), notify: false)
+        XCTAssertTrue(mounted.window.makeFirstResponder(mounted.view))
 
         XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandAEvent()))
 

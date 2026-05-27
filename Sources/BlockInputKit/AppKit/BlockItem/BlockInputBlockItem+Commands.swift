@@ -83,7 +83,8 @@ extension BlockInputBlockItem {
         guard let blockID else {
             return
         }
-        if tableView.selectAllInActiveCellIfNeeded() {
+        if selectAllBehavior != .document,
+           tableView.selectAllInActiveCellIfNeeded() {
             return
         }
         delegate?.blockItemDidRequestSelectAll(self, blockID: blockID)

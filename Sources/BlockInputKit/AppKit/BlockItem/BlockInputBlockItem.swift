@@ -68,6 +68,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var isEditable = true
     var disabledCursor: NSCursor?
     var rawSlashCommandChips = false
+    var selectAllBehavior = BlockInputSelectAllBehavior.focusedContentThenDocument
     var slashCommandAvailability = BlockInputSlashCommandAvailability.documentStart
     var isDocumentStartBlock = false
     var editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
@@ -202,6 +203,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         disabledCursor: NSCursor? = nil,
         inlineHint: BlockInputInlineHint? = nil,
         rawSlashCommandChips: Bool = false,
+        selectAllBehavior: BlockInputSelectAllBehavior = .focusedContentThenDocument,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
         isDocumentStartBlock: Bool = false,
         isSelected: Bool = false,
@@ -220,6 +222,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.fileBaseURL = fileBaseURL
         applySlashCommandConfiguration(
             rawSlashCommandChips: rawSlashCommandChips,
+            selectAllBehavior: selectAllBehavior,
             slashCommandAvailability: slashCommandAvailability,
             isDocumentStartBlock: isDocumentStartBlock
         )
@@ -258,16 +261,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         configureBlockKindChrome(block: block)
         updateHorizontalConstraints(for: block)
         updateSelectionChromeFrame()
-    }
-
-    func applySlashCommandConfiguration(
-        rawSlashCommandChips: Bool,
-        slashCommandAvailability: BlockInputSlashCommandAvailability,
-        isDocumentStartBlock: Bool
-    ) {
-        self.rawSlashCommandChips = rawSlashCommandChips
-        self.slashCommandAvailability = slashCommandAvailability
-        self.isDocumentStartBlock = isDocumentStartBlock
     }
 
     func configureReorderHandle(canReorderBlock: Bool) {
@@ -484,6 +477,7 @@ extension BlockInputBlockItem {
         tableView.delegate = nil
         renderedCodeColorScheme = nil
         rawSlashCommandChips = false
+        selectAllBehavior = .focusedContentThenDocument
         slashCommandAvailability = .documentStart
         isDocumentStartBlock = false
         textView.cancelBlockSelectionDrag()

@@ -470,16 +470,16 @@ final class BlockInputTableCellEditingTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks[0].kind, .table)
     }
 
-    private func bodyCell(in item: BlockInputBlockItem, row: Int, column: Int) throws -> BlockInputTableCellTextView {
+    func bodyCell(in item: BlockInputBlockItem, row: Int, column: Int) throws -> BlockInputTableCellTextView {
         try tableCell(in: item, row: row + 1, column: column, columnCount: 2)
     }
 
-    private func tableCell(in item: BlockInputBlockItem, row: Int, column: Int, columnCount: Int) throws -> BlockInputTableCellTextView {
+    func tableCell(in item: BlockInputBlockItem, row: Int, column: Int, columnCount: Int) throws -> BlockInputTableCellTextView {
         let index = row * columnCount + column
         return try XCTUnwrap(item.testingTableCellTextViews.indices.contains(index) ? item.testingTableCellTextViews[index] : nil)
     }
 
-    private static func tableBlock(
+    static func tableBlock(
         header: [String] = ["H1", "H2"],
         bodyRows: [[String]] = [["one", "two"]]
     ) -> BlockInputBlock {

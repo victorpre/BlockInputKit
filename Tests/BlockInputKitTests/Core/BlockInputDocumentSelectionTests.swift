@@ -37,6 +37,36 @@ final class BlockInputDocumentSelectionTests: XCTestCase {
         XCTAssertEqual(selection, .blocks([firstID, secondID]))
     }
 
+    func testSelectAllPromotesEmptyCurrentBlockToAllBlocks() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: ""),
+            BlockInputBlock(id: secondID, text: "World")
+        ])
+
+        let selection = document.selectAll(currentBlockID: firstID, currentSelection: nil)
+
+        XCTAssertEqual(selection, .blocks([firstID, secondID]))
+    }
+
+    func testSelectAllDocumentBehaviorSelectsAllBlocksImmediately() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "Hello"),
+            BlockInputBlock(id: secondID, text: "World")
+        ])
+
+        let selection = document.selectAll(
+            currentBlockID: firstID,
+            currentSelection: nil,
+            behavior: .document
+        )
+
+        XCTAssertEqual(selection, .blocks([firstID, secondID]))
+    }
+
     func testSelectAllEscalatesSelectedHorizontalRuleToAllBlocks() {
         let firstID = BlockInputBlockID(rawValue: "first")
         let ruleID = BlockInputBlockID(rawValue: "rule")

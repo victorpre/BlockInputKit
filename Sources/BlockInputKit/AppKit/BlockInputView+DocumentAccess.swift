@@ -12,6 +12,10 @@ extension BlockInputView {
         return documentStore.block(at: index)
     }
 
+    var loadedBlockIDs: [BlockInputBlockID] {
+        (0..<blockCount).compactMap { block(at: $0)?.id }
+    }
+
     func block(withID id: BlockInputBlockID) -> BlockInputBlock? {
         guard let documentStore else {
             return document.block(withID: id)

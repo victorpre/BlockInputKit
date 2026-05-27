@@ -261,6 +261,14 @@ Button("Bold") {
 
 `BlockInputEditorCommand` covers undo, redo, select all, clipboard actions, inline formatting, links, images, and table insertion/row/column/table actions.
 
+By default, `Cmd+A` selects the focused content before promoting to the whole document. Empty
+focused text blocks promote directly to the whole document. Hosts that want `Cmd+A` to select the whole document
+immediately can opt in:
+
+```swift
+BlockInputConfiguration(selectAllBehavior: .document)
+```
+
 ### Host Keyboard Shortcuts
 
 Register keyboard shortcuts when the host needs to intercept keys before the editor's built-in behavior. Only dictionary
@@ -508,7 +516,8 @@ Mention/slash completion and local file-drop insertion are disabled inside table
 - `Return` and `Shift+Return` move vertically when another cell exists, or insert a paragraph outside the table at boundaries.
 - `Shift+Arrow` expands or collapses rectangular cell selection.
 - Backspace/Delete in empty body cells selects, then removes, the row.
-- `Cmd+A` selects cell contents, then the table block, then all blocks.
+- `Cmd+A` selects cell contents, then the table block, then all blocks. With `selectAllBehavior: .document`, it selects
+  all blocks immediately.
 
 Right-click menus expose table actions when they apply: `Insert Table`, `Insert Row`, `Insert Column`, `Delete Row`, `Delete Column`, and `Delete Table`.
 

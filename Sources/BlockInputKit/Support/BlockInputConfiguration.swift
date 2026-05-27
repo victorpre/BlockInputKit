@@ -209,67 +209,6 @@ public struct BlockInputSlashCommandChipClickContext {
     }
 }
 
-/// Preferred editor height behavior for hosts that want the editor to size itself from rendered content.
-public struct BlockInputEditorHeightSizing {
-    /// Minimum/default viewport height expressed as a rendered line count.
-    ///
-    /// Empty and short documents use at least this much vertical space. The line count is converted through the current
-    /// paragraph row metrics and editor vertical inset, so the resulting point height follows the configured style and
-    /// leaves room for the same number of one-line paragraph blocks.
-    public var defaultVisibleLineCount: Int
-    /// Maximum viewport height expressed as a rendered line count.
-    ///
-    /// A `nil` value allows the editor to grow to its rendered content height. When non-nil, the line count uses the same
-    /// paragraph row metrics as `defaultVisibleLineCount`, and extra content remains in the editor and scrolls vertically.
-    public var maximumVisibleLineCount: Int?
-    /// Called when the editor's clamped preferred height changes.
-    ///
-    /// The value is the height a host should assign to the editor viewport, not the unlimited natural document height.
-    public var onPreferredHeightChange: (@MainActor (CGFloat) -> Void)?
-    /// Animation metadata used for non-initial preferred-height transition callbacks.
-    ///
-    /// Set this to nil when transition callbacks should request immediate layout.
-    public var animation: BlockInputEditorHeightAnimation?
-    /// Called when the editor's clamped preferred height changes, including transition metadata.
-    ///
-    /// Hosts still own frame or constraint mutation. The transition reports the target height and, for non-initial
-    /// changes, an optional animation to apply while resizing the editor container.
-    public var onPreferredHeightTransition: (@MainActor (BlockInputEditorHeightTransition) -> Void)?
-
-    /// Creates preferred editor height behavior.
-    ///
-    /// Counts less than one are sanitized by the editor when measuring. If `maximumVisibleLineCount` is smaller than
-    /// `defaultVisibleLineCount`, the editor treats the maximum as equal to the default.
-    public init(
-        defaultVisibleLineCount: Int,
-        maximumVisibleLineCount: Int? = nil,
-        onPreferredHeightChange: (@MainActor (CGFloat) -> Void)? = nil
-    ) {
-        self.defaultVisibleLineCount = defaultVisibleLineCount
-        self.maximumVisibleLineCount = maximumVisibleLineCount
-        self.onPreferredHeightChange = onPreferredHeightChange
-        animation = .default
-        onPreferredHeightTransition = nil
-    }
-
-    /// Creates preferred editor height behavior with transition metadata for animated hosts.
-    ///
-    /// Counts less than one are sanitized by the editor when measuring. If `maximumVisibleLineCount` is smaller than
-    /// `defaultVisibleLineCount`, the editor treats the maximum as equal to the default.
-    public init(
-        defaultVisibleLineCount: Int,
-        maximumVisibleLineCount: Int? = nil,
-        animation: BlockInputEditorHeightAnimation?,
-        onPreferredHeightTransition: @escaping @MainActor (BlockInputEditorHeightTransition) -> Void
-    ) {
-        self.defaultVisibleLineCount = defaultVisibleLineCount
-        self.maximumVisibleLineCount = maximumVisibleLineCount
-        onPreferredHeightChange = nil
-        self.animation = animation
-        self.onPreferredHeightTransition = onPreferredHeightTransition
-    }
-}
-
 /// Runtime options and host integration points for a block input editor.
 public struct BlockInputConfiguration {
     /// Default visual horizontal inset for block content.
@@ -330,6 +269,12 @@ public struct BlockInputConfiguration {
     public var dropIndicatorColor: NSColor
     /// Visual styling for editor text, code, and selection chrome.
     public var style: BlockInputStyle
+    /// Behavior used by editor-owned Cmd+A and select-all commands.
+    ///
+    /// The default `.focusedContentThenDocument` behavior selects the focused content first and promotes to the whole
+    /// document on the next select-all command. Set `.document` when the host wants Cmd+A to select the whole editor
+    /// document immediately.
+    public var selectAllBehavior: BlockInputSelectAllBehavior
     /// Optional rendered-content height sizing for hosts that want the editor to provide its preferred height.
     ///
     /// When nil, the editor keeps its historical behavior and exposes no intrinsic height. When set, the editor reports a
@@ -409,6 +354,9 @@ public struct BlockInputConfiguration {
     }
 
     /// Creates configuration. When `documentStore` is supplied, it is the source of truth and `document` is ignored.
+    ///
+    /// The `selectAllBehavior` parameter controls editor-owned Cmd+A and select-all commands. It does not affect native
+    /// AppKit select-all handling inside focused modal fields.
     public init(
         document: BlockInputDocument = BlockInputDocument(),
         documentStore: (any BlockInputDocumentStore)? = nil,
@@ -423,6 +371,7 @@ public struct BlockInputConfiguration {
         rawSlashCommandChips: Bool = false,
         dropIndicatorColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
+        selectAllBehavior: BlockInputSelectAllBehavior = .focusedContentThenDocument,
         heightSizing: BlockInputEditorHeightSizing? = nil,
         imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader(),
         imageDiskCache: (any BlockInputImageDiskCaching)? = BlockInputDefaultImageDiskCache(),
@@ -462,6 +411,7 @@ public struct BlockInputConfiguration {
         self.rawSlashCommandChips = rawSlashCommandChips
         self.dropIndicatorColor = dropIndicatorColor
         self.style = style
+        self.selectAllBehavior = selectAllBehavior
         self.heightSizing = heightSizing
         self.imageLoader = imageLoader
         self.imageDiskCache = imageDiskCache

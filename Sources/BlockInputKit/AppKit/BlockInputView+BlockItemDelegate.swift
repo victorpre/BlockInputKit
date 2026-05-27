@@ -288,12 +288,20 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     }
 
     private func tableAwareSelectAll(currentBlockID blockID: BlockInputBlockID) -> BlockInputSelection? {
+        if selectAllBehavior == .document {
+            let blockIDs = loadedBlockIDs
+            return blockIDs.isEmpty ? nil : .blocks(blockIDs)
+        }
         if block(withID: blockID)?.kind == .table,
            selection == .blocks([blockID]) {
-            let allBlockIDs = (0..<blockCount).compactMap { block(at: $0)?.id }
+            let allBlockIDs = loadedBlockIDs
             return .blocks(allBlockIDs)
         }
-        return document.selectAll(currentBlockID: blockID, currentSelection: selection)
+        return document.selectAll(
+            currentBlockID: blockID,
+            currentSelection: selection,
+            behavior: selectAllBehavior
+        )
     }
 
     func blockItem(

@@ -86,6 +86,12 @@ final class BlockInputEditorTests: XCTestCase {
         XCTAssertTrue(editor.resolvedConfiguration().rawSlashCommandChips)
     }
 
+    func testResolvedConfigurationPreservesSelectAllBehavior() {
+        let editor = BlockInputEditor(configuration: BlockInputConfiguration(selectAllBehavior: .document))
+
+        XCTAssertEqual(editor.resolvedConfiguration().selectAllBehavior, .document)
+    }
+
     func testResolvedConfigurationPreservesExpandedStyle() {
         let style = BlockInputStyle(
             editorSurface: BlockInputEditorSurfaceStyle(
