@@ -37,6 +37,7 @@ final class BlockInputDocumentScrollView: NSScrollView {
     override func layout() {
         super.layout()
         blockInputView?.updateCollectionViewWidthForVisibleBounds()
+        blockInputView?.clampVerticalScrollOffsetIfNeeded()
     }
 
     @objc

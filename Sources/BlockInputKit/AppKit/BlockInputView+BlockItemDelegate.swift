@@ -118,6 +118,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             resizeVisibleItem(item, for: afterBlock)
             invalidateLayoutForBlock(at: index, editedItem: item, block: afterBlock)
         }
+        scrollActiveTextSelectionToVisibleIfNeeded()
         syncDocumentStore(.replaceBlock(afterBlock))
         if !didReplaceCachedBlock && isDocumentCacheSynchronized {
             refreshDocumentFromStore()

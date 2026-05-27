@@ -53,19 +53,89 @@ extension BlockInputView {
     }
 
     func clampVerticalScrollOffsetIfNeeded() {
-        let contentHeight = collectionView.collectionViewLayout?.collectionViewContentSize.height
-            ?? collectionView.frame.height
+        guard heightSizing != nil else {
+            return
+        }
+        let contentHeight = currentDocumentContentHeight()
         let maximumY = max(0, contentHeight - scrollView.contentSize.height)
         let origin = scrollView.contentView.bounds.origin
         guard origin.y > maximumY + 0.5 else {
             return
         }
-        scrollView.contentView.scroll(to: NSPoint(x: origin.x, y: maximumY))
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: maximumY))
         scrollView.reflectScrolledClipView(scrollView.contentView)
+    }
+
+    func scrollActiveTextSelectionToVisibleIfNeeded() {
+        guard heightSizing != nil,
+              window != nil,
+              let caret = activeTextSelectionCaret,
+              let item = visibleItemForActiveTextSelection(blockID: caret.blockID) else {
+            return
+        }
+        collectionView.layoutSubtreeIfNeeded()
+        item.view.layoutSubtreeIfNeeded()
+        let caretRect = collectionView.convert(item.anchorWindowRect(forUTF16Offset: caret.utf16Offset), from: nil)
+        scrollDocumentRectToVisibleIfNeeded(caretRect)
     }
 
     private var lastMeasuredContentWidthFallback: CGFloat {
         max(collectionView.bounds.width, scrollView.contentSize.width, 0)
+    }
+
+    private var activeTextSelectionCaret: (blockID: BlockInputBlockID, utf16Offset: Int)? {
+        switch selection {
+        case let .cursor(cursor):
+            return (cursor.blockID, cursor.utf16Offset)
+        case let .text(textRange):
+            return (textRange.blockID, NSMaxRange(textRange.range))
+        case .blocks, .mixed, nil:
+            return nil
+        }
+    }
+
+    private func visibleItemForActiveTextSelection(blockID: BlockInputBlockID) -> BlockInputBlockItem? {
+        collectionView.visibleItems()
+            .compactMap { $0 as? BlockInputBlockItem }
+            .first { $0.representedBlockID == blockID }
+    }
+
+    private func scrollDocumentRectToVisibleIfNeeded(_ rect: NSRect) {
+        guard rect != .zero,
+              !rect.isNull,
+              !rect.isInfinite,
+              scrollView.contentSize.height > 0 else {
+            return
+        }
+        let padding: CGFloat = 4
+        let visibleRect = scrollView.contentView.bounds
+        let minimumVisibleY = rect.minY - padding
+        let maximumVisibleY = rect.maxY + padding
+        let targetY: CGFloat
+        if maximumVisibleY > visibleRect.maxY {
+            targetY = maximumVisibleY - visibleRect.height
+        } else if minimumVisibleY < visibleRect.minY {
+            targetY = minimumVisibleY
+        } else {
+            return
+        }
+        let contentHeight = currentDocumentContentHeight()
+        let maximumY = max(0, contentHeight - visibleRect.height)
+        let clampedTargetY = min(max(targetY, 0), maximumY)
+        guard abs(clampedTargetY - visibleRect.minY) > 0.5 else {
+            return
+        }
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: clampedTargetY))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+    }
+
+    private func currentDocumentContentHeight() -> CGFloat {
+        let layoutHeight = collectionView.collectionViewLayout?.collectionViewContentSize.height ?? 0
+        // While typing, mounted item frames can update before the flow layout's content size catches up.
+        let visibleItemHeight = collectionView.visibleItems().reduce(CGFloat(0)) { height, item in
+            max(height, item.view.frame.maxY)
+        }
+        return max(layoutHeight, visibleItemHeight, scrollView.contentSize.height)
     }
 
     private func schedulePreferredHeightCallback() {

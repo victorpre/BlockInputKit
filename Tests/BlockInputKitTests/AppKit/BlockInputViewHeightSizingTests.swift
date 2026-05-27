@@ -117,6 +117,40 @@ final class BlockInputViewHeightSizingTests: XCTestCase {
         )
     }
 
+    func testInlineNewlineKeepsCaretVisibleWhileHostHeightAnimates() throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [BlockInputBlock(id: "first", text: "One")]),
+            heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 1, maximumVisibleLineCount: 6)
+        ), size: NSSize(width: 360, height: 200))
+        let collapsedHeight = mounted.view.preferredHeight(forWidth: 360)
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 360, height: collapsedHeight))
+        mounted.view.scrollView.contentView.scroll(to: .zero)
+
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let expandedText = "One\nTwo\nThree\nFour"
+        let expandedOffset = (expandedText as NSString).length
+
+        mounted.window.makeFirstResponder(textView)
+        textView.string = expandedText
+        textView.setSelectedRange(NSRange(location: expandedOffset, length: 0))
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+        mounted.view.collectionView.layoutSubtreeIfNeeded()
+
+        let caretRect = mounted.view.collectionView.convert(item.anchorWindowRect(forUTF16Offset: expandedOffset), from: nil)
+        let visibleRect = mounted.view.scrollView.contentView.bounds
+        XCTAssertGreaterThan(visibleRect.minY, 0)
+        XCTAssertLessThanOrEqual(caretRect.maxY, visibleRect.maxY + 0.5)
+
+        let expandedHeight = mounted.view.preferredHeight(forWidth: 360)
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 360, height: expandedHeight))
+        let contentHeight = mounted.view.collectionView.collectionViewLayout?.collectionViewContentSize.height ?? 0
+        XCTAssertLessThanOrEqual(
+            mounted.view.scrollView.contentView.bounds.minY,
+            max(0, contentHeight - mounted.view.scrollView.contentSize.height) + 0.5
+        )
+    }
+
     func testPreferredHeightCallbackPublishesInitialAndChangedHeightOnce() async {
         var reportedHeights: [CGFloat] = []
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 360, height: 200))
