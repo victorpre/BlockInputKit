@@ -3,7 +3,7 @@ import Foundation
 
 final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked Sendable {
     private let maxCandidateMatches = 500
-    private let slashCommands = [
+    private static let slashCommands = [
         DemoSlashCommand(
             title: "Heading",
             label: "heading",
@@ -23,6 +23,10 @@ final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked
             argumentHint: "Quote text"
         )
     ]
+    private let slashCommandArgumentHints = BlockInputSlashCommandArgumentHints(
+        commandHints: DemoFileCompletionProvider.slashCommands.map { (command: $0.label, hint: $0.argumentHint) },
+        requiresDocumentStart: false
+    )
     private let launchDirectory: URL
     private let fileManager: FileManager
 
@@ -44,20 +48,7 @@ final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked
     }
 
     func inlineHint(for context: BlockInputInlineHintContext) -> BlockInputInlineHint? {
-        let text = context.block.text as NSString
-        let caretOffset = min(max(context.cursor.utf16Offset, 0), text.length)
-        guard caretOffset == text.length else {
-            return nil
-        }
-        let prefix = text.substring(to: caretOffset)
-        guard let parsedCommand = parsedSlashCommandPrefix(prefix) else {
-            return nil
-        }
-        guard let command = slashCommands.first(where: { $0.label == parsedCommand.commandName }) else {
-            return nil
-        }
-        let hint = parsedCommand.trailingText.isEmpty ? " \(command.argumentHint)" : command.argumentHint
-        return BlockInputInlineHint(text: hint)
+        slashCommandArgumentHints.inlineHint(for: context)
     }
 
     private func fileSuggestions(for context: BlockInputCompletionContext) -> [BlockInputCompletionSuggestion] {
@@ -79,7 +70,7 @@ final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked
 
     private func slashCommandSuggestions(for context: BlockInputCompletionContext) -> [BlockInputCompletionSuggestion] {
         let query = context.query.lowercased()
-        return slashCommands
+        return Self.slashCommands
             .filter { command in
                 query.isEmpty ||
                     command.title.lowercased().contains(query) ||
@@ -95,51 +86,6 @@ final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked
                     detailText: "Command"
                 )
             }
-    }
-
-    private func parsedSlashCommandPrefix(_ prefix: String) -> DemoSlashCommandPrefix? {
-        if let rawPrefix = parsedRawSlashCommandPrefix(prefix) {
-            return rawPrefix
-        }
-        return parsedLinkBackedSlashCommandPrefix(prefix)
-    }
-
-    private func parsedRawSlashCommandPrefix(_ prefix: String) -> DemoSlashCommandPrefix? {
-        guard prefix.hasPrefix("/") else {
-            return nil
-        }
-        let commandAndTrailingText = prefix.dropFirst()
-        let commandEnd = commandAndTrailingText.firstIndex(where: \.isWhitespace) ?? commandAndTrailingText.endIndex
-        let commandName = String(commandAndTrailingText[..<commandEnd]).lowercased()
-        let trailingText = String(commandAndTrailingText[commandEnd...])
-        guard !commandName.isEmpty,
-              containsOnlyInlineHintWhitespace(trailingText) else {
-            return nil
-        }
-        return DemoSlashCommandPrefix(commandName: commandName, trailingText: trailingText)
-    }
-
-    private func parsedLinkBackedSlashCommandPrefix(_ prefix: String) -> DemoSlashCommandPrefix? {
-        for command in slashCommands {
-            let source = markdownLinkSlashCommandSource(for: command)
-            guard prefix.hasPrefix(source) else {
-                continue
-            }
-            let trailingText = String(prefix.dropFirst(source.count))
-            guard containsOnlyInlineHintWhitespace(trailingText) else {
-                return nil
-            }
-            return DemoSlashCommandPrefix(commandName: command.label, trailingText: trailingText)
-        }
-        return nil
-    }
-
-    private func markdownLinkSlashCommandSource(for command: DemoSlashCommand) -> String {
-        "[/\(command.label)](\(command.uri))"
-    }
-
-    private func containsOnlyInlineHintWhitespace(_ text: String) -> Bool {
-        text.unicodeScalars.allSatisfy { CharacterSet.whitespaces.contains($0) }
     }
 
     private func completionScope(for context: BlockInputCompletionContext) -> DemoFileCompletionScope {
@@ -263,11 +209,6 @@ private struct DemoSlashCommand {
     var label: String
     var uri: String
     var argumentHint: String
-}
-
-private struct DemoSlashCommandPrefix {
-    var commandName: String
-    var trailingText: String
 }
 
 private struct DemoFileCompletionCandidate {

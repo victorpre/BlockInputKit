@@ -432,21 +432,19 @@ Use `inlineHintProvider` for visual-only slash-command argument hints after the 
 document text, Markdown export, undo, pasteboard contents, completion ranges, or accessibility value text.
 
 ```swift
+let argumentHints = BlockInputSlashCommandArgumentHints([
+    "review-github-pr": "[PR URL]"
+])
+
 let configuration = BlockInputConfiguration(
     document: document,
     slashCommandAvailability: .documentStart,
-    inlineHintProvider: { context in
-        guard context.isDocumentStartBlock,
-              context.block.text == "/review-github-pr",
-              context.cursor.utf16Offset == (context.block.text as NSString).length else {
-            return nil
-        }
-        return BlockInputInlineHint(text: " [PR URL]")
-    }
+    inlineHintProvider: { argumentHints.inlineHint(for: $0) }
 )
 ```
 
 The provider only runs for a focused, editable, inline-Markdown-capable block with a valid collapsed selection.
+`BlockInputSlashCommandArgumentHints` supports raw `/command` text and link-backed slash command chips.
 
 ## File Drops
 
