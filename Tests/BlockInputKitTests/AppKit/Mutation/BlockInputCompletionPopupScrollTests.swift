@@ -121,6 +121,22 @@ final class BlockInputCompletionPopupScrollTests: XCTestCase {
         XCTAssertEqual(popup.visibleSuggestionTitlesForTesting.first, "File1.md")
     }
 
+    func testPopupScrollReusesVisibleRowViews() {
+        let popup = makePopup(suggestions: popupFileSuggestions(count: 8))
+        let originalRows = popup.rowViewsForTesting
+
+        XCTAssertTrue(popup.routeScrollWheel(
+            at: NSPoint(x: popup.bounds.midX, y: popup.bounds.midY),
+            event: TestScrollWheelEvent(deltaY: -1)
+        ))
+
+        XCTAssertEqual(popup.visibleSuggestionTitlesForTesting.first, "File1.md")
+        XCTAssertEqual(popup.rowViewsForTesting.count, originalRows.count)
+        for (row, originalRow) in zip(popup.rowViewsForTesting, originalRows) {
+            XCTAssertTrue(row === originalRow)
+        }
+    }
+
     func testPopupChromeScrollWheelRoutesToPopup() {
         let popup = makePopup(suggestions: popupFileSuggestions(count: 8))
 

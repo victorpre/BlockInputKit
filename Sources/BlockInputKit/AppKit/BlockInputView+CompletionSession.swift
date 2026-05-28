@@ -170,37 +170,7 @@ extension BlockInputView {
               let popup = completionPopupView else {
             return
         }
-        let state = BlockInputCompletionPopupState(
-            suggestions: session.suggestions,
-            highlightedIndex: session.highlightedIndex,
-            isLoading: session.isLoading,
-            sessionID: session.id
-        )
-        let popupLayout = completionPopupLayout(for: session, state: state)
-        let popupContainer = popupLayout.container
-        if popup.superview !== popupContainer {
-            popup.removeFromSuperview()
-            popupContainer.addSubview(popup, positioned: .above, relativeTo: nil)
-        }
-        if completionPopupEventCaptureView.superview != nil,
-           completionPopupEventCaptureView.superview !== popupContainer {
-            completionPopupEventCaptureView.removeFromSuperview()
-            popupContainer.addSubview(completionPopupEventCaptureView, positioned: .above, relativeTo: nil)
-        }
-        if completionPopupEventCaptureView.superview === popupContainer,
-           popupContainer.subviews.last !== completionPopupEventCaptureView {
-            completionPopupEventCaptureView.removeFromSuperview()
-            popupContainer.addSubview(completionPopupEventCaptureView, positioned: .above, relativeTo: nil)
-        }
-        let previousFrame = popup.frame
-        popup.frame = popupLayout.frame
-        if previousFrame != popup.frame {
-            popup.suppressHoverUntilPointerMoves()
-        }
-        if completionPopupEventCaptureView.superview === popupContainer {
-            completionPopupEventCaptureView.frame = popupContainer.bounds
-        }
-        popup.needsLayout = true
+        presentCompletionPopup(popup, for: session, state: completionPopupState(for: session))
     }
 
     private func completionPopupLayout(
@@ -383,38 +353,64 @@ extension BlockInputView {
     private func showCompletionPopup(for session: BlockInputCompletionSession) {
         let popup = completionPopupView ?? BlockInputCompletionPopupView()
         completionPopupView = popup
-        popup.appearance = effectiveAppearance
-        let state = BlockInputCompletionPopupState(
+        presentCompletionPopup(popup, for: session, state: completionPopupState(for: session))
+        installCompletionPopupDismissalMonitor()
+        updateInlineHintsForVisibleItems()
+    }
+
+    private func completionPopupState(for session: BlockInputCompletionSession) -> BlockInputCompletionPopupState {
+        BlockInputCompletionPopupState(
             suggestions: session.suggestions,
             highlightedIndex: session.highlightedIndex,
             isLoading: session.isLoading,
             sessionID: session.id
         )
-        popup.configure(
-            state: state,
-            style: completionPopupConfiguration.style,
-            onSelect: { [weak self] suggestion in
-                self?.acceptCompletionSuggestionFromPopup(suggestion)
-            },
-            onHighlight: { [weak self] index in
-                self?.highlightCompletionSuggestion(at: index)
+    }
+
+    private func presentCompletionPopup(
+        _ popup: BlockInputCompletionPopupView,
+        for session: BlockInputCompletionSession,
+        state: BlockInputCompletionPopupState
+    ) {
+        blockInputWithoutCompletionPopupAnimations {
+            let popupLayout = completionPopupLayout(for: session, state: state)
+            let popupContainer = popupLayout.container
+            let previousFrame = popup.frame
+            popup.appearance = effectiveAppearance
+
+            if popup.superview !== popupContainer {
+                popup.removeFromSuperview()
+                popupContainer.addSubview(popup, positioned: .above, relativeTo: nil)
             }
-        )
-        positionCompletionPopup()
-        guard let positionedPopupContainer = popup.superview else {
-            return
+            popup.frame = popupLayout.frame
+            popup.configure(
+                state: state,
+                style: completionPopupConfiguration.style,
+                onSelect: { [weak self] suggestion in
+                    self?.acceptCompletionSuggestionFromPopup(suggestion)
+                },
+                onHighlight: { [weak self] index in
+                    self?.highlightCompletionSuggestion(at: index)
+                }
+            )
+            if previousFrame != popup.frame {
+                popup.suppressHoverUntilPointerMoves()
+            }
+
+            completionPopupEventCaptureView.configure(popup: popup)
+            completionPopupEventCaptureView.appearance = effectiveAppearance
+            completionPopupEventCaptureView.autoresizingMask = [.width, .height]
+            completionPopupEventCaptureView.frame = popupContainer.bounds
+            if completionPopupEventCaptureView.superview !== popupContainer ||
+                popupContainer.subviews.last !== completionPopupEventCaptureView {
+                completionPopupEventCaptureView.removeFromSuperview()
+                popupContainer.addSubview(completionPopupEventCaptureView, positioned: .above, relativeTo: nil)
+            }
+
+            popup.needsLayout = true
+            popup.layoutSubtreeIfNeeded()
+            popup.displayIfNeeded()
         }
-        completionPopupEventCaptureView.configure(popup: popup)
-        completionPopupEventCaptureView.appearance = effectiveAppearance
-        completionPopupEventCaptureView.autoresizingMask = [.width, .height]
-        completionPopupEventCaptureView.frame = positionedPopupContainer.bounds
-        if completionPopupEventCaptureView.superview !== positionedPopupContainer ||
-            positionedPopupContainer.subviews.last !== completionPopupEventCaptureView {
-            completionPopupEventCaptureView.removeFromSuperview()
-            positionedPopupContainer.addSubview(completionPopupEventCaptureView, positioned: .above, relativeTo: nil)
-        }
-        installCompletionPopupDismissalMonitor()
-        updateInlineHintsForVisibleItems()
     }
 
     private func moveCompletionHighlight(delta: Int) {

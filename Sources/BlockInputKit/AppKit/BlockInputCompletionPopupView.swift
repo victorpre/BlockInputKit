@@ -49,6 +49,10 @@ final class BlockInputCompletionPopupView: NSView {
         popupStyle
     }
 
+    var rowViewsForTesting: [BlockInputCompletionPopupRowView] {
+        rowViews
+    }
+
     func visibleSuggestionPointForTesting(title: String) -> NSPoint? {
         layoutSubtreeIfNeeded()
         layout()
@@ -200,7 +204,7 @@ final class BlockInputCompletionPopupView: NSView {
     }
 
     func suppressHoverUntilPointerMoves() {
-        // Rebuilding rows can emit mouseEntered for a stationary pointer; keep keyboard selection until movement.
+        // Updating rows can emit mouseEntered for a stationary pointer; keep keyboard selection until movement.
         suppressedHoverWindowLocation = lastMouseWindowLocation ?? window?.mouseLocationOutsideOfEventStream
     }
 
@@ -257,25 +261,23 @@ final class BlockInputCompletionPopupView: NSView {
 
     private func rebuild() {
         let previousRowCount = rowViews.count
-        rowViews.forEach { $0.removeFromSuperview() }
-        rowViews = []
-        isHidden = false
-        loadingIndicator.isHidden = !state.isLoading
-        loadingField.isHidden = !state.isLoading
-        emptyField.isHidden = state.isLoading || !state.suggestions.isEmpty
+        blockInputWithoutCompletionPopupAnimations {
+            isHidden = false
+            loadingIndicator.isHidden = !state.isLoading
+            loadingField.isHidden = !state.isLoading
+            emptyField.isHidden = state.isLoading || !state.suggestions.isEmpty
 
-        if !state.isLoading {
-            rowViews = visibleSuggestionRows(anchorHighlightedSuggestion: true).map { index, suggestion in
-                makeRow(index: index, suggestion: suggestion)
+            let visibleRows = state.isLoading ? [] : Array(visibleSuggestionRows(anchorHighlightedSuggestion: true))
+            reconcileRows(with: visibleRows)
+            if previousRowCount == 0 || state.isLoading || !state.suggestions.isEmpty {
+                suppressHoverUntilPointerMoves()
             }
-        }
-        if previousRowCount == 0 || state.isLoading || !state.suggestions.isEmpty {
-            suppressHoverUntilPointerMoves()
-        }
 
-        invalidateIntrinsicContentSize()
-        needsLayout = true
-        needsDisplay = true
+            invalidateIntrinsicContentSize()
+            needsLayout = true
+            needsDisplay = true
+            layoutForImmediateDisplay()
+        }
     }
 
     private func row(at point: NSPoint) -> BlockInputCompletionPopupRowView? {
@@ -305,20 +307,36 @@ final class BlockInputCompletionPopupView: NSView {
             requestHighlight(nextHighlightedIndex, preservesVisibleWindow: true)
             state.highlightedIndex = nextHighlightedIndex
         }
-        rowViews.forEach { $0.removeFromSuperview() }
-        rowViews = visibleSuggestionRows(anchorHighlightedSuggestion: false).map { index, suggestion in
-            makeRow(index: index, suggestion: suggestion)
+        blockInputWithoutCompletionPopupAnimations {
+            reconcileRows(with: Array(visibleSuggestionRows(anchorHighlightedSuggestion: false)))
+            suppressHoverUntilPointerMoves()
+            needsLayout = true
+            needsDisplay = true
+            layoutForImmediateDisplay()
         }
-        suppressHoverUntilPointerMoves()
-        needsLayout = true
-        needsDisplay = true
     }
 
-    private func makeRow(
+    private func reconcileRows(
+        with visibleRows: [(Int, BlockInputCompletionSuggestion)]
+    ) {
+        while rowViews.count > visibleRows.count {
+            rowViews.removeLast().removeFromSuperview()
+        }
+        while rowViews.count < visibleRows.count {
+            let row = BlockInputCompletionPopupRowView()
+            rowViews.append(row)
+            addSubview(row)
+        }
+        for (offset, visibleRow) in visibleRows.enumerated() {
+            configureRow(rowViews[offset], index: visibleRow.0, suggestion: visibleRow.1)
+        }
+    }
+
+    private func configureRow(
+        _ row: BlockInputCompletionPopupRowView,
         index: Int,
         suggestion: BlockInputCompletionSuggestion
-    ) -> BlockInputCompletionPopupRowView {
-        let row = BlockInputCompletionPopupRowView()
+    ) {
         row.applyPopupStyle(popupStyle)
         row.configure(
             suggestion: suggestion,
@@ -343,8 +361,6 @@ final class BlockInputCompletionPopupView: NSView {
                 self?.requestHighlight(index, preservesVisibleWindow: true)
             }
         )
-        addSubview(row)
-        return row
     }
 
     private func requestHighlight(_ index: Int, preservesVisibleWindow: Bool) {
@@ -355,8 +371,16 @@ final class BlockInputCompletionPopupView: NSView {
     }
 
     private func applyPopupStyleWithoutRebuild() {
-        rowViews.forEach { $0.applyPopupStyle(popupStyle) }
-        needsDisplay = true
+        blockInputWithoutCompletionPopupAnimations {
+            rowViews.forEach { $0.applyPopupStyle(popupStyle) }
+            needsDisplay = true
+            layoutForImmediateDisplay()
+        }
+    }
+
+    private func layoutForImmediateDisplay() {
+        layoutSubtreeIfNeeded()
+        displayIfNeeded()
     }
 
     private func updateHoverSuppression(for event: NSEvent) {
