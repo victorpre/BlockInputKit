@@ -109,6 +109,81 @@ final class BlockInputTextCommandTests: XCTestCase {
         XCTAssertTrue(mounted.window.firstResponder === mounted.view)
     }
 
+    func testCommandAWithDocumentBehaviorCollapsesSingleEmptyPlaceholderDocumentFromTextFocus() throws {
+        let blockID = BlockInputBlockID(rawValue: "empty")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "")
+            ]),
+            placeholder: "Ask anything",
+            selectAllBehavior: .document
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandAEvent()))
+
+        assertSingleEmptyPlaceholderSelectAllCollapsed(mounted: mounted, item: item, textView: textView, blockID: blockID)
+        XCTAssertTrue(mounted.window.firstResponder === textView)
+    }
+
+    func testCommandAWithDocumentBehaviorCollapsesSingleEmptyPlaceholderDocumentFromEditorFocus() throws {
+        let blockID = BlockInputBlockID(rawValue: "empty")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "")
+            ]),
+            placeholder: "Ask anything",
+            selectAllBehavior: .document
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+        XCTAssertTrue(mounted.window.makeFirstResponder(mounted.view))
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandAEvent()))
+
+        assertSingleEmptyPlaceholderSelectAllCollapsed(mounted: mounted, item: item, textView: textView, blockID: blockID)
+    }
+
+    func testSelectAllActionWithDocumentBehaviorCollapsesSingleEmptyPlaceholderDocument() throws {
+        let blockID = BlockInputBlockID(rawValue: "empty")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "")
+            ]),
+            placeholder: "Ask anything",
+            selectAllBehavior: .document
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+
+        textView.selectAll(nil)
+
+        assertSingleEmptyPlaceholderSelectAllCollapsed(mounted: mounted, item: item, textView: textView, blockID: blockID)
+    }
+
+    func testEditorSelectAllActionWithDocumentBehaviorCollapsesSingleEmptyPlaceholderDocument() throws {
+        let blockID = BlockInputBlockID(rawValue: "empty")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "")
+            ]),
+            placeholder: "Ask anything",
+            selectAllBehavior: .document
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.view.applySelection(.cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)), notify: false)
+        XCTAssertTrue(mounted.window.makeFirstResponder(mounted.view))
+
+        mounted.view.selectAll(nil)
+
+        assertSingleEmptyPlaceholderSelectAllCollapsed(mounted: mounted, item: item, textView: textView, blockID: blockID)
+    }
+
     func testSelectAllActionSelectsCurrentBlockThenAllBlocksFromTextFocus() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
@@ -466,4 +541,25 @@ final class BlockInputTextCommandTests: XCTestCase {
         }
     }
 
+}
+
+@MainActor
+private func assertSingleEmptyPlaceholderSelectAllCollapsed(
+    mounted: (view: BlockInputView, window: NSWindow),
+    item: BlockInputBlockItem,
+    textView: BlockInputTextView,
+    blockID: BlockInputBlockID,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    XCTAssertEqual(
+        mounted.view.selection,
+        .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 0)),
+        file: file,
+        line: line
+    )
+    XCTAssertEqual(textView.selectedRange(), NSRange(location: 0, length: 0), file: file, line: line)
+    XCTAssertTrue(item.testingSelectionBackgroundView.isHidden, file: file, line: line)
+    XCTAssertFalse(mounted.view.placeholderLabel.isHidden, file: file, line: line)
+    XCTAssertEqual(mounted.view.placeholderLabel.stringValue, "Ask anything", file: file, line: line)
 }

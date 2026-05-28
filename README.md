@@ -262,8 +262,9 @@ Button("Bold") {
 `BlockInputEditorCommand` covers undo, redo, select all, clipboard actions, inline formatting, links, images, and table insertion/row/column/table actions.
 
 By default, `Cmd+A` selects the focused content before promoting to the whole document. Empty
-focused text blocks promote directly to the whole document. Hosts that want `Cmd+A` to select the whole document
-immediately can opt in:
+focused text blocks promote directly to the whole document unless they are the only placeholder-eligible block, where
+select all leaves the caret collapsed with no visible selection. Hosts that want `Cmd+A` to select the whole document
+immediately when content exists can opt in:
 
 ```swift
 BlockInputConfiguration(selectAllBehavior: .document)

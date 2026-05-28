@@ -79,6 +79,10 @@ extension BlockInputView {
         }
     }
 
+    var isSingleEmptyPlaceholderEligibleDocument: Bool {
+        blockCount == 1 && block(at: 0)?.isPlaceholderEligibleEmptyTextBlock == true
+    }
+
     private func placeholderTextLineFrame() -> NSRect? {
         guard blockCount == 1,
               let item = collectionView.item(at: IndexPath(item: 0, section: 0)) as? BlockInputBlockItem,
@@ -115,7 +119,7 @@ final class BlockInputPlaceholderLabel: NSTextField {
     }
 }
 
-private extension BlockInputBlock {
+extension BlockInputBlock {
     var isPlaceholderEligibleEmptyTextBlock: Bool {
         guard isEmpty else {
             return false
