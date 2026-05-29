@@ -17,6 +17,45 @@ final class BlockInputInlineChipNavigationTests: XCTestCase {
         try assertCaret(in: textView, isAtLeadingEdgeOfChipFor: linkRange)
     }
 
+    func testPlainLeftAtFileLinkChipLeadingEdgeMovesIntoPrecedingText() throws {
+        let text = "Open [README.md](file:///tmp/README.md) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        setCaret(in: textView, to: linkRange.fullRange.location, affinity: .upstream)
+
+        textView.keyDown(with: try plainLeftEvent())
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: linkRange.fullRange.location - 1, length: 0))
+        XCTAssertLessThan(try caretRect(in: textView).minX, try chipRect(in: textView, for: linkRange).minX)
+    }
+
+    func testRepeatedPlainLeftAtDocumentStartChipLeadingEdgeDoesNotJumpToTrailingEdge() throws {
+        let text = "[README.md](file:///tmp/README.md) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        setCaret(in: textView, to: linkRange.fullRange.location, affinity: .upstream)
+
+        for _ in 0..<3 {
+            textView.keyDown(with: try plainLeftEvent())
+        }
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: linkRange.fullRange.location, length: 0))
+        try assertCaret(in: textView, isAtLeadingEdgeOfChipFor: linkRange)
+    }
+
+    func testMoveLeftCommandAtDocumentStartChipLeadingEdgeDoesNotJumpToTrailingEdge() throws {
+        let text = "[README.md](file:///tmp/README.md) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        setCaret(in: textView, to: linkRange.fullRange.location, affinity: .upstream)
+
+        textView.doCommand(by: #selector(NSResponder.moveLeft(_:)))
+        textView.doCommand(by: #selector(NSResponder.moveLeft(_:)))
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: linkRange.fullRange.location, length: 0))
+        try assertCaret(in: textView, isAtLeadingEdgeOfChipFor: linkRange)
+    }
+
     func testPlainRightAtFileLinkChipContentEndExitsTrailingEdge() throws {
         let text = "Open [README.md](file:///tmp/README.md) trailing"
         let textView = try mountedTextView(for: text)
@@ -28,6 +67,18 @@ final class BlockInputInlineChipNavigationTests: XCTestCase {
         XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.fullRange), length: 0))
         XCTAssertEqual(textView.selectionAffinity, .downstream)
         try assertCaret(in: textView, isAtTrailingEdgeOfChipFor: linkRange)
+    }
+
+    func testPlainRightAtFileLinkChipTrailingEdgeMovesIntoFollowingText() throws {
+        let text = "Open [README.md](file:///tmp/README.md) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        setCaret(in: textView, to: NSMaxRange(linkRange.fullRange), affinity: .downstream)
+
+        textView.keyDown(with: try plainRightEvent())
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.fullRange) + 1, length: 0))
+        XCTAssertGreaterThan(try caretRect(in: textView).minX, try chipRect(in: textView, for: linkRange).maxX)
     }
 
     func testMoveLeftCommandAtSlashCommandChipContentStartExitsLeadingEdge() throws {
@@ -105,6 +156,10 @@ final class BlockInputInlineChipNavigationTests: XCTestCase {
         mounted.window.makeFirstResponder(textView)
         textView.layoutManager?.ensureLayout(for: try XCTUnwrap(textView.textContainer))
         return textView
+    }
+
+    private func setCaret(in textView: BlockInputTextView, to offset: Int, affinity: NSSelectionAffinity) {
+        textView.setSelectedRanges([NSValue(range: NSRange(location: offset, length: 0))], affinity: affinity, stillSelecting: false)
     }
 
     private func inlineLinkRange(in text: String) -> BlockInputInlineMarkdownRange? {

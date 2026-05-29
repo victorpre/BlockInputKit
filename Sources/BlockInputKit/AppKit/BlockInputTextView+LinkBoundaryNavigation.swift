@@ -51,20 +51,37 @@ extension BlockInputTextView {
             .filter { $0.style == .link }
         switch direction {
         case .leftward:
-            return linkRanges.last { range in
+            if let range = linkRanges.last(where: { range in
                 range.contentRange.location == offset && range.fullRange.location < offset
-            }.map { range in
-                HiddenLinkBoundaryTarget(
+            }) {
+                return HiddenLinkBoundaryTarget(
                     range: NSRange(location: range.fullRange.location, length: 0),
                     affinity: .upstream
                 )
             }
-        case .rightward:
-            return linkRanges.first { range in
-                NSMaxRange(range.contentRange) == offset && NSMaxRange(range.fullRange) > offset
+            return linkRanges.last { range in
+                range.fullRange.location == offset && range.fullRange.location < NSMaxRange(range.fullRange)
             }.map { range in
                 HiddenLinkBoundaryTarget(
+                    range: NSRange(location: max(range.fullRange.location - 1, 0), length: 0),
+                    affinity: .upstream
+                )
+            }
+        case .rightward:
+            if let range = linkRanges.first(where: { range in
+                NSMaxRange(range.contentRange) == offset && NSMaxRange(range.fullRange) > offset
+            }) {
+                return HiddenLinkBoundaryTarget(
                     range: NSRange(location: NSMaxRange(range.fullRange), length: 0),
+                    affinity: .downstream
+                )
+            }
+            let textLength = (text as NSString).length
+            return linkRanges.first { range in
+                NSMaxRange(range.fullRange) == offset && range.fullRange.location < NSMaxRange(range.fullRange)
+            }.map { range in
+                HiddenLinkBoundaryTarget(
+                    range: NSRange(location: min(NSMaxRange(range.fullRange) + 1, textLength), length: 0),
                     affinity: .downstream
                 )
             }
