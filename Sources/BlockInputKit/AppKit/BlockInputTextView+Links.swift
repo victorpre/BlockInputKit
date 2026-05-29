@@ -254,7 +254,7 @@ extension BlockInputTextView {
         }
     }
 
-    func inlineChipBackgroundRectsForTesting() -> [NSRect] {
+    func inlineChipBackgroundRects() -> [NSRect] {
         guard supportsInlineMarkdownLinkRendering,
               let layoutManager,
               let textContainer else {
@@ -274,6 +274,10 @@ extension BlockInputTextView {
                 textContainer: textContainer
             )
         }
+    }
+
+    func inlineChipBackgroundRectsForTesting() -> [NSRect] {
+        inlineChipBackgroundRects()
     }
 
     private func linkCursorRects(
@@ -351,19 +355,19 @@ extension BlockInputTextView {
         var glyphIndex = glyphRange.location
         while glyphIndex < NSMaxRange(glyphRange) {
             var lineGlyphRange = NSRange()
-            let lineFragmentRect = layoutManager.lineFragmentUsedRect(forGlyphAt: glyphIndex, effectiveRange: &lineGlyphRange)
+            let lineFragmentUsedRect = layoutManager.lineFragmentUsedRect(forGlyphAt: glyphIndex, effectiveRange: &lineGlyphRange)
             let lineChipGlyphRange = NSIntersectionRange(glyphRange, lineGlyphRange)
             if lineChipGlyphRange.length > 0 {
                 let labelRect = layoutManager.boundingRect(forGlyphRange: lineChipGlyphRange, in: textContainer)
-                let visualHeight = max(baseLineHeight, labelRect.height)
-                let centeredYOffset = floor(max(lineFragmentRect.height - visualHeight, 0) / 2)
-                let visualY = lineFragmentRect.minY + centeredYOffset
+                let verticalPadding: CGFloat = 2
+                let visualHeight = max(baseLineHeight, labelRect.height) + (verticalPadding * 2)
+                let visualY = lineFragmentUsedRect.midY - (visualHeight / 2)
 
                 rects.append(NSRect(
                     x: labelRect.minX + drawingOffset.x - 2,
-                    y: visualY + drawingOffset.y - 2,
+                    y: visualY + drawingOffset.y,
                     width: labelRect.width + 4,
-                    height: visualHeight + 4
+                    height: visualHeight
                 ))
             }
             glyphIndex = max(glyphIndex + 1, NSMaxRange(lineGlyphRange))

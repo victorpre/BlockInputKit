@@ -66,6 +66,26 @@ final class BlockInputViewSnapshotTests: XCTestCase {
         }
     }
 
+    func testSelectedFileChipSnapshots() {
+        for snapshotCase in FileChipSnapshotCase.matrix {
+            assertSnapshot(
+                of: makeSelectedFileChipSnapshotView(for: snapshotCase),
+                as: appKitSnapshotImage(),
+                named: "selected-\(snapshotCase.name)"
+            )
+        }
+    }
+
+    func testWholeSelectedFileChipSnapshots() {
+        for snapshotCase in FileChipSnapshotCase.matrix {
+            assertSnapshot(
+                of: makeWholeSelectedFileChipSnapshotView(for: snapshotCase),
+                as: appKitSnapshotImage(),
+                named: "whole-selected-\(snapshotCase.name)"
+            )
+        }
+    }
+
     func testCustomYellowChipStyleSnapshot() {
         assertSnapshot(
             of: makeCustomYellowChipStyleSnapshotView(),
@@ -116,21 +136,6 @@ final class BlockInputViewSnapshotTests: XCTestCase {
         )
         view.showLinkModal(context: context)
         view.linkModalView?.window?.makeFirstResponder(view.linkModalView)
-        return view
-    }
-
-    private func makeFileChipSnapshotView(for snapshotCase: FileChipSnapshotCase) -> NSView {
-        let view = BlockInputView(frame: NSRect(origin: .zero, size: snapshotCase.size))
-        view.appearance = NSAppearance(named: snapshotCase.appearance)
-        view.configure(BlockInputConfiguration(
-            document: BlockInputDocument(blocks: [
-                BlockInputBlock(id: "paragraph", text: "Linked [../README.md](<file:///tmp/README.md>) from the launch folder")
-            ]),
-            allowsBlockReordering: false,
-            dropIndicatorColor: .systemBlue
-        ))
-        view.layoutSubtreeIfNeeded()
-        view.collectionView.layoutSubtreeIfNeeded()
         return view
     }
 
@@ -246,17 +251,6 @@ private struct CompletionPopupSnapshotCase {
                 isLoading: false
             )
         )
-    ]
-}
-
-private struct FileChipSnapshotCase {
-    var name: String
-    var appearance: NSAppearance.Name
-    var size: CGSize
-
-    static let matrix: [Self] = [
-        Self(name: "file-chip-light", appearance: .aqua, size: CGSize(width: 620, height: 120)),
-        Self(name: "file-chip-dark", appearance: .darkAqua, size: CGSize(width: 620, height: 120))
     ]
 }
 

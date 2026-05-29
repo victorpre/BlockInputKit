@@ -58,7 +58,11 @@ final class BlockInputViewBlockSelectionDragTests: XCTestCase {
         XCTAssertTrue(textView.isSelectable)
         XCTAssertFalse(firstItem.testingSelectionBackgroundView.isHidden)
         XCTAssertFalse(secondItem.testingSelectionBackgroundView.isHidden)
-        XCTAssertEqual(firstItem.testingSelectionBackgroundView.frame.height, secondItem.testingSelectionBackgroundView.frame.height)
+        try assertPartialSelectionChromeMatchesRenderedLine(in: firstItem, utf16Offset: 2)
+        XCTAssertGreaterThan(
+            secondItem.testingSelectionBackgroundView.frame.height,
+            firstItem.testingSelectionBackgroundView.frame.height
+        )
     }
 
     func testDraggingFromTextViewAcrossBlocksSynthesizesPartialSelectionFromAnchorOffset() throws {
@@ -307,7 +311,11 @@ final class BlockInputViewBlockSelectionDragTests: XCTestCase {
         XCTAssertEqual(textView.selectedRange(), NSRange(location: 0, length: 0))
         XCTAssertFalse(thirdItem.testingSelectionBackgroundView.isHidden)
         XCTAssertFalse(secondItem.testingSelectionBackgroundView.isHidden)
-        XCTAssertEqual(thirdItem.testingSelectionBackgroundView.frame.height, secondItem.testingSelectionBackgroundView.frame.height)
+        try assertPartialSelectionChromeMatchesRenderedLine(in: thirdItem, utf16Offset: 0)
+        XCTAssertGreaterThan(
+            secondItem.testingSelectionBackgroundView.frame.height,
+            thirdItem.testingSelectionBackgroundView.frame.height
+        )
     }
 
     func testDraggingFromCollectionRowChromeSelectsBlockRange() throws {
@@ -440,16 +448,6 @@ final class BlockInputViewBlockSelectionDragTests: XCTestCase {
         item.beginBlockSelectionDrag()
         _ = item.updateBlockSelectionDrag(with: try mouseDraggedEvent(location: targetLocation, windowNumber: window.windowNumber))
         item.finishBlockSelectionDrag()
-    }
-
-    private func viewX(forUTF16Offset offset: Int, in item: BlockInputBlockItem) throws -> CGFloat {
-        let textView = try XCTUnwrap(item.testingTextView)
-        let textContainerX = try XCTUnwrap(item.textContainerX(forUTF16Offset: offset))
-        let textContainerOrigin = textView.textContainerOrigin
-        return textView.convert(
-            NSPoint(x: textContainerOrigin.x + textContainerX, y: textContainerOrigin.y),
-            to: item.view
-        ).x
     }
 
 }

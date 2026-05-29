@@ -26,7 +26,7 @@ extension BlockInputBlockItem {
             return
         }
         let layout = selectedContentBackgroundLayout()
-        let frame = layout.frame.integral
+        let frame = layout.usesIntegralFrame ? layout.frame.integral : layout.frame
         selectionBackgroundView.frame = frame
         selectionBackgroundView.segmentRects = layout.segmentFrames.map {
             $0.offsetBy(dx: -frame.minX, dy: -frame.minY).integral
@@ -94,7 +94,11 @@ extension BlockInputBlockItem {
             return selectedPartialTextBackgroundLayout()
         }
         let frame = selectedWholeContentBackgroundFrame()
-        return BlockInputSelectionBackgroundLayout(frame: frame, segmentFrames: [frame])
+        return BlockInputSelectionBackgroundLayout(
+            frame: frame.rect,
+            segmentFrames: [frame.rect],
+            usesIntegralFrame: frame.usesIntegralFrame
+        )
     }
 
     private var usesImageSelectionBorder: Bool {
@@ -126,33 +130,64 @@ extension BlockInputBlockItem {
         return chrome.cornerRadius
     }
 
-    private func selectedWholeContentBackgroundFrame() -> NSRect {
+    private func selectedWholeContentBackgroundFrame() -> BlockInputWholeSelectionFrame {
         if case .code = renderedBlock?.kind,
            !codeBackgroundView.isHidden {
-            return codeBackgroundView.frame.integral
+            return BlockInputWholeSelectionFrame(rect: codeBackgroundView.frame.integral)
         }
         if renderedBlock?.kind == .table,
            !tableView.isHidden {
-            return tableView.convert(tableView.visibleTableFrame, to: view).integral
+            return BlockInputWholeSelectionFrame(rect: tableView.convert(tableView.visibleTableFrame, to: view).integral)
         }
         if renderedBlock?.kind.isImage == true,
            !imageBlockView.isHidden {
-            return imageBlockView.frame.integral
+            return BlockInputWholeSelectionFrame(rect: imageBlockView.frame.integral)
         }
         let leadingPadding: CGFloat = 0
         let trailingPadding: CGFloat = 6
         let verticalInset = Self.scaledVerticalInset(2, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
         let bounds = selectedContentBounds()
+        let chipVerticalFrame = selectedSingleLineInlineChipVerticalFrame()
         let xPosition = max(0, bounds.minX - leadingPadding)
         let maxWidth = max(0, view.bounds.maxX - xPosition - trailingPadding)
         let width = min(max(bounds.width + leadingPadding + trailingPadding, 24), maxWidth)
-        return NSRect(
-            x: xPosition,
-            y: verticalInset,
-            width: width,
-            height: max(0, view.bounds.height - verticalInset * 2)
+        return BlockInputWholeSelectionFrame(
+            rect: NSRect(
+                x: xPosition,
+                y: chipVerticalFrame?.minY ?? verticalInset,
+                width: width,
+                height: chipVerticalFrame?.height ?? max(0, view.bounds.height - verticalInset * 2)
+            ),
+            usesIntegralFrame: chipVerticalFrame == nil
         )
-        .integral
+    }
+
+    private func selectedSingleLineInlineChipVerticalFrame() -> NSRect? {
+        guard let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else {
+            return nil
+        }
+        let text = textView.string as NSString
+        layoutManager.ensureLayout(for: textContainer)
+        guard textLineSelectionFragments(
+            layoutManager: layoutManager,
+            textContainer: textContainer,
+            text: text
+        ).count == 1 else {
+            return nil
+        }
+        let chipRects = textView.inlineChipBackgroundRects()
+        guard let firstRect = chipRects.first else {
+            return nil
+        }
+        let chipBounds = chipRects.dropFirst().reduce(firstRect) { $0.union($1) }
+        let itemChipBounds = textView.convert(chipBounds, to: view)
+        return NSRect(
+            x: 0,
+            y: itemChipBounds.minY,
+            width: max(itemChipBounds.width, 1),
+            height: max(itemChipBounds.height, 1)
+        )
     }
 
     private func selectedContentBounds() -> NSRect {
@@ -236,9 +271,6 @@ extension BlockInputBlockItem {
         let frames = lineFrames.mergingSelectionChromeFrames(
             selectedLogicalListLineStartBackgroundFrames(for: clampedRange, layoutManager: layoutManager)
         )
-        guard lineFragments.count > 1 else {
-            return frames.map(singleLinePartialBackgroundFrame(for:))
-        }
         return frames
     }
 
@@ -281,9 +313,9 @@ extension BlockInputBlockItem {
         }
         let lineViewRect = textView.convert(NSRect(
             x: textOrigin.x + line.lineRect.minX,
-            y: textOrigin.y + line.lineRect.minY,
+            y: textOrigin.y + line.usedRect.minY,
             width: max(line.lineRect.width, 1),
-            height: max(line.lineRect.height, 1)
+            height: max(line.usedRect.height, 1)
         ), to: view)
         let frame = NSRect(
             x: minX,
@@ -435,4 +467,10 @@ extension BlockInputBlockItem {
 private struct BlockInputSelectionBackgroundLayout {
     var frame: NSRect
     var segmentFrames: [NSRect]
+    var usesIntegralFrame: Bool = true
+}
+
+private struct BlockInputWholeSelectionFrame {
+    var rect: NSRect
+    var usesIntegralFrame: Bool = true
 }
