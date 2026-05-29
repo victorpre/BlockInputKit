@@ -25,24 +25,23 @@ extension BlockInputTextView {
         guard selectedRange.length == 0,
               let renderedBlock = blockItem?.renderedBlock,
               BlockInputBlockItem.supportsInlineMarkdownStyling(renderedBlock.kind),
-              let targetOffset = hiddenLinkBoundaryTargetOffset(
+              let target = hiddenLinkBoundaryTarget(
                 from: selectedRange.location,
                 direction: direction,
                 text: string
               ) else {
             return false
         }
-        let targetRange = NSRange(location: targetOffset, length: 0)
-        setSelectedRange(targetRange)
-        scrollRangeToVisible(targetRange)
+        setSelectedRanges([NSValue(range: target.range)], affinity: target.affinity, stillSelecting: false)
+        scrollRangeToVisible(target.range)
         return true
     }
 
-    private func hiddenLinkBoundaryTargetOffset(
+    private func hiddenLinkBoundaryTarget(
         from offset: Int,
         direction: BlockInputHorizontalMovementDirection,
         text: String
-    ) -> Int? {
+    ) -> HiddenLinkBoundaryTarget? {
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
         let linkRanges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: text,
@@ -54,11 +53,26 @@ extension BlockInputTextView {
         case .leftward:
             return linkRanges.last { range in
                 range.contentRange.location == offset && range.fullRange.location < offset
-            }?.fullRange.location
+            }.map { range in
+                HiddenLinkBoundaryTarget(
+                    range: NSRange(location: range.fullRange.location, length: 0),
+                    affinity: .upstream
+                )
+            }
         case .rightward:
             return linkRanges.first { range in
                 NSMaxRange(range.contentRange) == offset && NSMaxRange(range.fullRange) > offset
-            }.map { NSMaxRange($0.fullRange) }
+            }.map { range in
+                HiddenLinkBoundaryTarget(
+                    range: NSRange(location: NSMaxRange(range.fullRange), length: 0),
+                    affinity: .downstream
+                )
+            }
         }
     }
+}
+
+private struct HiddenLinkBoundaryTarget {
+    let range: NSRange
+    let affinity: NSSelectionAffinity
 }

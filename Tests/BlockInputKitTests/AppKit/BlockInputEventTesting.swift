@@ -225,6 +225,10 @@ func plainDownEvent() throws -> NSEvent {
     try keyDownEvent(keyCode: 125, characters: "\u{F701}")
 }
 
+func plainLeftEvent() throws -> NSEvent {
+    try keyDownEvent(keyCode: 123, characters: "\u{F702}")
+}
+
 func plainRightEvent() throws -> NSEvent {
     try keyDownEvent(keyCode: 124, characters: "\u{F703}")
 }
