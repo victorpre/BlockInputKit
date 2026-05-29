@@ -49,13 +49,15 @@ extension BlockInputTextView {
             fileBaseURL: blockItem?.fileBaseURL
         )
             .filter { $0.style == .link }
+        let source = text as NSString
+        let textLength = source.length
         switch direction {
         case .leftward:
             if let range = linkRanges.last(where: { range in
                 range.contentRange.location == offset && range.fullRange.location < offset
             }) {
                 return HiddenLinkBoundaryTarget(
-                    range: NSRange(location: range.fullRange.location, length: 0),
+                    range: range.visibleLeadingExitRange(in: source),
                     affinity: .upstream
                 )
             }
@@ -63,7 +65,7 @@ extension BlockInputTextView {
                 range.fullRange.location == offset && range.fullRange.location < NSMaxRange(range.fullRange)
             }.map { range in
                 HiddenLinkBoundaryTarget(
-                    range: NSRange(location: max(range.fullRange.location - 1, 0), length: 0),
+                    range: range.visibleLeadingExitRange(in: source),
                     affinity: .upstream
                 )
             }
@@ -72,20 +74,38 @@ extension BlockInputTextView {
                 NSMaxRange(range.contentRange) == offset && NSMaxRange(range.fullRange) > offset
             }) {
                 return HiddenLinkBoundaryTarget(
-                    range: NSRange(location: NSMaxRange(range.fullRange), length: 0),
+                    range: range.visibleTrailingExitRange(in: source, textLength: textLength),
                     affinity: .downstream
                 )
             }
-            let textLength = (text as NSString).length
             return linkRanges.first { range in
                 NSMaxRange(range.fullRange) == offset && range.fullRange.location < NSMaxRange(range.fullRange)
             }.map { range in
                 HiddenLinkBoundaryTarget(
-                    range: NSRange(location: min(NSMaxRange(range.fullRange) + 1, textLength), length: 0),
+                    range: range.visibleTrailingExitRange(in: source, textLength: textLength),
                     affinity: .downstream
                 )
             }
         }
+    }
+}
+
+private extension BlockInputInlineMarkdownRange {
+    func visibleLeadingExitRange(in text: NSString) -> NSRange {
+        guard fullRange.location > 0 else {
+            return NSRange(location: 0, length: 0)
+        }
+        let previousCharacterRange = text.rangeOfComposedCharacterSequence(at: fullRange.location - 1)
+        return NSRange(location: previousCharacterRange.location, length: 0)
+    }
+
+    func visibleTrailingExitRange(in text: NSString, textLength: Int) -> NSRange {
+        let endOffset = NSMaxRange(fullRange)
+        guard endOffset < textLength else {
+            return NSRange(location: textLength, length: 0)
+        }
+        let nextCharacterRange = text.rangeOfComposedCharacterSequence(at: endOffset)
+        return NSRange(location: NSMaxRange(nextCharacterRange), length: 0)
     }
 }
 

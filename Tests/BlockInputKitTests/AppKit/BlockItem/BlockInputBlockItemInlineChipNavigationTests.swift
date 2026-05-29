@@ -12,9 +12,35 @@ final class BlockInputInlineChipNavigationTests: XCTestCase {
 
         textView.keyDown(with: try plainLeftEvent())
 
-        XCTAssertEqual(textView.selectedRange(), NSRange(location: linkRange.fullRange.location, length: 0))
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: linkRange.fullRange.location - 1, length: 0))
         XCTAssertEqual(textView.selectionAffinity, .upstream)
+        XCTAssertLessThan(try caretRect(in: textView).minX, try chipRect(in: textView, for: linkRange).minX)
+    }
+
+    func testPlainLeftAtDocumentStartFileLinkChipContentStartDoesNotJumpToTrailingEdge() throws {
+        let text = "[README.md](file:///tmp/README.md) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        textView.setSelectedRange(NSRange(location: linkRange.contentRange.location, length: 0))
+
+        textView.keyDown(with: try plainLeftEvent())
+        textView.keyDown(with: try plainLeftEvent())
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: linkRange.fullRange.location, length: 0))
         try assertCaret(in: textView, isAtLeadingEdgeOfChipFor: linkRange)
+    }
+
+    func testPlainLeftAtFileLinkChipContentStartMovesAcrossPrecedingComposedCharacter() throws {
+        let text = "👩‍💻 [README.md](file:///tmp/README.md) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        textView.setSelectedRange(NSRange(location: linkRange.contentRange.location, length: 0))
+
+        textView.keyDown(with: try plainLeftEvent())
+
+        let expectedRange = (text as NSString).rangeOfComposedCharacterSequence(at: linkRange.fullRange.location - 1)
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: expectedRange.location, length: 0))
+        XCTAssertLessThan(try caretRect(in: textView).minX, try chipRect(in: textView, for: linkRange).minX)
     }
 
     func testPlainLeftAtFileLinkChipLeadingEdgeMovesIntoPrecedingText() throws {
@@ -64,9 +90,9 @@ final class BlockInputInlineChipNavigationTests: XCTestCase {
 
         textView.keyDown(with: try plainRightEvent())
 
-        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.fullRange), length: 0))
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.fullRange) + 1, length: 0))
         XCTAssertEqual(textView.selectionAffinity, .downstream)
-        try assertCaret(in: textView, isAtTrailingEdgeOfChipFor: linkRange)
+        XCTAssertGreaterThan(try caretRect(in: textView).minX, try chipRect(in: textView, for: linkRange).maxX)
     }
 
     func testPlainRightAtFileLinkChipTrailingEdgeMovesIntoFollowingText() throws {
@@ -81,6 +107,32 @@ final class BlockInputInlineChipNavigationTests: XCTestCase {
         XCTAssertGreaterThan(try caretRect(in: textView).minX, try chipRect(in: textView, for: linkRange).maxX)
     }
 
+    func testPlainRightAtDocumentEndFileLinkChipContentEndDoesNotMovePastDocumentEnd() throws {
+        let text = "Open [README.md](file:///tmp/README.md)"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        textView.setSelectedRange(NSRange(location: NSMaxRange(linkRange.contentRange), length: 0))
+
+        textView.keyDown(with: try plainRightEvent())
+        textView.keyDown(with: try plainRightEvent())
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.fullRange), length: 0))
+        try assertCaret(in: textView, isAtTrailingEdgeOfChipFor: linkRange)
+    }
+
+    func testPlainRightAtFileLinkChipContentEndMovesAcrossFollowingComposedCharacter() throws {
+        let text = "Open [README.md](file:///tmp/README.md) 👩‍💻"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        textView.setSelectedRange(NSRange(location: NSMaxRange(linkRange.contentRange), length: 0))
+
+        textView.keyDown(with: try plainRightEvent())
+
+        let expectedRange = (text as NSString).rangeOfComposedCharacterSequence(at: NSMaxRange(linkRange.fullRange))
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(expectedRange), length: 0))
+        XCTAssertGreaterThan(try caretRect(in: textView).minX, try chipRect(in: textView, for: linkRange).maxX)
+    }
+
     func testMoveLeftCommandAtSlashCommandChipContentStartExitsLeadingEdge() throws {
         let text = "Run [/table](host-app://commands/table) today"
         let textView = try mountedTextView(for: text)
@@ -89,9 +141,9 @@ final class BlockInputInlineChipNavigationTests: XCTestCase {
 
         textView.doCommand(by: #selector(NSResponder.moveLeft(_:)))
 
-        XCTAssertEqual(textView.selectedRange(), NSRange(location: linkRange.fullRange.location, length: 0))
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: linkRange.fullRange.location - 1, length: 0))
         XCTAssertEqual(textView.selectionAffinity, .upstream)
-        try assertCaret(in: textView, isAtLeadingEdgeOfChipFor: linkRange)
+        XCTAssertLessThan(try caretRect(in: textView).minX, try chipRect(in: textView, for: linkRange).minX)
     }
 
     func testMoveRightCommandAtSlashCommandChipContentEndExitsTrailingEdge() throws {
@@ -102,9 +154,9 @@ final class BlockInputInlineChipNavigationTests: XCTestCase {
 
         textView.doCommand(by: #selector(NSResponder.moveRight(_:)))
 
-        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.fullRange), length: 0))
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.fullRange) + 1, length: 0))
         XCTAssertEqual(textView.selectionAffinity, .downstream)
-        try assertCaret(in: textView, isAtTrailingEdgeOfChipFor: linkRange)
+        XCTAssertGreaterThan(try caretRect(in: textView).minX, try chipRect(in: textView, for: linkRange).maxX)
     }
 
     func testPlainHorizontalMovementInsideFileLinkChipUsesNativeMovement() throws {
