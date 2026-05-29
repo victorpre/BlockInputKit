@@ -371,6 +371,27 @@ BlockInputCompletionPopupConfiguration(
 
 When `highlightedRowCornerRadius` is omitted, selected rows use the popup `cornerRadius`.
 
+### Link And Image Modal Placement
+
+By default, the built-in link and image modals are direct children of the editor and use editor bounds for placement. Use
+`modalOverlayProvider` when the host needs those modals to live in a higher overlay surface:
+
+```swift
+let configuration = BlockInputConfiguration(
+    document: document,
+    modalOverlayProvider: { context in
+        let container = overlayView
+        return BlockInputModalOverlay(
+            container: container,
+            frame: context.modalFrame(in: container)
+        )
+    }
+)
+```
+
+The provider receives the modal kind, default editor-owned frame, measured modal size, and source anchor. Return the
+modal parent view plus a frame in that parent's coordinate space.
+
 ### File Mentions
 
 For file mentions in paragraphs or headings, return a file-link suggestion:

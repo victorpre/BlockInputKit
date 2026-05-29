@@ -148,6 +148,8 @@ extension BlockInputView {
     /// Presents the single editor-owned link modal and binds its actions to the captured source context.
     func showLinkModal(context: BlockInputLinkContext, text prefilledText: String? = nil, urlString prefilledURLString: String? = nil) {
         guard isEditable, let block = block(withID: context.blockID) else { return }
+        dismissImageModal(restoreFocus: false)
+        dismissCompletionPopup()
         removeLinkModalDismissalMonitors()
         let modal = linkModalView ?? BlockInputLinkModalView()
         let mode: BlockInputLinkModalMode
@@ -169,10 +171,7 @@ extension BlockInputView {
         linkModalView = modal
         linkModalContext = context
         linkModalRetargetMouseDownWindowLocation = nil
-        if modal.superview == nil {
-            addSubview(modal)
-        }
-        positionLinkModal(modal, anchoredTo: context.anchorWindowRect)
+        hostMutationModal(modal, kind: .link, anchoredTo: context.anchorWindowRect, minimumSize: NSSize(width: 300, height: 148))
         installLinkModalDismissalMonitors()
         modal.focusInitialField()
     }
@@ -246,20 +245,6 @@ extension BlockInputView {
             applySelection(.text(BlockInputTextRange(blockID: context.blockID, range: clampedRange)), notify: true)
             restoreVisibleSelection()
         }
-    }
-
-    /// Positions the modal near the clicked link or caret while keeping it inside the editor bounds.
-    private func positionLinkModal(_ modal: BlockInputLinkModalView, anchoredTo windowRect: NSRect) {
-        let anchor = convert(windowRect.origin, from: nil)
-        let modalSize = modal.fittingSize == .zero ? modal.frame.size : modal.fittingSize
-        let width = max(modalSize.width, 300)
-        let height = max(modalSize.height, 148)
-        let modalOriginX = min(max(anchor.x - 12, bounds.minX + 12), max(bounds.minX + 12, bounds.maxX - width - 12))
-        let preferredY = anchor.y - height - 8
-        let modalOriginY = preferredY >= bounds.minY + 12
-            ? preferredY
-            : min(max(anchor.y + 18, bounds.minY + 12), max(bounds.minY + 12, bounds.maxY - height - 12))
-        modal.frame = NSRect(x: modalOriginX, y: modalOriginY, width: width, height: height)
     }
 
     /// Handles supported URL paste by editing an existing link or inserting Markdown without selecting the result.

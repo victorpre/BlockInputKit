@@ -320,6 +320,12 @@ public struct BlockInputConfiguration {
     /// Optional host router for slash-command chip clicks.
     public var slashCommandChipClickHandler:
         (@MainActor (BlockInputSlashCommandChipClickContext) -> BlockInputSlashCommandChipClickAction)?
+    /// Optional host override for editor-owned link and image modal presentation.
+    ///
+    /// Return both the parent view and modal frame in that parent's coordinate space. Keeping the container and frame
+    /// together lets hosts rehost modals into another surface while aligning them to that surface. When nil, the editor
+    /// owns the modal as a direct child and uses editor bounds as the placement surface.
+    public var modalOverlayProvider: (@MainActor (BlockInputModalOverlayContext) -> BlockInputModalOverlay?)?
     /// Built-in completion popup behavior, including caret anchoring and optional overlay hosting.
     public var completionPopupConfiguration: BlockInputCompletionPopupConfiguration
     /// Convenience access to `completionPopupConfiguration.placement`.
@@ -390,6 +396,7 @@ public struct BlockInputConfiguration {
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
         slashCommandChipClickHandler:
             (@MainActor (BlockInputSlashCommandChipClickContext) -> BlockInputSlashCommandChipClickAction)? = nil,
+        modalOverlayProvider: (@MainActor (BlockInputModalOverlayContext) -> BlockInputModalOverlay?)? = nil,
         completionPopupPlacement: BlockInputCompletionPopupPlacement = .caret,
         completionPopupConfiguration: BlockInputCompletionPopupConfiguration? = nil,
         onDocumentMutation: ((BlockInputDocumentChange) -> Void)? = nil,
@@ -429,6 +436,7 @@ public struct BlockInputConfiguration {
         self.completionReturnBehavior = completionReturnBehavior
         self.slashCommandAvailability = slashCommandAvailability
         self.slashCommandChipClickHandler = slashCommandChipClickHandler
+        self.modalOverlayProvider = modalOverlayProvider
         self.completionPopupConfiguration = completionPopupConfiguration ?? BlockInputCompletionPopupConfiguration(
             placement: completionPopupPlacement
         )

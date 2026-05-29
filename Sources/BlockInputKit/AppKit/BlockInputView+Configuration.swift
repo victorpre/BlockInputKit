@@ -100,6 +100,8 @@ extension BlockInputView {
         onSelectionChange = configuration.onSelectionChange
         onFocusChange = configuration.onFocusChange
         fileDropHandler = configuration.fileDropHandler
+        modalOverlayProvider = configuration.modalOverlayProvider
+        refreshMutationModalPresentation()
     }
 
     func configureUndoController(

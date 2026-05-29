@@ -115,6 +115,7 @@ public final class BlockInputView: NSView {
     var linkModalContext: BlockInputLinkContext?
     var imageModalView: BlockInputImageModalView?
     var imageModalContext: BlockInputImageContext?
+    var modalOverlayProvider: (@MainActor (BlockInputModalOverlayContext) -> BlockInputModalOverlay?)?
     // Local monitors are needed because a child modal view does not receive every outside mouse-down by responder routing.
     nonisolated(unsafe) var linkModalMouseDownMonitor: Any?
     var linkModalRetargetMouseDownWindowLocation: NSPoint?

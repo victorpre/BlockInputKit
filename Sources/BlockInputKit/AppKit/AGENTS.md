@@ -4,6 +4,7 @@
 - Route local file drops through mounted text views for inline chip insertion; collection-view file drops are only for appending from bottom blank space, while block-ID drops stay reserved for block reordering.
 - Keep live completion UI editor-owned; mounted text views should route completion keys through `BlockInputView`/`BlockInputBlockItem` delegates, while suggestions remain host-provided through `completionProvider`.
 - Keep completion overlay hosting explicit: `.overlay` customization should use `BlockInputCompletionPopupConfiguration.overlayProvider`, returning both the popup parent view and the frame in that parent's coordinate space.
+- Keep link/image modal overlay hosting explicit: `BlockInputConfiguration.modalOverlayProvider` should return both the modal parent view and frame in that parent's coordinate space.
 - Keep inline link/chip clicks routed through visual hit geometry across the collection view, item root, scroll view, clip view, and text view; first-click behavior must not depend on the text view already being focused.
 - Keep inline chip background metrics vertically aligned with partial and whole text selection chrome; selected file-chip snapshots guard this visual contract.
 - Cover focus, selection, keyboard command, drag/drop, and visual-state changes with mounted AppKit tests when model-only tests could miss visible `NSTextView` or `NSCollectionView` behavior.

@@ -65,15 +65,14 @@ extension BlockInputView {
         guard isEditable else {
             return
         }
+        dismissLinkModal(restoreFocus: false)
+        dismissCompletionPopup()
         let modal = imageModalView ?? BlockInputImageModalView()
         modal.configure(urlString: source ?? "", altText: altText ?? "")
         configureImageModalActions(modal, context: context)
         imageModalView = modal
         imageModalContext = context
-        if modal.superview == nil {
-            addSubview(modal)
-        }
-        positionImageModal(modal, anchoredTo: context.anchorWindowRect)
+        hostMutationModal(modal, kind: .image, anchoredTo: context.anchorWindowRect, minimumSize: NSSize(width: 300, height: 148))
         modal.focusInitialField()
     }
 
@@ -314,18 +313,6 @@ extension BlockInputView {
         )
     }
 
-    private func positionImageModal(_ modal: BlockInputImageModalView, anchoredTo windowRect: NSRect) {
-        let anchor = convert(windowRect.origin, from: nil)
-        let modalSize = modal.fittingSize == .zero ? modal.frame.size : modal.fittingSize
-        let width = max(modalSize.width, 300)
-        let height = max(modalSize.height, 148)
-        let modalOriginX = min(max(anchor.x - 12, bounds.minX + 12), max(bounds.minX + 12, bounds.maxX - width - 12))
-        let preferredY = anchor.y - height - 8
-        let modalOriginY = preferredY >= bounds.minY + 12
-            ? preferredY
-            : min(max(anchor.y + 18, bounds.minY + 12), max(bounds.minY + 12, bounds.maxY - height - 12))
-        modal.frame = NSRect(x: modalOriginX, y: modalOriginY, width: width, height: height)
-    }
 }
 
 private func clampedRange(_ range: NSRange, in text: String) -> NSRange {
