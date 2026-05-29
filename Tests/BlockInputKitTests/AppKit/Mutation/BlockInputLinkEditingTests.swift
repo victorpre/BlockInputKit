@@ -357,7 +357,7 @@ final class BlockInputLinkEditingTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks[0].text, originalText)
     }
 
-    func testRightArrowAfterEscapeFromEditModalStaysAfterInlineChip() throws {
+    func testRightArrowAfterEscapeFromEditModalLeavesInlineChip() throws {
         let text = "Open [AGENTS.md](file:///tmp/AGENTS.md) after"
         let blockID = BlockInputBlockID(rawValue: "block")
         let mounted = makeMountedBlockInputView(blocks: [
@@ -382,7 +382,8 @@ final class BlockInputLinkEditingTests: XCTestCase {
         XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(labelRange), length: 0))
 
         textView.keyDown(with: try plainRightEvent())
-        let expectedRange = NSRange(location: NSMaxRange(linkRange.fullRange), length: 0)
+        let nextCharacterRange = (text as NSString).rangeOfComposedCharacterSequence(at: NSMaxRange(linkRange.fullRange))
+        let expectedRange = NSRange(location: NSMaxRange(nextCharacterRange), length: 0)
         XCTAssertEqual(textView.selectedRange(), expectedRange)
         XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: expectedRange.location)))
     }
