@@ -27,6 +27,7 @@ extension BlockInputView {
         }
         guard let chrome = style.editorSurface.chrome else {
             removeEditorChromeLayers()
+            editorChromeView.configure(chrome: nil, fallbackFillColor: nil)
             layer.backgroundColor = style.editorSurface.editorBackgroundColor?.cgColor
             layer.borderColor = nil
             layer.borderWidth = 0
@@ -37,6 +38,7 @@ extension BlockInputView {
         }
 
         let fillColor = chrome.fillColor ?? style.editorSurface.editorBackgroundColor
+        editorChromeView.configure(chrome: chrome, fallbackFillColor: style.editorSurface.editorBackgroundColor)
         layer.backgroundColor = nil
         layer.borderColor = nil
         layer.borderWidth = 0
@@ -124,6 +126,116 @@ private extension BlockInputEditorChromeCorners {
             mask.insert(.layerMaxXMaxYCorner)
         }
         return mask
+    }
+}
+
+final class BlockInputEditorChromeView: NSView {
+    private var chrome: BlockInputEditorChromeStyle?
+    private var fallbackFillColor: NSColor?
+
+    override var isOpaque: Bool { false }
+
+    func configure(chrome: BlockInputEditorChromeStyle?, fallbackFillColor: NSColor?) {
+        self.chrome = chrome
+        self.fallbackFillColor = fallbackFillColor
+        isHidden = chrome == nil
+        needsDisplay = true
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard bounds.width > 0, bounds.height > 0,
+              let chrome else {
+            return
+        }
+
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            if let fillColor = chrome.fillColor ?? fallbackFillColor {
+                fillColor.setFill()
+                NSBezierPath.blockInputEditorChromePath(
+                    in: bounds,
+                    radius: chrome.cornerRadius,
+                    roundedCorners: chrome.roundedCorners
+                )
+                .fill()
+            }
+
+            if let strokeColor = chrome.strokeColor, chrome.borderWidth > 0 {
+                strokeColor.setStroke()
+                let strokeInset = chrome.borderWidth / 2
+                let path = NSBezierPath.blockInputEditorChromePath(
+                    in: bounds.insetBy(dx: strokeInset, dy: strokeInset),
+                    radius: chrome.cornerRadius,
+                    roundedCorners: chrome.roundedCorners
+                )
+                path.lineWidth = chrome.borderWidth
+                path.stroke()
+            }
+        }
+    }
+}
+
+private extension NSBezierPath {
+    static func blockInputEditorChromePath(
+        in rect: NSRect,
+        radius: CGFloat,
+        roundedCorners: BlockInputEditorChromeCorners
+    ) -> NSBezierPath {
+        let radius = min(max(0, radius), min(rect.width, rect.height) / 2)
+        let path = NSBezierPath()
+        guard rect.width > 0, rect.height > 0 else {
+            return path
+        }
+
+        let topLeft = roundedCorners.contains(.topLeft) ? radius : 0
+        let topRight = roundedCorners.contains(.topRight) ? radius : 0
+        let bottomRight = roundedCorners.contains(.bottomRight) ? radius : 0
+        let bottomLeft = roundedCorners.contains(.bottomLeft) ? radius : 0
+        let curveFactor: CGFloat = 0.45
+
+        path.move(to: NSPoint(x: rect.minX + bottomLeft, y: rect.minY))
+        path.line(to: NSPoint(x: rect.maxX - bottomRight, y: rect.minY))
+        if bottomRight > 0 {
+            path.curve(
+                to: NSPoint(x: rect.maxX, y: rect.minY + bottomRight),
+                controlPoint1: NSPoint(x: rect.maxX - bottomRight * curveFactor, y: rect.minY),
+                controlPoint2: NSPoint(x: rect.maxX, y: rect.minY + bottomRight * curveFactor)
+            )
+        }
+
+        path.line(to: NSPoint(x: rect.maxX, y: rect.maxY - topRight))
+        if topRight > 0 {
+            path.curve(
+                to: NSPoint(x: rect.maxX - topRight, y: rect.maxY),
+                controlPoint1: NSPoint(x: rect.maxX, y: rect.maxY - topRight * curveFactor),
+                controlPoint2: NSPoint(x: rect.maxX - topRight * curveFactor, y: rect.maxY)
+            )
+        }
+
+        path.line(to: NSPoint(x: rect.minX + topLeft, y: rect.maxY))
+        if topLeft > 0 {
+            path.curve(
+                to: NSPoint(x: rect.minX, y: rect.maxY - topLeft),
+                controlPoint1: NSPoint(x: rect.minX + topLeft * curveFactor, y: rect.maxY),
+                controlPoint2: NSPoint(x: rect.minX, y: rect.maxY - topLeft * curveFactor)
+            )
+        }
+
+        path.line(to: NSPoint(x: rect.minX, y: rect.minY + bottomLeft))
+        if bottomLeft > 0 {
+            path.curve(
+                to: NSPoint(x: rect.minX + bottomLeft, y: rect.minY),
+                controlPoint1: NSPoint(x: rect.minX, y: rect.minY + bottomLeft * curveFactor),
+                controlPoint2: NSPoint(x: rect.minX + bottomLeft * curveFactor, y: rect.minY)
+            )
+        }
+        path.close()
+        return path
     }
 }
 

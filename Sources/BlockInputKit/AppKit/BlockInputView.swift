@@ -54,6 +54,7 @@ public final class BlockInputView: NSView {
     let scrollView = BlockInputDocumentScrollView()
     let collectionView = BlockInputCollectionView()
     let placeholderLabel = BlockInputPlaceholderLabel(labelWithString: "")
+    let editorChromeView = BlockInputEditorChromeView()
     let dropIndicatorView = NSView()
     let editorChromeFillLayer = CAShapeLayer()
     let editorChromeStrokeLayer = CAShapeLayer()

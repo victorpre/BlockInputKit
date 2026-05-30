@@ -45,6 +45,7 @@ extension BlockInputView {
             self?.handleDocumentScrollContentBoundsChange()
         }
 
+        setupEditorChromeView()
         addSubview(scrollView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -59,5 +60,16 @@ extension BlockInputView {
         updateCollectionViewWidthForVisibleBounds()
         scheduleProgressivePreloadCheck()
         dismissCompletionPopup()
+    }
+
+    private func setupEditorChromeView() {
+        editorChromeView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(editorChromeView)
+        NSLayoutConstraint.activate([
+            editorChromeView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            editorChromeView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            editorChromeView.topAnchor.constraint(equalTo: topAnchor),
+            editorChromeView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
     }
 }

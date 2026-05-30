@@ -132,7 +132,7 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
     }
 
     func testMountedEditorRendersBottomChromeCornersAtVisualBottom() throws {
-        let samples = try renderedChromeCornerSamples(roundedCorners: .bottom)
+        let samples = try cachedDisplayChromeCornerSamples(roundedCorners: .bottom)
 
         assertFilled(samples.topLeft, "top-left", roundedCorners: ".bottom")
         assertFilled(samples.topRight, "top-right", roundedCorners: ".bottom")
@@ -141,7 +141,7 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
     }
 
     func testMountedEditorRendersTopChromeCornersAtVisualTop() throws {
-        let samples = try renderedChromeCornerSamples(roundedCorners: .top)
+        let samples = try cachedDisplayChromeCornerSamples(roundedCorners: .top)
 
         assertClipped(samples.topLeft, "top-left", roundedCorners: ".top")
         assertClipped(samples.topRight, "top-right", roundedCorners: ".top")
@@ -150,12 +150,68 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
     }
 
     func testMountedEditorRendersAllChromeCorners() throws {
-        let samples = try renderedChromeCornerSamples(roundedCorners: .all)
+        let samples = try cachedDisplayChromeCornerSamples(roundedCorners: .all)
 
         assertClipped(samples.topLeft, "top-left", roundedCorners: ".all")
         assertClipped(samples.topRight, "top-right", roundedCorners: ".all")
         assertClipped(samples.bottomLeft, "bottom-left", roundedCorners: ".all")
         assertClipped(samples.bottomRight, "bottom-right", roundedCorners: ".all")
+    }
+
+    func testMountedEditorChromeFillAndStrokeRenderThroughViewSnapshots() throws {
+        let samples = try cachedDisplayChromeInteriorSamples(roundedCorners: .bottom)
+
+        assertFilled(samples.fill, "interior fill", roundedCorners: ".bottom")
+        assertFilled(samples.leftStroke, "left stroke", roundedCorners: ".bottom")
+        assertFilled(samples.bottomStroke, "bottom stroke", roundedCorners: ".bottom")
+    }
+
+    func testMountedEditorTranslucentChromeDrawsThroughChromeView() throws {
+        let size = NSSize(width: 80, height: 40)
+        let view = BlockInputView(frame: NSRect(origin: .zero, size: size))
+        view.configure(BlockInputConfiguration(style: BlockInputStyle(editorSurface: BlockInputEditorSurfaceStyle(
+            editorBackgroundColor: nil,
+            scrollBackgroundColor: nil,
+            collectionBackgroundColor: nil,
+            chrome: BlockInputEditorChromeStyle(
+                fillColor: NSColor.white.withAlphaComponent(0.08),
+                strokeColor: NSColor.white.withAlphaComponent(0.18),
+                borderWidth: 1,
+                cornerRadius: 18,
+                roundedCorners: .bottom,
+                clipsContentToShape: true
+            )
+        ))))
+        view.displayIfNeeded()
+        view.layoutSubtreeIfNeeded()
+        view.editorChromeView.layoutSubtreeIfNeeded()
+
+        let bitmap = try XCTUnwrap(
+            NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: Int(size.width),
+                pixelsHigh: Int(size.height),
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+            )
+        )
+        bitmap.size = size
+        let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        NSColor(calibratedWhite: 0.16, alpha: 1).setFill()
+        NSRect(origin: .zero, size: size).fill()
+        NSGraphicsContext.restoreGraphicsState()
+        view.editorChromeView.cacheDisplay(in: view.editorChromeView.bounds, to: bitmap)
+
+        let background = try XCTUnwrap(bitmap.colorAt(x: 2, y: 38)?.usingColorSpace(.deviceRGB))
+        let fill = try XCTUnwrap(bitmap.colorAt(x: 40, y: 20)?.usingColorSpace(.deviceRGB))
+        XCTAssertGreaterThan(fill.redComponent, background.redComponent + 0.03)
     }
 
     func testMountedEditorReconfiguresChromeStyle() throws {
@@ -279,11 +335,48 @@ private struct ChromeCornerSamples {
 }
 
 @MainActor
-private func renderedChromeCornerSamples(
+private func cachedDisplayChromeCornerSamples(
     roundedCorners: BlockInputEditorChromeCorners,
     file: StaticString = #filePath,
     line: UInt = #line
 ) throws -> ChromeCornerSamples {
+    let bitmap = try cachedDisplayChromeBitmap(roundedCorners: roundedCorners, file: file, line: line)
+    let size = NSSize(width: bitmap.pixelsWide, height: bitmap.pixelsHigh)
+
+    return ChromeCornerSamples(
+        topLeft: try XCTUnwrap(bitmap.colorAt(x: 2, y: 2), file: file, line: line),
+        topRight: try XCTUnwrap(bitmap.colorAt(x: Int(size.width) - 3, y: 2), file: file, line: line),
+        bottomLeft: try XCTUnwrap(bitmap.colorAt(x: 2, y: Int(size.height) - 3), file: file, line: line),
+        bottomRight: try XCTUnwrap(bitmap.colorAt(x: Int(size.width) - 3, y: Int(size.height) - 3), file: file, line: line)
+    )
+}
+
+private struct ChromeInteriorSamples {
+    let fill: NSColor
+    let leftStroke: NSColor
+    let bottomStroke: NSColor
+}
+
+@MainActor
+private func cachedDisplayChromeInteriorSamples(
+    roundedCorners: BlockInputEditorChromeCorners,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) throws -> ChromeInteriorSamples {
+    let bitmap = try cachedDisplayChromeBitmap(roundedCorners: roundedCorners, file: file, line: line)
+    return ChromeInteriorSamples(
+        fill: try XCTUnwrap(bitmap.colorAt(x: 40, y: 20), file: file, line: line),
+        leftStroke: try XCTUnwrap(bitmap.colorAt(x: 1, y: 20), file: file, line: line),
+        bottomStroke: try XCTUnwrap(bitmap.colorAt(x: 40, y: 38), file: file, line: line)
+    )
+}
+
+@MainActor
+private func cachedDisplayChromeBitmap(
+    roundedCorners: BlockInputEditorChromeCorners,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) throws -> NSBitmapImageRep {
     let size = NSSize(width: 80, height: 40)
     let mounted = makeMountedBlockInputView(
         configuration: BlockInputConfiguration(style: BlockInputStyle(editorSurface: BlockInputEditorSurfaceStyle(
@@ -302,8 +395,6 @@ private func renderedChromeCornerSamples(
     )
     mounted.view.displayIfNeeded()
     mounted.view.layoutSubtreeIfNeeded()
-    mounted.view.updateLayer()
-    mounted.view.layer?.layoutIfNeeded()
 
     let bitmap = try XCTUnwrap(
         NSBitmapImageRep(
@@ -322,18 +413,8 @@ private func renderedChromeCornerSamples(
         line: line
     )
     bitmap.size = size
-    let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap), file: file, line: line)
-    NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = context
-    mounted.view.layer?.render(in: context.cgContext)
-    NSGraphicsContext.restoreGraphicsState()
-
-    return ChromeCornerSamples(
-        topLeft: try XCTUnwrap(bitmap.colorAt(x: 2, y: 2), file: file, line: line),
-        topRight: try XCTUnwrap(bitmap.colorAt(x: Int(size.width) - 3, y: 2), file: file, line: line),
-        bottomLeft: try XCTUnwrap(bitmap.colorAt(x: 2, y: Int(size.height) - 3), file: file, line: line),
-        bottomRight: try XCTUnwrap(bitmap.colorAt(x: Int(size.width) - 3, y: Int(size.height) - 3), file: file, line: line)
-    )
+    mounted.view.cacheDisplay(in: mounted.view.bounds, to: bitmap)
+    return bitmap
 }
 
 private func assertFilled(
