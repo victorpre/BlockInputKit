@@ -248,13 +248,13 @@ extension BlockInputView {
             guard !copiedBlocks.isEmpty else {
                 return nil
             }
-            return BlockInputDocument(blocks: copiedBlocks).markdown
+            return BlockInputDocument(blocks: copiedBlocks.clipboardMarkdownBlocks).markdown
         case let .mixed(mixedSelection):
             let copiedBlocks = blocksForMixedMarkdownCopy(mixedSelection)
             guard !copiedBlocks.isEmpty else {
                 return nil
             }
-            return BlockInputDocument(blocks: copiedBlocks).markdown
+            return BlockInputDocument(blocks: copiedBlocks.clipboardMarkdownBlocks).markdown
         case .cursor, nil:
             return nil
         }
@@ -418,8 +418,11 @@ extension BlockInputBlock {
             .first { markdownRange in
                 markdownRange.style == .link && markdownRange.contentRange.containsSourceRange(range)
             }
-        guard linkRange != nil else {
+        guard let linkRange else {
             return nil
+        }
+        if linkRange.contentRange == range {
+            return (text as NSString).substring(with: linkRange.fullRange)
         }
         return (text as NSString).substring(with: range).blockInputUnescapedLinkLabel
     }
@@ -431,6 +434,26 @@ extension BlockInputBlock {
         case .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
             return false
         }
+    }
+}
+
+private extension Array where Element == BlockInputBlock {
+    var clipboardMarkdownBlocks: [BlockInputBlock] {
+        map(\.clipboardMarkdownBlock)
+    }
+}
+
+private extension BlockInputBlock {
+    var clipboardMarkdownBlock: BlockInputBlock {
+        guard case var .image(image) = kind,
+              image.width == nil,
+              image.height == nil else {
+            return self
+        }
+        image.sourceStyle = .markdown
+        var block = self
+        block.kind = .image(image)
+        return block
     }
 }
 

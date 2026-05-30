@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class BlockInputTableCellClipboardTests: XCTestCase {
-    func testPartialTableCellCopyUsesMarkdownAwareLinkLabelText() throws {
+    func testFullTableCellLinkLabelCopyUsesMarkdownSource() throws {
         let cellText = #"Open [a\[b\]c](https://example.com)"#
         let mounted = makeMountedBlockInputView(blocks: [Self.tableBlock(cellText: cellText)])
         let cell = try bodyCell(in: mounted.view)
@@ -13,7 +13,20 @@ final class BlockInputTableCellClipboardTests: XCTestCase {
 
         withCleanTableCellPasteboard { pasteboard in
             cell.copy(nil)
-            XCTAssertEqual(pasteboard.string(forType: .string), "a[b]c")
+            XCTAssertEqual(pasteboard.string(forType: .string), #"[a\[b\]c](https://example.com)"#)
+        }
+    }
+
+    func testPartialTableCellLinkLabelCopyUsesPlainText() throws {
+        let cellText = #"Open [a\[b\]c](https://example.com)"#
+        let mounted = makeMountedBlockInputView(blocks: [Self.tableBlock(cellText: cellText)])
+        let cell = try bodyCell(in: mounted.view)
+        XCTAssertTrue(mounted.window.makeFirstResponder(cell))
+        cell.setSelectedRange((cellText as NSString).range(of: "b"))
+
+        withCleanTableCellPasteboard { pasteboard in
+            cell.copy(nil)
+            XCTAssertEqual(pasteboard.string(forType: .string), "b")
         }
     }
 
