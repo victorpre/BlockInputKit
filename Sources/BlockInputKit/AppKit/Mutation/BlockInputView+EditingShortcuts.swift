@@ -89,6 +89,37 @@ extension BlockInputView {
         )
     }
 
+    @discardableResult
+    func replaceActiveSelection(with insertedText: String) -> Bool {
+        guard isEditable,
+              !insertedText.isEmpty else {
+            return false
+        }
+        switch selection {
+        case let .text(textRange):
+            return finishTypedSelectionReplacement(replaceTextSelection(textRange, with: insertedText))
+        case let .mixed(selection):
+            return finishTypedSelectionReplacement(replaceMixedSelection(selection, with: insertedText))
+        case let .blocks(blockIDs):
+            return finishTypedSelectionReplacement(replaceBlockSelection(blockIDs, with: insertedText))
+        case .cursor, nil:
+            return false
+        }
+    }
+
+    private func finishTypedSelectionReplacement(_ selection: BlockInputSelection?) -> Bool {
+        guard selection != nil else {
+            return false
+        }
+        collectionView.layoutSubtreeIfNeeded()
+        if case let .cursor(cursor) = selection {
+            focus(blockID: cursor.blockID, utf16Offset: cursor.utf16Offset)
+        } else {
+            restoreVisibleSelection()
+        }
+        return true
+    }
+
     private func performTextViewEditAction(_ action: Selector) -> Bool {
         switch selection {
         case let .cursor(cursor):
@@ -116,6 +147,90 @@ extension BlockInputView {
             return true
         }
         return NSApp.sendAction(action, to: textView, from: self)
+    }
+
+    private func replaceTextSelection(
+        _ textRange: BlockInputTextRange,
+        with insertedText: String
+    ) -> BlockInputSelection? {
+        performStructuralEdit(
+            named: "Insert Text",
+            storeSyncAction: { _, afterDocument, _ in
+                guard let block = afterDocument.block(withID: textRange.blockID) else {
+                    return .replaceDocument
+                }
+                return .replaceBlock(block)
+            },
+            edit: { document in
+                document.replaceText(in: textRange.blockID, range: textRange.range, replacement: insertedText)
+            }
+        )
+    }
+
+    private func replaceMixedSelection(
+        _ selection: BlockInputMixedSelection,
+        with insertedText: String
+    ) -> BlockInputSelection? {
+        performStructuralEdit(
+            named: "Insert Text",
+            storeSyncAction: { _, _, _ in .replaceDocument },
+            edit: { document in
+                guard let cursor = document.deleteMixedSelection(selection) else {
+                    return nil
+                }
+                return document.replaceText(
+                    in: cursor.blockID,
+                    range: NSRange(location: cursor.utf16Offset, length: 0),
+                    replacement: insertedText
+                )
+            }
+        )
+    }
+
+    private func replaceBlockSelection(
+        _ blockIDs: [BlockInputBlockID],
+        with insertedText: String
+    ) -> BlockInputSelection? {
+        guard !blockIDs.isEmpty else {
+            return nil
+        }
+        let selectedIDs = Set(blockIDs)
+        return performStructuralEdit(
+            named: "Insert Text",
+            storeSyncAction: { _, afterDocument, _ in
+                guard blockIDs.count == 1,
+                      let blockID = blockIDs.first,
+                      let replacementBlock = afterDocument.block(withID: blockID) else {
+                    return .replaceDocument
+                }
+                return .replaceBlock(replacementBlock)
+            },
+            edit: { document in
+                guard let firstSelectedBlock = document.blocks.first(where: { selectedIDs.contains($0.id) }) else {
+                    return nil
+                }
+                let replacementBlock = BlockInputBlock(
+                    id: firstSelectedBlock.id,
+                    kind: .paragraph,
+                    text: insertedText
+                )
+                var didInsertReplacement = false
+                document.blocks = document.blocks.compactMap { block in
+                    guard selectedIDs.contains(block.id) else {
+                        return block
+                    }
+                    guard !didInsertReplacement else {
+                        return nil
+                    }
+                    didInsertReplacement = true
+                    return replacementBlock
+                }
+                return .cursor(BlockInputCursor(
+                    blockID: replacementBlock.id,
+                    utf16Offset: replacementBlock.utf16Length
+                ))
+            }
+        )
     }
 
     private func selectedPlainText() -> String? {

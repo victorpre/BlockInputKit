@@ -40,6 +40,7 @@ extension BlockInputView: NSCollectionViewDataSource {
             return blockItem
         }
         configureBlockItem(blockItem, block: block, blockIndex: indexPath.item)
+        restoreCursorSelectionIfNeeded(on: blockItem, block: block)
         return blockItem
     }
 }

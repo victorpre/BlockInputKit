@@ -88,6 +88,23 @@ extension NSEvent {
         return nil
     }
 
+    var blockInputInsertedText: String? {
+        let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard type == .keyDown,
+              !modifiers.contains(.command),
+              !modifiers.contains(.option),
+              !modifiers.contains(.control),
+              !isBackspaceOrDelete,
+              !isCancelOperation,
+              !isArrowKey,
+              let characters,
+              !characters.isEmpty,
+              !characters.unicodeScalars.contains(where: \.blockInputIsNonPrintingKeyScalar) else {
+            return nil
+        }
+        return characters
+    }
+
     var blockInputSelectionExpansionDirection: BlockInputVerticalMovementDirection? {
         let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard modifiers.contains(.shift),
@@ -272,4 +289,10 @@ extension NSEvent {
         return names.isEmpty ? "none" : names.joined(separator: "+")
     }
 
+}
+
+private extension UnicodeScalar {
+    var blockInputIsNonPrintingKeyScalar: Bool {
+        CharacterSet.controlCharacters.contains(self) || (0xF700...0xF8FF).contains(value)
+    }
 }

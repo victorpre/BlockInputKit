@@ -122,6 +122,10 @@ extension BlockInputView {
             if selectedBlockCount == 1, deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil { return }
             if deleteSelectedBlocksForBackspaceOrDelete() != nil { return }
         }
+        if let insertedText = event.blockInputInsertedText,
+           replaceActiveSelection(with: insertedText) {
+            return
+        }
         super.keyDown(with: event)
     }
 

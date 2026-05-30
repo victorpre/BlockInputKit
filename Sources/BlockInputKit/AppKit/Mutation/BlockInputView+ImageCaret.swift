@@ -213,24 +213,4 @@ private extension NSEvent {
         keyCode == 51 || charactersIgnoringModifiers == "\u{7F}"
     }
 
-    var blockInputInsertedText: String? {
-        let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard !modifiers.contains(.command),
-              !modifiers.contains(.control),
-              !modifiers.contains(.option),
-              !isArrowKey,
-              !isBackspaceOrDelete,
-              !isCancelOperation,
-              !blockInputIsReturn,
-              !blockInputIsTab,
-              let characters,
-              !characters.isEmpty else {
-            return nil
-        }
-        return characters
-    }
-
-    var blockInputIsTab: Bool {
-        keyCode == 48 || charactersIgnoringModifiers == "\t" || characters == "\t"
-    }
 }

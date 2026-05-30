@@ -268,6 +268,35 @@ extension BlockInputView {
         pendingFocus = nil
     }
 
+    func restoreCursorSelectionIfNeeded(on item: BlockInputBlockItem, block: BlockInputBlock) {
+        let cursor: BlockInputCursor?
+        if pendingFocus?.blockID == block.id {
+            cursor = pendingFocus
+        } else if case let .cursor(selectionCursor) = selection,
+                  selectionCursor.blockID == block.id {
+            cursor = selectionCursor
+        } else {
+            cursor = nil
+        }
+        guard let cursor else {
+            return
+        }
+        if block.kind.isImage {
+            item.setImageCaretOffset(cursor.utf16Offset)
+            if !isBecomingFirstResponder, window?.firstResponder !== self {
+                window?.makeFirstResponder(self)
+            }
+            if pendingFocus == cursor {
+                pendingFocus = nil
+            }
+            return
+        }
+        item.focusText(atUTF16Offset: cursor.utf16Offset)
+        if pendingFocus == cursor {
+            pendingFocus = nil
+        }
+    }
+
     private func mountedImageItem(for blockID: BlockInputBlockID) -> BlockInputBlockItem? {
         guard let index = activeStandaloneBlockIndex(for: blockID),
               block(at: index)?.kind.isImage == true else {
