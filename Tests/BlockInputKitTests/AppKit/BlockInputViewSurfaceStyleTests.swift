@@ -166,7 +166,7 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
         assertFilled(samples.bottomStroke, "bottom stroke", roundedCorners: ".bottom")
     }
 
-    func testMountedEditorTranslucentChromeDrawsThroughChromeView() throws {
+    func testMountedEditorTranslucentChromeDarkensLightFullViewSnapshots() throws {
         let size = NSSize(width: 80, height: 40)
         let view = BlockInputView(frame: NSRect(origin: .zero, size: size))
         view.configure(BlockInputConfiguration(style: BlockInputStyle(editorSurface: BlockInputEditorSurfaceStyle(
@@ -174,8 +174,8 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
             scrollBackgroundColor: nil,
             collectionBackgroundColor: nil,
             chrome: BlockInputEditorChromeStyle(
-                fillColor: NSColor.white.withAlphaComponent(0.08),
-                strokeColor: NSColor.white.withAlphaComponent(0.18),
+                fillColor: NSColor.black.withAlphaComponent(0.08),
+                strokeColor: NSColor.black.withAlphaComponent(0.18),
                 borderWidth: 1,
                 cornerRadius: 18,
                 roundedCorners: .bottom,
@@ -184,7 +184,6 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
         ))))
         view.displayIfNeeded()
         view.layoutSubtreeIfNeeded()
-        view.editorChromeView.layoutSubtreeIfNeeded()
 
         let bitmap = try XCTUnwrap(
             NSBitmapImageRep(
@@ -204,14 +203,36 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
         let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context
-        NSColor(calibratedWhite: 0.16, alpha: 1).setFill()
+        NSColor.white.setFill()
         NSRect(origin: .zero, size: size).fill()
         NSGraphicsContext.restoreGraphicsState()
-        view.editorChromeView.cacheDisplay(in: view.editorChromeView.bounds, to: bitmap)
+        view.cacheDisplay(in: view.bounds, to: bitmap)
 
         let background = try XCTUnwrap(bitmap.colorAt(x: 2, y: 38)?.usingColorSpace(.deviceRGB))
         let fill = try XCTUnwrap(bitmap.colorAt(x: 40, y: 20)?.usingColorSpace(.deviceRGB))
-        XCTAssertGreaterThan(fill.redComponent, background.redComponent + 0.03)
+        XCTAssertLessThan(fill.redComponent, background.redComponent - 0.03)
+    }
+
+    func testMountedEditorChromeOverlayDoesNotCaptureHitTests() throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            style: BlockInputStyle(editorSurface: BlockInputEditorSurfaceStyle(
+                editorBackgroundColor: nil,
+                scrollBackgroundColor: nil,
+                collectionBackgroundColor: nil,
+                chrome: BlockInputEditorChromeStyle(
+                    fillColor: .systemRed,
+                    strokeColor: .systemGreen,
+                    borderWidth: 1,
+                    cornerRadius: 12,
+                    clipsContentToShape: true
+                )
+            ))
+        ))
+        mounted.view.displayIfNeeded()
+        mounted.view.layoutSubtreeIfNeeded()
+
+        let hitView = try XCTUnwrap(mounted.view.hitTest(NSPoint(x: mounted.view.bounds.midX, y: mounted.view.bounds.midY)))
+        XCTAssertFalse(hitView === mounted.view.editorChromeView)
     }
 
     func testMountedEditorReconfiguresChromeStyle() throws {

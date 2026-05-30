@@ -9,15 +9,20 @@ extension BlockInputView {
             if let scrollBackgroundColor = style.editorSurface.scrollBackgroundColor {
                 scrollView.backgroundColor = scrollBackgroundColor
                 scrollView.drawsBackground = true
+                scrollView.layer?.backgroundColor = scrollBackgroundColor.cgColor
                 scrollView.contentView.backgroundColor = scrollBackgroundColor
                 scrollView.contentView.drawsBackground = true
+                scrollView.contentView.layer?.backgroundColor = scrollBackgroundColor.cgColor
             } else {
                 scrollView.backgroundColor = .clear
                 scrollView.drawsBackground = false
+                scrollView.layer?.backgroundColor = NSColor.clear.cgColor
                 scrollView.contentView.backgroundColor = .clear
                 scrollView.contentView.drawsBackground = false
+                scrollView.contentView.layer?.backgroundColor = NSColor.clear.cgColor
             }
             collectionView.backgroundColors = style.editorSurface.collectionBackgroundColor.map { [$0] } ?? []
+            collectionView.layer?.backgroundColor = (style.editorSurface.collectionBackgroundColor ?? .clear).cgColor
         }
     }
 
@@ -134,6 +139,10 @@ final class BlockInputEditorChromeView: NSView {
     private var fallbackFillColor: NSColor?
 
     override var isOpaque: Bool { false }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
 
     func configure(chrome: BlockInputEditorChromeStyle?, fallbackFillColor: NSColor?) {
         self.chrome = chrome
