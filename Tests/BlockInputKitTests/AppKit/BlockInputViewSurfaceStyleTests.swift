@@ -131,6 +131,33 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
         XCTAssertNotNil(mounted.view.editorChromeMaskLayer.path)
     }
 
+    func testMountedEditorRendersBottomChromeCornersAtVisualBottom() throws {
+        let samples = try renderedChromeCornerSamples(roundedCorners: .bottom)
+
+        assertFilled(samples.topLeft, "top-left", roundedCorners: ".bottom")
+        assertFilled(samples.topRight, "top-right", roundedCorners: ".bottom")
+        assertClipped(samples.bottomLeft, "bottom-left", roundedCorners: ".bottom")
+        assertClipped(samples.bottomRight, "bottom-right", roundedCorners: ".bottom")
+    }
+
+    func testMountedEditorRendersTopChromeCornersAtVisualTop() throws {
+        let samples = try renderedChromeCornerSamples(roundedCorners: .top)
+
+        assertClipped(samples.topLeft, "top-left", roundedCorners: ".top")
+        assertClipped(samples.topRight, "top-right", roundedCorners: ".top")
+        assertFilled(samples.bottomLeft, "bottom-left", roundedCorners: ".top")
+        assertFilled(samples.bottomRight, "bottom-right", roundedCorners: ".top")
+    }
+
+    func testMountedEditorRendersAllChromeCorners() throws {
+        let samples = try renderedChromeCornerSamples(roundedCorners: .all)
+
+        assertClipped(samples.topLeft, "top-left", roundedCorners: ".all")
+        assertClipped(samples.topRight, "top-right", roundedCorners: ".all")
+        assertClipped(samples.bottomLeft, "bottom-left", roundedCorners: ".all")
+        assertClipped(samples.bottomRight, "bottom-right", roundedCorners: ".all")
+    }
+
     func testMountedEditorReconfiguresChromeStyle() throws {
         let view = BlockInputView()
         view.configure(BlockInputConfiguration(style: BlockInputStyle(editorSurface: BlockInputEditorSurfaceStyle(
@@ -242,4 +269,103 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
 
         XCTAssertNotEqual(lightColor, darkColor)
     }
+}
+
+private struct ChromeCornerSamples {
+    let topLeft: NSColor
+    let topRight: NSColor
+    let bottomLeft: NSColor
+    let bottomRight: NSColor
+}
+
+@MainActor
+private func renderedChromeCornerSamples(
+    roundedCorners: BlockInputEditorChromeCorners,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) throws -> ChromeCornerSamples {
+    let size = NSSize(width: 80, height: 40)
+    let mounted = makeMountedBlockInputView(
+        configuration: BlockInputConfiguration(style: BlockInputStyle(editorSurface: BlockInputEditorSurfaceStyle(
+            editorBackgroundColor: nil,
+            scrollBackgroundColor: nil,
+            collectionBackgroundColor: nil,
+            chrome: BlockInputEditorChromeStyle(
+                fillColor: .systemRed,
+                cornerRadius: 18,
+                roundedCorners: roundedCorners,
+                clipsContentToShape: true
+            )
+        ))),
+        size: size,
+        styleMask: [.borderless]
+    )
+    mounted.view.displayIfNeeded()
+    mounted.view.layoutSubtreeIfNeeded()
+    mounted.view.updateLayer()
+    mounted.view.layer?.layoutIfNeeded()
+
+    let bitmap = try XCTUnwrap(
+        NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: Int(size.width),
+            pixelsHigh: Int(size.height),
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ),
+        file: file,
+        line: line
+    )
+    bitmap.size = size
+    let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap), file: file, line: line)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = context
+    mounted.view.layer?.render(in: context.cgContext)
+    NSGraphicsContext.restoreGraphicsState()
+
+    return ChromeCornerSamples(
+        topLeft: try XCTUnwrap(bitmap.colorAt(x: 2, y: 2), file: file, line: line),
+        topRight: try XCTUnwrap(bitmap.colorAt(x: Int(size.width) - 3, y: 2), file: file, line: line),
+        bottomLeft: try XCTUnwrap(bitmap.colorAt(x: 2, y: Int(size.height) - 3), file: file, line: line),
+        bottomRight: try XCTUnwrap(bitmap.colorAt(x: Int(size.width) - 3, y: Int(size.height) - 3), file: file, line: line)
+    )
+}
+
+private func assertFilled(
+    _ color: NSColor,
+    _ corner: String,
+    roundedCorners: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    let resolved = color.usingColorSpace(.deviceRGB) ?? color
+    XCTAssertGreaterThan(
+        resolved.alphaComponent,
+        0.8,
+        "Expected \(corner) to be filled for \(roundedCorners), got alpha \(resolved.alphaComponent)",
+        file: file,
+        line: line
+    )
+}
+
+private func assertClipped(
+    _ color: NSColor,
+    _ corner: String,
+    roundedCorners: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    let resolved = color.usingColorSpace(.deviceRGB) ?? color
+    XCTAssertLessThan(
+        resolved.alphaComponent,
+        0.2,
+        "Expected \(corner) to be clipped for \(roundedCorners), got alpha \(resolved.alphaComponent)",
+        file: file,
+        line: line
+    )
 }

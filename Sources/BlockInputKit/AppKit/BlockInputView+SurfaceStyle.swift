@@ -139,10 +139,13 @@ private extension CGPath {
             return path
         }
 
-        let topLeft = roundedCorners.contains(.topLeft) ? radius : 0
-        let topRight = roundedCorners.contains(.topRight) ? radius : 0
-        let bottomRight = roundedCorners.contains(.bottomRight) ? radius : 0
-        let bottomLeft = roundedCorners.contains(.bottomLeft) ? radius : 0
+        // `CAShapeLayer.render(in:)` maps the path's maxY edge to the visual
+        // top in AppKit-backed layers, so translate visual corner options to
+        // the path-space edge they actually draw on.
+        let topLeft = roundedCorners.contains(.bottomLeft) ? radius : 0
+        let topRight = roundedCorners.contains(.bottomRight) ? radius : 0
+        let bottomRight = roundedCorners.contains(.topRight) ? radius : 0
+        let bottomLeft = roundedCorners.contains(.topLeft) ? radius : 0
         let curveFactor: CGFloat = 0.45
 
         path.move(to: CGPoint(x: rect.minX + topLeft, y: rect.minY))
