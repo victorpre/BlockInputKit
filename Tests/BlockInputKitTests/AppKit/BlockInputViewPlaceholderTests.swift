@@ -141,6 +141,99 @@ final class BlockInputViewPlaceholderTests: XCTestCase {
         XCTAssertEqual(store.completeSnapshotCount, 0)
     }
 
+    func testPlaceholderHidesForSingleEmptyCodeBlock() {
+        let codeBlocks = [
+            BlockInputBlock(id: "empty-code", kind: .code(language: nil), text: ""),
+            BlockInputBlock(id: "blank-code", kind: .code(language: "swift"), text: "\n")
+        ]
+
+        for block in codeBlocks {
+            let view = BlockInputView()
+            view.configure(BlockInputConfiguration(
+                document: BlockInputDocument(blocks: [block]),
+                placeholder: "Empty"
+            ))
+
+            assertPlaceholderHidden(view)
+        }
+    }
+
+    func testPlaceholderHidesForStoreBackedSingleEmptyCodeBlock() {
+        let codeBlocks = [
+            BlockInputBlock(id: "empty-code", kind: .code(language: nil), text: ""),
+            BlockInputBlock(id: "blank-code", kind: .code(language: "swift"), text: "\n")
+        ]
+
+        for block in codeBlocks {
+            let store = LoadedStore(blocks: [block], isComplete: true)
+            let view = BlockInputView()
+            view.configure(BlockInputConfiguration(documentStore: store, placeholder: "Empty"))
+
+            assertPlaceholderHidden(view)
+            XCTAssertEqual(store.completeSnapshotCount, 0)
+        }
+    }
+
+    func testCodeFenceReturnHidesPlaceholder() throws {
+        let blockID = BlockInputBlockID(rawValue: "code")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "```")
+            ]),
+            placeholder: "Ask anything"
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 3, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+
+        XCTAssertEqual(mounted.view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .code(language: nil))
+        ])
+        assertPlaceholderHidden(mounted.view)
+    }
+
+    func testReturnInEmptyCodeBlockShowsPlaceholderAgain() throws {
+        let blockID = BlockInputBlockID(rawValue: "code")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .code(language: nil))
+            ]),
+            placeholder: "Ask anything"
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        assertPlaceholderHidden(mounted.view)
+
+        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+
+        XCTAssertEqual(mounted.view.document.blocks, [
+            BlockInputBlock(id: blockID, kind: .paragraph)
+        ])
+        XCTAssertFalse(mounted.view.placeholderLabel.isHidden)
+        XCTAssertEqual(mounted.view.placeholderLabel.stringValue, "Ask anything")
+        XCTAssertEqual(mounted.view.placeholderLabel.accessibilityLabel(), "Ask anything")
+    }
+
+    func testStoreBackedPlaceholderRefreshesWhenEmptyParagraphBecomesCodeBlock() {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let store = LoadedStore(blocks: [
+            BlockInputBlock(id: blockID, text: "")
+        ], isComplete: true)
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(documentStore: store, placeholder: "Empty"))
+        XCTAssertFalse(view.placeholderLabel.isHidden)
+        XCTAssertEqual(view.placeholderLabel.stringValue, "Empty")
+
+        store.replaceBlock(BlockInputBlock(id: blockID, kind: .code(language: nil)))
+        store.emitReplacedDocument()
+
+        assertPlaceholderHidden(view)
+        XCTAssertEqual(store.completeSnapshotCount, 0)
+    }
+
     func testPlaceholderVisibilityTreatsNonTextAndNonEmptyBlocksAsContent() {
         let contentBlocks: [BlockInputBlock] = [
             BlockInputBlock(id: "text", text: "Content"),
@@ -216,6 +309,17 @@ private func textLeadingEdge(for item: BlockInputBlockItem, in view: BlockInputV
     return textView.convert(NSPoint(x: textViewX, y: 0), to: view.collectionView).x
 }
 
+@MainActor
+private func assertPlaceholderHidden(
+    _ view: BlockInputView,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    XCTAssertTrue(view.placeholderLabel.isHidden, file: file, line: line)
+    XCTAssertEqual(view.placeholderLabel.stringValue, "", file: file, line: line)
+    XCTAssertNil(view.placeholderLabel.accessibilityLabel(), file: file, line: line)
+}
+
 private final class EmptyLoadedStore: BlockInputDocumentStore {
     var loadedBlockCount: Int { 0 }
     var isComplete: Bool
@@ -246,12 +350,13 @@ private final class EmptyLoadedStore: BlockInputDocumentStore {
     func replaceDocument(_ document: BlockInputDocument) {}
 }
 
-private final class LoadedStore: BlockInputDocumentStore {
+private final class LoadedStore: BlockInputDocumentStore, @unchecked Sendable {
     var loadedBlockCount: Int { blocks.count }
     var isComplete: Bool
     var completeSnapshotCount = 0
 
     private var blocks: [BlockInputBlock]
+    private var observers: [UUID: @MainActor (BlockInputDocumentStoreChange) -> Void] = [:]
 
     init(blocks: [BlockInputBlock], isComplete: Bool) {
         self.blocks = blocks
@@ -270,6 +375,14 @@ private final class LoadedStore: BlockInputDocumentStore {
         blocks.firstIndex { $0.id == id }
     }
 
+    func observeChanges(_ observer: @escaping @MainActor (BlockInputDocumentStoreChange) -> Void) -> BlockInputDocumentStoreObservation {
+        let id = UUID()
+        observers[id] = observer
+        return BlockInputDocumentStoreObservation { [weak self] in
+            self?.observers[id] = nil
+        }
+    }
+
     @MainActor
     func completeDocumentSnapshot(limit: Int) async throws -> BlockInputDocument {
         completeSnapshotCount += 1
@@ -278,5 +391,17 @@ private final class LoadedStore: BlockInputDocumentStore {
 
     func replaceDocument(_ document: BlockInputDocument) {
         blocks = document.blocks
+    }
+
+    func replaceBlock(_ block: BlockInputBlock) {
+        guard let index = index(of: block.id) else {
+            return
+        }
+        blocks[index] = block
+    }
+
+    @MainActor
+    func emitReplacedDocument() {
+        observers.values.forEach { $0(.replacedDocument) }
     }
 }

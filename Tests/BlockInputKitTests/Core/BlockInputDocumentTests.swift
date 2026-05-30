@@ -114,6 +114,20 @@ final class BlockInputDocumentTests: XCTestCase {
         XCTAssertEqual(document.blocks[0].kind, .horizontalRule)
     }
 
+    func testEmptyCodeBlocksAreNotEffectivelyEmptyContent() {
+        let blocks = [
+            BlockInputBlock(id: "empty", kind: .code(language: nil), text: ""),
+            BlockInputBlock(id: "blank-lines", kind: .code(language: "swift"), text: "\n")
+        ]
+
+        for block in blocks {
+            let document = BlockInputDocument(blocks: [block])
+
+            XCTAssertFalse(document.isEffectivelyEmpty, "Expected empty code block to count as content")
+            XCTAssertTrue(block.isEmpty, "Expected code block emptiness to keep editing semantics")
+        }
+    }
+
     func testHorizontalRuleBlocksNormalizeStoredText() throws {
         var block = BlockInputBlock(id: "rule", kind: .horizontalRule, text: "Hidden")
 

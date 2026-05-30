@@ -26,13 +26,19 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
         BlockInputMarkdownSerializer.markdown(from: self)
     }
 
-    /// Returns true when every block is empty and no frontmatter block is present.
+    /// Returns true when every block is empty and no frontmatter or code block is present.
     ///
-    /// Empty frontmatter is still document metadata and therefore counts as
+    /// Empty frontmatter and code blocks are still structured content and therefore count as
     /// meaningful content for placeholder and empty-state decisions.
     public var isEffectivelyEmpty: Bool {
         blocks.allSatisfy { block in
-            block.kind != .frontMatter && block.isEmpty
+            switch block.kind {
+            case .frontMatter, .code:
+                return false
+            case .paragraph, .heading, .horizontalRule, .quote, .bulletedListItem, .numberedListItem, .checklistItem,
+                    .table, .image, .rawMarkdown:
+                return block.isEmpty
+            }
         }
     }
 

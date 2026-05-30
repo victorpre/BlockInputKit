@@ -104,6 +104,26 @@ final class BlockInputSelectAllCommandTests: XCTestCase {
         assertSingleEmptyPlaceholderSelectAllCollapsed(mounted: mounted, item: item, textView: textView, blockID: blockID)
     }
 
+    func testCommandAWithDocumentBehaviorSelectsSingleEmptyCodeBlock() throws {
+        let blockID = BlockInputBlockID(rawValue: "code")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .code(language: nil))
+            ]),
+            placeholder: "Ask anything",
+            selectAllBehavior: .document
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandAEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .blocks([blockID]))
+        XCTAssertTrue(mounted.window.firstResponder === mounted.view)
+        XCTAssertTrue(mounted.view.placeholderLabel.isHidden)
+    }
+
     func testSelectAllActionWithDocumentBehaviorCollapsesSingleEmptyPlaceholderDocument() throws {
         let blockID = BlockInputBlockID(rawValue: "empty")
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(

@@ -233,6 +233,16 @@ final class BlockInputDocumentTypingShortcutTests: XCTestCase {
         XCTAssertEqual(document.blocks[0].text, "Heading")
     }
 
+    func testTypingShortcutLeavesCodeFenceForReturnConversion() {
+        let blockID = BlockInputBlockID(rawValue: "code")
+        let document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "")
+        ])
+
+        XCTAssertNil(document.typingShortcut(for: blockID, proposedText: "```", proposedUTF16Offset: 3))
+        XCTAssertNil(document.typingShortcut(for: blockID, proposedText: "```swift", proposedUTF16Offset: 8))
+    }
+
     func testTypingShortcutTurnsFirstEmptyBlockThreeDashesIntoFrontMatter() {
         let blockID = BlockInputBlockID(rawValue: "rule")
         var document = BlockInputDocument(blocks: [

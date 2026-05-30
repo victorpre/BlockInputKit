@@ -39,6 +39,23 @@ final class BlockInputMarkdownTests: XCTestCase {
         """)
     }
 
+    func testMarkdownParsesEmptyCodeFencesAsContent() {
+        let empty = BlockInputDocument(markdown: """
+        ```
+        ```
+        """)
+        let blankLine = BlockInputDocument(markdown: "```\n\n\n```")
+
+        XCTAssertEqual(empty.blocks.map(\.kind), [.code(language: nil)])
+        XCTAssertEqual(empty.blocks.map(\.text), [""])
+        XCTAssertFalse(empty.isEffectivelyEmpty)
+        XCTAssertEqual(empty.markdown, "```\n\n```")
+        XCTAssertEqual(blankLine.blocks.map(\.kind), [.code(language: nil)])
+        XCTAssertEqual(blankLine.blocks.map(\.text), ["\n"])
+        XCTAssertFalse(blankLine.isEffectivelyEmpty)
+        XCTAssertEqual(blankLine.markdown, "```\n\n\n```")
+    }
+
     func testMarkdownRoundTripKeepsAdjacentParagraphBlocksSeparate() {
         let document = BlockInputDocument(blocks: [
             BlockInputBlock(id: "first", kind: .paragraph, text: "First"),
