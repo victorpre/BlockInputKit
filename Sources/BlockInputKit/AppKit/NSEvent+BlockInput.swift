@@ -139,6 +139,23 @@ extension NSEvent {
         return nil
     }
 
+    var lineBoundarySelectionDirection: BlockInputLineBoundarySelectionDirection? {
+        let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers.contains(.shift),
+              modifiers.contains(.command),
+              !modifiers.contains(.option),
+              !modifiers.contains(.control) else {
+            return nil
+        }
+        if keyCode == 123 || charactersIgnoringModifiers == "\u{F702}" {
+            return .beginning
+        }
+        if keyCode == 124 || charactersIgnoringModifiers == "\u{F703}" {
+            return .end
+        }
+        return nil
+    }
+
     var plainHorizontalMovementDirection: BlockInputHorizontalMovementDirection? {
         let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard !modifiers.contains(.shift),

@@ -22,6 +22,26 @@ extension BlockInputBlockItem {
         return min(max(roundedCharacterIndex, line.insertionRange.location), NSMaxRange(line.insertionRange))
     }
 
+    func lineBoundaryUTF16Offset(
+        containingUTF16Offset offset: Int,
+        direction: BlockInputLineBoundarySelectionDirection
+    ) -> Int {
+        let text = textView.string as NSString
+        let clampedOffset = min(max(offset, 0), text.length)
+        guard textView.window != nil else {
+            return text.sourceLineBoundaryOffset(containingUTF16Offset: clampedOffset, direction: direction)
+        }
+        if let line = textLineFragments().line(containingInsertionOffset: clampedOffset, textLength: text.length) {
+            switch direction {
+            case .beginning:
+                return line.insertionRange.location
+            case .end:
+                return NSMaxRange(line.insertionRange)
+            }
+        }
+        return text.sourceLineBoundaryOffset(containingUTF16Offset: clampedOffset, direction: direction)
+    }
+
     func canMoveVerticallyOutOfBlock(_ direction: BlockInputVerticalMovementDirection) -> Bool {
         let selectedRange = textView.selectedRange()
         guard selectedRange.length == 0 else {
@@ -256,6 +276,52 @@ private extension Array where Element == TextLineFragment {
             return first
         case .last:
             return last
+        }
+    }
+
+    func line(containingInsertionOffset offset: Int, textLength: Int) -> TextLineFragment? {
+        if let line = first(where: { $0.insertionRange.location == offset }) {
+            return line
+        }
+        if let line = first(where: { $0.insertionRange.containsInsertionOffset(offset) }) {
+            return line
+        }
+        if offset == textLength {
+            return last
+        }
+        return nil
+    }
+}
+
+private extension NSRange {
+    func containsInsertionOffset(_ offset: Int) -> Bool {
+        offset > location && offset <= NSMaxRange(self)
+    }
+}
+
+private extension NSString {
+    func sourceLineBoundaryOffset(
+        containingUTF16Offset offset: Int,
+        direction: BlockInputLineBoundarySelectionDirection
+    ) -> Int {
+        guard length > 0 else {
+            return 0
+        }
+        let clampedOffset = min(max(offset, 0), length)
+        var lineStart = 0
+        var lineEnd = 0
+        var contentsEnd = 0
+        getLineStart(
+            &lineStart,
+            end: &lineEnd,
+            contentsEnd: &contentsEnd,
+            for: NSRange(location: clampedOffset, length: 0)
+        )
+        switch direction {
+        case .beginning:
+            return lineStart
+        case .end:
+            return contentsEnd
         }
     }
 }

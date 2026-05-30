@@ -49,6 +49,54 @@ final class BlockInputPartialLinkCopyTests: XCTestCase {
         }
     }
 
+    func testCopyingSelectionAcrossPartialLinksAndChipsDoesNotExposeHiddenMarkdownSource() throws {
+        let text = "Include [a normal link](https://github.com/afollestad/BlockInputKit), " +
+            "[README.md](file:///tmp/README.md), and [/quote](host-app://commands/quote)."
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "block", text: text)
+        ])
+        let textView = try textView(in: mounted.view)
+        let source = text as NSString
+        let start = source.range(of: "mal link").location
+        let slashRange = source.range(of: "/qu")
+        textView.setSelectedRange(NSRange(location: start, length: NSMaxRange(slashRange) - start))
+
+        withCleanPasteboard { pasteboard in
+            textView.copy(nil)
+            XCTAssertEqual(
+                pasteboard.string(forType: .string),
+                "[mal link](https://github.com/afollestad/BlockInputKit), " +
+                    "[README.md](file:///tmp/README.md), and [/qu](host-app://commands/quote)"
+            )
+        }
+    }
+
+    func testEditorOwnedSelectionAcrossPartialLinksAndChipsDoesNotExposeHiddenMarkdownSource() throws {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let text = "Include [a normal link](https://github.com/afollestad/BlockInputKit), " +
+            "[README.md](file:///tmp/README.md), and [/quote](host-app://commands/quote)."
+        let source = text as NSString
+        let start = source.range(of: "mal link").location
+        let slashRange = source.range(of: "/qu")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: blockID, text: text)
+        ])
+        mounted.view.applySelection(
+            .text(BlockInputTextRange(blockID: blockID, range: NSRange(location: start, length: NSMaxRange(slashRange) - start))),
+            notify: false
+        )
+        mounted.window.makeFirstResponder(mounted.view)
+
+        try withCleanPasteboard { pasteboard in
+            XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandCEvent()))
+            XCTAssertEqual(
+                pasteboard.string(forType: .string),
+                "[mal link](https://github.com/afollestad/BlockInputKit), " +
+                    "[README.md](file:///tmp/README.md), and [/qu](host-app://commands/quote)"
+            )
+        }
+    }
+
     func testCopyingTableCellPartialLinkLabelUsesSelectedLabel() throws {
         let cellText = "Open [docs](https://example.com)"
         let mounted = makeMountedBlockInputView(blocks: [Self.tableBlock(cellText: cellText)])

@@ -30,6 +30,10 @@ extension BlockInputTextView {
             return
         }
         if !hasMarkedText(),
+           handleLocalInlineLinkHorizontalSelectionShortcut(event) {
+            return
+        }
+        if !hasMarkedText(),
            blockItem?.handleTableCellKeyDown(event, selectedRange: selectedRange()) == true {
             return
         }
@@ -45,6 +49,10 @@ extension BlockInputTextView {
         }
         if handleDocumentBoundaryShortcut(event) {
             BlockInputSelectionDebug.emit("text key consumed document boundary")
+            return
+        }
+        if handleLineBoundarySelectionShortcut(event) {
+            BlockInputSelectionDebug.emit("text key consumed line boundary")
             return
         }
         if handleSelectionExpansionShortcut(event) {
@@ -104,6 +112,9 @@ extension BlockInputTextView {
             return false
         }
         if handleTableCellCommandArrow(event) {
+            return true
+        }
+        if handleLocalInlineLinkHorizontalSelectionShortcut(event) {
             return true
         }
         return blockItem?.handleTableCellKeyDown(event, selectedRange: selectedRange()) == true
@@ -166,6 +177,10 @@ extension BlockInputTextView {
         }
         if handleDocumentBoundaryShortcut(event) {
             BlockInputSelectionDebug.emit("text equivalent consumed document boundary")
+            return true
+        }
+        if handleLineBoundarySelectionShortcut(event) {
+            BlockInputSelectionDebug.emit("text equivalent consumed line boundary")
             return true
         }
         if handleSelectionExpansionShortcut(event) {

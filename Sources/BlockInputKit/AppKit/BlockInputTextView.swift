@@ -282,38 +282,6 @@ class BlockInputTextView: NSTextView {
         performNonTableCommandDefaults(selector)
     }
 
-    override func moveWordLeft(_ sender: Any?) {
-        if blockItem?.isTableCellTextView(self) != true,
-           requestWordMovementFromOwningBlock(.leftward) {
-            return
-        }
-        super.moveWordLeft(sender)
-    }
-
-    override func moveWordRight(_ sender: Any?) {
-        if blockItem?.isTableCellTextView(self) != true,
-           requestWordMovementFromOwningBlock(.rightward) {
-            return
-        }
-        super.moveWordRight(sender)
-    }
-
-    override func moveWordBackward(_ sender: Any?) {
-        if blockItem?.isTableCellTextView(self) != true,
-           requestWordMovementFromOwningBlock(.leftward) {
-            return
-        }
-        super.moveWordBackward(sender)
-    }
-
-    override func moveWordForward(_ sender: Any?) {
-        if blockItem?.isTableCellTextView(self) != true,
-           requestWordMovementFromOwningBlock(.rightward) {
-            return
-        }
-        super.moveWordForward(sender)
-    }
-
     override func moveToBeginningOfDocument(_ sender: Any?) {
         if blockItem?.isTableCellTextView(self) != true,
            requestDocumentBoundaryFromOwningBlock(.upward) {

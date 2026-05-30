@@ -45,6 +45,20 @@ extension BlockInputKeyboardShortcut {
             modifiers: selectorModifiers
         )
     }
+
+    var lineBoundarySelectionDirection: BlockInputLineBoundarySelectionDirection? {
+        guard modifiers == [.command, .shift] else {
+            return nil
+        }
+        switch key {
+        case .leftArrow:
+            return .beginning
+        case .rightArrow:
+            return .end
+        default:
+            return nil
+        }
+    }
 }
 
 extension BlockInputKeyboardModifiers {
@@ -84,6 +98,11 @@ extension BlockInputKeyboardModifiers {
              #selector(NSTextView.moveToBeginningOfLine(_:)),
              #selector(NSTextView.moveToEndOfLine(_:)):
             self = .command
+        case #selector(NSTextView.moveToBeginningOfLineAndModifySelection(_:)),
+             #selector(NSTextView.moveToLeftEndOfLineAndModifySelection(_:)),
+             #selector(NSTextView.moveToEndOfLineAndModifySelection(_:)),
+             #selector(NSTextView.moveToRightEndOfLineAndModifySelection(_:)):
+            self = [.command, .shift]
         case #selector(NSTextView.moveWordLeft(_:)),
              #selector(NSTextView.moveWordRight(_:)),
              #selector(NSTextView.moveWordBackward(_:)),
@@ -117,11 +136,15 @@ private extension BlockInputKeyboardKey {
         #selector(NSTextView.moveToBeginningOfDocument(_:)): .upArrow,
         #selector(NSTextView.moveToEndOfDocument(_:)): .downArrow,
         #selector(NSTextView.moveToBeginningOfLine(_:)): .leftArrow,
+        #selector(NSTextView.moveToBeginningOfLineAndModifySelection(_:)): .leftArrow,
+        #selector(NSTextView.moveToLeftEndOfLineAndModifySelection(_:)): .leftArrow,
         #selector(NSTextView.moveWordLeft(_:)): .leftArrow,
         #selector(NSTextView.moveWordBackward(_:)): .leftArrow,
         #selector(NSTextView.moveWordLeftAndModifySelection(_:)): .leftArrow,
         #selector(NSTextView.moveWordBackwardAndModifySelection(_:)): .leftArrow,
         #selector(NSTextView.moveToEndOfLine(_:)): .rightArrow,
+        #selector(NSTextView.moveToEndOfLineAndModifySelection(_:)): .rightArrow,
+        #selector(NSTextView.moveToRightEndOfLineAndModifySelection(_:)): .rightArrow,
         #selector(NSTextView.moveWordRight(_:)): .rightArrow,
         #selector(NSTextView.moveWordForward(_:)): .rightArrow,
         #selector(NSTextView.moveWordRightAndModifySelection(_:)): .rightArrow,

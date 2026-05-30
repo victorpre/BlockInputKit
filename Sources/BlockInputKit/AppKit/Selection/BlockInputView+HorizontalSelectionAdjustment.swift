@@ -70,7 +70,14 @@ extension BlockInputView {
             return true
         }
         if clampedRange.length == 0 {
-            let anchor = BlockInputDocumentTextBoundary(blockID: blockID, utf16Offset: clampedRange.location)
+            let anchorOffset: Int
+            if let navigation = inlineLinkNavigation(for: block),
+               navigation.characterBoundaryNeedsCustomMovement(from: clampedRange.location, direction: direction) {
+                anchorOffset = navigation.selectionAnchorOffset(from: clampedRange.location, direction: direction)
+            } else {
+                anchorOffset = clampedRange.location
+            }
+            let anchor = BlockInputDocumentTextBoundary(blockID: blockID, utf16Offset: anchorOffset)
             return adjustSelectionHorizontally(from: anchor, direction: direction)
         }
         let start = BlockInputDocumentTextBoundary(blockID: blockID, utf16Offset: clampedRange.location)
@@ -227,7 +234,7 @@ extension BlockInputView {
         active: BlockInputDocumentTextBoundary
     ) {
         applySelection(selection, notify: true)
-        horizontalSelectionExpansion = selection.isCollapsed ? nil : BlockInputHorizontalSelectionExpansion(anchor: anchor)
+        horizontalSelectionExpansion = selection.isCollapsed ? nil : BlockInputHorizontalSelectionExpansion(anchor: anchor, active: active)
         preferredNavigationX = textContainerX(for: active)
         blockSelectionExpansion = nil
         switch selection {
@@ -256,9 +263,13 @@ extension BlockInputView {
         }
         // Keep the original fixed edge whenever Shift+Left/Right continues from an editor-owned selection. Without
         // this, opposite-direction movement would flip the anchor and expand instead of first contracting.
-        if let anchor = horizontalSelectionExpansion?.anchor,
-           let span = anchoredHorizontalSelectionSpan(anchor: anchor, selectedBounds: selectedBounds) {
-            return span
+        if let expansion = horizontalSelectionExpansion {
+            if let active = expansion.active {
+                return (anchor: expansion.anchor, active: active)
+            }
+            if let span = anchoredHorizontalSelectionSpan(anchor: expansion.anchor, selectedBounds: selectedBounds) {
+                return span
+            }
         }
         if let expansion = blockSelectionExpansion {
             switch expansion.direction {
@@ -276,7 +287,7 @@ extension BlockInputView {
         }
     }
 
-    private func selectionBounds() -> (start: BlockInputDocumentTextBoundary, end: BlockInputDocumentTextBoundary)? {
+    func selectionBounds() -> (start: BlockInputDocumentTextBoundary, end: BlockInputDocumentTextBoundary)? {
         switch selection {
         case let .cursor(cursor):
             let boundary = BlockInputDocumentTextBoundary(blockID: cursor.blockID, utf16Offset: cursor.utf16Offset)
@@ -383,6 +394,11 @@ extension BlockInputView {
         }
         let offset = min(max(boundary.utf16Offset, 0), block.utf16Length)
         if block.kind != .horizontalRule, offset > 0 {
+            if let navigation = inlineLinkNavigation(for: block),
+               navigation.characterBoundaryNeedsCustomMovement(from: offset, direction: .leftward),
+               let sourceOffset = navigation.characterBoundary(from: offset, direction: .leftward) {
+                return BlockInputDocumentTextBoundary(blockID: block.id, utf16Offset: sourceOffset)
+            }
             return BlockInputDocumentTextBoundary(blockID: block.id, utf16Offset: offset - 1)
         }
         // Crossing left from a fully selected block lands on the previous block's final character, matching the
@@ -401,6 +417,11 @@ extension BlockInputView {
         }
         let offset = min(max(boundary.utf16Offset, 0), block.utf16Length)
         if block.kind != .horizontalRule, offset < block.utf16Length {
+            if let navigation = inlineLinkNavigation(for: block),
+               navigation.characterBoundaryNeedsCustomMovement(from: offset, direction: .rightward),
+               let sourceOffset = navigation.characterBoundary(from: offset, direction: .rightward) {
+                return BlockInputDocumentTextBoundary(blockID: block.id, utf16Offset: sourceOffset)
+            }
             return BlockInputDocumentTextBoundary(
                 blockID: block.id,
                 utf16Offset: rightwardListLineBoundaryOffset(from: offset, in: block) ?? offset + 1
@@ -444,6 +465,13 @@ extension BlockInputView {
         }
         collectionView.scrollToItems(at: [IndexPath(item: index, section: 0)], scrollPosition: .nearestVerticalEdge)
         collectionView.layoutSubtreeIfNeeded()
+    }
+
+    private func inlineLinkNavigation(for block: BlockInputBlock) -> BlockInputInlineLinkNavigation? {
+        guard BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
+            return nil
+        }
+        return BlockInputInlineLinkNavigation(text: block.text, fileBaseURL: fileBaseURL)
     }
 }
 

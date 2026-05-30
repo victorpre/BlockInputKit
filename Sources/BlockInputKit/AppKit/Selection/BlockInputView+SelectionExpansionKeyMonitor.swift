@@ -14,6 +14,7 @@ extension BlockInputView {
                   !linkModalContainsCurrentResponder(),
                   handleFocusedTableCellSelectionKeyEvent(event)
                     || handleSelectionExpansionKeyEvent(event)
+                    || handleLineBoundarySelectionKeyEvent(event)
                     || handleHorizontalSelectionAdjustmentKeyEvent(event)
                     || handleWordSelectionAdjustmentShortcut(event) else {
                 if event.isArrowKey {
@@ -46,6 +47,9 @@ extension BlockInputView {
         }
         if let direction = event.blockInputDocumentBoundaryDirection,
            moveCaretToDocumentBoundary(direction) {
+            return true
+        }
+        if handleLineBoundarySelectionKeyEvent(event) {
             return true
         }
         if handleFocusedTableCellSelectionKeyEvent(event) {

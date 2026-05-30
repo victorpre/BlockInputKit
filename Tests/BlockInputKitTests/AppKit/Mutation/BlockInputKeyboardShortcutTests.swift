@@ -213,6 +213,47 @@ final class BlockInputKeyboardShortcutTests: XCTestCase {
         XCTAssertEqual(textView.selectedRange(), NSRange(location: 0, length: 0))
     }
 
+    func testCommandShiftRightShortcutHandledInterceptsEditorLineBoundarySelection() throws {
+        let shortcut = BlockInputKeyboardShortcut(key: .rightArrow, modifiers: [.command, .shift])
+        var context: BlockInputKeyboardShortcutContext?
+        let mounted = lineBoundaryShortcutMountedView(shortcut: shortcut) {
+            context = $0
+            return .handled
+        }
+        let beforeSelection = mounted.view.selection
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandShiftRightEvent()))
+
+        XCTAssertEqual(context?.shortcut, shortcut)
+        XCTAssertEqual(context?.focusSource, .blockSelection)
+        XCTAssertEqual(mounted.view.selection, beforeSelection)
+    }
+
+    func testCommandShiftRightShortcutIgnoredRunsEditorLineBoundaryDefaultOnce() throws {
+        let shortcut = BlockInputKeyboardShortcut(key: .rightArrow, modifiers: [.command, .shift])
+        var count = 0
+        let mounted = lineBoundaryShortcutMountedView(shortcut: shortcut) { _ in
+            count += 1
+            return .ignored
+        }
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandShiftRightEvent()))
+
+        XCTAssertEqual(count, 1)
+        XCTAssertEqual(mounted.view.selection, lineBoundaryShortcutDefaultSelection())
+    }
+
+    func testCommandShiftRightShortcutCanPerformEditorLineBoundaryDefault() throws {
+        let shortcut = BlockInputKeyboardShortcut(key: .rightArrow, modifiers: [.command, .shift])
+        let mounted = lineBoundaryShortcutMountedView(shortcut: shortcut) { _ in
+            .performDefault(shortcut)
+        }
+
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try commandShiftRightEvent()))
+
+        XCTAssertEqual(mounted.view.selection, lineBoundaryShortcutDefaultSelection())
+    }
+
     func testRegisteredReturnWorksInTableCells() throws {
         let blockID = BlockInputBlockID(rawValue: "table")
         let table = BlockInputTable.normalized(
@@ -309,6 +350,40 @@ final class BlockInputKeyboardShortcutTests: XCTestCase {
 
 private func returnKeyEvent(modifierFlags: NSEvent.ModifierFlags = []) throws -> NSEvent {
     try keyDownEvent(keyCode: 36, characters: "\r", modifierFlags: modifierFlags)
+}
+
+@MainActor
+private func lineBoundaryShortcutMountedView(
+    shortcut: BlockInputKeyboardShortcut,
+    handler: @escaping BlockInputKeyboardShortcutHandler
+) -> (view: BlockInputView, window: NSWindow) {
+    let firstID = BlockInputBlockID(rawValue: "first")
+    let secondID = BlockInputBlockID(rawValue: "second")
+    let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+        document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First"),
+            BlockInputBlock(id: secondID, text: "Second")
+        ]),
+        keyboardShortcuts: [shortcut: handler]
+    ))
+    mounted.view.applySelection(.mixed(BlockInputMixedSelection(
+        blockIDs: [],
+        leadingTextRange: BlockInputTextRange(blockID: firstID, range: NSRange(location: 2, length: 3)),
+        trailingTextRange: BlockInputTextRange(blockID: secondID, range: NSRange(location: 0, length: 2))
+    )), notify: false)
+    mounted.view.blockSelectionExpansion = BlockInputBlockSelectionExpansion(anchorBlockID: firstID, direction: .downward)
+    mounted.window.makeFirstResponder(mounted.view)
+    return mounted
+}
+
+private func lineBoundaryShortcutDefaultSelection() -> BlockInputSelection {
+    .mixed(BlockInputMixedSelection(
+        blockIDs: [BlockInputBlockID(rawValue: "second")],
+        leadingTextRange: BlockInputTextRange(
+            blockID: BlockInputBlockID(rawValue: "first"),
+            range: NSRange(location: 2, length: 3)
+        )
+    ))
 }
 
 @MainActor

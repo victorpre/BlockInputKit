@@ -58,9 +58,9 @@ Read the nearest `AGENTS.md` before editing. Current scopes:
 
 - Use SwiftLint from the repo root without `--config` so nested configs apply.
 - Install repo hooks with `./scripts/setup.sh`.
+- Treat every SwiftLint warning or error as blocking; do not commit while lint reports any violation.
 - New Swift should follow `.swiftlint.yml`: no force unwraps outside tests, no force casts, prefer `let`, max line length 150.
 - Keep lint exceptions centralized in `.swiftlint.yml`; do not add inline SwiftLint suppression comments.
-- If a change introduces lint warnings or errors, tell the user before committing.
 
 ## Code Style
 

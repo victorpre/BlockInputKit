@@ -43,6 +43,9 @@ extension BlockInputTextView {
     }
 
     func performDefaultKeyboardShortcut(_ shortcut: BlockInputKeyboardShortcut) -> Bool {
+        if let direction = shortcut.lineBoundarySelectionDirection {
+            return requestLineBoundarySelectionFromOwningBlock(direction)
+        }
         guard shortcut == .returnKey else {
             return false
         }
@@ -79,6 +82,9 @@ extension BlockInputTextView {
         if handleNonTableSelectionKeyEquivalent(event) {
             return true
         }
+        if handleWordMovementShortcut(event) {
+            return true
+        }
         if event.blockInputIsCopyShortcut {
             if blockItem?.requestCopyActiveSelection() == true || copySelectedPlainText(allowingEditorRoute: false) {
                 return true
@@ -96,6 +102,10 @@ extension BlockInputTextView {
     }
 
     func performTableCellCommandDefaults(_ selector: Selector) {
+        if handleLocalInlineLinkHorizontalSelectionCommand(selector) {
+            BlockInputSelectionDebug.emit("text command consumed table inline link selector=\(selector)")
+            return
+        }
         if blockItem?.handleTableCellCommand(selector, selectedRange: selectedRange()) == true {
             BlockInputSelectionDebug.emit("text command consumed table selector=\(selector)")
             return
@@ -106,6 +116,7 @@ extension BlockInputTextView {
     func performNonTableCommandDefaults(_ selector: Selector) {
         if handleBlockCommand(selector) ||
             handleDocumentBoundaryCommand(selector) ||
+            handleLineBoundarySelectionCommand(selector) ||
             handleSelectionExpansionCommand(selector) ||
             handleHorizontalSelectionAdjustmentCommand(selector) ||
             handleWordSelectionAdjustmentCommand(selector) ||

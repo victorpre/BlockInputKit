@@ -190,12 +190,13 @@ extension BlockInputView {
               ) else {
             return
         }
-        horizontalSelectionExpansion = BlockInputHorizontalSelectionExpansion(anchor: anchor)
-        preferredNavigationX = textContainerX(for: wordSelectionActiveBoundary(
+        let active = wordSelectionActiveBoundary(
             blockID: blockID,
             anchor: anchor,
             currentRange: currentRange
-        ))
+        )
+        horizontalSelectionExpansion = BlockInputHorizontalSelectionExpansion(anchor: anchor, active: active)
+        preferredNavigationX = textContainerX(for: active)
         blockSelectionExpansion = nil
     }
 

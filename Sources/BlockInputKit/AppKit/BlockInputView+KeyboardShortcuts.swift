@@ -82,6 +82,9 @@ extension BlockInputView {
         if let performDefault {
             return performDefault(shortcut)
         }
+        if let direction = shortcut.lineBoundarySelectionDirection {
+            return adjustSelectionToLineBoundary(direction)
+        }
         guard shortcut == .returnKey else {
             return false
         }
@@ -114,14 +117,12 @@ extension BlockInputView {
         if event.isCancelOperation, cancelMultiBlockSelection() { return }
         if handleImageCaretKeyDown(event) { return }
         if handleEditorArrowKeyEvent(event) { return }
+        if handleLineBoundarySelectionKeyEvent(event) { return }
         if handleWordSelectionAdjustmentShortcut(event) { return }
         if handleWordMovementShortcut(event) { return }
         if let direction = event.plainVerticalMovementDirection, collapseMultiBlockSelection(direction: direction) { return }
         if let direction = event.verticalMovementDirection, moveSelectedBlockVertically(direction) { return }
-        if event.isBackspaceOrDelete {
-            if selectedBlockCount == 1, deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil { return }
-            if deleteSelectedBlocksForBackspaceOrDelete() != nil { return }
-        }
+        if handleEditorBackspaceOrDelete(event) { return }
         if let insertedText = event.blockInputInsertedText,
            replaceActiveSelection(with: insertedText) {
             return
@@ -132,9 +133,24 @@ extension BlockInputView {
     func performEditorKeyEquivalentDefaults(_ event: NSEvent) -> Bool {
         if performKeyboardShortcutCommand(for: event) { return true }
         if handleEditorArrowKeyEvent(event) { return true }
+        if handleLineBoundarySelectionKeyEvent(event) { return true }
         if handleWordSelectionAdjustmentShortcut(event) { return true }
         if handleWordMovementShortcut(event) { return true }
+        if window?.firstResponder is BlockInputTextView,
+           event.blockInputWordMovementDirection != nil {
+            return false
+        }
         return super.performKeyEquivalent(with: event)
+    }
+
+    private func handleEditorBackspaceOrDelete(_ event: NSEvent) -> Bool {
+        guard event.isBackspaceOrDelete else {
+            return false
+        }
+        if selectedBlockCount == 1, deleteSelectedHorizontalRuleForBackspaceOrDelete() != nil {
+            return true
+        }
+        return deleteSelectedBlocksForBackspaceOrDelete() != nil
     }
 
     private func isSkippingKeyboardShortcutDispatch(for event: NSEvent) -> Bool {

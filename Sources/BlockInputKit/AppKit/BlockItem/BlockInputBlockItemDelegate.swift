@@ -13,6 +13,12 @@ enum BlockInputHorizontalMovementDirection: Equatable {
     case rightward
 }
 
+/// Logical Shift+Command+Left/Right line-boundary selection direction.
+enum BlockInputLineBoundarySelectionDirection: Equatable {
+    case beginning
+    case end
+}
+
 /// Logical Option+Left/Right direction after AppKit key events and selectors are normalized.
 enum BlockInputWordMovementDirection: Equatable {
     case leftward
@@ -218,6 +224,12 @@ protocol BlockInputBlockItemDelegate: AnyObject {
         _ item: BlockInputBlockItem,
         blockID: BlockInputBlockID,
         didRequestHorizontalSelectionAdjustment direction: BlockInputHorizontalMovementDirection,
+        selectedRange: NSRange
+    ) -> Bool
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestLineBoundarySelection direction: BlockInputLineBoundarySelectionDirection,
         selectedRange: NSRange
     ) -> Bool
     func blockItem(

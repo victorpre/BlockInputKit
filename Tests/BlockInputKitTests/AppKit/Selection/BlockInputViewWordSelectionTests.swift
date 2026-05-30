@@ -230,6 +230,64 @@ final class BlockInputViewWordSelectionTests: XCTestCase {
         )
     }
 
+    func testShiftRightAtTableCellLinkSourceBoundaryStaysInsideCell() throws {
+        let cellText = "Open [docs](https://example.com)"
+        let tableBlock = BlockInputBlock(
+            id: "table",
+            kind: .table,
+            text: BlockInputTable.normalized(
+                header: ["H1", "H2"],
+                bodyRows: [[cellText, "two"]],
+                alignments: [.left, .left]
+            ).markdown
+        )
+        let mounted = makeMountedBlockInputView(blocks: [tableBlock])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let cell = try bodyCell(in: item, row: 0, column: 0)
+        let table = try XCTUnwrap(BlockInputTable(markdown: tableBlock.text))
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: cellText))
+        mounted.window.makeFirstResponder(cell)
+        cell.setSelectedRange(NSRange(location: linkRange.fullRange.location, length: 0))
+
+        cell.doCommand(by: #selector(NSResponder.moveRightAndModifySelection(_:)))
+
+        let selectedRange = NSRange(location: linkRange.contentRange.location, length: 1)
+        XCTAssertEqual(cell.selectedRange(), selectedRange)
+        XCTAssertEqual(
+            mounted.view.selection,
+            table.selection(blockID: "table", position: .init(row: .body(0), column: 0), localRange: selectedRange)
+        )
+    }
+
+    func testShiftRightKeyEquivalentAtTableCellLinkSourceBoundaryStaysInsideCell() throws {
+        let cellText = "Open [docs](https://example.com)"
+        let tableBlock = BlockInputBlock(
+            id: "table",
+            kind: .table,
+            text: BlockInputTable.normalized(
+                header: ["H1", "H2"],
+                bodyRows: [[cellText, "two"]],
+                alignments: [.left, .left]
+            ).markdown
+        )
+        let mounted = makeMountedBlockInputView(blocks: [tableBlock])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let cell = try bodyCell(in: item, row: 0, column: 0)
+        let table = try XCTUnwrap(BlockInputTable(markdown: tableBlock.text))
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: cellText))
+        mounted.window.makeFirstResponder(cell)
+        cell.setSelectedRange(NSRange(location: linkRange.fullRange.location, length: 0))
+
+        XCTAssertTrue(cell.performKeyEquivalent(with: try shiftRightEvent()))
+
+        let selectedRange = NSRange(location: linkRange.contentRange.location, length: 1)
+        XCTAssertEqual(cell.selectedRange(), selectedRange)
+        XCTAssertEqual(
+            mounted.view.selection,
+            table.selection(blockID: "table", position: .init(row: .body(0), column: 0), localRange: selectedRange)
+        )
+    }
+
     private func copiedStringAfterOptionShiftSelection(blocks: [BlockInputBlock]) throws -> String? {
         let mounted = makeMountedBlockInputView(blocks: blocks)
         let firstItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
@@ -259,5 +317,13 @@ final class BlockInputViewWordSelectionTests: XCTestCase {
         }
         XCTAssertTrue(view.performKeyEquivalent(with: try commandCEvent()))
         return pasteboard.string(forType: .string)
+    }
+
+    private func inlineLinkRange(in text: String) -> BlockInputInlineMarkdownRange? {
+        BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: text,
+            excluding: BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
+        )
+        .first { $0.style == .link }
     }
 }

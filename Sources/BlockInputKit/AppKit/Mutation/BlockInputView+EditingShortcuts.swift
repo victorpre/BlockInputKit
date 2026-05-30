@@ -361,7 +361,7 @@ extension BlockInputBlock {
            NSMaxRange(clampedRange) == utf16Length {
             return BlockInputDocument(blocks: [self]).markdown
         }
-        if let copiedLinkLabelText = copiedVisibleLinkLabelText(in: clampedRange, fileBaseURL: fileBaseURL) {
+        if let copiedLinkLabelText = copiedVisibleInlineLinkText(in: clampedRange, fileBaseURL: fileBaseURL) {
             return copiedLinkLabelText
         }
         return (text as NSString).substring(with: clampedRange)
@@ -405,38 +405,6 @@ extension BlockInputBlock {
         return false
     }
 
-    private func copiedVisibleLinkLabelText(in range: NSRange, fileBaseURL: URL? = nil) -> String? {
-        guard supportsInlineLinkCopy else {
-            return nil
-        }
-        let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
-        let linkRange = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
-            in: text,
-            excluding: inlineCodeRanges,
-            fileBaseURL: fileBaseURL
-        )
-            .first { markdownRange in
-                markdownRange.style == .link && markdownRange.contentRange.containsSourceRange(range)
-            }
-        guard let linkRange else {
-            return nil
-        }
-        if linkRange.contentRange == range {
-            return (text as NSString).substring(with: linkRange.fullRange)
-        }
-        let copiedLabel = (text as NSString).substring(with: range).blockInputUnescapedLinkLabel
-        let destination = linkRange.linkRawDestination ?? linkRange.linkDestination?.absoluteString ?? ""
-        return BlockInputLinkURL.markdownLink(label: copiedLabel, destination: destination)
-    }
-
-    private var supportsInlineLinkCopy: Bool {
-        switch kind {
-        case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
-            return true
-        case .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
-            return false
-        }
-    }
 }
 
 private extension Array where Element == BlockInputBlock {
@@ -465,11 +433,5 @@ private extension String {
         let location = min(max(range.location, 0), text.length)
         let length = min(max(range.length, 0), max(text.length - location, 0))
         return NSRange(location: location, length: length)
-    }
-}
-
-private extension NSRange {
-    func containsSourceRange(_ range: NSRange) -> Bool {
-        location <= range.location && NSMaxRange(range) <= NSMaxRange(self)
     }
 }

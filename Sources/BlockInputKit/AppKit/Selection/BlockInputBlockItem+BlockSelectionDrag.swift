@@ -118,6 +118,23 @@ extension BlockInputBlockItem {
         return result
     }
 
+    func requestLineBoundarySelection(_ direction: BlockInputLineBoundarySelectionDirection) -> Bool {
+        guard let blockID else {
+            return false
+        }
+        let range = textView.selectedRange()
+        let result = delegate?.blockItem(
+            self,
+            blockID: blockID,
+            didRequestLineBoundarySelection: direction,
+            selectedRange: range
+        ) ?? false
+        BlockInputSelectionDebug.emit(
+            "item request line boundary block=\(blockID.rawValue) direction=\(direction.debugName) range=\(range) result=\(result)"
+        )
+        return result
+    }
+
     func requestCollapseSelection(_ direction: BlockInputVerticalMovementDirection) -> Bool {
         guard let blockID else {
             return false

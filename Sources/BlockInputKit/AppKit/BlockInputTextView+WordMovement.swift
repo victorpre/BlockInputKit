@@ -1,8 +1,55 @@
 import AppKit
 
 extension BlockInputTextView {
+    override func moveWordLeft(_ sender: Any?) {
+        if moveWordAcrossInlineLinkSource(.leftward) {
+            return
+        }
+        if blockItem?.isTableCellTextView(self) != true,
+           requestWordMovementFromOwningBlock(.leftward) {
+            return
+        }
+        super.moveWordLeft(sender)
+    }
+
+    override func moveWordRight(_ sender: Any?) {
+        if moveWordAcrossInlineLinkSource(.rightward) {
+            return
+        }
+        if blockItem?.isTableCellTextView(self) != true,
+           requestWordMovementFromOwningBlock(.rightward) {
+            return
+        }
+        super.moveWordRight(sender)
+    }
+
+    override func moveWordBackward(_ sender: Any?) {
+        if moveWordAcrossInlineLinkSource(.leftward) {
+            return
+        }
+        if blockItem?.isTableCellTextView(self) != true,
+           requestWordMovementFromOwningBlock(.leftward) {
+            return
+        }
+        super.moveWordBackward(sender)
+    }
+
+    override func moveWordForward(_ sender: Any?) {
+        if moveWordAcrossInlineLinkSource(.rightward) {
+            return
+        }
+        if blockItem?.isTableCellTextView(self) != true,
+           requestWordMovementFromOwningBlock(.rightward) {
+            return
+        }
+        super.moveWordForward(sender)
+    }
+
     override func moveWordLeftAndModifySelection(_ sender: Any?) {
         let previousRange = selectedRange()
+        if modifyWordSelectionAcrossInlineLinkSource(.leftward, previousRange: previousRange) {
+            return
+        }
         super.moveWordLeftAndModifySelection(sender)
         requestWordSelectionAdjustmentFromOwningBlock(
             .leftward,
@@ -13,6 +60,9 @@ extension BlockInputTextView {
 
     override func moveWordRightAndModifySelection(_ sender: Any?) {
         let previousRange = selectedRange()
+        if modifyWordSelectionAcrossInlineLinkSource(.rightward, previousRange: previousRange) {
+            return
+        }
         super.moveWordRightAndModifySelection(sender)
         requestWordSelectionAdjustmentFromOwningBlock(
             .rightward,
@@ -23,6 +73,9 @@ extension BlockInputTextView {
 
     override func moveWordBackwardAndModifySelection(_ sender: Any?) {
         let previousRange = selectedRange()
+        if modifyWordSelectionAcrossInlineLinkSource(.leftward, previousRange: previousRange) {
+            return
+        }
         super.moveWordBackwardAndModifySelection(sender)
         requestWordSelectionAdjustmentFromOwningBlock(
             .leftward,
@@ -33,6 +86,9 @@ extension BlockInputTextView {
 
     override func moveWordForwardAndModifySelection(_ sender: Any?) {
         let previousRange = selectedRange()
+        if modifyWordSelectionAcrossInlineLinkSource(.rightward, previousRange: previousRange) {
+            return
+        }
         super.moveWordForwardAndModifySelection(sender)
         requestWordSelectionAdjustmentFromOwningBlock(
             .rightward,
@@ -75,6 +131,19 @@ extension BlockInputTextView {
         default:
             return false
         }
+    }
+
+    func handleWordMovementShortcut(_ event: NSEvent) -> Bool {
+        guard let direction = event.blockInputWordMovementDirection else {
+            return false
+        }
+        switch direction {
+        case .leftward:
+            moveWordLeft(nil)
+        case .rightward:
+            moveWordRight(nil)
+        }
+        return true
     }
 
     func handleWordMovementCommand(_ selector: Selector) -> Bool {

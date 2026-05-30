@@ -17,7 +17,7 @@ final class BlockInputTableCellClipboardTests: XCTestCase {
         }
     }
 
-    func testPartialTableCellLinkLabelCopyUsesPlainText() throws {
+    func testPartialTableCellLinkLabelCopyUsesSelectedLabelLink() throws {
         let cellText = #"Open [a\[b\]c](https://example.com)"#
         let mounted = makeMountedBlockInputView(blocks: [Self.tableBlock(cellText: cellText)])
         let cell = try bodyCell(in: mounted.view)
@@ -26,7 +26,7 @@ final class BlockInputTableCellClipboardTests: XCTestCase {
 
         withCleanTableCellPasteboard { pasteboard in
             cell.copy(nil)
-            XCTAssertEqual(pasteboard.string(forType: .string), "b")
+            XCTAssertEqual(pasteboard.string(forType: .string), "[b](https://example.com)")
         }
     }
 

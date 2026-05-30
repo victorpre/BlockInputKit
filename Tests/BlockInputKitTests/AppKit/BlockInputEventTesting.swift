@@ -177,8 +177,16 @@ func commandLeftEvent() throws -> NSEvent {
     try keyEquivalentEvent(keyCode: 123, characters: "\u{F702}", modifierFlags: .command)
 }
 
+func commandShiftLeftEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 123, characters: "\u{F702}", modifierFlags: [.command, .shift])
+}
+
 func commandRightEvent() throws -> NSEvent {
     try keyEquivalentEvent(keyCode: 124, characters: "\u{F703}", modifierFlags: .command)
+}
+
+func commandShiftRightEvent() throws -> NSEvent {
+    try keyEquivalentEvent(keyCode: 124, characters: "\u{F703}", modifierFlags: [.command, .shift])
 }
 
 func commandShiftDownEvent() throws -> NSEvent {

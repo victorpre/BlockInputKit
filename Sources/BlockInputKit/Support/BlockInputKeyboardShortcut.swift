@@ -92,8 +92,8 @@ public enum BlockInputKeyboardShortcutResult: Equatable, Sendable {
     case ignored
     /// Run the editor's normal behavior for another shortcut instead of the original event.
     ///
-    /// Currently `.returnKey` is the supported default target. Unsupported targets fall back to the original event's
-    /// default behavior.
+    /// Supported default targets include `.returnKey` and built-in selection movement shortcuts. Unsupported targets
+    /// fall back to the original event's default behavior.
     case performDefault(BlockInputKeyboardShortcut)
 }
 

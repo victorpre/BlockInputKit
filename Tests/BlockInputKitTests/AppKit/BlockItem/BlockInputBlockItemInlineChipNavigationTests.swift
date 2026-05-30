@@ -173,6 +173,114 @@ final class BlockInputInlineChipNavigationTests: XCTestCase {
         XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.contentRange) - 1, length: 0))
     }
 
+    func testOptionRightAtNormalLinkSourceBoundaryMovesToVisibleLabelEnd() throws {
+        let text = "Open [docs](https://example.com) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        setCaret(in: textView, to: linkRange.fullRange.location, affinity: .upstream)
+
+        textView.keyDown(with: try optionRightEvent())
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.contentRange), length: 0))
+    }
+
+    func testOptionRightAtEmojiLinkSourceBoundaryKeepsComposedLabelIntact() throws {
+        let text = "Open [👩‍💻](https://example.com) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        setCaret(in: textView, to: linkRange.fullRange.location, affinity: .upstream)
+
+        textView.keyDown(with: try optionRightEvent())
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.contentRange), length: 0))
+    }
+
+    func testOptionRightKeyEquivalentAtNormalLinkSourceBoundaryMovesToVisibleLabelEnd() throws {
+        let text = "Open [docs](https://example.com) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        setCaret(in: textView, to: linkRange.fullRange.location, affinity: .upstream)
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try optionRightEvent()))
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.contentRange), length: 0))
+    }
+
+    func testOptionLeftAtNormalLinkTrailingSourceBoundaryMovesToVisibleLabelStart() throws {
+        let text = "Open [docs](https://example.com) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        setCaret(in: textView, to: NSMaxRange(linkRange.fullRange), affinity: .downstream)
+
+        textView.keyDown(with: try optionLeftEvent())
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: linkRange.contentRange.location, length: 0))
+    }
+
+    func testMoveWordRightInsideFileChipStopsAtVisibleLabelEnd() throws {
+        let text = "Open [README.md](file:///tmp/README.md) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        textView.setSelectedRange(NSRange(location: linkRange.contentRange.location, length: 0))
+
+        textView.moveWordRight(nil)
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(linkRange.contentRange), length: 0))
+    }
+
+    func testMoveWordLeftInsideSlashCommandChipStopsAtVisibleLabelStart() throws {
+        let text = "Run [/table](host-app://commands/table) today"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        textView.setSelectedRange(NSRange(location: NSMaxRange(linkRange.contentRange), length: 0))
+
+        textView.moveWordLeft(nil)
+
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: linkRange.contentRange.location, length: 0))
+    }
+
+    func testShiftRightAtLinkSourceBoundarySelectsFirstVisibleLabelCharacter() throws {
+        let text = "Open [docs](https://example.com) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        setCaret(in: textView, to: linkRange.fullRange.location, affinity: .upstream)
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try shiftRightEvent()))
+
+        XCTAssertEqual(
+            textView.blockItem?.temporarySelectionHighlightRange,
+            NSRange(location: linkRange.contentRange.location, length: 1)
+        )
+    }
+
+    func testShiftLeftAtLinkTrailingSourceBoundarySelectsLastVisibleLabelCharacter() throws {
+        let text = "Open [docs](https://example.com) trailing"
+        let textView = try mountedTextView(for: text)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        setCaret(in: textView, to: NSMaxRange(linkRange.fullRange), affinity: .downstream)
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try shiftLeftEvent()))
+
+        XCTAssertEqual(
+            textView.blockItem?.temporarySelectionHighlightRange,
+            NSRange(location: NSMaxRange(linkRange.contentRange) - 1, length: 1)
+        )
+    }
+
+    func testShiftRightSkipsEscapedLinkLabelBackslash() throws {
+        let text = "Open [a\\[b\\]c](https://example.com) trailing"
+        let textView = try mountedTextView(for: text)
+        let escapedOpenBracketRange = (text as NSString).range(of: "\\[")
+
+        textView.setSelectedRange(NSRange(location: escapedOpenBracketRange.location, length: 0))
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try shiftRightEvent()))
+        XCTAssertEqual(
+            textView.blockItem?.temporarySelectionHighlightRange,
+            NSRange(location: escapedOpenBracketRange.location + 1, length: 1)
+        )
+    }
+
     func testPlainLeftAtRawSlashCommandChipUsesNativeMovement() throws {
         let text = "Run /table today"
         let textView = try mountedTextView(
@@ -190,6 +298,25 @@ final class BlockInputInlineChipNavigationTests: XCTestCase {
         textView.keyDown(with: try plainLeftEvent())
 
         XCTAssertEqual(textView.selectedRange(), NSRange(location: slashOffset - 1, length: 0))
+    }
+
+    func testShiftRightAtRawSlashCommandChipUsesNativeSelection() throws {
+        let text = "Run /table today"
+        let textView = try mountedTextView(
+            configuration: BlockInputConfiguration(
+                document: BlockInputDocument(blocks: [
+                    BlockInputBlock(id: "paragraph", kind: .paragraph, text: text)
+                ]),
+                rawSlashCommandChips: true,
+                slashCommandAvailability: .anywhere
+            )
+        )
+        let slashOffset = contentLocation("/table", in: text)
+        textView.setSelectedRange(NSRange(location: slashOffset, length: 0))
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try shiftRightEvent()))
+
+        XCTAssertEqual(textView.blockItem?.temporarySelectionHighlightRange, NSRange(location: slashOffset, length: 1))
     }
 
     private func mountedTextView(for text: String) throws -> BlockInputTextView {

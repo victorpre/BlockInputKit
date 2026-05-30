@@ -70,10 +70,11 @@ struct BlockInputBlockSelectionExpansion {
 
 /// Tracks the fixed edge while Shift+Left/Right adjusts editor-owned selections.
 ///
-/// `NSRange` has no anchor/focus direction once selection crosses into block chrome. Keeping the anchor explicit lets
-/// the opposite horizontal arrow contract the active edge before expanding through the anchor to the other side.
+/// `NSRange` has no anchor/focus direction once selection crosses into block chrome. Keeping the anchor and active edge
+/// explicit preserves zero-width continuation points that canonical `.mixed` selections cannot represent directly.
 struct BlockInputHorizontalSelectionExpansion {
     var anchor: BlockInputDocumentTextBoundary
+    var active: BlockInputDocumentTextBoundary?
 }
 
 /// A boundary in the flattened Markdown text stream represented by block ID plus UTF-16 offset.
@@ -103,6 +104,17 @@ extension BlockInputHorizontalMovementDirection {
             return "left"
         case .rightward:
             return "right"
+        }
+    }
+}
+
+extension BlockInputLineBoundarySelectionDirection {
+    var debugName: String {
+        switch self {
+        case .beginning:
+            return "beginning"
+        case .end:
+            return "end"
         }
     }
 }

@@ -51,6 +51,29 @@ final class BlockInputViewHorizontalSelectionTests: XCTestCase {
         XCTAssertEqual(mounted.window.firstResponder, mounted.view)
     }
 
+    func testShiftRightContinuationAcrossLinkUsesVisibleLabelText() throws {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let text = "Open [docs](https://example.com) trailing"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: blockID, text: text)
+        ])
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let linkRange = try XCTUnwrap(inlineLinkRange(in: text))
+        mounted.window.makeFirstResponder(textView)
+        textView.setSelectedRange(NSRange(location: linkRange.fullRange.location, length: 0))
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try shiftRightEvent()))
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try shiftRightEvent()))
+        XCTAssertTrue(mounted.view.performKeyEquivalent(with: try shiftLeftEvent()))
+
+        XCTAssertEqual(mounted.view.selection, .mixed(BlockInputMixedSelection(
+            blockIDs: [],
+            leadingTextRange: BlockInputTextRange(blockID: blockID, range: NSRange(location: linkRange.contentRange.location, length: 1))
+        )))
+        XCTAssertEqual(item.temporarySelectionHighlightRange, NSRange(location: linkRange.contentRange.location, length: 1))
+    }
+
     func testShiftDownAfterShiftRightMaintainsAdjustedActiveEdgeX() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
@@ -368,6 +391,14 @@ final class BlockInputViewHorizontalSelectionTests: XCTestCase {
 
     private func lineStartOffsets(in text: String) -> [Int] {
         BlockInputLineBreaks.lineStartOffsets(in: text)
+    }
+
+    private func inlineLinkRange(in text: String) -> BlockInputInlineMarkdownRange? {
+        BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: text,
+            excluding: BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
+        )
+        .first { $0.style == .link }
     }
 
     private func horizontalSelectionTraceStep(
