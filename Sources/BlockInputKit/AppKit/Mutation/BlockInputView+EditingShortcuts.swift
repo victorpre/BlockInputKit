@@ -424,7 +424,9 @@ extension BlockInputBlock {
         if linkRange.contentRange == range {
             return (text as NSString).substring(with: linkRange.fullRange)
         }
-        return (text as NSString).substring(with: range).blockInputUnescapedLinkLabel
+        let copiedLabel = (text as NSString).substring(with: range).blockInputUnescapedLinkLabel
+        let destination = linkRange.linkRawDestination ?? linkRange.linkDestination?.absoluteString ?? ""
+        return BlockInputLinkURL.markdownLink(label: copiedLabel, destination: destination)
     }
 
     private var supportsInlineLinkCopy: Bool {

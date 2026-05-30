@@ -111,8 +111,8 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
         ).filter { $0.style == .rawSlashCommand }.isEmpty)
     }
 
-    func testRawSlashCommandChipsAreExcludedInsideLinksImagesAndInlineCode() {
-        let text = "Skip [/link](demo://command) ![/image](image.png) `/code` but keep /table"
+    func testRawSlashCommandChipsAreExcludedInsideLinksImagesInlineCodeAndInlineMarkdownDelimiters() {
+        let text = "Skip [/link](demo://command) ![/image](image.png) `/code` <u>underline</u>, <ins>inserted</ins> but keep /table"
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
         let ranges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: text,
@@ -122,6 +122,18 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
         ).filter { $0.style == .rawSlashCommand }
 
         XCTAssertEqual(ranges.map { content(in: text, range: $0.contentRange) }, ["/table"])
+    }
+
+    func testRawSlashCommandChipsStillApplyInsideInlineMarkdownContent() {
+        let text = "<u>run /table here</u> and *use /quote here*"
+        let ranges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: text,
+            rawSlashCommandChips: true,
+            slashCommandAvailability: .anywhere
+        )
+        .filter { $0.style == .rawSlashCommand }
+
+        XCTAssertEqual(ranges.map { content(in: text, range: $0.contentRange) }, ["/table", "/quote"])
     }
 
     func testNonSlashCustomSchemeLinksStayUnsupported() {

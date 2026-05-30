@@ -62,26 +62,51 @@ enum BlockInputInlineMarkdownParsing {
             textLength: nsText.length,
             ranges: excludedRanges
         )
+        let nonRawRangeGroups = nonRawMarkdownRangeGroups(
+            in: nsText,
+            excluding: excludedRangeLookup,
+            fileBaseURL: fileBaseURL
+        )
         let rawSlashRanges: [BlockInputInlineMarkdownRange] = rawSlashCommandChips ? {
             let linkSourceRanges = linkSourceRanges(in: nsText, excluding: excludedRangeLookup)
             return rawSlashCommandRanges(
                 in: nsText,
-                excluding: BlockInputExcludedRangeLookup(textLength: nsText.length, ranges: excludedRanges + linkSourceRanges),
+                excluding: BlockInputExcludedRangeLookup(
+                    textLength: nsText.length,
+                    ranges: excludedRanges + linkSourceRanges + nonRawRangeGroups.delimiterRanges
+                ),
                 availability: slashCommandAvailability,
                 isDocumentStartBlock: isDocumentStartBlock
             )
         }() : []
-        return mergedByContentLocation([
-            linkRanges(in: nsText, excluding: excludedRangeLookup, fileBaseURL: fileBaseURL),
-            rawSlashRanges,
-            composedDelimiterRanges(in: nsText, delimiter: tripleAsterisk, styles: [.bold, .italic], excluding: excludedRangeLookup),
-            delimiterRanges(in: nsText, delimiter: doubleAsterisk, style: .bold, excluding: excludedRangeLookup),
-            delimiterRanges(in: nsText, delimiter: doubleTilde, style: .strikethrough, excluding: excludedRangeLookup),
-            underlineRanges(in: nsText, openingTag: underlineOpeningTag, closingTag: underlineClosingTag, excluding: excludedRangeLookup),
-            underlineRanges(in: nsText, openingTag: insertOpeningTag, closingTag: insertClosingTag, excluding: excludedRangeLookup),
-            delimiterRanges(in: nsText, delimiter: singleAsterisk, style: .italic, excluding: excludedRangeLookup),
-            delimiterRanges(in: nsText, delimiter: singleUnderscore, style: .italic, excluding: excludedRangeLookup)
-        ])
+        return mergedByContentLocation(nonRawRangeGroups.including(rawSlashRanges: rawSlashRanges))
+    }
+
+    private static func nonRawMarkdownRangeGroups(
+        in text: NSString,
+        excluding excludedRangeLookup: BlockInputExcludedRangeLookup,
+        fileBaseURL: URL?
+    ) -> BlockInputInlineMarkdownRangeGroups {
+        BlockInputInlineMarkdownRangeGroups(
+            links: linkRanges(in: text, excluding: excludedRangeLookup, fileBaseURL: fileBaseURL),
+            composedAsterisks: composedDelimiterRanges(
+                in: text,
+                delimiter: tripleAsterisk,
+                styles: [.bold, .italic],
+                excluding: excludedRangeLookup
+            ),
+            bold: delimiterRanges(in: text, delimiter: doubleAsterisk, style: .bold, excluding: excludedRangeLookup),
+            strikethrough: delimiterRanges(in: text, delimiter: doubleTilde, style: .strikethrough, excluding: excludedRangeLookup),
+            underlineTags: underlineRanges(
+                in: text,
+                openingTag: underlineOpeningTag,
+                closingTag: underlineClosingTag,
+                excluding: excludedRangeLookup
+            ),
+            insertTags: underlineRanges(in: text, openingTag: insertOpeningTag, closingTag: insertClosingTag, excluding: excludedRangeLookup),
+            italicAsterisks: delimiterRanges(in: text, delimiter: singleAsterisk, style: .italic, excluding: excludedRangeLookup),
+            italicUnderscores: delimiterRanges(in: text, delimiter: singleUnderscore, style: .italic, excluding: excludedRangeLookup)
+        )
     }
 
     private static func rawSlashCommandRanges(
@@ -376,6 +401,50 @@ enum BlockInputInlineMarkdownParsing {
 private struct BlockInputClosingSearch {
     let closingLocation: Int?
     let resumeLocation: Int
+}
+
+private struct BlockInputInlineMarkdownRangeGroups {
+    let links: [BlockInputInlineMarkdownRange]
+    let composedAsterisks: [BlockInputInlineMarkdownRange]
+    let bold: [BlockInputInlineMarkdownRange]
+    let strikethrough: [BlockInputInlineMarkdownRange]
+    let underlineTags: [BlockInputInlineMarkdownRange]
+    let insertTags: [BlockInputInlineMarkdownRange]
+    let italicAsterisks: [BlockInputInlineMarkdownRange]
+    let italicUnderscores: [BlockInputInlineMarkdownRange]
+
+    var delimiterRanges: [NSRange] {
+        nonRawGroups.flatMap { ranges in
+            ranges.flatMap { $0.delimiterRanges }
+        }
+    }
+
+    func including(rawSlashRanges: [BlockInputInlineMarkdownRange]) -> [[BlockInputInlineMarkdownRange]] {
+        [
+            links,
+            rawSlashRanges,
+            composedAsterisks,
+            bold,
+            strikethrough,
+            underlineTags,
+            insertTags,
+            italicAsterisks,
+            italicUnderscores
+        ]
+    }
+
+    private var nonRawGroups: [[BlockInputInlineMarkdownRange]] {
+        [
+            links,
+            composedAsterisks,
+            bold,
+            strikethrough,
+            underlineTags,
+            insertTags,
+            italicAsterisks,
+            italicUnderscores
+        ]
+    }
 }
 
 /// Constant-time lookup for inline-code exclusions during one row scan.

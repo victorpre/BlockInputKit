@@ -17,7 +17,7 @@ final class BlockInputLinkEditingTests: XCTestCase {
         }
     }
 
-    func testCopyingPartialVisibleLinkLabelCopiesPlainTextOnly() throws {
+    func testCopyingPartialVisibleLinkLabelCopiesMarkdownWithSelectedLabel() throws {
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "block", text: "Open [a\\[b\\]c](https://example.com)")
         ])
@@ -26,7 +26,7 @@ final class BlockInputLinkEditingTests: XCTestCase {
 
         try withCleanPasteboard { pasteboard in
             textView.copy(nil)
-            XCTAssertEqual(pasteboard.string(forType: .string), "b")
+            XCTAssertEqual(pasteboard.string(forType: .string), "[b](https://example.com)")
         }
     }
 

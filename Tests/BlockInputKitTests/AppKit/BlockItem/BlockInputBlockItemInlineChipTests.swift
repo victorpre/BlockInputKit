@@ -121,6 +121,31 @@ final class BlockInputBlockItemInlineChipTests: XCTestCase {
         XCTAssertTrue(try font(at: contentOffset, in: textStorage).isFixedPitch)
     }
 
+    func testUnderlineClosingTagDoesNotRenderAsRawSlashChip() throws {
+        let text = "Inline <u>underline</u>, then plain"
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "paragraph", kind: .paragraph, text: text)
+            ]),
+            rawSlashCommandChips: true,
+            slashCommandAvailability: .anywhere
+        ))
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 620, height: 140))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let textStorage = try XCTUnwrap(textView.textStorage)
+        textView.layoutManager?.ensureLayout(for: try XCTUnwrap(textView.textContainer))
+        let closingSlashOffset = (text as NSString).range(of: "</u>").location + 1
+
+        XCTAssertTrue(textView.inlineChipBackgroundRectsForTesting().isEmpty)
+        XCTAssertNil(textStorage.attribute(.blockInputInlineChip, at: closingSlashOffset, effectiveRange: nil))
+        XCTAssertEqual(textStorage.attribute(.foregroundColor, at: closingSlashOffset, effectiveRange: nil) as? NSColor, .clear)
+        XCTAssertEqual(
+            textStorage.attribute(.underlineStyle, at: contentLocation("underline", in: text), effectiveRange: nil) as? Int,
+            NSUnderlineStyle.single.rawValue
+        )
+    }
+
     func testRawSlashCommandDoesNotRenderAsChipByDefault() throws {
         let text = "Run /table today"
         let item = BlockInputBlockItem.configuredForTesting(
