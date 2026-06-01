@@ -197,6 +197,25 @@ final class BlockInputEditorCommandTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks[0].text, "Before")
     }
 
+    func testImageModalTextFieldsKeepOptionArrowWordNavigation() throws {
+        let blockID = BlockInputBlockID(rawValue: "paragraph")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: blockID, text: "Before")
+        ])
+        mounted.view.focus(blockID: blockID, utf16Offset: 6)
+        let originalSelection = mounted.view.selection
+        XCTAssertTrue(mounted.view.performCommand(.insertImage(BlockInputInsertImageCommand(presentation: .modal))))
+        let modal = try XCTUnwrap(mounted.view.imageModalView)
+
+        for field in [modal.urlField, modal.altTextField] {
+            XCTAssertTrue(mounted.window.makeFirstResponder(field))
+            XCTAssertFalse(mounted.view.performKeyEquivalent(with: try optionLeftEvent()))
+            XCTAssertFalse(mounted.view.performKeyEquivalent(with: try optionRightEvent()))
+            XCTAssertIdentical(mounted.view.imageModalView, modal)
+            XCTAssertEqual(mounted.view.selection, originalSelection)
+        }
+    }
+
     func testImageModalFieldEditorCommandPasteTargetsFocusedFieldEditor() throws {
         let blockID = BlockInputBlockID(rawValue: "paragraph")
         let mounted = makeMountedBlockInputView(blocks: [

@@ -228,8 +228,7 @@ public final class BlockInputView: NSView {
     /// Handles editor keyboard shortcuts before forwarding unhandled key equivalents to AppKit.
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if performFocusedModalFieldEditorKeyEquivalent(event) { return true }
-        if linkModalContainsCurrentResponder() { return super.performKeyEquivalent(with: event) }
-        if imageModalContainsCurrentResponder() { return super.performKeyEquivalent(with: event) }
+        if modalContainsCurrentResponder { return false }
         switch dispatchKeyboardShortcut(event: event) {
         case .handled:
             return true
