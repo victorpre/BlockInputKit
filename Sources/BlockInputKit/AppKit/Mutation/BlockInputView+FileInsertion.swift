@@ -23,7 +23,7 @@ public extension BlockInputView {
             return nil
         }
 
-        return insertFileBlocks(insertedBlocks) { document in
+        return insertFileBlocks(insertedBlocks, actionName: "Insert Files") { document in
             self.fileInsertionIndex(below: targetBlockID, in: document)
         }
     }
@@ -45,7 +45,58 @@ public extension BlockInputView {
             return nil
         }
 
-        return insertFileBlocks(insertedBlocks) { document in
+        return insertFileBlocks(insertedBlocks, actionName: "Insert Files") { document in
+            self.fileInsertionIndex(at: insertionIndex, in: document)
+        }
+    }
+
+    /// Inserts local file URLs using the same image-aware block mapping as file drops.
+    ///
+    /// Image files are inserted as image blocks. Other file URLs are inserted as Markdown
+    /// file-link paragraph blocks. Non-file URLs are ignored.
+    @discardableResult
+    func insertLocalFileURLs(
+        _ fileURLs: [URL],
+        below blockID: BlockInputBlockID? = nil
+    ) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
+        // Keep picker insertion aligned with drop behavior so host apps do not need
+        // to duplicate BlockInputKit's file/image classification rules.
+        let insertedBlocks = fileURLs.compactMap(Self.droppedFileBlock)
+        guard !insertedBlocks.isEmpty else {
+            return nil
+        }
+
+        let targetBlockID = blockID ?? activeBlockID
+        if let targetBlockID, index(of: targetBlockID) == nil {
+            return nil
+        }
+
+        return insertFileBlocks(insertedBlocks, actionName: Self.fileDropActionName(for: insertedBlocks)) { document in
+            self.fileInsertionIndex(below: targetBlockID, in: document)
+        }
+    }
+
+    /// Inserts local file URLs at a document index using image-aware block mapping.
+    ///
+    /// The insertion index is clamped to the current document, but never before
+    /// leading frontmatter because frontmatter is only canonical at index `0`.
+    @discardableResult
+    func insertLocalFileURLs(
+        _ fileURLs: [URL],
+        at insertionIndex: Int
+    ) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
+        let insertedBlocks = fileURLs.compactMap(Self.droppedFileBlock)
+        guard !insertedBlocks.isEmpty else {
+            return nil
+        }
+
+        return insertFileBlocks(insertedBlocks, actionName: Self.fileDropActionName(for: insertedBlocks)) { document in
             self.fileInsertionIndex(at: insertionIndex, in: document)
         }
     }
@@ -98,10 +149,11 @@ public extension BlockInputView {
 
     private func insertFileBlocks(
         _ insertedBlocks: [BlockInputBlock],
+        actionName: String,
         insertionIndex: @escaping (BlockInputDocument) -> Int
     ) -> BlockInputSelection? {
         performStructuralEdit(
-            named: "Insert Files",
+            named: actionName,
             storeSyncAction: { beforeDocument, _, _ in
                 if beforeDocument.blocks.count == 1,
                    beforeDocument.blocks[0].kind == .paragraph,
@@ -118,12 +170,23 @@ public extension BlockInputView {
                     guard let firstBlock = insertedBlocks.first else {
                         return nil
                     }
-                    return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0))
+                    return Self.fileInsertionSelection(for: firstBlock)
                 }
 
-                return document.insertBlocks(insertedBlocks, at: insertionIndex(document))
+                let selection = document.insertBlocks(insertedBlocks, at: insertionIndex(document))
+                guard let firstBlock = insertedBlocks.first else {
+                    return selection
+                }
+                return Self.fileInsertionSelection(for: firstBlock)
             }
         )
+    }
+
+    private static func fileInsertionSelection(for firstBlock: BlockInputBlock) -> BlockInputSelection {
+        if firstBlock.kind.isImage {
+            return .blocks([firstBlock.id])
+        }
+        return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0))
     }
 }
 
@@ -162,11 +225,7 @@ extension BlockInputView {
             edit: { document in
                 let clampedIndex = self.fileInsertionIndex(at: insertionIndex, in: document)
                 document.blocks.insert(contentsOf: insertedBlocks, at: clampedIndex)
-                let firstBlock = insertedBlocks[0]
-                if firstBlock.kind.isImage {
-                    return .blocks([firstBlock.id])
-                }
-                return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: 0))
+                return Self.fileInsertionSelection(for: insertedBlocks[0])
             }
         )
     }

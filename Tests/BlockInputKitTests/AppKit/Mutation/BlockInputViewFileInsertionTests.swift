@@ -280,4 +280,118 @@ final class BlockInputViewFileInsertionTests: XCTestCase {
 
         XCTAssertEqual(view.document.blocks[0].text, "[Alpha).md](<file:///tmp/Alpha).md>)")
     }
+
+    func testInsertLocalFileURLsInsertsImageBlocksAndFileLinkBlocksInOrder() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: firstID, text: "First")
+        ])))
+        view.focus(blockID: firstID, utf16Offset: 5)
+
+        let selection = view.insertLocalFileURLs([
+            URL(fileURLWithPath: "/tmp/Cat Photo.png"),
+            URL(fileURLWithPath: "/tmp/Notes.md")
+        ])
+
+        XCTAssertEqual(view.document.blocks.count, 3)
+        XCTAssertEqual(view.document.blocks.map(\.id).first, firstID)
+        guard case let .image(image) = view.document.blocks[1].kind else {
+            return XCTFail("Expected an image block.")
+        }
+        XCTAssertEqual(image.source, "file:///tmp/Cat%20Photo.png")
+        XCTAssertEqual(image.altText, "Cat Photo")
+        XCTAssertEqual(view.document.blocks[2].text, "[Notes.md](<file:///tmp/Notes.md>)")
+        XCTAssertEqual(selection, .blocks([view.document.blocks[1].id]))
+    }
+
+    func testInsertLocalFileURLsReplacesDefaultEmptyParagraphWithImageBlock() {
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        var publishedDocument: BlockInputDocument?
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(),
+            undoController: undoController,
+            onDocumentChange: { publishedDocument = $0 }
+        ))
+
+        let selection = view.insertLocalFileURLs([
+            URL(fileURLWithPath: "/tmp/Cat Photo.png")
+        ])
+
+        XCTAssertEqual(view.document.blocks.count, 1)
+        guard case let .image(image) = view.document.blocks[0].kind else {
+            return XCTFail("Expected an image block.")
+        }
+        XCTAssertEqual(image.source, "file:///tmp/Cat%20Photo.png")
+        XCTAssertEqual(selection, .blocks([view.document.blocks[0].id]))
+        XCTAssertEqual(publishedDocument, view.document)
+
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Insert Image")
+        XCTAssertEqual(view.document.blocks.count, 1)
+        XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[0].text, "")
+    }
+
+    func testInsertLocalFileURLsAtStartKeepsFrontMatterLeading() {
+        let frontID = BlockInputBlockID(rawValue: "front")
+        let bodyID = BlockInputBlockID(rawValue: "body")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: frontID, kind: .frontMatter, text: "title: Demo"),
+            BlockInputBlock(id: bodyID, text: "Body")
+        ])))
+
+        let selection = view.insertLocalFileURLs([
+            URL(fileURLWithPath: "/tmp/Cat Photo.png")
+        ], at: 0)
+
+        XCTAssertEqual(view.document.blocks.map(\.id).first, frontID)
+        guard case .image = view.document.blocks[1].kind else {
+            return XCTFail("Expected an image block.")
+        }
+        XCTAssertEqual(view.document.blocks.map(\.id).last, bodyID)
+        XCTAssertEqual(selection, .blocks([view.document.blocks[1].id]))
+    }
+
+    func testInsertLocalFileURLsIgnoresEmptyAndNonFileInput() throws {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let view = BlockInputView()
+        var publishCount = 0
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "First")
+            ]),
+            onDocumentChange: { _ in publishCount += 1 }
+        ))
+        let remoteURL = try XCTUnwrap(URL(string: "https://example.com/Cat.png"))
+
+        let selection = view.insertLocalFileURLs([remoteURL])
+
+        XCTAssertNil(selection)
+        XCTAssertEqual(publishCount, 0)
+        XCTAssertEqual(view.document.blocks.map(\.id), [blockID])
+    }
+
+    func testInsertLocalFileURLsWithExplicitMissingBlockDoesNothing() {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let view = BlockInputView()
+        var publishCount = 0
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "First")
+            ]),
+            onDocumentChange: { _ in publishCount += 1 }
+        ))
+
+        let selection = view.insertLocalFileURLs([
+            URL(fileURLWithPath: "/tmp/Cat Photo.png")
+        ], below: "missing")
+
+        XCTAssertNil(selection)
+        XCTAssertEqual(publishCount, 0)
+        XCTAssertEqual(view.document.blocks.map(\.id), [blockID])
+    }
 }

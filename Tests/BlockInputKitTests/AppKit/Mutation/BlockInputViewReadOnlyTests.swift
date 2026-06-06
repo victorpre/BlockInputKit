@@ -58,6 +58,7 @@ final class BlockInputViewReadOnlyTests: XCTestCase {
         XCTAssertNil(mounted.view.imageModalView)
         XCTAssertFalse(mounted.view.performCommand(.insertTable))
         XCTAssertNil(mounted.view.insertFileURLs([URL(fileURLWithPath: "/tmp/read-only.txt")]))
+        XCTAssertNil(mounted.view.insertLocalFileURLs([URL(fileURLWithPath: "/tmp/read-only.png")]))
         XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["Content"])
     }
 
