@@ -15,6 +15,27 @@ final class BlockInputHeightSizingRegressionTests: XCTestCase {
         )
     }
 
+    func testHeightSizedShortDocumentAutohidesDocumentScrollerWhenContentFits() {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [BlockInputBlock(id: "first", text: "")]),
+            editorVerticalInset: 10,
+            blockVerticalInsetMultiplier: 0.7,
+            heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 2, maximumVisibleLineCount: 9)
+        ), size: NSSize(width: 360, height: 200))
+        let preferredHeight = mounted.view.preferredHeight(forWidth: 360)
+
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 360, height: preferredHeight))
+        mounted.view.scrollView.tile()
+
+        XCTAssertTrue(mounted.view.scrollView.hasVerticalScroller)
+        XCTAssertTrue(mounted.view.scrollView.autohidesScrollers)
+        XCTAssertTrue(mounted.view.scrollView.verticalScroller?.isHidden ?? true)
+
+        let contentHeight = mounted.view.collectionView.collectionViewLayout?.collectionViewContentSize.height ?? 0
+        XCTAssertLessThanOrEqual(contentHeight, mounted.view.scrollView.contentSize.height + 0.5)
+        XCTAssertEqual(mounted.view.scrollView.contentView.bounds.minY, 0, accuracy: 0.5)
+    }
+
     func testInlineNewlineKeepsCaretVisibleWhileHostHeightAnimates() throws {
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
             document: BlockInputDocument(blocks: [BlockInputBlock(id: "first", text: "One\nTwo\nThree")]),

@@ -39,6 +39,7 @@ extension BlockInputView {
         scrollView.borderType = .noBorder
         scrollView.hasHorizontalScroller = false
         scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
         scrollView.blockInputView = self
         scrollView.documentView = collectionView
         scrollView.onContentBoundsDidChange = { [weak self] in
