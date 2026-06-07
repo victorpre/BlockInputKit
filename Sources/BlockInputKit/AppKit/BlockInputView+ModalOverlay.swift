@@ -9,6 +9,14 @@ extension BlockInputView {
         }
     }
 
+    public override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else {
+            return
+        }
+        invalidateVisibleCursorRects()
+    }
+
     func hostMutationModal(
         _ modal: NSView,
         kind: BlockInputModalKind,

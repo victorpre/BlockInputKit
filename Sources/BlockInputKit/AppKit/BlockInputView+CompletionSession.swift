@@ -31,6 +31,7 @@ extension BlockInputView {
         updateEditorChromeLayers()
         if sizeChanged {
             dismissCompletionPopup()
+            invalidateVisibleCursorRects()
         }
         guard heightSizing != nil else {
             return

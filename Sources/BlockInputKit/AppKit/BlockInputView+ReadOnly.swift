@@ -17,16 +17,7 @@ extension BlockInputView {
     }
 
     func invalidateReadOnlyCursorRects() {
-        guard let window else {
-            collectionView.needsDisplay = true
-            return
-        }
-        for view in [self, scrollView, collectionView] {
-            window.invalidateCursorRects(for: view)
-        }
-        for item in collectionView.visibleItems().compactMap({ $0 as? BlockInputBlockItem }) {
-            item.invalidateCursorRects()
-        }
+        invalidateVisibleCursorRects()
     }
 
     func addDisabledCursorRectIfNeeded(to view: NSView) {
