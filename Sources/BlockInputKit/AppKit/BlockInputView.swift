@@ -214,7 +214,7 @@ public final class BlockInputView: NSView {
         if selector == #selector(cancelOperation(_:)), cancelMultiBlockSelection() {
             return
         }
-        if selector == #selector(moveUp(_:)), collapseMultiBlockSelection(direction: .upward) { return }
+        if selector == #selector(moveUp(_:)), handleMoveUpCommand() { return }
         if selector == #selector(moveDown(_:)), collapseMultiBlockSelection(direction: .downward) { return }
         if handleFocusedTableCellSelectionCommand(selector) { return }
         if handleDocumentBoundaryCommand(selector) || handleLineBoundarySelectionCommand(selector) ||

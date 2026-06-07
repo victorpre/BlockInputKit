@@ -117,7 +117,21 @@ extension BlockInputBlockItem {
     }
 
     func requestMoveVertically(_ direction: BlockInputVerticalMovementDirection) -> Bool {
-        guard let blockID, canMoveVerticallyOutOfBlock(direction) else {
+        guard let blockID else {
+            return false
+        }
+        if shouldMoveVerticallyOutOfFocusedTableCell(direction) {
+            return delegate?.blockItem(
+                self,
+                blockID: blockID,
+                didRequestVerticalMovement: direction,
+                preferredTextContainerX: nil
+            ) ?? false
+        }
+        if tableView.activeCellView != nil {
+            return false
+        }
+        guard canMoveVerticallyOutOfBlock(direction) else {
             return false
         }
         return delegate?.blockItem(

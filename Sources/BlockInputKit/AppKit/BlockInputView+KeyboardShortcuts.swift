@@ -120,7 +120,7 @@ extension BlockInputView {
         if handleLineBoundarySelectionKeyEvent(event) { return }
         if handleWordSelectionAdjustmentShortcut(event) { return }
         if handleWordMovementShortcut(event) { return }
-        if let direction = event.plainVerticalMovementDirection, collapseMultiBlockSelection(direction: direction) { return }
+        if handlePlainVerticalMovement(event) { return }
         if let direction = event.verticalMovementDirection, moveSelectedBlockVertically(direction) { return }
         if handleEditorBackspaceOrDelete(event) { return }
         if let insertedText = event.blockInputInsertedText,
@@ -132,6 +132,7 @@ extension BlockInputView {
 
     func performEditorKeyEquivalentDefaults(_ event: NSEvent) -> Bool {
         if performKeyboardShortcutCommand(for: event) { return true }
+        if event.plainVerticalMovementDirection == .upward, moveSelectedTableUpIfNeeded() { return true }
         if handleEditorArrowKeyEvent(event) { return true }
         if handleLineBoundarySelectionKeyEvent(event) { return true }
         if handleWordSelectionAdjustmentShortcut(event) { return true }
@@ -141,6 +142,16 @@ extension BlockInputView {
             return false
         }
         return super.performKeyEquivalent(with: event)
+    }
+
+    private func handlePlainVerticalMovement(_ event: NSEvent) -> Bool {
+        guard let direction = event.plainVerticalMovementDirection else {
+            return false
+        }
+        if collapseMultiBlockSelection(direction: direction) {
+            return true
+        }
+        return direction == .upward && moveSelectedTableUpIfNeeded()
     }
 
     private func handleEditorBackspaceOrDelete(_ event: NSEvent) -> Bool {

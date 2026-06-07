@@ -19,6 +19,33 @@ extension BlockInputView {
         return moveVertically(from: blockID, direction: direction, preferredTextContainerX: nil)
     }
 
+    func moveSelectedTableUpIfNeeded() -> Bool {
+        guard case let .blocks(blockIDs) = selection,
+              blockIDs.count == 1,
+              let blockID = blockIDs.first else {
+            return false
+        }
+        refreshDocumentFromStore()
+        guard block(withID: blockID)?.kind == .table,
+              let index = index(of: blockID) else {
+            return false
+        }
+        guard index > 0 else {
+            return true
+        }
+        let didMove = moveSelectedBlockVertically(.upward)
+        if didMove {
+            tableKeyboardRowSelection = nil
+        }
+        return didMove
+    }
+
+    func handleMoveUpCommand() -> Bool {
+        collapseMultiBlockSelection(direction: .upward)
+            || moveSelectedTableUpIfNeeded()
+            || moveSelectedBlockVertically(.upward)
+    }
+
     private func moveVertically(
         from blockID: BlockInputBlockID,
         direction: BlockInputVerticalMovementDirection,

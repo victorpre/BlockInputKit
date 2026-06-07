@@ -110,6 +110,10 @@ extension BlockInputTextView {
             BlockInputSelectionDebug.emit("text command consumed table selector=\(selector)")
             return
         }
+        if handleBoundaryCommand(selector) {
+            BlockInputSelectionDebug.emit("text command consumed table boundary selector=\(selector)")
+            return
+        }
         super.doCommand(by: selector)
     }
 

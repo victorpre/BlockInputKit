@@ -65,6 +65,17 @@ extension BlockInputBlockItem {
         }
     }
 
+    func shouldMoveVerticallyOutOfFocusedTableCell(_ direction: BlockInputVerticalMovementDirection) -> Bool {
+        guard direction == .upward,
+              let activeCellView = tableView.activeCellView,
+              activeCellView.position.row == .header,
+              activeCellView.position.column == 0 else {
+            return false
+        }
+        let selectedRange = activeCellView.textView.selectedRange()
+        return selectedRange.location == 0 && selectedRange.length == 0
+    }
+
     func currentCaretTextContainerX() -> CGFloat? {
         selectionExtentTextContainerX(.downward)
     }

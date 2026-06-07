@@ -213,6 +213,24 @@ final class BlockInputTextVerticalMovementTests: XCTestCase {
         XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: firstID, utf16Offset: 6)))
     }
 
+    func testMoveUpFromFirstTableCellStartFocusesPreviousBlockEnd() throws {
+        let headingID = BlockInputBlockID(rawValue: "heading")
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: headingID, kind: .heading(level: 1), text: "Tables"),
+            Self.tableBlock(),
+            BlockInputBlock(id: "images", kind: .heading(level: 1), text: "Images")
+        ])
+        let tableItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 1))
+        let cell = try tableCell(in: tableItem, row: 0, column: 0, columnCount: 2)
+        XCTAssertTrue(mounted.window.makeFirstResponder(cell))
+        cell.setSelectedRange(NSRange(location: 0, length: 0))
+
+        cell.keyDown(with: try plainUpEvent())
+
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: headingID, utf16Offset: 6)))
+        XCTAssertTrue(mounted.window.firstResponder === mounted.view.visibleBlockItemForTesting(at: 0)?.testingTextView)
+    }
+
     func testMoveUpAtStartOfInternalLineStaysInCurrentBlock() throws {
         let firstID = BlockInputBlockID(rawValue: "first")
         let secondID = BlockInputBlockID(rawValue: "second")
@@ -231,5 +249,17 @@ final class BlockInputTextVerticalMovementTests: XCTestCase {
         } else {
             XCTFail("Expected cursor selection in the current block.")
         }
+    }
+
+    private static func tableBlock() -> BlockInputBlock {
+        BlockInputBlock(
+            id: "table",
+            kind: .table,
+            text: BlockInputTable.normalized(
+                header: ["Feature area", "Renderer"],
+                bodyRows: [["Tables", "Structured"], ["Images", "Standalone"]],
+                alignments: [.left, .left]
+            ).markdown
+        )
     }
 }

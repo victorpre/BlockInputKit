@@ -22,9 +22,11 @@ extension BlockInputView {
             }
             return true
         }
-        if event.blockInputIsBackwardDelete,
-           cursor.utf16Offset <= 0 {
-            return moveImageCaretToPreviousBlock(cursor)
+        if event.isBackspaceOrDelete {
+            if cursor.utf16Offset <= 0 {
+                return moveImageCaretToPreviousBlock(cursor)
+            }
+            return deleteImageBlockAtCaret(cursor) != nil
         }
         guard let text = event.blockInputInsertedText else {
             return false
@@ -68,6 +70,34 @@ extension BlockInputView {
             return false
         }
         return insertTextAtImageCaret(text, cursor: cursor) != nil
+    }
+
+    private func deleteImageBlockAtCaret(_ cursor: BlockInputCursor) -> BlockInputSelection? {
+        guard isEditable else {
+            return nil
+        }
+        refreshDocumentFromStore()
+        guard let deletionIndex = activeImageCaretIndex(for: cursor.blockID),
+              let deletedBlock = block(at: deletionIndex),
+              deletedBlock.kind.isImage else {
+            return nil
+        }
+        return performStructuralEdit(
+            named: "Delete Block",
+            storeSyncAction: { beforeDocument, afterDocument, _ in
+                if beforeDocument.blocks.count == 1,
+                   let replacementBlock = afterDocument.block(withID: deletedBlock.id) {
+                    return .replaceBlock(replacementBlock)
+                }
+                if beforeDocument.blocks.filter({ $0.id == deletedBlock.id }).count == 1 {
+                    return .deleteBlocks([deletedBlock.id])
+                }
+                return .replaceDocument
+            },
+            edit: { document in
+                document.deleteBlock(at: deletionIndex)
+            }
+        )
     }
 
     private func handleSelectedImageHorizontalMovement(_ event: NSEvent) -> Bool {
@@ -208,9 +238,4 @@ private extension NSEvent {
     var blockInputIsReturn: Bool {
         keyCode == 36 || keyCode == 76 || charactersIgnoringModifiers == "\r" || charactersIgnoringModifiers == "\n"
     }
-
-    var blockInputIsBackwardDelete: Bool {
-        keyCode == 51 || charactersIgnoringModifiers == "\u{7F}"
-    }
-
 }
