@@ -38,6 +38,11 @@ final class BlockInputMarkerView: NSView {
             needsDisplay = true
         }
     }
+    var accentColor = NSColor.controlAccentColor {
+        didSet {
+            needsDisplay = true
+        }
+    }
 
     override var isFlipped: Bool {
         true
@@ -237,19 +242,23 @@ final class BlockInputMarkerView: NSView {
             width: markerSize,
             height: markerSize
         )
-        let fillColor = NSColor.tertiaryLabelColor.withAlphaComponent(0.28)
-        fillColor.setFill()
-        NSBezierPath(roundedRect: markerFrame, xRadius: 5, yRadius: 5).fill()
         if checkboxState == .checked {
+            accentColor.setFill()
+            NSBezierPath(roundedRect: markerFrame, xRadius: 5, yRadius: 5).fill()
             let checkPath = NSBezierPath()
-            checkPath.lineWidth = 1.8
+            checkPath.lineWidth = 1.4
             checkPath.lineCapStyle = .round
             checkPath.lineJoinStyle = .round
-            checkPath.move(to: NSPoint(x: markerFrame.minX + 4, y: markerFrame.midY))
-            checkPath.line(to: NSPoint(x: markerFrame.minX + 7, y: markerFrame.maxY - 4))
-            checkPath.line(to: NSPoint(x: markerFrame.maxX - 4, y: markerFrame.minY + 4))
-            (textColor ?? NSColor.labelColor).withAlphaComponent(0.75).setStroke()
+            checkPath.move(to: NSPoint(x: markerFrame.minX + markerFrame.width * 0.25, y: markerFrame.midY))
+            checkPath.line(to: NSPoint(x: markerFrame.minX + markerFrame.width * 0.43, y: markerFrame.maxY - markerFrame.height * 0.28))
+            checkPath.line(to: NSPoint(x: markerFrame.maxX - markerFrame.width * 0.22, y: markerFrame.minY + markerFrame.height * 0.28))
+            NSColor.white.setStroke()
             checkPath.stroke()
+        } else {
+            NSColor.quaternaryLabelColor.setStroke()
+            let path = NSBezierPath(roundedRect: markerFrame.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
+            path.lineWidth = 1.0
+            path.stroke()
         }
         return true
     }

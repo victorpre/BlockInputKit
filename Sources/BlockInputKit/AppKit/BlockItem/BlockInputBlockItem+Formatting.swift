@@ -275,6 +275,10 @@ extension BlockInputBlockItem {
         applyInlineCodeAttributes(for: block, textStorage: textStorage)
         applyFrontMatterKeyValueAttributes(for: block, textStorage: textStorage)
         applyFrontMatterValidationAttributes(for: block, textStorage: textStorage)
+        if case .checklistItem(true) = block.kind {
+            textStorage.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: fullRange)
+            textStorage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: fullRange)
+        }
         textStorage.endEditing()
         textView.layoutManager?.invalidateLayout(forCharacterRange: fullRange, actualCharacterRange: nil)
         textView.needsDisplay = true
@@ -329,6 +333,7 @@ extension BlockInputBlockItem {
 
     func applyKindLabelAttributes(for block: BlockInputBlock) {
         kindLabel.font = Self.font(for: block.kind, style: style)
+        kindLabel.accentColor = accentColor
         kindLabel.setMarkerLines(Self.markerLines(for: block))
         updateMarkerLineYOffsets()
     }
@@ -470,12 +475,18 @@ extension BlockInputBlockItem {
         if case .code = kind {
             return style.codeBlock.foregroundColor ?? style.baseText.foregroundColor ?? .labelColor
         }
+        if case .checklistItem(true) = kind {
+            return NSColor.tertiaryLabelColor
+        }
         return readOnlyForegroundColor(style.baseText.foregroundColor ?? .labelColor, for: kind)
     }
 
     private func typingForegroundColor(for kind: BlockInputBlockKind) -> NSColor? {
         if case .code = kind {
             return style.codeBlock.foregroundColor ?? style.baseText.foregroundColor
+        }
+        if case .checklistItem(true) = kind {
+            return NSColor.tertiaryLabelColor
         }
         guard !isEditable else {
             return style.baseText.foregroundColor

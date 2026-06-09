@@ -64,7 +64,7 @@ extension BlockInputBlockItem {
         kindLabel.setMarkerLines([])
         kindLabelLeadingConstraint?.constant = 0
         kindLabelWidthConstraint?.constant = 0
-        checklistButton.state = .off
+        checklistButton.isChecked = false
         checklistButton.isHidden = true
         checklistButton.isEnabled = false
         checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
