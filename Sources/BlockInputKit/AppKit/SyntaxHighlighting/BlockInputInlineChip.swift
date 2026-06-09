@@ -5,10 +5,14 @@ enum BlockInputInlineChipKind: Equatable {
     case fileLink
     case slashCommand
     case rawSlashCommand
+    case hashtag
 }
 
 extension BlockInputInlineMarkdownRange {
     func inlineChipKind(in text: String) -> BlockInputInlineChipKind? {
+        if style == .hashtag {
+            return .hashtag
+        }
         if style == .rawSlashCommand {
             return .rawSlashCommand
         }
@@ -49,6 +53,8 @@ extension BlockInputStyle {
             return slashCommandChip
         case .rawSlashCommand:
             return rawSlashCommandChip
+        case .hashtag:
+            return hashtagChip
         }
     }
 }

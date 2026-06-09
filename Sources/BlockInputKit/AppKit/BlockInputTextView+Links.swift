@@ -312,7 +312,13 @@ extension BlockInputTextView {
     }
 
     private func inlineChipVisualRangesForCurrentText() -> [BlockInputInlineMarkdownRange] {
-        inlineMarkdownRangesForCurrentText().filter { $0.inlineChipKind(in: string) != nil }
+        let isChecklist = blockItem?.renderedBlock?.kind.isChecklist == true
+        return inlineMarkdownRangesForCurrentText().filter {
+            if $0.style == .hashtag {
+                return isChecklist
+            }
+            return $0.inlineChipKind(in: string) != nil
+        }
     }
 
     private func inlineChipStyle(for range: BlockInputInlineMarkdownRange) -> BlockInputInlineChipStyle? {

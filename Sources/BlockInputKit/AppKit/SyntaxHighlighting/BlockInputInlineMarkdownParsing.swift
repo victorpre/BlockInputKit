@@ -8,6 +8,7 @@ enum BlockInputInlineMarkdownStyle: Hashable {
     case strikethrough
     case link
     case rawSlashCommand
+    case hashtag
 }
 
 /// UTF-16 ranges for one visual inline Markdown span.
@@ -79,7 +80,11 @@ enum BlockInputInlineMarkdownParsing {
                 isDocumentStartBlock: isDocumentStartBlock
             )
         }() : []
-        return mergedByContentLocation(nonRawRangeGroups.including(rawSlashRanges: rawSlashRanges))
+        let hashtagRanges = BlockInputHashtagParsing.hashtagRanges(
+            in: text,
+            excluding: excludedRanges + nonRawRangeGroups.delimiterRanges + rawSlashRanges.map(\.fullRange)
+        )
+        return mergedByContentLocation(nonRawRangeGroups.including(rawSlashRanges: rawSlashRanges, hashtagRanges: hashtagRanges))
     }
 
     private static func nonRawMarkdownRangeGroups(
@@ -419,10 +424,14 @@ private struct BlockInputInlineMarkdownRangeGroups {
         }
     }
 
-    func including(rawSlashRanges: [BlockInputInlineMarkdownRange]) -> [[BlockInputInlineMarkdownRange]] {
+    func including(
+        rawSlashRanges: [BlockInputInlineMarkdownRange],
+        hashtagRanges: [BlockInputInlineMarkdownRange] = []
+    ) -> [[BlockInputInlineMarkdownRange]] {
         [
             links,
             rawSlashRanges,
+            hashtagRanges,
             composedAsterisks,
             bold,
             strikethrough,

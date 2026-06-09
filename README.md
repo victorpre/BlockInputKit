@@ -121,6 +121,12 @@ let configuration = BlockInputConfiguration(
             strokeColor: NSColor.controlAccentColor.withAlphaComponent(0.24),
             foregroundColor: .labelColor,
             cornerRadius: 5
+        ),
+        hashtagChip: BlockInputInlineChipStyle(
+            fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
+            foregroundColor: .labelColor,
+            cornerRadius: 6
         )
     )
 )
@@ -500,6 +506,40 @@ let configuration = BlockInputConfiguration(
 ```
 
 Return `.useDefault` for built-in insertion, `.cancel` to leave the document unchanged, or `.insert(...)` with replacement references.
+
+## Checklist Hashtags
+
+Checklist blocks detect `#tag` patterns and render them as inline chip badges. Tags start with `#` followed by alphanumeric characters, hyphens, and underscores (e.g., `#groceries`, `#my-tag`, `#tag123`). The `#` must not be preceded by a word character.
+
+```swift
+let blocks: [BlockInputBlock] = [
+    BlockInputBlock(
+        id: "1",
+        kind: .checklistItem(isChecked: false),
+        text: "buy milk #groceries"
+    ),
+    BlockInputBlock(
+        id: "2",
+        kind: .checklistItem(isChecked: true),
+        text: "reply to email #work"
+    )
+]
+```
+
+Hashtag badges are visual only. They keep editing, selection, copy, accessibility text, and Markdown export behavior as normal text. Tags render only in checklist blocks; `#tag` text in paragraphs, headings, quotes, or other block kinds stays plain text.
+
+Configure the badge appearance through `BlockInputStyle.hashtagChip`:
+
+```swift
+let style = BlockInputStyle(
+    hashtagChip: BlockInputInlineChipStyle(
+        fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
+        strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
+        foregroundColor: .labelColor,
+        cornerRadius: 6
+    )
+)
+```
 
 ## Images
 
