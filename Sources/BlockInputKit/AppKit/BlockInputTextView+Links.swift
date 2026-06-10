@@ -165,7 +165,10 @@ extension BlockInputTextView {
         textContainer: NSTextContainer
     ) -> BlockInputLinkHitResult? {
         let location = convert(windowLocation, from: nil)
-        for linkRange in linkRangesForCurrentText() where linkRange.inlineChipKind(in: string) != nil {
+        for linkRange in linkRangesForCurrentText() {
+            guard let chipKind = linkRange.inlineChipKind(in: string) else {
+                continue
+            }
             let characterRange = string.linkCursorClampedRange(linkRange.contentRange)
             let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
                 .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
@@ -175,7 +178,9 @@ extension BlockInputTextView {
             let backgroundRects = inlineChipBackgroundRects(
                 glyphRange: glyphRange,
                 layoutManager: layoutManager,
-                textContainer: textContainer
+                textContainer: textContainer,
+                extraLeftPadding: chipIconPadding(for: chipKind),
+                leadingMargin: Self.chipLeadingMargin(for: chipKind)
             )
             if backgroundRects.contains(where: { $0.contains(location) }) {
                 return BlockInputLinkHitResult(
@@ -207,11 +212,13 @@ extension BlockInputTextView {
             guard glyphRange.length > 0 else {
                 continue
             }
-            if linkRange.inlineChipKind(in: string) != nil {
+            if let chipKind = linkRange.inlineChipKind(in: string) {
                 for cursorRect in inlineChipBackgroundRects(
                     glyphRange: glyphRange,
                     layoutManager: layoutManager,
-                    textContainer: textContainer
+                    textContainer: textContainer,
+                    extraLeftPadding: chipIconPadding(for: chipKind),
+                    leadingMargin: Self.chipLeadingMargin(for: chipKind)
                 ) {
                     addCursorRect(cursorRect, cursor: .pointingHand)
                 }
@@ -235,7 +242,8 @@ extension BlockInputTextView {
         }
         layoutManager.ensureLayout(for: textContainer)
         for chipRange in inlineChipVisualRangesForCurrentText() {
-            guard let chipStyle = inlineChipStyle(for: chipRange) else {
+            guard let chipStyle = inlineChipStyle(for: chipRange),
+                  let chipKind = chipRange.inlineChipKind(in: string) else {
                 continue
             }
             let characterRange = string.linkCursorClampedRange(chipRange.contentRange)
@@ -244,12 +252,19 @@ extension BlockInputTextView {
             guard glyphRange.length > 0 else {
                 continue
             }
+            let iconPadding = chipIconPadding(for: chipKind)
+            let chipLeadingMargin = Self.chipLeadingMargin(for: chipKind)
             for drawRect in inlineChipBackgroundRects(
                 glyphRange: glyphRange,
                 layoutManager: layoutManager,
-                textContainer: textContainer
+                textContainer: textContainer,
+                extraLeftPadding: iconPadding,
+                leadingMargin: chipLeadingMargin
             ) where drawRect.intersects(dirtyRect) {
                 drawInlineChipBackground(in: drawRect, style: chipStyle)
+                if iconPadding > 0 {
+                    drawDueDateIcon(in: drawRect, leadingMargin: chipLeadingMargin, color: dueDateIconColor(for: chipKind))
+                }
             }
         }
     }
@@ -265,13 +280,16 @@ extension BlockInputTextView {
             let characterRange = string.linkCursorClampedRange(chipRange.contentRange)
             let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
                 .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
-            guard glyphRange.length > 0 else {
+            guard glyphRange.length > 0,
+                  let chipKind = chipRange.inlineChipKind(in: string) else {
                 return []
             }
             return inlineChipBackgroundRects(
                 glyphRange: glyphRange,
                 layoutManager: layoutManager,
-                textContainer: textContainer
+                textContainer: textContainer,
+                extraLeftPadding: chipIconPadding(for: chipKind),
+                leadingMargin: Self.chipLeadingMargin(for: chipKind)
             )
         }
     }
@@ -314,10 +332,12 @@ extension BlockInputTextView {
     private func inlineChipVisualRangesForCurrentText() -> [BlockInputInlineMarkdownRange] {
         let isChecklist = blockItem?.renderedBlock?.kind.isChecklist == true
         return inlineMarkdownRangesForCurrentText().filter {
-            if $0.style == .hashtag {
+            switch $0.style {
+            case .hashtag, .dueDate:
                 return isChecklist
+            default:
+                return $0.inlineChipKind(in: string) != nil
             }
-            return $0.inlineChipKind(in: string) != nil
         }
     }
 
@@ -353,7 +373,9 @@ extension BlockInputTextView {
     private func inlineChipBackgroundRects(
         glyphRange: NSRange,
         layoutManager: NSLayoutManager,
-        textContainer: NSTextContainer
+        textContainer: NSTextContainer,
+        extraLeftPadding: CGFloat = 0,
+        leadingMargin: CGFloat = 0
     ) -> [NSRect] {
         let drawingOffset = textContainerOrigin
         let baseLineHeight = inlineChipBaseLineHeight(layoutManager: layoutManager)
@@ -370,9 +392,9 @@ extension BlockInputTextView {
                 let visualY = lineFragmentUsedRect.midY - (visualHeight / 2)
 
                 rects.append(NSRect(
-                    x: labelRect.minX + drawingOffset.x - 2,
+                    x: labelRect.minX + drawingOffset.x - 2 - extraLeftPadding - leadingMargin,
                     y: visualY + drawingOffset.y,
-                    width: labelRect.width + 4,
+                    width: labelRect.width + 4 + extraLeftPadding + leadingMargin,
                     height: visualHeight
                 ))
             }
@@ -389,6 +411,63 @@ extension BlockInputTextView {
             return 0
         }
         return ceil(max(layoutManager.defaultLineHeight(for: baseFont), baseFont.boundingRectForFont.height))
+    }
+    private static let dueDateIconTextGap: CGFloat = 4
+    private static let dueDateChipLeadingMargin: CGFloat = 6
+
+    private func chipIconPadding(for chipKind: BlockInputInlineChipKind) -> CGFloat {
+        switch chipKind {
+        case .dueDateOverdue, .dueDateToday, .dueDateUpcoming:
+            return dueDateIconSize + Self.dueDateIconTextGap
+        default:
+            return 0
+        }
+    }
+
+    private static func chipLeadingMargin(for chipKind: BlockInputInlineChipKind) -> CGFloat {
+        switch chipKind {
+        case .dueDateOverdue, .dueDateToday, .dueDateUpcoming:
+            return Self.dueDateChipLeadingMargin
+        default:
+            return 0
+        }
+    }
+
+    private var dueDateIconSize: CGFloat {
+        let baseFont = blockItem?.renderedBlock.map {
+            BlockInputBlockItem.font(for: $0.kind, style: blockItem?.style ?? .default)
+        } ?? font
+        guard let baseFont else {
+            return 10
+        }
+        return ceil(max(baseFont.pointSize * 0.94, 1) * 0.75)
+    }
+
+    private func drawDueDateIcon(in rect: NSRect, leadingMargin: CGFloat = 0, color: NSColor) {
+        let size = dueDateIconSize
+        let iconRect = NSRect(
+            x: rect.minX + 2 + leadingMargin,
+            y: rect.midY - size / 2,
+            width: size,
+            height: size
+        )
+        if let icon = NSImage(systemSymbolName: "flag.fill", accessibilityDescription: nil) {
+            let config = NSImage.SymbolConfiguration(pointSize: size, weight: .regular)
+            let configured = icon.withSymbolConfiguration(config)
+            let tinted = configured?.withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: [color]))
+            tinted?.draw(in: iconRect)
+        }
+    }
+
+    private func dueDateIconColor(for chipKind: BlockInputInlineChipKind) -> NSColor {
+        switch chipKind {
+        case .dueDateOverdue, .dueDateToday:
+            return dueDateAlertColor
+        case .dueDateUpcoming:
+            return .secondaryLabelColor
+        default:
+            return .labelColor
+        }
     }
 
     private func drawInlineChipBackground(in rect: NSRect, style: BlockInputInlineChipStyle) {

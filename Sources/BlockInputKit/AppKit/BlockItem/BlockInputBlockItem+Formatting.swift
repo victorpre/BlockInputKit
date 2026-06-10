@@ -277,7 +277,6 @@ extension BlockInputBlockItem {
         applyFrontMatterValidationAttributes(for: block, textStorage: textStorage)
         if case .checklistItem(true) = block.kind {
             textStorage.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: fullRange)
-            textStorage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: fullRange)
             let spaceChar: unichar = 0x20
             textStorage.enumerateAttribute(.blockInputInlineChip, in: fullRange) { value, chipRange, _ in
                 guard value as? Bool == true else { return }
