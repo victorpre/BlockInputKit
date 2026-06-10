@@ -54,6 +54,11 @@ final class BlockInputCompletionPopupRowView: NSView {
         let iconSystemName = suggestion.iconSystemName ?? Self.fallbackIconSystemName(for: suggestion)
         iconView.image = NSImage(systemSymbolName: iconSystemName, accessibilityDescription: suggestion.title) ??
             NSImage(systemSymbolName: Self.fallbackIconSystemName(for: suggestion), accessibilityDescription: suggestion.title)
+        if let iconTint = suggestion.iconTint {
+            iconView.contentTintColor = NSColor(red: iconTint.red, green: iconTint.green, blue: iconTint.blue, alpha: iconTint.alpha)
+        } else {
+            iconView.contentTintColor = nil
+        }
         setAccessibilityLabel(accessibilityLabel(for: suggestion))
         needsLayout = true
         needsDisplay = true
