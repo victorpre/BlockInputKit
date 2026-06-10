@@ -127,6 +127,24 @@ let configuration = BlockInputConfiguration(
             strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
             foregroundColor: .labelColor,
             cornerRadius: 6
+        ),
+        dueDateOverdueChip: BlockInputInlineChipStyle(
+            fillColor: NSColor.systemRed.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemRed.withAlphaComponent(0.18),
+            foregroundColor: .labelColor,
+            cornerRadius: 6
+        ),
+        dueDateTodayChip: BlockInputInlineChipStyle(
+            fillColor: NSColor.systemOrange.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemOrange.withAlphaComponent(0.18),
+            foregroundColor: .labelColor,
+            cornerRadius: 6
+        ),
+        dueDateUpcomingChip: BlockInputInlineChipStyle(
+            fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
+            foregroundColor: .labelColor,
+            cornerRadius: 6
         )
     )
 )
@@ -533,6 +551,56 @@ Configure the badge appearance through `BlockInputStyle.hashtagChip`:
 ```swift
 let style = BlockInputStyle(
     hashtagChip: BlockInputInlineChipStyle(
+        fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
+        strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
+        foregroundColor: .labelColor,
+        cornerRadius: 6
+    )
+)
+```
+
+## Checklist Due Dates
+
+Checklist blocks detect `!YYYY-MM-DD` patterns and render them as inline chip badges with a calendar icon. The `!` must not be preceded by a word character. Chips change color based on the due date status:
+
+- **Overdue** (past date): red chip (`.dueDateOverdueChip`)
+- **Today** (current date): orange chip (`.dueDateTodayChip`)
+- **Upcoming** (future date): teal chip (`.dueDateUpcomingChip`)
+
+```swift
+let blocks: [BlockInputBlock] = [
+    BlockInputBlock(
+        id: "1",
+        kind: .checklistItem(isChecked: false),
+        text: "finish report !2030-12-31"
+    ),
+    BlockInputBlock(
+        id: "2",
+        kind: .checklistItem(isChecked: true),
+        text: "old task !2020-01-01"
+    )
+]
+```
+
+Due-date badges are visual only. They keep editing, selection, copy, accessibility text, and Markdown export behavior as normal text. Dates render only in checklist blocks; `!YYYY-MM-DD` text in paragraphs, headings, quotes, or other block kinds stays plain text.
+
+Configure the badge appearance through `BlockInputStyle.dueDateOverdueChip`, `BlockInputStyle.dueDateTodayChip`, and `BlockInputStyle.dueDateUpcomingChip`:
+
+```swift
+let style = BlockInputStyle(
+    dueDateOverdueChip: BlockInputInlineChipStyle(
+        fillColor: NSColor.systemRed.withAlphaComponent(0.11),
+        strokeColor: NSColor.systemRed.withAlphaComponent(0.18),
+        foregroundColor: .labelColor,
+        cornerRadius: 6
+    ),
+    dueDateTodayChip: BlockInputInlineChipStyle(
+        fillColor: NSColor.systemOrange.withAlphaComponent(0.11),
+        strokeColor: NSColor.systemOrange.withAlphaComponent(0.18),
+        foregroundColor: .labelColor,
+        cornerRadius: 6
+    ),
+    dueDateUpcomingChip: BlockInputInlineChipStyle(
         fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
         strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
         foregroundColor: .labelColor,

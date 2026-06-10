@@ -9,6 +9,7 @@ enum BlockInputInlineMarkdownStyle: Hashable {
     case link
     case rawSlashCommand
     case hashtag
+    case dueDate
 }
 
 /// UTF-16 ranges for one visual inline Markdown span.
@@ -84,7 +85,11 @@ enum BlockInputInlineMarkdownParsing {
             in: text,
             excluding: excludedRanges + nonRawRangeGroups.delimiterRanges + rawSlashRanges.map(\.fullRange)
         )
-        return mergedByContentLocation(nonRawRangeGroups.including(rawSlashRanges: rawSlashRanges, hashtagRanges: hashtagRanges))
+        let dueDateRanges = BlockInputDueDateParsing.dueDateRanges(
+            in: text,
+            excluding: excludedRanges + nonRawRangeGroups.delimiterRanges + rawSlashRanges.map(\.fullRange) + hashtagRanges.map(\.fullRange)
+        )
+        return mergedByContentLocation(nonRawRangeGroups.including(rawSlashRanges: rawSlashRanges, hashtagRanges: hashtagRanges, dueDateRanges: dueDateRanges))
     }
 
     private static func nonRawMarkdownRangeGroups(
@@ -426,12 +431,14 @@ private struct BlockInputInlineMarkdownRangeGroups {
 
     func including(
         rawSlashRanges: [BlockInputInlineMarkdownRange],
-        hashtagRanges: [BlockInputInlineMarkdownRange] = []
+        hashtagRanges: [BlockInputInlineMarkdownRange] = [],
+        dueDateRanges: [BlockInputInlineMarkdownRange] = []
     ) -> [[BlockInputInlineMarkdownRange]] {
         [
             links,
             rawSlashRanges,
             hashtagRanges,
+            dueDateRanges,
             composedAsterisks,
             bold,
             strikethrough,

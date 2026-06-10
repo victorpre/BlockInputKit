@@ -39,11 +39,11 @@ extension BlockInputBlockItem {
         )
         let markdownRanges = block.kind.isChecklist
             ? allMarkdownRanges
-            : allMarkdownRanges.filter { $0.style != .hashtag }
+            : allMarkdownRanges.filter { $0.style != .hashtag && $0.style != .dueDate }
         let baseFont = Self.font(for: block.kind, style: style)
         for markdownRange in markdownRanges {
-            let inlineChipStyle = markdownRange
-                .inlineChipKind(in: textStorage.string)
+            let inlineChipKind = markdownRange.inlineChipKind(in: textStorage.string)
+            let inlineChipStyle = inlineChipKind
                 .map { style.inlineChipStyle(for: $0) }
             Self.applyInlineMarkdownContentAttributes(
                 for: markdownRange,
@@ -67,8 +67,13 @@ extension BlockInputBlockItem {
                     range: clampedDelimiterRange
                 )
             }
-            if inlineChipStyle != nil {
-                Self.applyInlineChipAdjacentWhitespaceSpacers(for: markdownRange, in: textStorage)
+            if let inlineChipKind {
+                Self.applyInlineChipAdjacentWhitespaceSpacers(
+                    for: markdownRange,
+                    in: textStorage,
+                    baseFont: baseFont,
+                    chipKind: inlineChipKind
+                )
             }
         }
     }
@@ -156,6 +161,8 @@ extension BlockInputBlockItem {
             applyInlineChip(to: range, in: textStorage, baseFont: baseFont, style: .init())
         case .hashtag:
             break
+        case .dueDate:
+            break
         }
     }
 
@@ -185,24 +192,47 @@ extension BlockInputBlockItem {
         max(0, ceil(baseFont.ascender - chipFont.ascender))
     }
 
+    private static let dueDateIconTextGap: CGFloat = 4
+    private static let dueDateChipLeadingMargin: CGFloat = 6
+    private static let dueDateChipExtraLeadingPadding: CGFloat = 6
+
     private static func applyInlineChipAdjacentWhitespaceSpacers(
         for markdownRange: BlockInputInlineMarkdownRange,
-        in textStorage: NSTextStorage
+        in textStorage: NSTextStorage,
+        baseFont: NSFont,
+        chipKind: BlockInputInlineChipKind
     ) {
         let text = textStorage.string as NSString
-        [
-            markdownRange.fullRange.location - 1,
-            NSMaxRange(markdownRange.fullRange)
-        ].forEach { location in
-            guard location >= 0,
-                  location < text.length,
-                  Self.isInlineChipAdjacentSpacerCharacter(text.character(at: location)) else {
-                return
-            }
+        let leftKern: CGFloat
+        let rightKern: CGFloat
+        switch chipKind {
+        case .dueDateOverdue, .dueDateToday, .dueDateUpcoming:
+            let chipFont = inlineChipFont(for: baseFont)
+            let iconSize = ceil(max(chipFont.pointSize * 0.94, 1) * 0.75)
+            leftKern = dueDateChipLeadingMargin + iconSize + dueDateIconTextGap + dueDateChipExtraLeadingPadding
+            rightKern = inlineChipAdjacentWhitespaceKern
+        default:
+            leftKern = inlineChipAdjacentWhitespaceKern
+            rightKern = inlineChipAdjacentWhitespaceKern
+        }
+        let leftLocation = markdownRange.fullRange.location - 1
+        if leftLocation >= 0,
+           leftLocation < text.length,
+           Self.isInlineChipAdjacentSpacerCharacter(text.character(at: leftLocation)) {
             textStorage.addAttribute(
                 .kern,
-                value: inlineChipAdjacentWhitespaceKern,
-                range: NSRange(location: location, length: 1)
+                value: leftKern,
+                range: NSRange(location: leftLocation, length: 1)
+            )
+        }
+        let rightLocation = NSMaxRange(markdownRange.fullRange)
+        if rightLocation >= 0,
+           rightLocation < text.length,
+           Self.isInlineChipAdjacentSpacerCharacter(text.character(at: rightLocation)) {
+            textStorage.addAttribute(
+                .kern,
+                value: rightKern,
+                range: NSRange(location: rightLocation, length: 1)
             )
         }
     }
@@ -253,6 +283,8 @@ extension BlockInputBlockItem {
                 break
             case .hashtag:
                 break
+            case .dueDate:
+                break
             }
         }
         return attributes
@@ -265,7 +297,7 @@ extension BlockInputBlockItem {
 
 private extension Set where Element == BlockInputInlineMarkdownStyle {
     var sortedByAttributeOrder: [BlockInputInlineMarkdownStyle] {
-        [.bold, .italic, .underline, .strikethrough, .link, .rawSlashCommand].filter { contains($0) }
+        [.bold, .italic, .underline, .strikethrough, .link, .rawSlashCommand, .hashtag, .dueDate].filter { contains($0) }
     }
 }
 
