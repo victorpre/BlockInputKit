@@ -263,7 +263,14 @@ extension BlockInputTextView {
             ) where drawRect.intersects(dirtyRect) {
                 drawInlineChipBackground(in: drawRect, style: chipStyle)
                 if iconPadding > 0 {
-                    drawDueDateIcon(in: drawRect, leadingMargin: chipLeadingMargin, color: dueDateIconColor(for: chipKind))
+                    switch chipKind {
+                    case .dueDateOverdue, .dueDateToday, .dueDateUpcoming:
+                        drawDueDateIcon(in: drawRect, leadingMargin: chipLeadingMargin, color: dueDateIconColor(for: chipKind))
+                    case .whenDateOverdue, .whenDateToday, .whenDateUpcoming:
+                        drawWhenDateIcon(in: drawRect, leadingMargin: chipLeadingMargin, color: whenDateIconColor(for: chipKind))
+                    default:
+                        break
+                    }
                 }
             }
         }
@@ -333,7 +340,7 @@ extension BlockInputTextView {
         let isChecklist = blockItem?.renderedBlock?.kind.isChecklist == true
         return inlineMarkdownRangesForCurrentText().filter {
             switch $0.style {
-            case .hashtag, .dueDate:
+            case .hashtag, .dueDate, .whenDate:
                 return isChecklist
             default:
                 return $0.inlineChipKind(in: string) != nil
@@ -419,6 +426,8 @@ extension BlockInputTextView {
         switch chipKind {
         case .dueDateOverdue, .dueDateToday, .dueDateUpcoming:
             return dueDateIconSize + Self.dueDateIconTextGap
+        case .whenDateOverdue, .whenDateToday, .whenDateUpcoming:
+            return whenDateIconSize + Self.dueDateIconTextGap
         default:
             return 0
         }
@@ -427,6 +436,8 @@ extension BlockInputTextView {
     private static func chipLeadingMargin(for chipKind: BlockInputInlineChipKind) -> CGFloat {
         switch chipKind {
         case .dueDateOverdue, .dueDateToday, .dueDateUpcoming:
+            return Self.dueDateChipLeadingMargin
+        case .whenDateOverdue, .whenDateToday, .whenDateUpcoming:
             return Self.dueDateChipLeadingMargin
         default:
             return 0
@@ -464,6 +475,45 @@ extension BlockInputTextView {
         case .dueDateOverdue, .dueDateToday:
             return dueDateAlertColor
         case .dueDateUpcoming:
+            return .secondaryLabelColor
+        default:
+            return .labelColor
+        }
+    }
+
+    private var whenDateIconSize: CGFloat {
+        let baseFont = blockItem?.renderedBlock.map {
+            BlockInputBlockItem.font(for: $0.kind, style: blockItem?.style ?? .default)
+        } ?? font
+        guard let baseFont else {
+            return 10
+        }
+        return ceil(max(baseFont.pointSize * 0.94, 1) * 0.75)
+    }
+
+    private func drawWhenDateIcon(in rect: NSRect, leadingMargin: CGFloat = 0, color: NSColor) {
+        let size = whenDateIconSize
+        let iconRect = NSRect(
+            x: rect.minX + 2 + leadingMargin,
+            y: rect.midY - size / 2,
+            width: size,
+            height: size
+        )
+        if let icon = NSImage(systemSymbolName: "calendar", accessibilityDescription: nil) {
+            let config = NSImage.SymbolConfiguration(pointSize: size, weight: .regular)
+            let configured = icon.withSymbolConfiguration(config)
+            let tinted = configured?.withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: [color]))
+            tinted?.draw(in: iconRect)
+        }
+    }
+
+    private func whenDateIconColor(for chipKind: BlockInputInlineChipKind) -> NSColor {
+        switch chipKind {
+        case .whenDateOverdue:
+            return dueDateAlertColor
+        case .whenDateToday:
+            return whenDateTodayColor
+        case .whenDateUpcoming:
             return .secondaryLabelColor
         default:
             return .labelColor

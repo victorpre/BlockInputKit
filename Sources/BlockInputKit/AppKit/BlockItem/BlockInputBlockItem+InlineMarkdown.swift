@@ -39,7 +39,7 @@ extension BlockInputBlockItem {
         )
         let markdownRanges = block.kind.isChecklist
             ? allMarkdownRanges
-            : allMarkdownRanges.filter { $0.style != .hashtag && $0.style != .dueDate }
+            : allMarkdownRanges.filter { $0.style != .hashtag && $0.style != .dueDate && $0.style != .whenDate }
         let baseFont = Self.font(for: block.kind, style: style)
         for markdownRange in markdownRanges {
             let inlineChipKind = markdownRange.inlineChipKind(in: textStorage.string)
@@ -163,6 +163,8 @@ extension BlockInputBlockItem {
             break
         case .dueDate:
             break
+        case .whenDate:
+            break
         }
     }
 
@@ -206,7 +208,8 @@ extension BlockInputBlockItem {
         let leftKern: CGFloat
         let rightKern: CGFloat
         switch chipKind {
-        case .dueDateOverdue, .dueDateToday, .dueDateUpcoming:
+        case .dueDateOverdue, .dueDateToday, .dueDateUpcoming,
+            .whenDateOverdue, .whenDateToday, .whenDateUpcoming:
             let chipFont = inlineChipFont(for: baseFont)
             let iconSize = ceil(max(chipFont.pointSize * 0.94, 1) * 0.75)
             leftKern = dueDateChipLeadingMargin + iconSize + dueDateIconTextGap + dueDateChipExtraLeadingPadding
@@ -285,6 +288,8 @@ extension BlockInputBlockItem {
                 break
             case .dueDate:
                 break
+            case .whenDate:
+                break
             }
         }
         return attributes
@@ -297,7 +302,7 @@ extension BlockInputBlockItem {
 
 private extension Set where Element == BlockInputInlineMarkdownStyle {
     var sortedByAttributeOrder: [BlockInputInlineMarkdownStyle] {
-        [.bold, .italic, .underline, .strikethrough, .link, .rawSlashCommand, .hashtag, .dueDate].filter { contains($0) }
+        [.bold, .italic, .underline, .strikethrough, .link, .rawSlashCommand, .hashtag, .dueDate, .whenDate].filter { contains($0) }
     }
 }
 

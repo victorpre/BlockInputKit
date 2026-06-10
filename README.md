@@ -472,6 +472,33 @@ BlockInputCompletionSuggestion.slashCommand(
 Raw slash chips are visual only. They keep editing, selection, copy, accessibility text, and Markdown export behavior as
 normal text. Link-backed slash chips and `slashCommandChipClickHandler` routing are unchanged.
 
+### Date Completions
+
+Return date suggestions under the `@` mention trigger alongside file mentions:
+
+```swift
+BlockInputCompletionSuggestion.date(date: tomorrow)
+```
+
+The factory inserts a when-date token (`@YYYY-MM-DD`) followed by a space. In checklist blocks this token renders
+as a chip with a calendar icon and date-aware coloring (overdue red, today orange, upcoming secondary). In
+non-checklist blocks `@YYYY-MM-DD` stays as plain text.
+
+The `style` parameter controls the visible title:
+
+```swift
+BlockInputCompletionSuggestion.date(date: nextMonday, style: .long)   // "June 15, 2026"
+BlockInputCompletionSuggestion.date(date: today, style: .relative)    // "Today"
+```
+
+Set `title:` to override the visible label while keeping the ISO‑8601 insertion text. Pass `iconSystemName:` or
+`detailText:` when the defaults (`"calendar"` / `"Date"`) should differ.
+
+The built-in completion popup tints the calendar icon to reflect date status: overdue and today dates get a blue accent
+(matching the editor's when‑date chip color), while upcoming dates keep the default icon tint.
+
+The styles are `.short`, `.medium` (default), `.long`, `.full`, and `.relative`, matching `DateFormatter.Style`.
+
 ### Inline Argument Hints
 
 Use `inlineHintProvider` for visual-only slash-command argument hints after the active caret. Hints are not inserted into
