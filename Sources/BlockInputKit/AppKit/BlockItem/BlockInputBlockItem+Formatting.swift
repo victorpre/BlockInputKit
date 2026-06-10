@@ -275,6 +275,20 @@ extension BlockInputBlockItem {
         applyInlineCodeAttributes(for: block, textStorage: textStorage)
         applyFrontMatterKeyValueAttributes(for: block, textStorage: textStorage)
         applyFrontMatterValidationAttributes(for: block, textStorage: textStorage)
+        if case .checklistItem(true) = block.kind {
+            textStorage.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: fullRange)
+            textStorage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: fullRange)
+            let spaceChar: unichar = 0x20
+            textStorage.enumerateAttribute(.blockInputInlineChip, in: fullRange) { value, chipRange, _ in
+                guard value as? Bool == true else { return }
+                var unboldedRange = chipRange
+                if chipRange.location > 0,
+                   (textStorage.string as NSString).character(at: chipRange.location - 1) == spaceChar {
+                    unboldedRange = NSRange(location: chipRange.location - 1, length: chipRange.length + 1)
+                }
+                textStorage.removeAttribute(.strikethroughStyle, range: unboldedRange)
+            }
+        }
         textStorage.endEditing()
         textView.layoutManager?.invalidateLayout(forCharacterRange: fullRange, actualCharacterRange: nil)
         textView.needsDisplay = true
@@ -329,6 +343,7 @@ extension BlockInputBlockItem {
 
     func applyKindLabelAttributes(for block: BlockInputBlock) {
         kindLabel.font = Self.font(for: block.kind, style: style)
+        kindLabel.accentColor = accentColor
         kindLabel.setMarkerLines(Self.markerLines(for: block))
         updateMarkerLineYOffsets()
     }
@@ -470,12 +485,18 @@ extension BlockInputBlockItem {
         if case .code = kind {
             return style.codeBlock.foregroundColor ?? style.baseText.foregroundColor ?? .labelColor
         }
+        if case .checklistItem(true) = kind {
+            return NSColor.tertiaryLabelColor
+        }
         return readOnlyForegroundColor(style.baseText.foregroundColor ?? .labelColor, for: kind)
     }
 
     private func typingForegroundColor(for kind: BlockInputBlockKind) -> NSColor? {
         if case .code = kind {
             return style.codeBlock.foregroundColor ?? style.baseText.foregroundColor
+        }
+        if case .checklistItem(true) = kind {
+            return NSColor.tertiaryLabelColor
         }
         guard !isEditable else {
             return style.baseText.foregroundColor

@@ -23,6 +23,8 @@ public struct BlockInputStyle: @unchecked Sendable {
     public var slashCommandChip: BlockInputInlineChipStyle
     /// Styling for raw `/command` visual chips.
     public var rawSlashCommandChip: BlockInputInlineChipStyle
+    /// Styling for hashtag inline chips rendered in checklist blocks.
+    public var hashtagChip: BlockInputInlineChipStyle
 
     /// Creates editor styling with optional overrides for built-in visual defaults.
     public init(
@@ -34,7 +36,13 @@ public struct BlockInputStyle: @unchecked Sendable {
         editorSurface: BlockInputEditorSurfaceStyle = BlockInputEditorSurfaceStyle(),
         fileChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
         slashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
-        rawSlashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle()
+        rawSlashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
+        hashtagChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(
+            fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
+            foregroundColor: .labelColor,
+            cornerRadius: 6
+        )
     ) {
         self.baseText = baseText
         self.selectionBackgroundColor = selectionBackgroundColor
@@ -45,6 +53,7 @@ public struct BlockInputStyle: @unchecked Sendable {
         self.fileChip = fileChip
         self.slashCommandChip = slashCommandChip
         self.rawSlashCommandChip = rawSlashCommandChip
+        self.hashtagChip = hashtagChip
     }
 }
 

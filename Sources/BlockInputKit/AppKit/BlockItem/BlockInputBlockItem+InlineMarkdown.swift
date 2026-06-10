@@ -29,7 +29,7 @@ extension BlockInputBlockItem {
         }
         let fullRange = NSRange(location: 0, length: textStorage.length)
         let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: textStorage.string).map(\.fullRange)
-        let markdownRanges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+        let allMarkdownRanges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: textStorage.string,
             excluding: inlineCodeRanges,
             fileBaseURL: fileBaseURL,
@@ -37,6 +37,9 @@ extension BlockInputBlockItem {
             slashCommandAvailability: slashCommandAvailability,
             isDocumentStartBlock: isDocumentStartBlock
         )
+        let markdownRanges = block.kind.isChecklist
+            ? allMarkdownRanges
+            : allMarkdownRanges.filter { $0.style != .hashtag }
         let baseFont = Self.font(for: block.kind, style: style)
         for markdownRange in markdownRanges {
             let inlineChipStyle = markdownRange
@@ -151,6 +154,8 @@ extension BlockInputBlockItem {
             )
         case .rawSlashCommand:
             applyInlineChip(to: range, in: textStorage, baseFont: baseFont, style: .init())
+        case .hashtag:
+            break
         }
     }
 
@@ -245,6 +250,8 @@ extension BlockInputBlockItem {
                 attributes[.foregroundColor] = NSColor.linkColor
                 attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
             case .rawSlashCommand:
+                break
+            case .hashtag:
                 break
             }
         }
