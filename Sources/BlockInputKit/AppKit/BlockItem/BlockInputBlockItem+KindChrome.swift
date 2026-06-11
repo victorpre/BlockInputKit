@@ -49,6 +49,7 @@ extension BlockInputBlockItem {
         updateHorizontalConstraints(for: block)
         updateQuoteBarVerticalExtent()
         configureChecklistButton(for: block, contentIndent: contentIndent)
+        configureMetadataRow(for: block)
         updateImageBlockLayout(for: block)
     }
 
@@ -93,6 +94,26 @@ extension BlockInputBlockItem {
             checklistButton.state = .off
             checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
         }
+    }
+
+    private func configureMetadataRow(for block: BlockInputBlock) {
+        let hasMetadata = block.whenDate != nil || block.deadline != nil || !block.tags.isEmpty
+        guard case .checklistItem = block.kind, hasMetadata else {
+            metadataRowView.isHidden = true
+            metadataRowTopConstraint?.constant = 0
+            metadataRowBottomConstraint?.constant = 0
+            scrollViewBottomConstraint?.isActive = true
+            metadataRowTopConstraint?.isActive = false
+            metadataRowBottomConstraint?.isActive = false
+            return
+        }
+        metadataRowView.configure(with: block.whenDate, deadline: block.deadline, tags: block.tags)
+        metadataRowView.isHidden = false
+        metadataRowTopConstraint?.constant = Self.metadataRowTopInset
+        metadataRowBottomConstraint?.constant = -Self.metadataRowBottomInset
+        scrollViewBottomConstraint?.isActive = false
+        metadataRowTopConstraint?.isActive = true
+        metadataRowBottomConstraint?.isActive = true
     }
 
     func textContainerInset(

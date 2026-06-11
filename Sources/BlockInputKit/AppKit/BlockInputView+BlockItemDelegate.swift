@@ -29,11 +29,8 @@ extension BlockInputView: BlockInputBlockItemDelegate {
     ) {
         guard let index = index(of: blockID),
               let beforeBlock = block(at: index),
-              beforeBlock.id == blockID else {
-            return
-        }
-        let beforeText = beforeBlock.text
-        guard beforeText != text else {
+              beforeBlock.id == blockID,
+              beforeBlock.text != text else {
             return
         }
         if discardReadOnlyTextChangeIfNeeded(item: item, block: beforeBlock) { return }
@@ -48,22 +45,23 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             proposedText: text,
             selectionBefore: capturedSelectionBefore
         )
+        if let metadataSelection = extractMetadataTokenIfNeeded(
+            blockID: blockID,
+            beforeBlock: beforeBlock,
+            proposedText: resolvedChange.text,
+            proposedUTF16Offset: resolvedChange.proposedOffset,
+            selectionBefore: capturedSelectionBefore
+        ) {
+            reconfigureItemForSelection(item: item, blockID: blockID, selection: metadataSelection)
+            return
+        }
         if let shortcutSelection = applyTypingShortcutIfNeeded(
             blockID: blockID,
             proposedText: resolvedChange.text,
             proposedUTF16Offset: resolvedChange.proposedOffset,
             selectionBefore: capturedSelectionBefore
         ) {
-            // Shortcuts can insert a new focused block and reload collection items,
-            // so only reconfigure this item if it still owns the edited block.
-            if case let .cursor(cursor) = shortcutSelection,
-               cursor.blockID == blockID,
-               item.representedBlockID == blockID {
-                if let block = block(withID: blockID) {
-                    configureBlockItem(item, block: block)
-                }
-                item.setSelectedRange(NSRange(location: cursor.utf16Offset, length: 0))
-            }
+            reconfigureItemForSelection(item: item, blockID: blockID, selection: shortcutSelection)
             return
         }
         applyPlainTextChange(
@@ -77,6 +75,50 @@ extension BlockInputView: BlockInputBlockItemDelegate {
             )
         )
         refreshCompletionSession(item: item, blockID: blockID)
+    }
+
+    private func reconfigureItemForSelection(
+        item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        selection: BlockInputSelection
+    ) {
+        guard case let .cursor(cursor) = selection,
+              cursor.blockID == blockID,
+              item.representedBlockID == blockID else {
+            return
+        }
+        if let block = block(withID: blockID) {
+            configureBlockItem(item, block: block)
+        }
+        item.setSelectedRange(NSRange(location: cursor.utf16Offset, length: 0))
+    }
+
+    private func applyMetadataExtractionInReturnIfNeeded(
+        item: BlockInputBlockItem,
+        block: BlockInputBlock,
+        blockIndex: Int
+    ) {
+        guard case .checklistItem = block.kind else { return }
+        guard let extraction = BlockInputDocument.extractMetadataTokens(
+            from: item.currentText,
+            cursorUTF16Offset: item.currentSelectedRange.location
+        ) else { return }
+
+        var afterBlock = block
+        afterBlock.text = extraction.cleanText
+        if let whenDate = extraction.whenDate { afterBlock.whenDate = whenDate }
+        if let deadline = extraction.deadline { afterBlock.deadline = deadline }
+        let newTags = extraction.tags.filter { !afterBlock.tags.contains($0) }
+        afterBlock.tags.append(contentsOf: newTags)
+
+        let savedDelegate = item.textView.delegate
+        item.textView.delegate = nil
+        item.textView.string = extraction.cleanText
+        item.textView.setSelectedRange(NSRange(location: extraction.cursorOffset, length: 0))
+        item.textView.delegate = savedDelegate
+
+        syncDocumentStore(.replaceBlock(afterBlock))
+        _ = replaceCachedBlock(afterBlock, at: blockIndex)
     }
 
     private func applyPlainTextChange(
@@ -154,6 +196,10 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         guard let block = block(withID: blockID) else {
             return true
         }
+        guard let blockIndex = index(of: blockID) else {
+            return true
+        }
+        applyMetadataExtractionInReturnIfNeeded(item: item, block: block, blockIndex: blockIndex)
         let currentBlock = BlockInputBlock(
             id: block.id,
             kind: block.kind,

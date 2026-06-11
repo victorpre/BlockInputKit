@@ -30,6 +30,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let horizontalRuleInnerInset: CGFloat = defaultTextLeading + 4
     static let frontMatterDividerHeight: CGFloat = 1
     static let frontMatterDividerVerticalInset: CGFloat = 10
+    static let metadataRowTopInset: CGFloat = 2
+    static let metadataRowBottomInset: CGFloat = 4
+    static let metadataRowMinimumHeight: CGFloat = 22
     static let tableExternalVerticalInset: CGFloat = 6
     static let imageSurfaceHorizontalInset: CGFloat = textContainerContentLeading
     static let imageExternalVerticalInset: CGFloat = 6
@@ -45,6 +48,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     let imageCaretView = NSView()
     let horizontalRuleView = BlockInputHorizontalRuleView()
     let frontMatterDividerView = BlockInputFrontMatterDividerView()
+    let metadataRowView = BlockInputMetadataRowView()
     let selectionBackgroundView = BlockInputSelectionBackgroundView()
     let textView = BlockInputTextView(), hiddenDelimiterLayoutDelegate = BlockInputDelimiterGlyphs()
     private var trackingArea: NSTrackingArea?
@@ -101,6 +105,8 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var imageBlockWidthConstraint: NSLayoutConstraint?
     var imageBlockTopConstraint: NSLayoutConstraint?
     var imageBlockBottomConstraint: NSLayoutConstraint?
+    var metadataRowTopConstraint: NSLayoutConstraint?
+    var metadataRowBottomConstraint: NSLayoutConstraint?
     var imageLoadTask: Task<Void, Never>?
     var imageLoadCacheKey: String?
     private var isHorizontalRule = false

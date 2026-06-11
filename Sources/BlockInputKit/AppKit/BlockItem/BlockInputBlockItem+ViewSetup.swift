@@ -17,6 +17,7 @@ extension BlockInputBlockItem {
         setupHorizontalRuleView()
         setupFrontMatterDividerView()
         setupQuoteBarView()
+        setupMetadataRowView()
         addArrangedSubviews()
         activateLayoutConstraints()
     }
@@ -123,6 +124,10 @@ extension BlockInputBlockItem {
         quoteBarView.layer?.cornerRadius = Self.quoteBarWidth / 2
     }
 
+    private func setupMetadataRowView() {
+        metadataRowView.isHidden = true
+    }
+
     private func addArrangedSubviews() {
         codeBackgroundView.translatesAutoresizingMaskIntoConstraints = true
         view.addSubview(codeBackgroundView)
@@ -136,6 +141,7 @@ extension BlockInputBlockItem {
         }
         imageCaretView.translatesAutoresizingMaskIntoConstraints = true
         view.addSubview(imageCaretView)
+        view.addSubview(metadataRowView)
         for subview in [frontMatterDividerView, handleView] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
@@ -245,7 +251,26 @@ extension BlockInputBlockItem {
             horizontalRuleTrailingConstraint,
             horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             horizontalRuleView.heightAnchor.constraint(equalToConstant: 9)
-        ] + tableViewLayoutConstraints() + imageBlockViewLayoutConstraints() + frontMatterDividerLayoutConstraints()
+        ] + metadataRowLayoutConstraints() + tableViewLayoutConstraints() + imageBlockViewLayoutConstraints() + frontMatterDividerLayoutConstraints()
+    }
+
+    private func metadataRowLayoutConstraints() -> [NSLayoutConstraint] {
+        let topConstraint = metadataRowView.topAnchor.constraint(
+            equalTo: scrollView.bottomAnchor,
+            constant: Self.metadataRowTopInset
+        )
+        metadataRowTopConstraint = topConstraint
+        let bottomConstraint = metadataRowView.bottomAnchor.constraint(
+            equalTo: view.bottomAnchor,
+            constant: -Self.metadataRowBottomInset
+        )
+        metadataRowBottomConstraint = bottomConstraint
+        return [
+            metadataRowView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            metadataRowView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            topConstraint,
+            bottomConstraint
+        ]
     }
 
     private func imageBlockViewLayoutConstraints() -> [NSLayoutConstraint] {

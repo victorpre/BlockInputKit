@@ -81,6 +81,21 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
             normalizeForKind()
         }
     }
+    /// When-date metadata for task blocks (extracted from `@` tokens).
+    ///
+    /// Only meaningful for ``BlockInputBlockKind/checklistItem`` blocks;
+    /// cleared by ``normalizeForKind()`` for other block kinds.
+    public var whenDate: String?
+    /// Deadline metadata for task blocks (extracted from `!` tokens).
+    ///
+    /// Only meaningful for ``BlockInputBlockKind/checklistItem`` blocks;
+    /// cleared by ``normalizeForKind()`` for other block kinds.
+    public var deadline: String?
+    /// Tag metadata for task blocks (extracted from `#` tokens).
+    ///
+    /// Only meaningful for ``BlockInputBlockKind/checklistItem`` blocks;
+    /// cleared by ``normalizeForKind()`` for other block kinds.
+    public var tags: [String]
     /// Nesting level used by list-like blocks.
     public var indentationLevel: Int {
         didSet {
@@ -103,13 +118,19 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
         kind: BlockInputBlockKind = .paragraph,
         text: String = "",
         indentationLevel: Int = 0,
-        lineIndentationLevels: [Int] = []
+        lineIndentationLevels: [Int] = [],
+        whenDate: String? = nil,
+        deadline: String? = nil,
+        tags: [String] = []
     ) {
         self.id = id
         self.kind = kind
         self.text = kind.normalizesTextToEmpty ? "" : text
         self.indentationLevel = indentationLevel
         self.lineIndentationLevels = lineIndentationLevels
+        self.whenDate = whenDate
+        self.deadline = deadline
+        self.tags = tags
         normalizeForKind()
     }
 
@@ -125,6 +146,9 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
             [Int].self,
             forKey: .lineIndentationLevels
         ) ?? []
+        whenDate = try container.decodeIfPresent(String.self, forKey: .whenDate)
+        deadline = try container.decodeIfPresent(String.self, forKey: .deadline)
+        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         normalizeForKind()
     }
 
@@ -170,6 +194,11 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
         if lineIndentationLevels != normalizedLineIndentations {
             lineIndentationLevels = normalizedLineIndentations
         }
+        if case .checklistItem = kind {} else {
+            whenDate = nil
+            deadline = nil
+            tags = []
+        }
     }
 
     private func normalizedLineIndentationLevels() -> [Int] {
@@ -195,6 +224,9 @@ public struct BlockInputBlock: Equatable, Codable, Sendable, Identifiable {
         case text
         case indentationLevel
         case lineIndentationLevels
+        case whenDate
+        case deadline
+        case tags
     }
 }
 

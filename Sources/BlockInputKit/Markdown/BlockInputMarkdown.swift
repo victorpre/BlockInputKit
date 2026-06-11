@@ -256,18 +256,22 @@ enum BlockInputMarkdownImporter {
         let trimmed = String(line.dropFirst(leadingSpaceCount))
 
         if trimmed == "- [ ]" || trimmed.hasPrefix("- [ ] ") {
-            return BlockInputBlock(
+            var block = BlockInputBlock(
                 kind: .checklistItem(isChecked: false),
                 text: String(trimmed.dropFirst(min(6, trimmed.count))),
                 indentationLevel: indentationLevel
             )
+            block.applyImportedMetadata()
+            return block
         }
         if trimmed == "- [x]" || trimmed == "- [X]" || trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") {
-            return BlockInputBlock(
+            var block = BlockInputBlock(
                 kind: .checklistItem(isChecked: true),
                 text: String(trimmed.dropFirst(min(6, trimmed.count))),
                 indentationLevel: indentationLevel
             )
+            block.applyImportedMetadata()
+            return block
         }
         if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("+ ") {
             return BlockInputBlock(
@@ -440,7 +444,8 @@ enum BlockInputMarkdownSerializer {
             return numberedListMarkdown(block, start: start)
         case .checklistItem(let isChecked):
             return BlockInputLineBreaks.lines(in: block.text).enumerated().map { offset, line in
-                "\(indent(for: block, lineOffset: offset))- [\(isChecked ? "x" : " ")] \(line)"
+                let metadataSuffix = offset == 0 ? block.metadataMarkdownSuffix : ""
+                return "\(indent(for: block, lineOffset: offset))- [\(isChecked ? "x" : " ")] \(line)\(metadataSuffix)"
             }.joined(separator: "\n")
         case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
             preconditionFailure("Expected structured Markdown block")

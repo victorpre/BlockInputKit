@@ -68,6 +68,13 @@ extension BlockInputBlockItem {
         checklistButton.isHidden = true
         checklistButton.isEnabled = false
         checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
+        metadataRowView.isHidden = true
+        metadataRowView.clearChips()
+        metadataRowTopConstraint?.constant = 0
+        metadataRowBottomConstraint?.constant = 0
+        scrollViewBottomConstraint?.isActive = true
+        metadataRowTopConstraint?.isActive = false
+        metadataRowBottomConstraint?.isActive = false
         frontMatterDividerView.isHidden = true
         frontMatterDividerView.alphaValue = 0
         handleView.isEnabled = false

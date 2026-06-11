@@ -41,7 +41,7 @@ extension BlockInputBlockItem {
         if case .code = block.kind {
             return codeBlockHeight(text: text, availableTextWidth: availableTextWidth, font: font, metrics: metrics)
         }
-        return textBlockHeight(BlockInputTextHeightContext(
+        let textHeight = textBlockHeight(BlockInputTextHeightContext(
             text: text,
             availableTextWidth: availableTextWidth,
             font: font,
@@ -51,6 +51,19 @@ extension BlockInputBlockItem {
             frontMatterReserve: frontMatterReserve,
             style: style
         ))
+        let metadataReserve = metadataRowReserve(for: block, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
+        return textHeight + metadataReserve
+    }
+
+    private static func metadataRowReserve(for block: BlockInputBlock, blockVerticalInsetMultiplier: CGFloat) -> CGFloat {
+        guard case .checklistItem = block.kind else {
+            return 0
+        }
+        let hasMetadata = block.whenDate != nil || block.deadline != nil || !block.tags.isEmpty
+        guard hasMetadata else {
+            return 0
+        }
+        return metadataRowTopInset + metadataRowMinimumHeight + metadataRowBottomInset
     }
 
     private static func codeBlockHeight(

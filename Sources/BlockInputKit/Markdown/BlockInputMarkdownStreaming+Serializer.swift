@@ -42,7 +42,8 @@ enum BlockInputStreamingMarkdownSerializer {
             try await writeNumberedList(block, start: start, to: &writer)
         case .checklistItem(let isChecked):
             try await writeLines(BlockInputLineBreaks.lines(in: block.text), to: &writer) { offset, line in
-                "\(indent(for: block, lineOffset: offset))- [\(isChecked ? "x" : " ")] \(line)"
+                let metadataSuffix = offset == 0 ? block.metadataMarkdownSuffix : ""
+                return "\(indent(for: block, lineOffset: offset))- [\(isChecked ? "x" : " ")] \(line)\(metadataSuffix)"
             }
         case .paragraph, .heading, .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
             break
