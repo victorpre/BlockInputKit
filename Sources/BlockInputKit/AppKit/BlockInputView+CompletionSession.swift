@@ -1,5 +1,4 @@
 import AppKit
-
 struct BlockInputCompletionToken: Equatable {
     var trigger: BlockInputCompletionTrigger
     var replacementRange: NSRange
@@ -7,9 +6,9 @@ struct BlockInputCompletionToken: Equatable {
     var rawQuery: String
     var fileQuery: BlockInputCompletionFileQuery?
 }
-
 struct BlockInputCompletionSession: Equatable {
     var id: UUID
+    var generation: Int
     var blockID: BlockInputBlockID
     var token: BlockInputCompletionToken
     var sourceText: String
@@ -19,10 +18,8 @@ struct BlockInputCompletionSession: Equatable {
     var highlightedIndex: Int
     var isLoading: Bool
 }
-
 extension BlockInputView {
     static let overlayCompletionPopupVerticalOffset: CGFloat = 8
-
     /// Dismisses the completion popup when the editor view changes size.
     public override func setFrameSize(_ newSize: NSSize) {
         let previousWidth = frame.width
@@ -313,7 +310,7 @@ extension BlockInputView {
         }
         completionRequestTask = Task.detached(
             priority: .userInitiated
-        ) { [weak self, provider = request.provider, context = request.context, sessionID = session.id] in
+        ) { [weak self, provider = request.provider, context = request.context, sessionID = session.id, generation = session.generation] in
             let suggestions = await provider.suggestions(for: context)
             guard !Task.isCancelled else {
                 return
@@ -324,13 +321,8 @@ extension BlockInputView {
                     return
                 }
                 guard var current = completionSession,
-                      current.id == sessionID else {
-                    return
-                }
-                guard let currentBlock = block(withID: current.blockID),
-                      current.sourceText == currentBlock.text,
-                      current.sourceKind == currentBlock.kind else {
-                    dismissCompletionPopup()
+                      current.id == sessionID,
+                      current.generation == generation else {
                     return
                 }
                 current.suggestions = suggestions
@@ -443,9 +435,8 @@ extension BlockInputView {
         guard let session = completionSession else {
             return false
         }
-        guard let suggestion = session.suggestions[safe: session.highlightedIndex] else {
-            return consumesWhenMissing
-        }
+        guard session.suggestions.indices.contains(session.highlightedIndex) else { return consumesWhenMissing }
+        let suggestion = session.suggestions[session.highlightedIndex]
         if allowsExactMatchPassthrough,
            shouldPassthroughCompletionReturn() {
             return false
@@ -468,6 +459,30 @@ extension BlockInputView {
         guard completionReplacementText(in: session) != nil else {
             return
         }
+
+        if suggestion.iconSystemName == "calendar",
+           case .checklistItem = block.kind {
+            let range = session.token.replacementRange
+            let proposedText = NSMutableString(string: block.text)
+            proposedText.replaceCharacters(in: range, with: suggestion.insertionText)
+            let searchText = "\(proposedText) "
+            if let extraction = BlockInputDocument.extractMetadataTokens(from: searchText, cursorUTF16Offset: proposedText.length) {
+                var extractedBlock = block
+                extractedBlock.text = extraction.cleanText
+                if let whenDate = extraction.whenDate { extractedBlock.whenDate = whenDate }
+                if let deadline = extraction.deadline { extractedBlock.deadline = deadline }
+                let newTags = extraction.tags.filter { !extractedBlock.tags.contains($0) }
+                extractedBlock.tags.append(contentsOf: newTags)
+                performStructuralEdit(named: "Date completion", edit: { document in
+                    guard let targetIndex = document.index(of: block.id) else { return nil }
+                    document.blocks[targetIndex] = extractedBlock
+                    let cursorEnd = (extraction.cleanText as NSString).length
+                    return .cursor(BlockInputCursor(blockID: block.id, utf16Offset: cursorEnd))
+                })
+                return
+            }
+        }
+
         guard acceptCompletionSuggestion(
             suggestion,
             in: session.blockID,
@@ -478,13 +493,4 @@ extension BlockInputView {
         restoreVisibleSelection()
     }
 
-}
-
-private extension Array {
-    subscript(safe index: Int) -> Element? {
-        guard indices.contains(index) else {
-            return nil
-        }
-        return self[index]
-    }
 }

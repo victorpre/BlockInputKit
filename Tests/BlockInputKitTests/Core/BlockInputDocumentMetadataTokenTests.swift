@@ -3,6 +3,13 @@ import XCTest
 @testable import BlockInputKit
 
 final class BlockInputDocumentMetadataTokenTests: XCTestCase {
+    private func resolvedDate(from text: String, file: StaticString = #filePath, line: UInt = #line) -> String {
+        guard let date = BlockInputDateResolver.resolveDate(from: text) else {
+            XCTFail("Could not resolve date from \"\(text)\"", file: file, line: line)
+            return ""
+        }
+        return BlockInputDateResolver.isoDateString(from: date)
+    }
     // MARK: - @ (whenDate) Extraction
 
     func testExtractWhenDateTokenWithTrailingSpace() {
@@ -15,7 +22,7 @@ final class BlockInputDocumentMetadataTokenTests: XCTestCase {
             return
         }
         XCTAssertEqual(extraction.cleanText, "Buy groceries ")
-        XCTAssertEqual(extraction.whenDate, "today")
+        XCTAssertEqual(extraction.whenDate, resolvedDate(from: "today"))
         XCTAssertNil(extraction.deadline)
         XCTAssertTrue(extraction.tags.isEmpty)
     }
@@ -30,7 +37,7 @@ final class BlockInputDocumentMetadataTokenTests: XCTestCase {
             return
         }
         XCTAssertEqual(extraction.cleanText, "Buy ")
-        XCTAssertEqual(extraction.whenDate, "today")
+        XCTAssertEqual(extraction.whenDate, resolvedDate(from: "today"))
     }
 
     // MARK: - ! (deadline) Extraction
@@ -46,7 +53,7 @@ final class BlockInputDocumentMetadataTokenTests: XCTestCase {
         }
         XCTAssertEqual(extraction.cleanText, "Submit report ")
         XCTAssertNil(extraction.whenDate)
-        XCTAssertEqual(extraction.deadline, "tomorrow")
+        XCTAssertEqual(extraction.deadline, resolvedDate(from: "tomorrow"))
     }
 
     // MARK: - # (tags) Extraction
@@ -89,8 +96,8 @@ final class BlockInputDocumentMetadataTokenTests: XCTestCase {
             return
         }
         XCTAssertEqual(extraction.cleanText, "Finish project ")
-        XCTAssertEqual(extraction.whenDate, "friday")
-        XCTAssertEqual(extraction.deadline, "monday")
+        XCTAssertEqual(extraction.whenDate, resolvedDate(from: "friday"))
+        XCTAssertEqual(extraction.deadline, resolvedDate(from: "monday"))
         XCTAssertEqual(extraction.tags, ["work", "urgent"])
     }
 
@@ -105,7 +112,7 @@ final class BlockInputDocumentMetadataTokenTests: XCTestCase {
             XCTFail("Expected extraction")
             return
         }
-        XCTAssertEqual(extraction.whenDate, "today")
+        XCTAssertEqual(extraction.whenDate, resolvedDate(from: "today"))
         XCTAssertEqual(extraction.cleanText, "Plan ")
     }
 
@@ -118,7 +125,7 @@ final class BlockInputDocumentMetadataTokenTests: XCTestCase {
             XCTFail("Expected extraction")
             return
         }
-        XCTAssertEqual(extraction.deadline, "monday")
+        XCTAssertEqual(extraction.deadline, resolvedDate(from: "monday"))
         XCTAssertEqual(extraction.cleanText, "Work ")
     }
 
@@ -193,6 +200,71 @@ final class BlockInputDocumentMetadataTokenTests: XCTestCase {
         XCTAssertNil(extraction)
     }
 
+    // MARK: - Non-resolving tokens (corner case: @t that doesn't resolve)
+
+    func testNonResolvingDateTriggerNotExtracted() {
+        let text = "Todo @t "
+        let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        )
+        XCTAssertNil(extraction, "Non-resolving @t should not trigger extraction")
+    }
+
+    func testNonResolvingDeadlineTriggerNotExtracted() {
+        let text = "Todo !xyz "
+        let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        )
+        XCTAssertNil(extraction, "Non-resolving !xyz should not trigger extraction")
+    }
+
+    func testMixedResolvingAndNonResolvingTokens() {
+        let text = "Todo @today @xyz "
+        guard let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        ) else {
+            XCTFail("Expected extraction when at least one token resolves")
+            return
+        }
+        XCTAssertEqual(extraction.whenDate, resolvedDate(from: "today"))
+        XCTAssertEqual(extraction.cleanText, "Todo @xyz ")
+        XCTAssertTrue(extraction.tags.isEmpty)
+    }
+
+    func testNonResolvingTokenAtEndPreserved() {
+        let text = "Todo @t "
+        let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        )
+        XCTAssertNil(extraction, "@t is not a valid date and should not be stripped")
+    }
+
+    func testResolvingAndNonResolvingDeadline() {
+        let text = "Todo !monday !badbeat "
+        guard let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        ) else {
+            XCTFail("Expected extraction when deadline resolves")
+            return
+        }
+        XCTAssertEqual(extraction.deadline, resolvedDate(from: "monday"))
+        XCTAssertEqual(extraction.cleanText, "Todo !badbeat ")
+    }
+
+    func testNonResolvingDoesNotStripText() {
+        let text = "Todo @t "
+        let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        )
+        XCTAssertNil(extraction, "Text should remain unchanged when no token resolves")
+    }
+
     // MARK: - Import-mode Extraction (end of string without space)
 
     func testExtractWhenDateFromEndOfString() {
@@ -205,7 +277,7 @@ final class BlockInputDocumentMetadataTokenTests: XCTestCase {
             return
         }
         XCTAssertEqual(extraction.cleanText, "Buy ")
-        XCTAssertEqual(extraction.whenDate, "today")
+        XCTAssertEqual(extraction.whenDate, resolvedDate(from: "today"))
     }
 
     func testExtractTagsFromEndOfString() {
@@ -249,7 +321,7 @@ final class BlockInputDocumentMetadataTokenTests: XCTestCase {
             proposedUTF16Offset: 12
         )
         XCTAssertNotNil(extraction)
-        XCTAssertEqual(extraction?.whenDate, "today")
+        XCTAssertEqual(extraction?.whenDate, resolvedDate(from: "today"))
     }
 
     // MARK: - Apply Extraction to Document
@@ -275,7 +347,7 @@ final class BlockInputDocumentMetadataTokenTests: XCTestCase {
         )
 
         XCTAssertEqual(document.blocks[0].text, "Buy ")
-        XCTAssertEqual(document.blocks[0].whenDate, "today")
+        XCTAssertEqual(document.blocks[0].whenDate, resolvedDate(from: "today"))
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 5)))
     }
 

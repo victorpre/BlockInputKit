@@ -24,6 +24,12 @@ final class BlockInputMetadataChipView: NSView {
         }
     }
 
+    var dateStyle: BlockInputMetadataDateStyle? {
+        didSet {
+            updateAppearance()
+        }
+    }
+
     override var isFlipped: Bool { true }
 
     init(kind: ChipKind, text: String) {
@@ -76,11 +82,45 @@ final class BlockInputMetadataChipView: NSView {
         case .whenDate:
             iconView.image = NSImage(systemSymbolName: "calendar", accessibilityDescription: "When")
         case .deadline:
-            iconView.image = NSImage(systemSymbolName: "flag", accessibilityDescription: "Deadline")
+            iconView.image = NSImage(systemSymbolName: "flag.fill", accessibilityDescription: "Deadline")
         case .tag:
             iconView.image = NSImage(systemSymbolName: "tag", accessibilityDescription: "Tag")
         }
         label.stringValue = chipText
+        applyDateColors()
+    }
+
+    private func applyDateColors() {
+        switch chipKind {
+        case .whenDate, .deadline:
+            guard let dateStyle,
+                  let category = BlockInputDateResolver.categorize(dateString: chipText) else {
+                setNeutralColors()
+                return
+            }
+            switch category {
+            case .past:
+                let color = chipKind == .deadline ? dateStyle.dueDateAlertColor : dateStyle.whenDateAlertColor
+                setAlertColors(color)
+            case .present:
+                setAlertColors(dateStyle.whenDateTodayColor)
+            case .future:
+                setNeutralColors()
+            }
+        case .tag:
+            setNeutralColors()
+        }
+    }
+
+    private func setAlertColors(_ color: NSColor) {
+        iconView.contentTintColor = color
+        label.textColor = color
+        layer?.backgroundColor = color.withAlphaComponent(0.15).cgColor
+    }
+
+    private func setNeutralColors() {
+        iconView.contentTintColor = .secondaryLabelColor
+        label.textColor = .secondaryLabelColor
         layer?.backgroundColor = NSColor.controlBackgroundColor.withSystemEffect(.pressed).cgColor
     }
 

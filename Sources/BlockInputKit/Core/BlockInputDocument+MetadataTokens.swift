@@ -37,11 +37,18 @@ extension BlockInputDocument {
             let trigger = nsText.substring(with: match.range(at: 1))
             let value = nsText.substring(with: match.range(at: 2))
 
-            assignMetadata(trigger: trigger, value: value, whenDate: &whenDate, deadline: &deadline, tags: &tags)
+            guard assignMetadata(trigger: trigger, value: value, whenDate: &whenDate, deadline: &deadline, tags: &tags) else {
+                continue
+            }
+
             adjustedOffset = adjustedCursorOffset(removalRange: removalRange, currentOffset: adjustedOffset)
 
             let cleanNSString = cleanText as NSString
             cleanText = cleanNSString.replacingCharacters(in: removalRange, with: "")
+        }
+
+        guard whenDate != nil || deadline != nil || !tags.isEmpty else {
+            return nil
         }
 
         let normalized = collapseInternalDoubleSpaces(cleanText)
@@ -58,22 +65,36 @@ extension BlockInputDocument {
         )
     }
 
+    @discardableResult
     private static func assignMetadata(
         trigger: String,
         value: String,
         whenDate: inout String?,
         deadline: inout String?,
         tags: inout [String]
-    ) {
+    ) -> Bool {
         switch trigger {
         case "@":
-            if whenDate == nil { whenDate = value }
+            guard let date = BlockInputDateResolver.resolveDate(from: value) else {
+                return false
+            }
+            if whenDate == nil {
+                whenDate = BlockInputDateResolver.isoDateString(from: date)
+            }
+            return true
         case "!":
-            if deadline == nil { deadline = value }
+            guard let date = BlockInputDateResolver.resolveDate(from: value) else {
+                return false
+            }
+            if deadline == nil {
+                deadline = BlockInputDateResolver.isoDateString(from: date)
+            }
+            return true
         case "#":
             tags.append(value)
+            return true
         default:
-            break
+            return false
         }
     }
 
