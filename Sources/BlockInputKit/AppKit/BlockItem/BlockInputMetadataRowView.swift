@@ -34,14 +34,23 @@ final class BlockInputMetadataRowView: NSView {
         ])
     }
 
-    func configure(with whenDate: String?, deadline: String?, tags: [String]) {
+    func configure(
+        with whenDate: String?,
+        deadline: String?,
+        tags: [String],
+        dateStyle: BlockInputMetadataDateStyle = BlockInputMetadataDateStyle()
+    ) {
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         if let whenDate, !whenDate.isEmpty {
-            stackView.addArrangedSubview(BlockInputMetadataChipView(kind: .whenDate, text: whenDate))
+            let chip = BlockInputMetadataChipView(kind: .whenDate, text: whenDate)
+            chip.dateStyle = dateStyle
+            stackView.addArrangedSubview(chip)
         }
         if let deadline, !deadline.isEmpty {
-            stackView.addArrangedSubview(BlockInputMetadataChipView(kind: .deadline, text: deadline))
+            let chip = BlockInputMetadataChipView(kind: .deadline, text: deadline)
+            chip.dateStyle = dateStyle
+            stackView.addArrangedSubview(chip)
         }
         for tag in tags where !tag.isEmpty {
             stackView.addArrangedSubview(BlockInputMetadataChipView(kind: .tag, text: tag))

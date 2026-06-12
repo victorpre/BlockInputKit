@@ -3,44 +3,56 @@ import XCTest
 @testable import BlockInputKit
 
 final class BlockInputMetadataMarkdownTests: XCTestCase {
+    private func resolvedDate(from text: String, file: StaticString = #filePath, line: UInt = #line) -> String {
+        guard let date = BlockInputDateResolver.resolveDate(from: text) else {
+            XCTFail("Could not resolve date from \"\(text)\"", file: file, line: line)
+            return ""
+        }
+        return BlockInputDateResolver.isoDateString(from: date)
+    }
+
     // MARK: - Markdown Export
 
     func testExportMetadataTokens() {
+        let todayIso = resolvedDate(from: "today")
+        let fridayIso = resolvedDate(from: "friday")
         let block = BlockInputBlock(
             kind: .checklistItem(isChecked: false),
             text: "Buy groceries",
-            whenDate: "today",
-            deadline: "friday",
+            whenDate: todayIso,
+            deadline: fridayIso,
             tags: ["food", "urgent"]
         )
         let document = BlockInputDocument(blocks: [block])
         let markdown = document.markdown
 
-        XCTAssertEqual(markdown, "- [ ] Buy groceries @today !friday #food #urgent")
+        XCTAssertEqual(markdown, "- [ ] Buy groceries @\(todayIso) !\(fridayIso) #food #urgent")
     }
 
     func testExportWhenDateOnly() {
+        let todayIso = resolvedDate(from: "today")
         let block = BlockInputBlock(
             kind: .checklistItem(isChecked: true),
             text: "Done task",
-            whenDate: "today"
+            whenDate: todayIso
         )
         let document = BlockInputDocument(blocks: [block])
         let markdown = document.markdown
 
-        XCTAssertEqual(markdown, "- [x] Done task @today")
+        XCTAssertEqual(markdown, "- [x] Done task @\(todayIso)")
     }
 
     func testExportDeadlineOnly() {
+        let nextWeekIso = resolvedDate(from: "next-week")
         let block = BlockInputBlock(
             kind: .checklistItem(isChecked: false),
             text: "Task",
-            deadline: "next-week"
+            deadline: nextWeekIso
         )
         let document = BlockInputDocument(blocks: [block])
         let markdown = document.markdown
 
-        XCTAssertEqual(markdown, "- [ ] Task !next-week")
+        XCTAssertEqual(markdown, "- [ ] Task !\(nextWeekIso)")
     }
 
     func testExportTagsOnly() {
@@ -67,15 +79,16 @@ final class BlockInputMetadataMarkdownTests: XCTestCase {
     }
 
     func testExportMultilineChecklistOnlyFirstLineGetsMetadata() {
+        let todayIso = resolvedDate(from: "today")
         let block = BlockInputBlock(
             kind: .checklistItem(isChecked: false),
             text: "First line\nSecond line",
-            whenDate: "today"
+            whenDate: todayIso
         )
         let document = BlockInputDocument(blocks: [block])
         let markdown = document.markdown
 
-        XCTAssertEqual(markdown, "- [ ] First line @today\n  Second line")
+        XCTAssertEqual(markdown, "- [ ] First line @\(todayIso)\n  Second line")
     }
 
     // MARK: - Markdown Import
@@ -87,8 +100,8 @@ final class BlockInputMetadataMarkdownTests: XCTestCase {
         XCTAssertEqual(document.blocks.count, 1)
         XCTAssertEqual(document.blocks[0].text, "Buy groceries")
         XCTAssertEqual(document.blocks[0].kind, .checklistItem(isChecked: false))
-        XCTAssertEqual(document.blocks[0].whenDate, "today")
-        XCTAssertEqual(document.blocks[0].deadline, "friday")
+        XCTAssertEqual(document.blocks[0].whenDate, resolvedDate(from: "today"))
+        XCTAssertEqual(document.blocks[0].deadline, resolvedDate(from: "friday"))
         XCTAssertEqual(document.blocks[0].tags, ["food", "urgent"])
     }
 
@@ -97,7 +110,7 @@ final class BlockInputMetadataMarkdownTests: XCTestCase {
         let document = BlockInputDocument(markdown: markdown)
 
         XCTAssertEqual(document.blocks[0].text, "Buy")
-        XCTAssertEqual(document.blocks[0].whenDate, "today")
+        XCTAssertEqual(document.blocks[0].whenDate, resolvedDate(from: "today"))
     }
 
     func testImportTagsOnly() {
@@ -124,19 +137,21 @@ final class BlockInputMetadataMarkdownTests: XCTestCase {
 
         XCTAssertEqual(document.blocks[0].kind, .checklistItem(isChecked: true))
         XCTAssertEqual(document.blocks[0].text, "Done")
-        XCTAssertEqual(document.blocks[0].whenDate, "yesterday")
+        XCTAssertEqual(document.blocks[0].whenDate, resolvedDate(from: "yesterday"))
         XCTAssertEqual(document.blocks[0].tags, ["completed"])
     }
 
     // MARK: - Round Trip
 
     func testRoundTripPreservesMetadata() {
+        let todayIso = resolvedDate(from: "today")
+        let fridayIso = resolvedDate(from: "friday")
         let original = BlockInputDocument(blocks: [
             BlockInputBlock(
                 kind: .checklistItem(isChecked: false),
                 text: "Buy groceries",
-                whenDate: "today",
-                deadline: "friday",
+                whenDate: todayIso,
+                deadline: fridayIso,
                 tags: ["food", "urgent"]
             )
         ])
@@ -151,18 +166,21 @@ final class BlockInputMetadataMarkdownTests: XCTestCase {
     }
 
     func testRoundTripPreservesMultipleChecklistItemsWithMixedMetadata() {
+        let todayIso = resolvedDate(from: "today")
+        let tomorrowIso = resolvedDate(from: "tomorrow")
+        let nextWeekIso = resolvedDate(from: "next-week")
         let original = BlockInputDocument(blocks: [
             BlockInputBlock(kind: .checklistItem(isChecked: false), text: "No metadata"),
             BlockInputBlock(
                 kind: .checklistItem(isChecked: true),
                 text: "With when",
-                whenDate: "today"
+                whenDate: todayIso
             ),
             BlockInputBlock(
                 kind: .checklistItem(isChecked: false),
                 text: "With all",
-                whenDate: "tomorrow",
-                deadline: "next-week",
+                whenDate: tomorrowIso,
+                deadline: nextWeekIso,
                 tags: ["work", "important"]
             )
         ])

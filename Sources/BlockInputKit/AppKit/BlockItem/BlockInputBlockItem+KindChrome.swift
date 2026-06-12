@@ -107,7 +107,7 @@ extension BlockInputBlockItem {
             metadataRowBottomConstraint?.isActive = false
             return
         }
-        metadataRowView.configure(with: block.whenDate, deadline: block.deadline, tags: block.tags)
+        metadataRowView.configure(with: block.whenDate, deadline: block.deadline, tags: block.tags, dateStyle: style.metadataDate)
         metadataRowView.isHidden = false
         metadataRowTopConstraint?.constant = Self.metadataRowTopInset
         metadataRowBottomConstraint?.constant = -Self.metadataRowBottomInset

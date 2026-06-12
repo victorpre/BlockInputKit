@@ -25,6 +25,8 @@ public struct BlockInputStyle: @unchecked Sendable {
     public var slashCommandChip: BlockInputInlineChipStyle
     /// Styling for raw `/command` visual chips.
     public var rawSlashCommandChip: BlockInputInlineChipStyle
+    /// Styling for date-aware metadata chip colors (whenDate, deadline).
+    public var metadataDate: BlockInputMetadataDateStyle
 
     /// Creates editor styling with optional overrides for built-in visual defaults.
     public init(
@@ -37,7 +39,8 @@ public struct BlockInputStyle: @unchecked Sendable {
         editorSurface: BlockInputEditorSurfaceStyle = BlockInputEditorSurfaceStyle(),
         fileChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
         slashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
-        rawSlashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle()
+        rawSlashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
+        metadataDate: BlockInputMetadataDateStyle = BlockInputMetadataDateStyle()
     ) {
         self.baseText = baseText
         self.selectionBackgroundColor = selectionBackgroundColor
@@ -49,6 +52,7 @@ public struct BlockInputStyle: @unchecked Sendable {
         self.fileChip = fileChip
         self.slashCommandChip = slashCommandChip
         self.rawSlashCommandChip = rawSlashCommandChip
+        self.metadataDate = metadataDate
     }
 }
 
@@ -346,6 +350,31 @@ public struct BlockInputInlineChipStyle: @unchecked Sendable {
 
     private static func validCornerRadius(_ value: CGFloat) -> CGFloat {
         max(0, value)
+    }
+}
+
+/// Alert and highlight colors for date-aware metadata chips (whenDate, deadline).
+///
+/// Past dueDate chips use `dueDateAlertColor`, past whenDate chips use
+/// `whenDateAlertColor`, and chips whose date is today use `whenDateTodayColor`.
+/// Future dates and tag chips always use the neutral built-in colors.
+public struct BlockInputMetadataDateStyle: @unchecked Sendable {
+    /// Color used for deadline chips when the date is in the past.
+    public var dueDateAlertColor: NSColor
+    /// Color used for whenDate chips when the date is in the past.
+    public var whenDateAlertColor: NSColor
+    /// Color used for both deadline and whenDate chips when the date is today.
+    public var whenDateTodayColor: NSColor
+
+    /// Creates metadata date styling overrides.
+    public init(
+        dueDateAlertColor: NSColor = NSColor(red: 230 / 255, green: 87 / 255, blue: 120 / 255, alpha: 1),
+        whenDateAlertColor: NSColor = NSColor(red: 230 / 255, green: 87 / 255, blue: 120 / 255, alpha: 1),
+        whenDateTodayColor: NSColor = NSColor(red: 0.95, green: 0.65, blue: 0.05, alpha: 1)
+    ) {
+        self.dueDateAlertColor = dueDateAlertColor
+        self.whenDateAlertColor = whenDateAlertColor
+        self.whenDateTodayColor = whenDateTodayColor
     }
 }
 

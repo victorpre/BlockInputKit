@@ -30,6 +30,7 @@ extension BlockInputView {
     ) -> BlockInputCompletionSession {
         BlockInputCompletionSession(
             id: UUID(),
+            generation: 0,
             blockID: blockID,
             token: token,
             sourceText: sourceText,
@@ -55,6 +56,7 @@ extension BlockInputView {
               session.token.replacementRange.location == token.replacementRange.location else {
             return nil
         }
+        session.generation += 1
         session.token = token
         session.sourceText = sourceText
         session.sourceKind = block.kind

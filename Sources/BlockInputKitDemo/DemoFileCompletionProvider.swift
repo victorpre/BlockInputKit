@@ -41,6 +41,10 @@ final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked
     func suggestions(for context: BlockInputCompletionContext) async -> [BlockInputCompletionSuggestion] {
         switch context.trigger {
         case .mention:
+            if let block = context.document.blocks.first(where: { $0.id == context.blockID }),
+               case .checklistItem = block.kind {
+                return BlockInputCompletionSuggestion.dateSuggestions(for: context.query)
+            }
             return fileSuggestions(for: context)
         case .slashCommand:
             return slashCommandSuggestions(for: context)

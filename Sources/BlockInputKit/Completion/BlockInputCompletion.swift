@@ -71,6 +71,40 @@ public struct BlockInputCompletionFileQuery: Equatable, Sendable {
     }
 }
 
+/// A Sendable-safe RGBA color representation used to tint completion icons.
+public struct CompletionIconTint: Equatable, Sendable {
+    /// Red component in the 0–1 range.
+    public var red: CGFloat
+    /// Green component in the 0–1 range.
+    public var green: CGFloat
+    /// Blue component in the 0–1 range.
+    public var blue: CGFloat
+    /// Alpha component in the 0–1 range (defaults to 1).
+    public var alpha: CGFloat
+
+    /// Creates an RGBA color value.
+    public init(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat = 1) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+        self.alpha = alpha
+    }
+}
+
+/// Date formatting style for date completion suggestions.
+public enum BlockInputCompletionDateStyle: String, CaseIterable, Equatable, Codable, Sendable {
+    /// Short style e.g. "6/10/26".
+    case short
+    /// Medium style e.g. "Jun 10, 2026".
+    case medium
+    /// Long style e.g. "June 10, 2026".
+    case long
+    /// Full style e.g. "Wednesday, June 10, 2026".
+    case full
+    /// Relative style e.g. "Today", "Tomorrow", "Yesterday".
+    case relative
+}
+
 /// Host-provided context for mention and slash-command completion lookups.
 public struct BlockInputCompletionContext: Equatable, Sendable {
     /// Completion trigger currently being resolved.
@@ -130,6 +164,11 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
     public var iconSystemName: String?
     /// Optional trailing detail shown by built-in completion UI.
     public var detailText: String?
+    /// Optional icon tint applied by built-in completion UI.
+    public var iconTint: CompletionIconTint?
+
+    /// Optional title color applied by built-in completion UI.
+    public var titleColor: CompletionIconTint?
 
     /// Creates a host-provided completion suggestion.
     public init(
@@ -140,7 +179,9 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
         exactMatchText: String? = nil,
         trigger: BlockInputCompletionTrigger,
         iconSystemName: String? = nil,
-        detailText: String? = nil
+        detailText: String? = nil,
+        iconTint: CompletionIconTint? = nil,
+        titleColor: CompletionIconTint? = nil
     ) {
         self.id = id
         self.title = title
@@ -150,6 +191,8 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
         self.trigger = trigger
         self.iconSystemName = iconSystemName
         self.detailText = detailText
+        self.iconTint = iconTint
+        self.titleColor = titleColor
     }
 
     /// Builds a mention suggestion that inserts a Markdown file link followed by a space.
@@ -225,6 +268,127 @@ public struct BlockInputCompletionSuggestion: Equatable, Identifiable, Sendable 
     }
 }
 
+// MARK: - Date Completion
+
+extension BlockInputCompletionSuggestion {
+    /// Builds a date completion suggestion that inserts a when-date token followed by a space.
+    ///
+    /// The visible title is formatted according to the requested style. The insertion text is
+    /// `@YYYY-MM-DD` that the editor recognizes as a when-date chip in checklist blocks.
+    public static func date(
+        id: String? = nil,
+        title: String? = nil,
+        subtitle: String? = nil,
+        date: Date,
+        style: BlockInputCompletionDateStyle = .medium,
+        trigger: BlockInputCompletionTrigger = .mention,
+        iconSystemName: String? = "calendar",
+        detailText: String? = "Date"
+    ) -> BlockInputCompletionSuggestion {
+        let isoDate = isoDateString(from: date)
+        let displayTitle = title ?? formattedDate(date, style: style)
+        let today = Calendar.current.startOfDay(for: Date())
+        let dateDay = Calendar.current.startOfDay(for: date)
+        let pastTint = CompletionIconTint(red: 230 / 255, green: 87 / 255, blue: 120 / 255)
+        let iconTint: CompletionIconTint?
+        let titleColor: CompletionIconTint?
+        if dateDay == today {
+            iconTint = CompletionIconTint(red: 1, green: 0.8, blue: 0)
+            titleColor = nil
+        } else if dateDay < today {
+            iconTint = pastTint
+            titleColor = pastTint
+        } else {
+            iconTint = nil
+            titleColor = nil
+        }
+        return BlockInputCompletionSuggestion(
+            id: id ?? isoDate,
+            title: displayTitle,
+            subtitle: subtitle,
+            insertionText: "@\(isoDate)",
+            exactMatchText: isoDate,
+            trigger: trigger,
+            iconSystemName: iconSystemName,
+            detailText: detailText,
+            iconTint: iconTint,
+            titleColor: titleColor
+        )
+    }
+
+    /// Returns matching date suggestions for a query string typed after `@`.
+    ///
+    /// Matches against natural-language labels (today, tomorrow, yesterday, next week,
+    /// next month, day names) and YYYY-MM-DD date strings.
+    public static func dateSuggestions(
+        for query: String,
+        style: BlockInputCompletionDateStyle = .relative
+    ) -> [BlockInputCompletionSuggestion] {
+        let lowerQuery = query.lowercased().trimmingCharacters(in: .whitespaces)
+        let referenceDate = Date()
+        let today = Calendar.current.startOfDay(for: referenceDate)
+
+        var results: [BlockInputCompletionSuggestion] = matchKnownDateSuggestions(query: lowerQuery, today: today, style: style)
+        results += matchDayNameSuggestions(query: lowerQuery, referenceDate: referenceDate, style: style)
+        results += matchISOStringSuggestions(query: lowerQuery, referenceDate: referenceDate, style: style)
+
+        results.sort { lhs, rhs in
+            let lhsIsExact = lhs.title.lowercased() == lowerQuery
+            let rhsIsExact = rhs.title.lowercased() == lowerQuery
+            if lhsIsExact != rhsIsExact {
+                return lhsIsExact
+            }
+            return lhs.title < rhs.title
+        }
+
+        return results
+    }
+
+    private static func matchKnownDateSuggestions(
+        query: String,
+        today: Date,
+        style: BlockInputCompletionDateStyle
+    ) -> [BlockInputCompletionSuggestion] {
+        let entries: [(String, Date?)] = [
+            ("today", today),
+            ("tomorrow", Calendar.current.date(byAdding: .day, value: 1, to: today)),
+            ("yesterday", Calendar.current.date(byAdding: .day, value: -1, to: today)),
+            ("next week", Calendar.current.date(byAdding: .day, value: 7, to: today)),
+            ("next month", Calendar.current.date(byAdding: .month, value: 1, to: today))
+        ]
+        return entries.compactMap { label, date in
+            guard let date, label.hasPrefix(query) else { return nil }
+            return .date(date: date, style: style, detailText: formattedDate(date, style: .medium))
+        }
+    }
+
+    private static func matchDayNameSuggestions(
+        query: String,
+        referenceDate: Date,
+        style: BlockInputCompletionDateStyle
+    ) -> [BlockInputCompletionSuggestion] {
+        let dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+        return dayNames.compactMap { dayName in
+            guard dayName.hasPrefix(query) || query.isEmpty else { return nil }
+            guard let date = BlockInputDateResolver.resolveDate(from: dayName, relativeTo: referenceDate) else { return nil }
+            return .date(date: date, style: style, detailText: formattedDate(date, style: .medium))
+        }
+    }
+
+    private static func matchISOStringSuggestions(
+        query: String,
+        referenceDate: Date,
+        style: BlockInputCompletionDateStyle
+    ) -> [BlockInputCompletionSuggestion] {
+        let pattern = #"^\d{4}(-\d{2}(-\d{2})?)?$"#
+        guard query.range(of: pattern, options: .regularExpression) != nil,
+              let date = BlockInputDateResolver.resolveDate(from: query, relativeTo: referenceDate) else {
+            return []
+        }
+        return [.date(date: date, style: style, detailText: formattedDate(date, style: .medium))]
+    }
+}
+
 /// Supplies mention and slash-command completions to the editor.
 public protocol BlockInputCompletionProvider: AnyObject, Sendable {
     /// Returns suggestions for the active completion context.
@@ -266,5 +430,31 @@ private extension BlockInputCompletionSuggestion {
         case .rawToken:
             return "\(label) "
         }
+    }
+
+    static func isoDateString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    static func formattedDate(_ date: Date, style: BlockInputCompletionDateStyle) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        switch style {
+        case .short:
+            formatter.dateStyle = .short
+        case .medium:
+            formatter.dateStyle = .medium
+        case .long:
+            formatter.dateStyle = .long
+        case .full:
+            formatter.dateStyle = .full
+        case .relative:
+            formatter.dateStyle = .medium
+            formatter.doesRelativeDateFormatting = true
+        }
+        return formatter.string(from: date)
     }
 }
