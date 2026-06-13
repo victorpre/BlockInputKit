@@ -150,7 +150,16 @@ extension BlockInputBlockItem {
         let chipVerticalFrame = selectedSingleLineInlineChipVerticalFrame()
         let xPosition = max(0, bounds.minX - leadingPadding)
         let maxWidth = max(0, view.bounds.maxX - xPosition - trailingPadding)
-        let width = min(max(bounds.width + leadingPadding + trailingPadding, 24), maxWidth)
+        var effectiveMaxX = bounds.maxX
+        if !metadataRowView.isHidden {
+            metadataRowView.layoutSubtreeIfNeeded()
+            let contentMaxX = metadataRowView.convert(
+                NSPoint(x: metadataRowView.contentMaxX, y: 0),
+                to: view
+            ).x
+            effectiveMaxX = max(effectiveMaxX, contentMaxX)
+        }
+        let width = min(max(effectiveMaxX - bounds.minX + leadingPadding + trailingPadding, 24), maxWidth)
         return BlockInputWholeSelectionFrame(
             rect: NSRect(
                 x: xPosition,

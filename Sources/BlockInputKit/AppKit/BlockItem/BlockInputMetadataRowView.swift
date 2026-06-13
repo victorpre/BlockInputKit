@@ -60,6 +60,14 @@ final class BlockInputMetadataRowView: NSView {
         invalidateIntrinsicContentSize()
     }
 
+    var contentMaxX: CGFloat {
+        guard !stackView.arrangedSubviews.isEmpty else { return 0 }
+        let rightmost = stackView.arrangedSubviews.compactMap { $0 as? NSView }
+            .map { $0.convert($0.bounds, to: self).maxX }
+            .max() ?? 0
+        return rightmost
+    }
+
     func clearChips() {
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         setAccessibilityElement(false)
