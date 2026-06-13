@@ -78,8 +78,12 @@ extension BlockInputDocument {
             guard let date = BlockInputDateResolver.resolveDate(from: value) else {
                 return false
             }
+            let isoString = BlockInputDateResolver.isoDateString(from: date)
+            guard BlockInputDateResolver.categorize(dateString: isoString) != .past else {
+                return false
+            }
             if whenDate == nil {
-                whenDate = BlockInputDateResolver.isoDateString(from: date)
+                whenDate = isoString
             }
             return true
         case "!":

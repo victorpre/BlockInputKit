@@ -19,7 +19,7 @@ final class BlockInputMetadataChipView: NSView {
 
     var chipText: String {
         didSet {
-            label.stringValue = chipText
+            updateAppearance()
             invalidateIntrinsicContentSize()
         }
     }
@@ -27,6 +27,17 @@ final class BlockInputMetadataChipView: NSView {
     var dateStyle: BlockInputMetadataDateStyle? {
         didSet {
             updateAppearance()
+        }
+    }
+
+    private var displayText: String {
+        switch chipKind {
+        case .whenDate:
+            BlockInputDateResolver.friendlyDateString(from: chipText, style: .whenDate) ?? chipText
+        case .deadline:
+            BlockInputDateResolver.friendlyDateString(from: chipText, style: .deadline) ?? chipText
+        case .tag:
+            chipText
         }
     }
 
@@ -86,7 +97,7 @@ final class BlockInputMetadataChipView: NSView {
         case .tag:
             iconView.image = NSImage(systemSymbolName: "tag", accessibilityDescription: "Tag")
         }
-        label.stringValue = chipText
+        label.stringValue = displayText
         applyDateColors()
     }
 

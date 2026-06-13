@@ -6,6 +6,11 @@ enum BlockInputTemporalCategory: Equatable {
     case future
 }
 
+enum BlockInputDateDisplayStyle {
+    case whenDate
+    case deadline
+}
+
 struct BlockInputDateResolver {
     static func resolveDate(from string: String, relativeTo referenceDate: Date = Date()) -> Date? {
         let lower = string.lowercased().trimmingCharacters(in: .whitespaces)
@@ -48,6 +53,52 @@ struct BlockInputDateResolver {
         }
 
         return nil
+    }
+
+    static func friendlyDateString(
+        from isoString: String,
+        style: BlockInputDateDisplayStyle,
+        relativeTo referenceDate: Date = Date()
+    ) -> String? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: isoString) else { return nil }
+
+        let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: referenceDate)
+        let dateDay = calendar.startOfDay(for: date)
+
+        let shortFormatter = DateFormatter()
+        shortFormatter.locale = Locale.current
+        shortFormatter.dateFormat = "EEE, MMM d"
+
+        switch style {
+        case .deadline:
+            return shortFormatter.string(from: date)
+
+        case .whenDate:
+            if dateDay == dayStart {
+                return "Today"
+            }
+            if dateDay == calendar.date(byAdding: .day, value: 1, to: dayStart) {
+                return "Tomorrow"
+            }
+
+            let todayWeekInterval = calendar.dateInterval(of: .weekOfMonth, for: dayStart)
+            let dateWeekInterval = calendar.dateInterval(of: .weekOfMonth, for: dateDay)
+
+            if dateDay > dayStart,
+               let todayWeek = todayWeekInterval, let dateWeek = dateWeekInterval,
+               todayWeek.start == dateWeek.start {
+                let dayFormatter = DateFormatter()
+                dayFormatter.locale = Locale.current
+                dayFormatter.dateFormat = "EEEE"
+                return dayFormatter.string(from: date)
+            }
+
+            return shortFormatter.string(from: date)
+        }
     }
 
     static func categorize(dateString: String, relativeTo referenceDate: Date = Date()) -> BlockInputTemporalCategory? {

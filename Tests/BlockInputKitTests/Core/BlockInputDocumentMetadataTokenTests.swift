@@ -265,6 +265,76 @@ final class BlockInputDocumentMetadataTokenTests: XCTestCase {
         XCTAssertNil(extraction, "Text should remain unchanged when no token resolves")
     }
 
+        // MARK: - Past-date rejection for @ (whenDate)
+
+    func testWhenDateRejectsYesterday() {
+        let text = "Todo @yesterday "
+        let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        )
+        XCTAssertNil(extraction, "@yesterday should not be extracted for whenDate (past date)")
+    }
+
+    func testWhenDateRejectsPastISOString() {
+        let text = "Todo @2020-01-01 "
+        let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        )
+        XCTAssertNil(extraction, "@2020-01-01 should not be extracted for whenDate (past date)")
+    }
+
+    func testWhenDateAcceptsToday() {
+        let text = "Todo @today "
+        guard let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        ) else {
+            XCTFail("Expected extraction for @today")
+            return
+        }
+        XCTAssertEqual(extraction.whenDate, resolvedDate(from: "today"))
+    }
+
+    func testWhenDateAcceptsFutureDate() {
+        let text = "Todo @next-week "
+        guard let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        ) else {
+            XCTFail("Expected extraction for @next-week")
+            return
+        }
+        XCTAssertEqual(extraction.whenDate, resolvedDate(from: "next-week"))
+    }
+
+    // MARK: - ! (deadline) Still Accepts Past Dates
+
+    func testDeadlineStillAcceptsYesterday() {
+        let text = "Todo !yesterday "
+        guard let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        ) else {
+            XCTFail("Expected extraction for !yesterday (deadline accepts past dates)")
+            return
+        }
+        XCTAssertEqual(extraction.deadline, resolvedDate(from: "yesterday"))
+    }
+
+    func testDeadlineStillAcceptsPastISOString() {
+        let text = "Todo !2020-01-01 "
+        guard let extraction = BlockInputDocument.extractMetadataTokens(
+            from: text,
+            cursorUTF16Offset: (text as NSString).length
+        ) else {
+            XCTFail("Expected extraction for !2020-01-01 (deadline accepts past dates)")
+            return
+        }
+        XCTAssertEqual(extraction.deadline, resolvedDate(from: "2020-01-01"))
+    }
+
     // MARK: - Import-mode Extraction (end of string without space)
 
     func testExtractWhenDateFromEndOfString() {

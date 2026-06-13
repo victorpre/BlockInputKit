@@ -352,7 +352,6 @@ extension BlockInputCompletionSuggestion {
         let entries: [(String, Date?)] = [
             ("today", today),
             ("tomorrow", Calendar.current.date(byAdding: .day, value: 1, to: today)),
-            ("yesterday", Calendar.current.date(byAdding: .day, value: -1, to: today)),
             ("next week", Calendar.current.date(byAdding: .day, value: 7, to: today)),
             ("next month", Calendar.current.date(byAdding: .month, value: 1, to: today))
         ]
@@ -383,6 +382,12 @@ extension BlockInputCompletionSuggestion {
         let pattern = #"^\d{4}(-\d{2}(-\d{2})?)?$"#
         guard query.range(of: pattern, options: .regularExpression) != nil,
               let date = BlockInputDateResolver.resolveDate(from: query, relativeTo: referenceDate) else {
+            return []
+        }
+        guard BlockInputDateResolver.categorize(
+            dateString: BlockInputDateResolver.isoDateString(from: date),
+            relativeTo: referenceDate
+        ) != .past else {
             return []
         }
         return [.date(date: date, style: style, detailText: formattedDate(date, style: .medium))]
