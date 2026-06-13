@@ -5,10 +5,26 @@ enum BlockInputInlineChipKind: Equatable {
     case fileLink
     case slashCommand
     case rawSlashCommand
+    case hashtag
+    case dueDateOverdue
+    case dueDateToday
+    case dueDateUpcoming
+    case whenDateOverdue
+    case whenDateToday
+    case whenDateUpcoming
 }
 
 extension BlockInputInlineMarkdownRange {
     func inlineChipKind(in text: String) -> BlockInputInlineChipKind? {
+        if style == .dueDate {
+            return dueDateChipKind(in: text)
+        }
+        if style == .whenDate {
+            return whenDateChipKind(in: text)
+        }
+        if style == .hashtag {
+            return .hashtag
+        }
         if style == .rawSlashCommand {
             return .rawSlashCommand
         }
@@ -38,6 +54,56 @@ extension BlockInputInlineMarkdownRange {
             .substring(with: text.blockInputLinkClampedRange(contentRange))
             .blockInputUnescapedLinkLabel
     }
+
+    private func whenDateChipKind(in text: String) -> BlockInputInlineChipKind? {
+        let nsText = text as NSString
+        guard contentRange.length == 10,
+              nsText.length >= NSMaxRange(contentRange) else {
+            return nil
+        }
+        let dateString = nsText.substring(with: contentRange)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        guard let date = formatter.date(from: dateString) else {
+            return nil
+        }
+        let today = Calendar.current.startOfDay(for: Date())
+        let dueDay = Calendar.current.startOfDay(for: date)
+        if dueDay < today {
+            return .whenDateOverdue
+        } else if dueDay == today {
+            return .whenDateToday
+        } else {
+            return .whenDateUpcoming
+        }
+    }
+
+    private func dueDateChipKind(in text: String) -> BlockInputInlineChipKind? {
+        let nsText = text as NSString
+        guard contentRange.length == 10,
+              nsText.length >= NSMaxRange(contentRange) else {
+            return nil
+        }
+        let dateString = nsText.substring(with: contentRange)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        guard let date = formatter.date(from: dateString) else {
+            return nil
+        }
+        let today = Calendar.current.startOfDay(for: Date())
+        let dueDay = Calendar.current.startOfDay(for: date)
+        if dueDay < today {
+            return .dueDateOverdue
+        } else if dueDay == today {
+            return .dueDateToday
+        } else {
+            return .dueDateUpcoming
+        }
+    }
 }
 
 extension BlockInputStyle {
@@ -49,6 +115,20 @@ extension BlockInputStyle {
             return slashCommandChip
         case .rawSlashCommand:
             return rawSlashCommandChip
+        case .hashtag:
+            return hashtagChip
+        case .dueDateOverdue:
+            return dueDateOverdueChip
+        case .dueDateToday:
+            return dueDateTodayChip
+        case .dueDateUpcoming:
+            return dueDateUpcomingChip
+        case .whenDateOverdue:
+            return whenDateOverdueChip
+        case .whenDateToday:
+            return whenDateTodayChip
+        case .whenDateUpcoming:
+            return whenDateUpcomingChip
         }
     }
 }

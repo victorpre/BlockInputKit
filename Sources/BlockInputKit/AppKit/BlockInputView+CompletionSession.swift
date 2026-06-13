@@ -292,8 +292,12 @@ extension BlockInputView {
             return true
         }
         let linkSourceRanges = BlockInputInlineMarkdownParsing.linkSourceRanges(in: text, excluding: inlineCodeRanges)
-        return linkSourceRanges.contains { linkRange in
-            linkRange.intersectionLength(with: range) > 0
+        if linkSourceRanges.contains(where: { $0.intersectionLength(with: range) > 0 }) {
+            return true
+        }
+        let whenDateRanges = BlockInputWhenDateParsing.whenDateRanges(in: text, excluding: inlineCodeRanges).map(\.fullRange)
+        return whenDateRanges.contains { whenDateRange in
+            whenDateRange.intersectionLength(with: range) > 0
         }
     }
 

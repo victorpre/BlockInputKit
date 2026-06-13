@@ -36,7 +36,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 
     let handleView = BlockInputDragHandleView()
     let kindLabel = BlockInputMarkerView()
-    let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    let checklistButton = BlockInputCheckboxView()
     let quoteBarView = NSView()
     let scrollView = BlockInputBlockItemScrollView()
     let codeBackgroundView = NSView()
@@ -61,6 +61,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var isDraggingBlockSelection = false
     var isUpdatingBlockSelectionDrag = false
     var renderedCodeColorScheme: BlockInputSyntaxColorScheme?
+    var accentColor = NSColor.controlAccentColor
     var style = BlockInputStyle.default
     var imageLoadingContext = BlockInputImageBlockLoadingContext()
     var fileBaseURL: URL?
@@ -217,6 +218,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.allowsReordering = allowsReordering
         self.editorHorizontalInset = editorHorizontalInset
         self.blockVerticalInsetMultiplier = BlockInputConfiguration.sanitizedBlockVerticalInsetMultiplier(blockVerticalInsetMultiplier)
+        self.accentColor = accentColor
         self.style = style
         self.imageLoadingContext = imageLoadingContext
         self.fileBaseURL = fileBaseURL
@@ -475,6 +477,7 @@ extension BlockInputBlockItem {
         horizontalRuleView.resetForReuse()
         tableView.blockItem = nil
         tableView.delegate = nil
+        accentColor = .controlAccentColor
         renderedCodeColorScheme = nil
         rawSlashCommandChips = false
         selectAllBehavior = .focusedContentThenDocument

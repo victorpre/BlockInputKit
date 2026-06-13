@@ -41,7 +41,9 @@ final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked
     func suggestions(for context: BlockInputCompletionContext) async -> [BlockInputCompletionSuggestion] {
         switch context.trigger {
         case .mention:
-            return fileSuggestions(for: context)
+            let dates = dateSuggestions(for: context)
+            let files = fileSuggestions(for: context)
+            return dates + files
         case .slashCommand:
             return slashCommandSuggestions(for: context)
         }
@@ -67,6 +69,90 @@ final class DemoFileCompletionProvider: BlockInputCompletionProvider, @unchecked
                 )
             }
     }
+
+    private func dateSuggestions(for context: BlockInputCompletionContext) -> [BlockInputCompletionSuggestion] {
+        let query = context.query.lowercased()
+        return commonDateEntries().filter { entry in
+            query.isEmpty
+                || Self.isoDateFormatter.string(from: entry.date).lowercased().contains(query)
+                || Self.longDateFormatter.string(from: entry.date).lowercased().contains(query)
+                || Self.relativeDateFormatter.string(from: entry.date).lowercased().contains(query)
+                || Self.shortDateFormatter.string(from: entry.date).lowercased().contains(query)
+                || entry.label?.lowercased().contains(query) == true
+        }.map { entry in
+            let relativeTitle = Self.relativeDateFormatter.string(from: entry.date)
+            let subtitle = Self.mediumDateFormatter.string(from: entry.date)
+            let title = entry.label ?? (relativeTitle != subtitle ? relativeTitle : Self.longDateFormatter.string(from: entry.date))
+            return BlockInputCompletionSuggestion.date(
+                title: title,
+                subtitle: subtitle,
+                date: entry.date,
+                style: .long
+            )
+        }
+    }
+
+    private func commonDateEntries() -> [DemoCommonDateEntry] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var entries: [DemoCommonDateEntry] = [DemoCommonDateEntry(date: today)]
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: today) {
+            entries.append(DemoCommonDateEntry(date: yesterday))
+        }
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) {
+            entries.append(DemoCommonDateEntry(date: tomorrow))
+        }
+        let weekday = calendar.component(.weekday, from: today)
+        let daysUntilMonday = (9 - weekday) % 7
+        let daysUntilFriday = (13 - weekday) % 7
+        if daysUntilMonday > 0,
+           let nextMonday = calendar.date(byAdding: .day, value: daysUntilMonday, to: today) {
+            entries.append(DemoCommonDateEntry(date: nextMonday))
+        }
+        if daysUntilFriday > 0,
+           let nextFriday = calendar.date(byAdding: .day, value: daysUntilFriday, to: today) {
+            entries.append(DemoCommonDateEntry(date: nextFriday))
+        }
+        if let nextWeek = calendar.date(byAdding: .day, value: 7, to: today) {
+            entries.append(DemoCommonDateEntry(date: nextWeek, label: "Next Week"))
+        }
+        if let nextMonth = calendar.date(byAdding: .month, value: 1, to: today) {
+            entries.append(DemoCommonDateEntry(date: nextMonth, label: "Next Month"))
+        }
+        return entries
+    }
+
+    private static let isoDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        return formatter
+    }()
+
+    private static let mediumDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter
+    }()
+
+    private static let longDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        return formatter
+    }()
+
+    private static let relativeDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.doesRelativeDateFormatting = true
+        return formatter
+    }()
 
     private func slashCommandSuggestions(for context: BlockInputCompletionContext) -> [BlockInputCompletionSuggestion] {
         let query = context.query.lowercased()
@@ -222,6 +308,11 @@ private struct DemoFileCompletionCandidate {
             url.path.lowercased().contains(query) ||
             url.lastPathComponent.lowercased().contains(query)
     }
+}
+
+private struct DemoCommonDateEntry {
+    var date: Date
+    var label: String?
 }
 
 private extension String {

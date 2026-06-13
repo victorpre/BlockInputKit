@@ -121,6 +121,30 @@ let configuration = BlockInputConfiguration(
             strokeColor: NSColor.controlAccentColor.withAlphaComponent(0.24),
             foregroundColor: .labelColor,
             cornerRadius: 5
+        ),
+        hashtagChip: BlockInputInlineChipStyle(
+            fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
+            foregroundColor: .labelColor,
+            cornerRadius: 6
+        ),
+        dueDateOverdueChip: BlockInputInlineChipStyle(
+            fillColor: NSColor.systemRed.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemRed.withAlphaComponent(0.18),
+            foregroundColor: .labelColor,
+            cornerRadius: 6
+        ),
+        dueDateTodayChip: BlockInputInlineChipStyle(
+            fillColor: NSColor.systemOrange.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemOrange.withAlphaComponent(0.18),
+            foregroundColor: .labelColor,
+            cornerRadius: 6
+        ),
+        dueDateUpcomingChip: BlockInputInlineChipStyle(
+            fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
+            foregroundColor: .labelColor,
+            cornerRadius: 6
         )
     )
 )
@@ -448,6 +472,33 @@ BlockInputCompletionSuggestion.slashCommand(
 Raw slash chips are visual only. They keep editing, selection, copy, accessibility text, and Markdown export behavior as
 normal text. Link-backed slash chips and `slashCommandChipClickHandler` routing are unchanged.
 
+### Date Completions
+
+Return date suggestions under the `@` mention trigger alongside file mentions:
+
+```swift
+BlockInputCompletionSuggestion.date(date: tomorrow)
+```
+
+The factory inserts a when-date token (`@YYYY-MM-DD`) followed by a space. In checklist blocks this token renders
+as a chip with a calendar icon and date-aware coloring (overdue red, today orange, upcoming secondary). In
+non-checklist blocks `@YYYY-MM-DD` stays as plain text.
+
+The `style` parameter controls the visible title:
+
+```swift
+BlockInputCompletionSuggestion.date(date: nextMonday, style: .long)   // "June 15, 2026"
+BlockInputCompletionSuggestion.date(date: today, style: .relative)    // "Today"
+```
+
+Set `title:` to override the visible label while keeping the ISO‑8601 insertion text. Pass `iconSystemName:` or
+`detailText:` when the defaults (`"calendar"` / `"Date"`) should differ.
+
+The built-in completion popup tints the calendar icon to reflect date status: overdue and today dates get a blue accent
+(matching the editor's when‑date chip color), while upcoming dates keep the default icon tint.
+
+The styles are `.short`, `.medium` (default), `.long`, `.full`, and `.relative`, matching `DateFormatter.Style`.
+
 ### Inline Argument Hints
 
 Use `inlineHintProvider` for visual-only slash-command argument hints after the active caret. Hints are not inserted into
@@ -500,6 +551,90 @@ let configuration = BlockInputConfiguration(
 ```
 
 Return `.useDefault` for built-in insertion, `.cancel` to leave the document unchanged, or `.insert(...)` with replacement references.
+
+## Checklist Hashtags
+
+Checklist blocks detect `#tag` patterns and render them as inline chip badges. Tags start with `#` followed by alphanumeric characters, hyphens, and underscores (e.g., `#groceries`, `#my-tag`, `#tag123`). The `#` must not be preceded by a word character.
+
+```swift
+let blocks: [BlockInputBlock] = [
+    BlockInputBlock(
+        id: "1",
+        kind: .checklistItem(isChecked: false),
+        text: "buy milk #groceries"
+    ),
+    BlockInputBlock(
+        id: "2",
+        kind: .checklistItem(isChecked: true),
+        text: "reply to email #work"
+    )
+]
+```
+
+Hashtag badges are visual only. They keep editing, selection, copy, accessibility text, and Markdown export behavior as normal text. Tags render only in checklist blocks; `#tag` text in paragraphs, headings, quotes, or other block kinds stays plain text.
+
+Configure the badge appearance through `BlockInputStyle.hashtagChip`:
+
+```swift
+let style = BlockInputStyle(
+    hashtagChip: BlockInputInlineChipStyle(
+        fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
+        strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
+        foregroundColor: .labelColor,
+        cornerRadius: 6
+    )
+)
+```
+
+## Checklist Due Dates
+
+Checklist blocks detect `!YYYY-MM-DD` patterns and render them as inline chip badges with a calendar icon. The `!` must not be preceded by a word character. Chips change color based on the due date status:
+
+- **Overdue** (past date): red chip (`.dueDateOverdueChip`)
+- **Today** (current date): orange chip (`.dueDateTodayChip`)
+- **Upcoming** (future date): teal chip (`.dueDateUpcomingChip`)
+
+```swift
+let blocks: [BlockInputBlock] = [
+    BlockInputBlock(
+        id: "1",
+        kind: .checklistItem(isChecked: false),
+        text: "finish report !2030-12-31"
+    ),
+    BlockInputBlock(
+        id: "2",
+        kind: .checklistItem(isChecked: true),
+        text: "old task !2020-01-01"
+    )
+]
+```
+
+Due-date badges are visual only. They keep editing, selection, copy, accessibility text, and Markdown export behavior as normal text. Dates render only in checklist blocks; `!YYYY-MM-DD` text in paragraphs, headings, quotes, or other block kinds stays plain text.
+
+Configure the badge appearance through `BlockInputStyle.dueDateOverdueChip`, `BlockInputStyle.dueDateTodayChip`, and `BlockInputStyle.dueDateUpcomingChip`:
+
+```swift
+let style = BlockInputStyle(
+    dueDateOverdueChip: BlockInputInlineChipStyle(
+        fillColor: NSColor.systemRed.withAlphaComponent(0.11),
+        strokeColor: NSColor.systemRed.withAlphaComponent(0.18),
+        foregroundColor: .labelColor,
+        cornerRadius: 6
+    ),
+    dueDateTodayChip: BlockInputInlineChipStyle(
+        fillColor: NSColor.systemOrange.withAlphaComponent(0.11),
+        strokeColor: NSColor.systemOrange.withAlphaComponent(0.18),
+        foregroundColor: .labelColor,
+        cornerRadius: 6
+    ),
+    dueDateUpcomingChip: BlockInputInlineChipStyle(
+        fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
+        strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
+        foregroundColor: .labelColor,
+        cornerRadius: 6
+    )
+)
+```
 
 ## Images
 

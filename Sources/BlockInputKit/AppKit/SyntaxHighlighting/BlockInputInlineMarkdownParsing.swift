@@ -8,6 +8,9 @@ enum BlockInputInlineMarkdownStyle: Hashable {
     case strikethrough
     case link
     case rawSlashCommand
+    case hashtag
+    case dueDate
+    case whenDate
 }
 
 /// UTF-16 ranges for one visual inline Markdown span.
@@ -79,7 +82,19 @@ enum BlockInputInlineMarkdownParsing {
                 isDocumentStartBlock: isDocumentStartBlock
             )
         }() : []
-        return mergedByContentLocation(nonRawRangeGroups.including(rawSlashRanges: rawSlashRanges))
+        let hashtagRanges = BlockInputHashtagParsing.hashtagRanges(
+            in: text,
+            excluding: excludedRanges + nonRawRangeGroups.delimiterRanges + rawSlashRanges.map(\.fullRange)
+        )
+        let dueDateRanges = BlockInputDueDateParsing.dueDateRanges(
+            in: text,
+            excluding: excludedRanges + nonRawRangeGroups.delimiterRanges + rawSlashRanges.map(\.fullRange) + hashtagRanges.map(\.fullRange)
+        )
+        let whenDateRanges = BlockInputWhenDateParsing.whenDateRanges(
+            in: text,
+            excluding: excludedRanges + nonRawRangeGroups.delimiterRanges + rawSlashRanges.map(\.fullRange) + hashtagRanges.map(\.fullRange) + dueDateRanges.map(\.fullRange)
+        )
+        return mergedByContentLocation(nonRawRangeGroups.including(rawSlashRanges: rawSlashRanges, hashtagRanges: hashtagRanges, dueDateRanges: dueDateRanges, whenDateRanges: whenDateRanges))
     }
 
     private static func nonRawMarkdownRangeGroups(
@@ -419,10 +434,18 @@ private struct BlockInputInlineMarkdownRangeGroups {
         }
     }
 
-    func including(rawSlashRanges: [BlockInputInlineMarkdownRange]) -> [[BlockInputInlineMarkdownRange]] {
+    func including(
+        rawSlashRanges: [BlockInputInlineMarkdownRange],
+        hashtagRanges: [BlockInputInlineMarkdownRange] = [],
+        dueDateRanges: [BlockInputInlineMarkdownRange] = [],
+        whenDateRanges: [BlockInputInlineMarkdownRange] = []
+    ) -> [[BlockInputInlineMarkdownRange]] {
         [
             links,
             rawSlashRanges,
+            hashtagRanges,
+            dueDateRanges,
+            whenDateRanges,
             composedAsterisks,
             bold,
             strikethrough,
