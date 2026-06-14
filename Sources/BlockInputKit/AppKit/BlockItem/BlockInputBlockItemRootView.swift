@@ -85,11 +85,12 @@ final class BlockInputBlockItemRootView: NSView {
         blockItem?.addEditableTextSurfaceCursorRectIfNeeded(to: self)
         blockItem?.addDisabledCursorRectIfNeeded(to: self)
         blockItem?.addImageResizeCursorRects(to: self)
-        guard let blockItem,
-              let cursor = blockItem.reorderHandleCursor else {
-            return
+        if let blockItem, let cursor = blockItem.reorderHandleCursor {
+            addCursorRect(blockItem.reorderHandleCursorRect, cursor: cursor)
         }
-        addCursorRect(blockItem.reorderHandleCursorRect, cursor: cursor)
+        if let blockItem, let cursor = blockItem.detailButtonCursor {
+            addCursorRect(blockItem.detailButtonCursorRect, cursor: cursor)
+        }
     }
 
     override func cursorUpdate(with event: NSEvent) {
@@ -98,16 +99,20 @@ final class BlockInputBlockItemRootView: NSView {
             imageResizeCursor.set()
             return
         }
-        guard let blockItem,
-              let cursor = blockItem.reorderHandleCursor,
-              blockItem.containsReorderHandleHitTarget(point) else {
-            if self.blockItem?.applyEditableTextSurfaceCursor(at: point) == true {
-                return
-            }
-            super.cursorUpdate(with: event)
+        if let cursor = blockItem?.reorderHandleCursor,
+           blockItem?.containsReorderHandleHitTarget(point) == true {
+            cursor.set()
             return
         }
-        cursor.set()
+        if let cursor = blockItem?.detailButtonCursor,
+           blockItem?.containsDetailButtonHitTarget(point) == true {
+            cursor.set()
+            return
+        }
+        if blockItem?.applyEditableTextSurfaceCursor(at: point) == true {
+            return
+        }
+        super.cursorUpdate(with: event)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {

@@ -17,5 +17,6 @@ extension BlockInputBlockItem {
     func setDetailButtonVisible(_ isVisible: Bool, animated: Bool = true) {
         let alpha: CGFloat = isVisible && !detailButton.isHidden ? 1 : 0
         detailButton.alphaValue = alpha
+        view.window?.invalidateCursorRects(for: view)
     }
 }

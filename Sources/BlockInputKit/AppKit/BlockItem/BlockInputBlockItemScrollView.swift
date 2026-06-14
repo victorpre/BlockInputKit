@@ -53,7 +53,8 @@ final class BlockInputBlockItemScrollView: NSScrollView {
     }
 
     override func cursorUpdate(with event: NSEvent) {
-        guard blockItem?.applyEditableTextSurfaceCursor(at: nil) == true else {
+        let point = blockItem?.view.convert(event.locationInWindow, from: nil)
+        guard blockItem?.applyEditableTextSurfaceCursor(at: point) == true else {
             super.cursorUpdate(with: event)
             return
         }
@@ -245,7 +246,8 @@ private final class BlockInputBlockItemClipView: NSClipView {
             super.cursorUpdate(with: event)
             return
         }
-        guard scrollView.blockItem?.applyEditableTextSurfaceCursor(at: nil) == true else {
+        let point = scrollView.blockItem?.view.convert(event.locationInWindow, from: nil)
+        guard scrollView.blockItem?.applyEditableTextSurfaceCursor(at: point) == true else {
             super.cursorUpdate(with: event)
             return
         }

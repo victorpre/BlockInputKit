@@ -2,6 +2,9 @@ import AppKit
 
 extension BlockInputTextView {
     override func cursorUpdate(with event: NSEvent) {
+        if applyDetailButtonCursor(for: event) {
+            return
+        }
         if applyReadOnlyCursor(for: event) {
             return
         }
@@ -9,10 +12,27 @@ extension BlockInputTextView {
     }
 
     override func mouseMoved(with event: NSEvent) {
+        if applyDetailButtonCursor(for: event) {
+            return
+        }
         if applyReadOnlyCursor(for: event) {
             return
         }
         super.mouseMoved(with: event)
+    }
+
+    @discardableResult
+    func applyDetailButtonCursor(for event: NSEvent) -> Bool {
+        guard let blockItem,
+              let cursor = blockItem.detailButtonCursor else {
+            return false
+        }
+        let point = blockItem.view.convert(event.locationInWindow, from: nil)
+        guard blockItem.containsDetailButtonHitTarget(point) else {
+            return false
+        }
+        cursor.set()
+        return true
     }
 
     @discardableResult

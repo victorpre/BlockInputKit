@@ -130,6 +130,7 @@ extension BlockInputBlockItem {
             guard abs(newOffset - lastComputedDetailButtonOffset) > 0.5 else { return }
             lastComputedDetailButtonOffset = newOffset
             detailButtonLeadingConstraint?.constant = newOffset
+            view.window?.invalidateCursorRects(for: view)
         }
     }
 

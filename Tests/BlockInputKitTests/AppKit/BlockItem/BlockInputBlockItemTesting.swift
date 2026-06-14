@@ -127,6 +127,10 @@ extension BlockInputBlockItem {
         }
     }
 
+    var testingDetailButton: BlockInputDetailButton? {
+        view.firstDescendant(of: BlockInputDetailButton.self)
+    }
+
     var testingHorizontalRuleView: NSView? {
         view.firstDescendant(of: NSView.self) { view in
             view.identifier?.rawValue == "BlockInputHorizontalRuleView"

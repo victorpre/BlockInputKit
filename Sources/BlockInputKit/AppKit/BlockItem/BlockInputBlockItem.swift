@@ -40,7 +40,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     let handleView = BlockInputDragHandleView()
     let kindLabel = BlockInputMarkerView()
     let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
-    let detailButton = NSButton(image: NSImage(systemSymbolName: "ellipsis.circle", accessibilityDescription: "More")!, target: nil, action: nil)
+    let detailButton = BlockInputDetailButton(image: NSImage(systemSymbolName: "ellipsis.circle", accessibilityDescription: "More")!, target: nil, action: nil)
     let quoteBarView = NSView()
     let scrollView = BlockInputBlockItemScrollView()
     let codeBackgroundView = NSView()
