@@ -1,13 +1,16 @@
 import Foundation
 
 enum BlockInputMarkdownImporter {
-    static func document(from markdown: String) -> BlockInputDocument {
+    static func document(
+        from markdown: String,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
+    ) -> BlockInputDocument {
         let lines = BlockInputLineBreaks.lines(in: markdown)
         var blocks: [BlockInputBlock] = []
         var index = 0
 
         while index < lines.count {
-            guard let parsed = parseNextBlock(lines: lines, startIndex: index) else {
+            guard let parsed = parseNextBlock(lines: lines, startIndex: index, imageParsingMode: imageParsingMode) else {
                 index += 1
                 continue
             }
@@ -20,7 +23,8 @@ enum BlockInputMarkdownImporter {
 
     private static func parseNextBlock(
         lines: [String],
-        startIndex: Int
+        startIndex: Int,
+        imageParsingMode: BlockInputMarkdownImageParsingMode
     ) -> (blocks: [BlockInputBlock], nextIndex: Int)? {
         let line = lines[startIndex]
         guard !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -36,22 +40,22 @@ enum BlockInputMarkdownImporter {
         if let parsed = parseTable(lines: lines, startIndex: startIndex) {
             return parsed
         }
-        if let parsed = parseUnsupportedBlock(lines: lines, startIndex: startIndex) {
+        if let parsed = parseUnsupportedBlock(lines: lines, startIndex: startIndex, imageParsingMode: imageParsingMode) {
             return parsed
         }
         if line.trimmingCharacters(in: .whitespaces) == "---" {
             return ([BlockInputBlock(kind: .horizontalRule)], startIndex + 1)
         }
         if let heading = parseHeading(line) {
-            return (imageBlocks(bySplitting: heading), startIndex + 1)
+            return (imageBlocks(bySplitting: heading, imageParsingMode: imageParsingMode), startIndex + 1)
         }
         if line.hasPrefix(">") {
-            return parseQuote(lines: lines, startIndex: startIndex)
+            return parseQuote(lines: lines, startIndex: startIndex, imageParsingMode: imageParsingMode)
         }
         if let parsed = parseListLine(lines[startIndex]) {
-            return (imageBlocks(bySplitting: parsed), startIndex + 1)
+            return (imageBlocks(bySplitting: parsed, imageParsingMode: imageParsingMode), startIndex + 1)
         }
-        return parseParagraph(lines: lines, startIndex: startIndex)
+        return parseParagraph(lines: lines, startIndex: startIndex, imageParsingMode: imageParsingMode)
     }
 
     static func codeFenceLanguage(in line: String) -> String?? {
@@ -78,19 +82,30 @@ enum BlockInputMarkdownImporter {
         return ([BlockInputBlock(kind: .code(language: language), text: content.joined(separator: "\n"))], index)
     }
 
-    private static func parseQuote(lines: [String], startIndex: Int) -> (blocks: [BlockInputBlock], nextIndex: Int) {
+    private static func parseQuote(
+        lines: [String],
+        startIndex: Int,
+        imageParsingMode: BlockInputMarkdownImageParsingMode
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         var content: [String] = []
         var index = startIndex
         while index < lines.count, lines[index].hasPrefix(">") {
             content.append(lines[index].droppingPrefix(">").droppingPrefix(" "))
             index += 1
         }
-        return (imageBlocks(bySplitting: BlockInputBlock(kind: .quote, text: content.joined(separator: "\n"))), index)
+        return (
+            imageBlocks(
+                bySplitting: BlockInputBlock(kind: .quote, text: content.joined(separator: "\n")),
+                imageParsingMode: imageParsingMode
+            ),
+            index
+        )
     }
 
     private static func parseUnsupportedBlock(
         lines: [String],
-        startIndex: Int
+        startIndex: Int,
+        imageParsingMode: BlockInputMarkdownImageParsingMode
     ) -> (blocks: [BlockInputBlock], nextIndex: Int)? {
         if isSetextHeading(lines: lines, startIndex: startIndex) {
             return rawBlock(lines: lines, range: startIndex..<(startIndex + 2))
@@ -102,7 +117,7 @@ enum BlockInputMarkdownImporter {
             return parseFootnoteDefinition(lines: lines, startIndex: startIndex)
         }
         if isHTMLBlockOpening(lines[startIndex]) {
-            return parseHTMLBlock(lines: lines, startIndex: startIndex)
+            return parseHTMLBlock(lines: lines, startIndex: startIndex, imageParsingMode: imageParsingMode)
         }
         return nil
     }
@@ -192,7 +207,11 @@ enum BlockInputMarkdownImporter {
         return ([BlockInputBlock(kind: .rawMarkdown, text: source)], upperBound)
     }
 
-    private static func parseParagraph(lines: [String], startIndex: Int) -> (blocks: [BlockInputBlock], nextIndex: Int) {
+    private static func parseParagraph(
+        lines: [String],
+        startIndex: Int,
+        imageParsingMode: BlockInputMarkdownImageParsingMode
+    ) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         var content: [String] = []
         var index = startIndex
         while index < lines.count {
@@ -202,7 +221,7 @@ enum BlockInputMarkdownImporter {
             }
             if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                 codeFenceLanguage(in: line) != nil ||
-                parseUnsupportedBlock(lines: lines, startIndex: index) != nil ||
+                parseUnsupportedBlock(lines: lines, startIndex: index, imageParsingMode: imageParsingMode) != nil ||
                 line.trimmingCharacters(in: .whitespaces) == "---" ||
                 parseHeading(line) != nil ||
                 line.hasPrefix(">") ||
@@ -212,7 +231,13 @@ enum BlockInputMarkdownImporter {
             content.append(line)
             index += 1
         }
-        return (imageBlocks(bySplitting: BlockInputBlock(kind: .paragraph, text: content.joined(separator: "\n"))), index)
+        return (
+            imageBlocks(
+                bySplitting: BlockInputBlock(kind: .paragraph, text: content.joined(separator: "\n")),
+                imageParsingMode: imageParsingMode
+            ),
+            index
+        )
     }
 
     static func parseHeading(_ line: String) -> BlockInputBlock? {

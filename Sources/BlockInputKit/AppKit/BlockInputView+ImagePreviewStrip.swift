@@ -1,0 +1,119 @@
+import AppKit
+
+extension BlockInputView {
+    func setupImagePreviewStrip() -> (height: NSLayoutConstraint, scrollTop: NSLayoutConstraint) {
+        imagePreviewStripView.onSelect = { [weak self] occurrence in
+            self?.selectImagePreviewOccurrence(occurrence)
+        }
+        imagePreviewStripView.onRemove = { [weak self] occurrence in
+            self?.removeImagePreviewOccurrence(occurrence)
+        }
+        imagePreviewStripView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(imagePreviewStripView)
+
+        let heightConstraint = imagePreviewStripView.heightAnchor.constraint(equalToConstant: 0)
+        let scrollTopConstraint = scrollView.topAnchor.constraint(equalTo: topAnchor)
+        imagePreviewStripHeightConstraint = heightConstraint
+        self.scrollViewTopConstraint = scrollTopConstraint
+        return (heightConstraint, scrollTopConstraint)
+    }
+
+    func refreshImagePreviewStrip() {
+        guard imagePresentation == .textLinksWithPreviewStrip else {
+            if !imagePreviewStripView.isHidden || imagePreviewStripHeightConstraint?.constant != 0 || !imagePreviewStripView.isEmpty {
+                imagePreviewStripView.configureItems([])
+                updateImagePreviewStripHeight(0)
+                imagePreviewStripView.isHidden = true
+            }
+            return
+        }
+        let occurrences = imagePreviewOccurrencesInLoadedBlocks()
+        imagePreviewStripView.isHidden = occurrences.isEmpty
+        imagePreviewStripView.configureStyle(style.imagePreviewStrip)
+        imagePreviewStripView.configureImageLoading(imageLoadingContext)
+        imagePreviewStripView.configureItems(occurrences)
+        updateImagePreviewStripHeight(occurrences.isEmpty ? 0 : style.imagePreviewStrip.preferredHeight)
+    }
+
+    func imagePreviewStripPreferredHeightForLoadedBlocks() -> CGFloat {
+        guard imagePresentation == .textLinksWithPreviewStrip,
+              !imagePreviewOccurrencesInLoadedBlocks().isEmpty else {
+            return 0
+        }
+        return style.imagePreviewStrip.preferredHeight
+    }
+
+    func selectImagePreviewOccurrence(_ occurrence: BlockInputImagePreviewOccurrence) {
+        guard containsValidTextRange(BlockInputTextRange(blockID: occurrence.blockID, range: occurrence.sourceRange)) else {
+            return
+        }
+        applySelection(
+            .text(BlockInputTextRange(blockID: occurrence.blockID, range: occurrence.sourceRange)),
+            notify: true
+        )
+        restoreVisibleTextSelection(BlockInputTextRange(blockID: occurrence.blockID, range: occurrence.sourceRange))
+    }
+
+    func removeImagePreviewOccurrence(_ occurrence: BlockInputImagePreviewOccurrence) {
+        guard isEditable,
+              let index = index(of: occurrence.blockID),
+              var block = block(at: index),
+              block.kind.supportsImageSyntaxSplitting else {
+            return
+        }
+        let text = block.text as NSString
+        guard NSMaxRange(occurrence.sourceRange) <= text.length,
+              text.substring(with: occurrence.sourceRange) == occurrence.sourceText else {
+            return
+        }
+        let beforeBlock = block
+        let beforeSelection = selection
+        let replacementText = NSMutableString(string: block.text)
+        replacementText.replaceCharacters(in: occurrence.sourceRange, with: "")
+        block.text = replacementText as String
+        let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
+            blockID: block.id,
+            utf16Offset: occurrence.sourceRange.location
+        ))
+        guard applyGranularBlockReplacement(block, at: index, selection: afterSelection) else {
+            return
+        }
+        undoController?.registerBlockReplacementStructuralEdit(
+            actionName: "Remove Image",
+            beforeBlock: beforeBlock,
+            afterBlock: block,
+            selectionBefore: beforeSelection,
+            selectionAfter: afterSelection
+        )
+    }
+
+    private func updateImagePreviewStripHeight(_ height: CGFloat) {
+        imagePreviewStripHeightConstraint?.constant = height
+        scrollViewTopConstraint?.constant = height
+        imagePreviewStripView.needsLayout = true
+        layoutSubtreeIfNeeded()
+    }
+
+    private func imagePreviewOccurrencesInLoadedBlocks() -> [BlockInputImagePreviewOccurrence] {
+        var occurrences: [BlockInputImagePreviewOccurrence] = []
+        for index in 0..<blockCount {
+            guard let block = block(at: index),
+                  block.kind.supportsImageSyntaxSplitting else {
+                continue
+            }
+            let source = block.text as NSString
+            for match in BlockInputImageSyntaxParser.imageMatches(in: block.text) {
+                guard NSMaxRange(match.range) <= source.length else {
+                    continue
+                }
+                occurrences.append(BlockInputImagePreviewOccurrence(
+                    blockID: block.id,
+                    sourceRange: match.range,
+                    sourceText: source.substring(with: match.range),
+                    image: match.image
+                ))
+            }
+        }
+        return occurrences
+    }
+}

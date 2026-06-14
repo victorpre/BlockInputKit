@@ -51,6 +51,28 @@ final class BlockInputViewImageTypingTests: XCTestCase {
         XCTAssertEqual(selection, .blocks([view.document.blocks[1].id]))
     }
 
+    func testTextLinkImagePresentationSuppressesTypingImageBlockConversion() {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let document = BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "Before")
+        ])
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: document,
+            imagePresentation: .textLinksWithPreviewStrip
+        ))
+
+        let selection = view.applyTypingShortcutIfNeeded(
+            blockID: blockID,
+            proposedText: "Before ![Alt](image.png) after",
+            proposedUTF16Offset: 30,
+            selectionBefore: .cursor(BlockInputCursor(blockID: blockID, utf16Offset: 6))
+        )
+
+        XCTAssertNil(selection)
+        XCTAssertEqual(view.document, document)
+    }
+
     func testStoreBackedTypingMarkdownImageUsesGranularReplacementAndInsertion() {
         let blockID = BlockInputBlockID(rawValue: "block")
         let store = CountingDocumentStore(document: BlockInputDocument(blocks: [

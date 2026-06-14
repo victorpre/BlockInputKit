@@ -138,6 +138,7 @@ extension BlockInputView {
             progressiveStoreError = nil
             updateDocumentCacheAfterProgressiveBatch(batch)
             appendProgressiveBatch(batch)
+            refreshImagePreviewStrip()
             updatePlaceholderVisibility()
             if batch.isComplete,
                pendingDocumentSnapshotWorkItem != nil {
@@ -147,6 +148,7 @@ extension BlockInputView {
             progressiveStoreError = nil
             refreshDocumentFromStore()
             reloadDataKeepingFocus()
+            refreshImagePreviewStrip()
             if documentStore?.isComplete == true,
                pendingDocumentSnapshotWorkItem != nil {
                 scheduleDeferredDocumentSnapshot()
@@ -154,6 +156,7 @@ extension BlockInputView {
         case .failed(let error):
             progressiveStoreError = error
             collectionView.reloadData()
+            refreshImagePreviewStrip()
             updatePlaceholderVisibility()
         }
     }

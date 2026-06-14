@@ -116,6 +116,18 @@ final class BlockInputImageBlockView: NSView {
         addCursorRect(bottomResizeHitRect, cursor: .resizeUpDown)
     }
 
+    override func cursorUpdate(with event: NSEvent) {
+        if !isEditable {
+            disabledCursor?.set()
+            return
+        }
+        if let cursor = resizeCursor(at: convert(event.locationInWindow, from: nil)) {
+            cursor.set()
+            return
+        }
+        super.cursorUpdate(with: event)
+    }
+
     override func layout() {
         super.layout()
         updateImageAlignment()

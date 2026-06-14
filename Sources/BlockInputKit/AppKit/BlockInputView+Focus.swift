@@ -128,6 +128,13 @@ extension BlockInputView {
             return nil
         }
         let indexPath = IndexPath(item: index, section: 0)
+        if indexPath.item >= collectionView.numberOfItems(inSection: indexPath.section) {
+            collectionView.reloadData()
+            collectionView.layoutSubtreeIfNeeded()
+        }
+        guard indexPath.item < collectionView.numberOfItems(inSection: indexPath.section) else {
+            return nil
+        }
         collectionView.scrollToItems(at: [indexPath], scrollPosition: .nearestVerticalEdge)
         collectionView.layoutSubtreeIfNeeded()
         guard let item = collectionView.item(at: indexPath) as? BlockInputBlockItem else {

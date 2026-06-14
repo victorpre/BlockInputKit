@@ -2,21 +2,23 @@ import Foundation
 
 enum BlockInputStreamingMarkdownImporter {
     static func document<Reader: BlockInputMarkdownLineReader>(
-        from reader: inout Reader
+        from reader: inout Reader,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
     ) async throws -> BlockInputDocument {
         var bufferedReader = BlockInputBufferedMarkdownLineReader(reader: reader)
         defer {
             reader = bufferedReader.reader
         }
         var blocks: [BlockInputBlock] = []
-        while let parsedBlocks = try await parseNextBlocks(from: &bufferedReader) {
+        while let parsedBlocks = try await parseNextBlocks(from: &bufferedReader, imageParsingMode: imageParsingMode) {
             blocks.append(contentsOf: parsedBlocks)
         }
         return BlockInputDocument(blocks: blocks)
     }
 
     private static func parseNextBlocks<Reader: BlockInputMarkdownLineReader>(
-        from reader: inout BlockInputBufferedMarkdownLineReader<Reader>
+        from reader: inout BlockInputBufferedMarkdownLineReader<Reader>,
+        imageParsingMode: BlockInputMarkdownImageParsingMode
     ) async throws -> [BlockInputBlock]? {
         while let line = try await reader.readLine() {
             let lineIndex = reader.consumedLineCount - 1
@@ -34,22 +36,32 @@ enum BlockInputStreamingMarkdownImporter {
             if let table = try await parseTable(startingWith: line, from: &reader) {
                 return [table]
             }
-            if let unsupported = try await parseUnsupportedBlock(startingWith: line, from: &reader) {
+            if let unsupported = try await parseUnsupportedBlock(
+                startingWith: line,
+                imageParsingMode: imageParsingMode,
+                from: &reader
+            ) {
                 return [unsupported]
             }
             if line.trimmingCharacters(in: .whitespaces) == "---" {
                 return [BlockInputBlock(kind: .horizontalRule)]
             }
             if let heading = BlockInputMarkdownImporter.parseHeading(line) {
-                return BlockInputMarkdownImporter.imageBlocks(bySplitting: heading)
+                return BlockInputMarkdownImporter.imageBlocks(bySplitting: heading, imageParsingMode: imageParsingMode)
             }
             if line.hasPrefix(">") {
-                return BlockInputMarkdownImporter.imageBlocks(bySplitting: try await parseQuote(startingWith: line, from: &reader))
+                return BlockInputMarkdownImporter.imageBlocks(
+                    bySplitting: try await parseQuote(startingWith: line, from: &reader),
+                    imageParsingMode: imageParsingMode
+                )
             }
             if let parsed = BlockInputMarkdownImporter.parseListLine(line) {
-                return BlockInputMarkdownImporter.imageBlocks(bySplitting: parsed)
+                return BlockInputMarkdownImporter.imageBlocks(bySplitting: parsed, imageParsingMode: imageParsingMode)
             }
-            return BlockInputMarkdownImporter.imageBlocks(bySplitting: try await parseParagraph(startingWith: line, from: &reader))
+            return BlockInputMarkdownImporter.imageBlocks(
+                bySplitting: try await parseParagraph(startingWith: line, from: &reader),
+                imageParsingMode: imageParsingMode
+            )
         }
         return nil
     }
@@ -98,6 +110,7 @@ enum BlockInputStreamingMarkdownImporter {
 
     private static func parseUnsupportedBlock<Reader: BlockInputMarkdownLineReader>(
         startingWith line: String,
+        imageParsingMode: BlockInputMarkdownImageParsingMode,
         from reader: inout BlockInputBufferedMarkdownLineReader<Reader>
     ) async throws -> BlockInputBlock? {
         if let nextLine = try await reader.peekLine(),
@@ -116,7 +129,7 @@ enum BlockInputStreamingMarkdownImporter {
             return try await parseFootnoteDefinition(startingWith: line, from: &reader)
         }
         if BlockInputMarkdownImporter.isHTMLBlockOpening(line) {
-            return try await parseHTMLBlock(startingWith: line, from: &reader)
+            return try await parseHTMLBlock(startingWith: line, imageParsingMode: imageParsingMode, from: &reader)
         }
         return nil
     }
@@ -182,10 +195,15 @@ enum BlockInputStreamingMarkdownImporter {
 
     private static func parseHTMLBlock<Reader: BlockInputMarkdownLineReader>(
         startingWith line: String,
+        imageParsingMode: BlockInputMarkdownImageParsingMode,
         from reader: inout BlockInputBufferedMarkdownLineReader<Reader>
     ) async throws -> BlockInputBlock {
-        if let imageBlock = BlockInputMarkdownImporter.imageBlock(fromHTMLLine: line) {
-            return imageBlock
+        if BlockInputImageSyntaxParser.singleHTMLImage(in: line) != nil {
+            if imageParsingMode == .imageBlocks,
+               let imageBlock = BlockInputMarkdownImporter.imageBlock(fromHTMLLine: line) {
+                return imageBlock
+            }
+            return BlockInputBlock(kind: .paragraph, text: line)
         }
         let opening = line.trimmingCharacters(in: .whitespaces)
         if opening.hasPrefix("<!--") {

@@ -2,9 +2,11 @@ import Foundation
 
 extension BlockInputMarkdownImporter {
     static func imageBlocks(
-        bySplitting block: BlockInputBlock
+        bySplitting block: BlockInputBlock,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
     ) -> [BlockInputBlock] {
-        guard block.kind.supportsImageSyntaxSplitting else {
+        guard imageParsingMode == .imageBlocks,
+              block.kind.supportsImageSyntaxSplitting else {
             return [block]
         }
         let matches = BlockInputImageSyntaxParser.imageMatches(in: block.text)
@@ -105,7 +107,7 @@ extension BlockInputMarkdownImporter {
     }
 }
 
-private enum BlockInputImageSyntaxParser {
+enum BlockInputImageSyntaxParser {
     static func imageMatches(in text: String) -> [BlockInputImageMatch] {
         let markdownMatches = markdownImageMatches(in: text)
         let htmlMatches = htmlImageMatches(in: text)
@@ -201,7 +203,7 @@ private enum BlockInputImageSyntaxParser {
     }
 }
 
-private struct BlockInputImageMatch {
+struct BlockInputImageMatch: Equatable {
     let range: NSRange
     let image: BlockInputImage
 }

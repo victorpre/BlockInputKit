@@ -20,43 +20,88 @@ public protocol BlockInputMarkdownWriter {
 
 public extension BlockInputDocument {
     /// Replaces this document with Markdown read sequentially from `reader`.
+    ///
+    /// - Parameters:
+    ///   - reader: Sequential Markdown line source.
+    ///   - imageParsingMode: Import-time image syntax handling. The default
+    ///     `.imageBlocks` parses supported images into standalone image blocks.
     mutating func readMarkdown<Reader: BlockInputMarkdownLineReader>(
-        from reader: inout Reader
+        from reader: inout Reader,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
     ) async throws {
-        self = try await Self.readingMarkdown(from: &reader)
+        self = try await Self.readingMarkdown(from: &reader, imageParsingMode: imageParsingMode)
     }
 
     /// Reads Markdown sequentially from `reader` into a new document.
+    ///
+    /// - Parameters:
+    ///   - reader: Sequential Markdown line source.
+    ///   - imageParsingMode: Import-time image syntax handling. The default
+    ///     `.imageBlocks` parses supported images into standalone image blocks.
     static func readMarkdown<Reader: BlockInputMarkdownLineReader>(
-        from reader: inout Reader
+        from reader: inout Reader,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
     ) async throws -> BlockInputDocument {
-        try await readingMarkdown(from: &reader)
+        try await readingMarkdown(from: &reader, imageParsingMode: imageParsingMode)
     }
 
     /// Reads Markdown sequentially from `reader` into a new document.
+    ///
+    /// - Parameters:
+    ///   - reader: Sequential Markdown line source.
+    ///   - imageParsingMode: Import-time image syntax handling. The default
+    ///     `.imageBlocks` parses supported images into standalone image blocks.
     static func readingMarkdown<Reader: BlockInputMarkdownLineReader>(
-        from reader: inout Reader
+        from reader: inout Reader,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
     ) async throws -> BlockInputDocument {
-        try await BlockInputStreamingMarkdownImporter.document(from: &reader)
+        try await BlockInputStreamingMarkdownImporter.document(from: &reader, imageParsingMode: imageParsingMode)
     }
 
     /// Replaces this document with UTF-8 Markdown read sequentially from `url`.
-    mutating func readMarkdown(from url: URL) async throws {
-        self = try await Self.readingMarkdown(from: url)
+    ///
+    /// - Parameters:
+    ///   - url: File URL containing UTF-8 Markdown.
+    ///   - imageParsingMode: Import-time image syntax handling. The default
+    ///     `.imageBlocks` parses supported images into standalone image blocks.
+    mutating func readMarkdown(
+        from url: URL,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
+    ) async throws {
+        self = try await Self.readingMarkdown(from: url, imageParsingMode: imageParsingMode)
     }
 
     /// Reads UTF-8 Markdown sequentially from `url` into a new document.
-    static func readMarkdown(from url: URL) async throws -> BlockInputDocument {
-        try await readingMarkdown(from: url)
+    ///
+    /// - Parameters:
+    ///   - url: File URL containing UTF-8 Markdown.
+    ///   - imageParsingMode: Import-time image syntax handling. The default
+    ///     `.imageBlocks` parses supported images into standalone image blocks.
+    static func readMarkdown(
+        from url: URL,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
+    ) async throws -> BlockInputDocument {
+        try await readingMarkdown(from: url, imageParsingMode: imageParsingMode)
     }
 
     /// Reads UTF-8 Markdown sequentially from `url` into a new document.
-    static func readingMarkdown(from url: URL) async throws -> BlockInputDocument {
+    ///
+    /// - Parameters:
+    ///   - url: File URL containing UTF-8 Markdown.
+    ///   - imageParsingMode: Import-time image syntax handling. The default
+    ///     `.imageBlocks` parses supported images into standalone image blocks.
+    static func readingMarkdown(
+        from url: URL,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
+    ) async throws -> BlockInputDocument {
         try await Task.detached {
             let reader = try BlockInputMarkdownFileLineReader(url: url)
             var mutableReader = reader
             do {
-                let document = try await BlockInputDocument.readingMarkdown(from: &mutableReader)
+                let document = try await BlockInputDocument.readingMarkdown(
+                    from: &mutableReader,
+                    imageParsingMode: imageParsingMode
+                )
                 try reader.close()
                 return document
             } catch {
@@ -67,13 +112,21 @@ public extension BlockInputDocument {
     }
 
     /// Parses Markdown asynchronously from an already-resident string on a background task.
-    static func parsingMarkdown(_ markdown: String) async -> BlockInputDocument {
+    ///
+    /// - Parameters:
+    ///   - markdown: Markdown source to parse.
+    ///   - imageParsingMode: Import-time image syntax handling. The default
+    ///     `.imageBlocks` parses supported images into standalone image blocks.
+    static func parsingMarkdown(
+        _ markdown: String,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
+    ) async -> BlockInputDocument {
         await Task.detached {
             var reader = BlockInputMarkdownStringLineReader(markdown: markdown)
             do {
-                return try await BlockInputDocument.readingMarkdown(from: &reader)
+                return try await BlockInputDocument.readingMarkdown(from: &reader, imageParsingMode: imageParsingMode)
             } catch {
-                return BlockInputDocument(markdown: markdown)
+                return BlockInputDocument(markdown: markdown, imageParsingMode: imageParsingMode)
             }
         }.value
     }

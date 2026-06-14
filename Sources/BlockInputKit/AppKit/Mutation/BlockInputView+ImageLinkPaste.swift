@@ -7,7 +7,8 @@ extension BlockInputView {
         selectedRange: NSRange?
     ) -> Bool {
         // Complete pending image syntax before generic URL paste can wrap the URL as a Markdown link.
-        guard let target = linkPasteTarget(blockID: blockID, selectedRangeOverride: selectedRange),
+        guard imagePresentation == .inlineBlocks,
+              let target = linkPasteTarget(blockID: blockID, selectedRangeOverride: selectedRange),
               let block = block(withID: target.blockID),
               block.kind.supportsImageSyntaxSplitting,
               let destinationRange = block.text.blockInputMarkdownImageDestinationRange(containing: target.range) else {

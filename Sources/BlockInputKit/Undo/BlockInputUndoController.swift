@@ -42,18 +42,14 @@ public struct BlockInputUndoResult: Equatable, Sendable {
 
 /// Coordinates per-block text undo with a separate structural undo stack.
 public final class BlockInputUndoController {
-    private var textUndoByBlockID: [BlockInputBlockID: [BlockInputTextUndoEntry]] = [:]
-    private var textRedoByBlockID: [BlockInputBlockID: [BlockInputTextUndoEntry]] = [:]
-    private var structuralUndoStack: [BlockInputStructuralUndoEntry] = []
-    private var structuralRedoStack: [BlockInputStructuralUndoEntry] = []
-    private var undoOrder: [BlockInputHistoryOperation] = []
-    private var redoOrder: [BlockInputHistoryOperation] = []
+    private var textUndoByBlockID: [BlockInputBlockID: [BlockInputTextUndoEntry]] = [:],
+                textRedoByBlockID: [BlockInputBlockID: [BlockInputTextUndoEntry]] = [:]
+    private var structuralUndoStack: [BlockInputStructuralUndoEntry] = [], structuralRedoStack: [BlockInputStructuralUndoEntry] = []
+    private var undoOrder: [BlockInputHistoryOperation] = [], redoOrder: [BlockInputHistoryOperation] = []
 
     /// Creates an empty undo controller.
     public init() {}
-
     func canUndo() -> Bool { undoOrder.reversed().contains { $0.canPerform(text: canUndoTextEdit, structural: !structuralUndoStack.isEmpty) } }
-
     func canRedo() -> Bool { redoOrder.reversed().contains { $0.canPerform(text: canRedoTextEdit, structural: !structuralRedoStack.isEmpty) } }
 
     func canUndoTextEdit(in blockID: BlockInputBlockID) -> Bool {
@@ -165,6 +161,10 @@ public final class BlockInputUndoController {
         actionName: String,
         insertedBlocks: [BlockInputBlock],
         insertionIndex: Int,
+        beforeChangedBlocks: [BlockInputBlock] = [],
+        afterChangedBlocks: [BlockInputBlock] = [],
+        beforeMarkerTransaction: BlockInputNumberedListMarkerTransaction? = nil,
+        afterMarkerTransaction: BlockInputNumberedListMarkerTransaction? = nil,
         selectionBefore: BlockInputSelection?,
         selectionAfter: BlockInputSelection?
     ) {
@@ -173,7 +173,14 @@ public final class BlockInputUndoController {
         }
         structuralUndoStack.append(BlockInputStructuralUndoEntry(
             actionName: actionName,
-            payload: .blockInsertion(insertedBlocks: insertedBlocks, insertionIndex: insertionIndex),
+            payload: .blockInsertion(
+                insertedBlocks: insertedBlocks,
+                insertionIndex: insertionIndex,
+                beforeChangedBlocks: beforeChangedBlocks,
+                afterChangedBlocks: afterChangedBlocks,
+                beforeMarkerTransaction: beforeMarkerTransaction,
+                afterMarkerTransaction: afterMarkerTransaction
+            ),
             selectionBefore: selectionBefore,
             selectionAfter: selectionAfter
         ))
@@ -417,6 +424,8 @@ public final class BlockInputUndoController {
         removeLastRedoOperation(.structural)
     }
 
+}
+extension BlockInputUndoController {
     func nextUndoOperation() -> BlockInputHistoryOperation? {
         while let operation = undoOrder.last {
             switch operation {

@@ -18,7 +18,7 @@ public extension BlockInputView {
             return nil
         }
 
-        let parsedBlocks = BlockInputDocument(markdown: markdown).blocks
+        let parsedBlocks = BlockInputDocument(markdown: markdown, imageParsingMode: markdownInsertionImageParsingMode).blocks
         let targetBlockID = blockID ?? activeBlockID
         if let targetBlockID, index(of: targetBlockID) == nil {
             return nil
@@ -65,6 +65,10 @@ public extension BlockInputView {
             return document.index(of: targetBlockID).map { $0 + 1 }
         }
         return document.blocks.count
+    }
+
+    private var markdownInsertionImageParsingMode: BlockInputMarkdownImageParsingMode {
+        imagePresentation == .textLinksWithPreviewStrip ? .preserveSourceText : .imageBlocks
     }
 }
 

@@ -24,6 +24,37 @@ final class BlockInputViewFileDropTests: XCTestCase {
         assertCaret(in: mounted.view, textView: textView, blockID: blockID, utf16Offset: (expectedText as NSString).length - 4)
     }
 
+    func testDroppingImageIntoParagraphWithTextLinkPresentationInsertsInlineMarkdownImage() throws {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let undoController = BlockInputUndoController()
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "Open docs")
+            ]),
+            imagePresentation: .textLinksWithPreviewStrip,
+            undoController: undoController
+        ))
+        let textView = try textView(in: mounted.view)
+        let location = try windowLocation(forUTF16Offset: 5, in: textView)
+        let draggingInfo = BlockInputDraggingInfo(
+            fileURLs: [URL(fileURLWithPath: "/tmp/Cat Photo.png")],
+            location: location
+        )
+
+        XCTAssertTrue(textView.draggingEntered(draggingInfo).contains(.copy))
+        XCTAssertTrue(textView.performDragOperation(draggingInfo))
+
+        let expectedText = "Open ![Cat Photo](file:///tmp/Cat%20Photo.png)docs"
+        XCTAssertEqual(mounted.view.document.blocks[0].text, expectedText)
+        XCTAssertEqual(mounted.view.imagePreviewStripView.itemCountForTesting, 1)
+        assertCaret(in: mounted.view, textView: textView, blockID: blockID, utf16Offset: (expectedText as NSString).length - 4)
+
+        let undo = mounted.view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Insert Image")
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Open docs")
+    }
+
     func testAcceptedFileDropCaretIsVerticallyAlignedToTextLine() throws {
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "block", text: "Open docs")

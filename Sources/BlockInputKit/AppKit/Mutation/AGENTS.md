@@ -18,7 +18,7 @@
 - Keep table row, column, cell, and table-delete mutations on granular store sync and structural undo where a single block replacement, insertion, or deletion describes the edit.
 - Table-cell formatting and links should share normal inline mutation logic through source-range adapters; never apply formatting to table delimiters, separator rows, pipes, padding, or ranges crossing cells.
 - Table-cell hot edits should use `.replaceBlock` and must not read complete snapshots for store-backed documents.
-- Host-driven local file pickers should call `BlockInputView.insertLocalFileURLs(...)` so image-aware picker insertion stays aligned with file-drop behavior.
+- Host-driven local file pickers should call `BlockInputView.insertLocalFileURLs(...)` so picker insertion stays aligned with file-drop behavior and `BlockInputConfiguration.imagePresentation`.
 
 ## Shortcuts
 

@@ -15,6 +15,7 @@ extension BlockInputView {
     }
 
     func publishDocumentChange() {
+        refreshImagePreviewStrip()
         updatePlaceholderVisibility()
         guard let onDocumentChange else {
             return
@@ -302,25 +303,44 @@ extension BlockInputView {
 
         if let insertedBlocks = result.insertedBlocks,
            let insertionIndex = result.insertionIndex {
-            return applyGranularInsertionUndo(insertedBlocks, at: insertionIndex, selection: result.selection)
+            return applyGranularInsertionUndo(
+                insertedBlocks,
+                at: insertionIndex,
+                changedBlocks: result.replacedBlocks ?? [],
+                markerTransaction: result.markerTransaction,
+                selection: result.selection
+            )
         }
 
         if let deletedBlockIDs = result.deletedBlockIDs,
            let firstDeletedBlockID = deletedBlockIDs.first,
            let deletionIndex = index(of: firstDeletedBlockID) {
-            return applyGranularDeletionUndo(deletedBlockIDs, at: deletionIndex, selection: result.selection)
+            return applyGranularDeletionUndo(
+                deletedBlockIDs,
+                at: deletionIndex,
+                changedBlocks: result.replacedBlocks ?? [],
+                markerTransaction: result.markerTransaction,
+                selection: result.selection
+            )
         }
 
         if let markerTransaction = result.markerTransaction,
            documentStore is BlockInputMarkerAdjustingStore {
-            syncDocumentStore(.numberedListMarkerTransaction(markerTransaction))
-            applySelection(validUndoSelection(result.selection), notify: true)
-            reloadDataKeepingFocus()
-            publishDocumentChange()
-            return true
+            return applyGranularMarkerTransactionUndo(markerTransaction, selection: result.selection)
         }
 
         return false
+    }
+
+    private func applyGranularMarkerTransactionUndo(
+        _ markerTransaction: BlockInputNumberedListMarkerTransaction,
+        selection: BlockInputSelection?
+    ) -> Bool {
+        syncDocumentStore(.numberedListMarkerTransaction(markerTransaction))
+        applySelection(validUndoSelection(selection), notify: true)
+        reloadDataKeepingFocus()
+        publishDocumentChange()
+        return true
     }
 
     private func applyGranularReplacementUndoResult(
@@ -412,52 +432,6 @@ extension BlockInputView {
         selection: BlockInputSelection?
     ) -> Bool {
         applyGranularBlockReplacement(block, at: index, selection: selection)
-    }
-
-    private func applyGranularInsertionUndo(
-        _ blocks: [BlockInputBlock],
-        at insertionIndex: Int,
-        selection: BlockInputSelection?
-    ) -> Bool {
-        let resolvedInsertionIndex = frontMatterPreservingInsertionIndex(insertionIndex)
-        if canSynchronizeCacheForGranularInsertion(insertedBlockCount: blocks.count) {
-            guard document.insertBlocks(blocks, at: resolvedInsertionIndex) != nil else {
-                return false
-            }
-        } else {
-            markDocumentCacheUnsynchronized()
-        }
-        syncDocumentStore(.insertBlocks(blocks, insertionIndex: resolvedInsertionIndex))
-        applySelection(validUndoSelection(selection), notify: true)
-        if blocks.count == 1 {
-            insertVisibleBlock(at: resolvedInsertionIndex)
-        } else {
-            reloadDataKeepingFocus()
-        }
-        publishDocumentChange()
-        return true
-    }
-
-    private func applyGranularDeletionUndo(
-        _ blockIDs: [BlockInputBlockID],
-        at deletionIndex: Int,
-        selection: BlockInputSelection?
-    ) -> Bool {
-        if canSynchronizeCacheForGranularDeletion(deletedBlockCount: blockIDs.count) {
-            let deletedIDs = Set(blockIDs)
-            document.blocks.removeAll { deletedIDs.contains($0.id) }
-        } else {
-            markDocumentCacheUnsynchronized()
-        }
-        syncDocumentStore(.deleteBlocks(blockIDs))
-        applySelection(validUndoSelection(selection), notify: true)
-        if blockIDs.count == 1 {
-            deleteVisibleBlock(at: deletionIndex, deletedBlockIDs: blockIDs)
-        } else {
-            reloadDataKeepingFocus()
-        }
-        publishDocumentChange()
-        return true
     }
 
     func validUndoSelection(_ selection: BlockInputSelection?) -> BlockInputSelection? {

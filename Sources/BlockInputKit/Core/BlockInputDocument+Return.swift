@@ -147,6 +147,7 @@ private extension BlockInputDocument {
             lineIndentationLevels: insertedLineIndentationLevels
         )
         blocks.insert(insertedBlock, at: index + 1)
+        normalizeNumberedListStartsIfNeeded(around: index + 1)
         return .cursor(BlockInputCursor(blockID: insertedBlock.id, utf16Offset: 0))
     }
 

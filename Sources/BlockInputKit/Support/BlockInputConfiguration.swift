@@ -281,6 +281,12 @@ public struct BlockInputConfiguration {
     /// preferred height that starts at `defaultVisibleLineCount`, grows with rendered content, and caps at
     /// `maximumVisibleLineCount` when provided.
     public var heightSizing: BlockInputEditorHeightSizing?
+    /// How images are presented in the editor.
+    ///
+    /// The default `.inlineBlocks` keeps existing standalone image block behavior. Use `.textLinksWithPreviewStrip`
+    /// together with `BlockInputDocument(markdown:imageParsingMode: .preserveSourceText)` when the editor should keep
+    /// image syntax editable as text and show extracted image thumbnails in a preview strip.
+    public var imagePresentation: BlockInputImagePresentation
     /// Image loader used for image block bytes and natural dimensions.
     public var imageLoader: any BlockInputImageLoading
     /// Optional disk cache used by the default loader for remote image bytes and dimensions.
@@ -379,6 +385,7 @@ public struct BlockInputConfiguration {
         style: BlockInputStyle = .default,
         selectAllBehavior: BlockInputSelectAllBehavior = .focusedContentThenDocument,
         heightSizing: BlockInputEditorHeightSizing? = nil,
+        imagePresentation: BlockInputImagePresentation = .inlineBlocks,
         imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader(),
         imageDiskCache: (any BlockInputImageDiskCaching)? = BlockInputDefaultImageDiskCache(),
         imageBaseURL: URL? = nil,
@@ -420,6 +427,7 @@ public struct BlockInputConfiguration {
         self.style = style
         self.selectAllBehavior = selectAllBehavior
         self.heightSizing = heightSizing
+        self.imagePresentation = imagePresentation
         self.imageLoader = imageLoader
         self.imageDiskCache = imageDiskCache
         self.imageBaseURL = imageBaseURL

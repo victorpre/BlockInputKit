@@ -39,20 +39,19 @@ public final class BlockInputView: NSView {
     public internal(set) var selectAllBehavior = BlockInputSelectAllBehavior.focusedContentThenDocument
     /// Multiplier applied to vertical padding inside rendered block rows.
     public internal(set) var blockVerticalInsetMultiplier: CGFloat = 1
-    var heightSizing: BlockInputEditorHeightSizing?
+    var heightSizing: BlockInputEditorHeightSizing?, lastReportedPreferredHeight: CGFloat?
     var isPreferredHeightCallbackScheduled = false
-    var lastReportedPreferredHeight: CGFloat?
     var imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader()
     var imageDiskCache: (any BlockInputImageDiskCaching)?
-    var imageBaseURL: URL?
-    var fileBaseURL: URL?
+    var imageBaseURL: URL?, fileBaseURL: URL?
+    var imagePresentation = BlockInputImagePresentation.inlineBlocks
     var allowsRemoteImageLoading = true
-    var maximumImageSourceBytes = 20 * 1024 * 1024
-    var maximumImagePixelDimension = 8_192
+    var maximumImageSourceBytes = 20 * 1024 * 1024, maximumImagePixelDimension = 8_192
     var defaultImagePlaceholderAspectRatio: CGFloat = 16.0 / 9.0
 
     let scrollView = BlockInputDocumentScrollView()
     let collectionView = BlockInputCollectionView()
+    let imagePreviewStripView = BlockInputImagePreviewStripView()
     let placeholderLabel = BlockInputPlaceholderLabel(labelWithString: "")
     let editorChromeView = BlockInputEditorChromeView()
     let dropIndicatorView = NSView()
@@ -60,10 +59,10 @@ public final class BlockInputView: NSView {
     let editorChromeStrokeLayer = CAShapeLayer()
     let editorChromeMaskLayer = CAShapeLayer()
     let layout = BlockInputCollectionViewFlowLayout()
+    var imagePreviewStripHeightConstraint: NSLayoutConstraint?, scrollViewTopConstraint: NSLayoutConstraint?
     var documentStore: (any BlockInputDocumentStore)?
     var documentStoreObservation: BlockInputDocumentStoreObservation?
-    var progressiveLoadTask: Task<Void, Never>?
-    var progressiveLoadBatchLimit = 5_000
+    var progressiveLoadTask: Task<Void, Never>?, progressiveLoadBatchLimit = 5_000
     var progressiveStoreError: String?
     var fallbackUndoController = BlockInputUndoController()
     var undoController: BlockInputUndoController?
@@ -134,6 +133,7 @@ public final class BlockInputView: NSView {
         collectionView.visibleItems().forEach { item in
             (item as? BlockInputLoadingItem)?.applySurfaceStyle(style.editorSurface)
         }
+        refreshImagePreviewStrip()
     }
 
     /// Creates an editor view and installs its collection-view-backed editing surface.

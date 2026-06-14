@@ -3,11 +3,16 @@ import Foundation
 extension BlockInputMarkdownImporter {
     static func parseHTMLBlock(
         lines: [String],
-        startIndex: Int
+        startIndex: Int,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
     ) -> (blocks: [BlockInputBlock], nextIndex: Int) {
         let opening = lines[startIndex].trimmingCharacters(in: .whitespaces)
-        if let imageBlock = imageBlock(fromHTMLLine: lines[startIndex]) {
-            return ([imageBlock], startIndex + 1)
+        if BlockInputImageSyntaxParser.singleHTMLImage(in: lines[startIndex]) != nil {
+            if imageParsingMode == .imageBlocks,
+               let imageBlock = imageBlock(fromHTMLLine: lines[startIndex]) {
+                return ([imageBlock], startIndex + 1)
+            }
+            return ([BlockInputBlock(kind: .paragraph, text: lines[startIndex])], startIndex + 1)
         }
         if let parsed = parseHTMLComment(lines: lines, startIndex: startIndex, opening: opening) {
             return parsed

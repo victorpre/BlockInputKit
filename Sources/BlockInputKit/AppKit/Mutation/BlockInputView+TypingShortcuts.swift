@@ -121,6 +121,9 @@ extension BlockInputView {
         guard isEditable else {
             return nil
         }
+        guard imagePresentation == .inlineBlocks else {
+            return nil
+        }
         var proposedBlock = blockBeforeEdit
         proposedBlock.text = proposedText
         var replacementBlocks = BlockInputMarkdownImporter.imageBlocks(bySplitting: proposedBlock)

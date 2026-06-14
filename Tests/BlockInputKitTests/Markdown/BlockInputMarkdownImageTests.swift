@@ -46,6 +46,23 @@ final class BlockInputMarkdownImageTests: XCTestCase {
         XCTAssertEqual(document.blocks.map(\.text), ["Before", "", "after"])
     }
 
+    func testPreserveSourceTextKeepsMarkdownAndHTMLImagesEditable() {
+        let source = """
+        Before ![Alt](image.png) after
+
+        <img src="remote.png" alt="Remote" width="50" />
+        """
+
+        let document = BlockInputDocument(markdown: source, imageParsingMode: .preserveSourceText)
+
+        XCTAssertEqual(document.blocks.map(\.kind), [.paragraph, .paragraph])
+        XCTAssertEqual(document.blocks.map(\.text), [
+            "Before ![Alt](image.png) after",
+            "<img src=\"remote.png\" alt=\"Remote\" width=\"50\" />"
+        ])
+        XCTAssertEqual(document.markdown, source)
+    }
+
     func testMarkdownImageWithEscapedDestinationRoundTrips() {
         let document = BlockInputDocument(blocks: [
             BlockInputBlock(kind: .image(BlockInputImage(source: "assets/Photo <1>\\final>draft.png", altText: "A [photo]")))
@@ -109,6 +126,25 @@ final class BlockInputMarkdownImageTests: XCTestCase {
         XCTAssertEqual(streamed.blocks.map(\.kind), parsed.blocks.map(\.kind))
         XCTAssertEqual(streamed.blocks.map(\.text), parsed.blocks.map(\.text))
         XCTAssertEqual(streamed.markdown, parsed.markdown)
+    }
+
+    func testStreamingImportPreservesImageSourceTextWhenRequested() async throws {
+        let source = """
+        Before ![Alt](image.png) after
+
+        <img src="remote.png" alt="Remote" width="50" />
+        """
+        var reader = ImageMarkdownLineReader(markdown: source)
+
+        let streamed = try await BlockInputDocument.readingMarkdown(
+            from: &reader,
+            imageParsingMode: .preserveSourceText
+        )
+        let parsed = await BlockInputDocument.parsingMarkdown(source, imageParsingMode: .preserveSourceText)
+
+        XCTAssertEqual(streamed.blocks.map(\.kind), [.paragraph, .paragraph])
+        XCTAssertEqual(streamed.blocks.map(\.text), parsed.blocks.map(\.text))
+        XCTAssertEqual(streamed.markdown, source)
     }
 }
 

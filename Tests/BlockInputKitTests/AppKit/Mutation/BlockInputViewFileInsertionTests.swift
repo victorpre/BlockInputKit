@@ -305,6 +305,35 @@ final class BlockInputViewFileInsertionTests: XCTestCase {
         XCTAssertEqual(selection, .blocks([view.document.blocks[1].id]))
     }
 
+    func testInsertLocalFileURLsWithTextLinkImagePresentationInsertsMarkdownImageText() {
+        let undoController = BlockInputUndoController()
+        let view = BlockInputView()
+        var publishedDocument: BlockInputDocument?
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(),
+            imagePresentation: .textLinksWithPreviewStrip,
+            undoController: undoController,
+            onDocumentChange: { publishedDocument = $0 }
+        ))
+
+        let selection = view.insertLocalFileURLs([
+            URL(fileURLWithPath: "/tmp/Cat Photo.png")
+        ])
+
+        XCTAssertEqual(view.document.blocks.count, 1)
+        XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[0].text, "![Cat Photo](file:///tmp/Cat%20Photo.png)")
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: view.document.blocks[0].id, utf16Offset: 0)))
+        XCTAssertEqual(publishedDocument, view.document)
+
+        let undo = view.undoStructuralEdit()
+
+        XCTAssertEqual(undo?.actionName, "Insert Image")
+        XCTAssertEqual(view.document.blocks.count, 1)
+        XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
+        XCTAssertEqual(view.document.blocks[0].text, "")
+    }
+
     func testInsertLocalFileURLsReplacesDefaultEmptyParagraphWithImageBlock() {
         let undoController = BlockInputUndoController()
         let view = BlockInputView()

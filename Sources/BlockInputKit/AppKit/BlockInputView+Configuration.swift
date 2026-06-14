@@ -50,11 +50,8 @@ extension BlockInputView {
         hideDropIndicator()
         invalidateReadOnlyCursorRects()
         clearStaleFocusState()
-        if restoresFocus {
-            reloadDataKeepingFocus()
-        } else {
-            reloadDataWithoutRestoringFocus()
-        }
+        reloadConfiguredDocument(restoresFocus: restoresFocus)
+        refreshImagePreviewStrip()
         attachDocumentStoreObservationIfNeeded()
         invalidatePreferredHeight()
     }
@@ -81,8 +78,17 @@ extension BlockInputView {
         selectAllBehavior = configuration.selectAllBehavior
         completionReturnBehavior = configuration.completionReturnBehavior
         dropIndicatorColor = configuration.dropIndicatorColor
+        imagePresentation = configuration.imagePresentation
         applyEditorSurfaceStyle()
         configureHeightSizing(configuration.heightSizing)
+    }
+
+    private func reloadConfiguredDocument(restoresFocus: Bool) {
+        if restoresFocus {
+            reloadDataKeepingFocus()
+        } else {
+            reloadDataWithoutRestoringFocus()
+        }
     }
 
     private func configureCommandDispatcher(_ dispatcher: BlockInputEditorCommandDispatcher?) {
@@ -133,6 +139,7 @@ extension BlockInputView {
         if style.imageBlock.placeholderAspectRatio == nil {
             style.imageBlock.placeholderAspectRatio = configuration.defaultImagePlaceholderAspectRatio
         }
+        imagePreviewStripView.configureStyle(style.imagePreviewStrip)
     }
 
     private func configureImageLoading(_ configuration: BlockInputConfiguration) {

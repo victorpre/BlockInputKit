@@ -106,6 +106,9 @@ extension BlockInputView {
               block.text == context.sourceText else {
             return nil
         }
+        if imagePresentation == .textLinksWithPreviewStrip {
+            return insertImageText(image, block: block, index: index, selectedRange: context.selectedRange)
+        }
         if !block.kind.supportsImageSyntaxSplitting {
             return insertImageBlocks([BlockInputBlock(kind: .image(image))], at: index + 1)
         }
@@ -116,6 +119,14 @@ extension BlockInputView {
     func insertImageFileURLs(_ fileURLs: [URL], below blockID: BlockInputBlockID) -> BlockInputSelection? {
         guard isEditable else {
             return nil
+        }
+        if imagePresentation == .textLinksWithPreviewStrip {
+            let textBlocks = fileURLs.compactMap(Self.imageTextBlock(for:))
+            guard !textBlocks.isEmpty,
+                  let index = index(of: blockID) else {
+                return nil
+            }
+            return insertImageTextBlocks(textBlocks, at: index + 1)
         }
         let imageBlocks = fileURLs.compactMap(Self.imageBlock(for:))
         guard !imageBlocks.isEmpty,
@@ -129,6 +140,19 @@ extension BlockInputView {
     func insertImageReferences(_ references: [BlockInputFileDropReference], below blockID: BlockInputBlockID) -> BlockInputSelection? {
         guard isEditable else {
             return nil
+        }
+        if imagePresentation == .textLinksWithPreviewStrip {
+            let textBlocks = references.compactMap { reference -> BlockInputBlock? in
+                guard reference.kind == .image else {
+                    return nil
+                }
+                return Self.imageTextBlock(for: reference)
+            }
+            guard !textBlocks.isEmpty,
+                  let index = index(of: blockID) else {
+                return nil
+            }
+            return insertImageTextBlocks(textBlocks, at: index + 1)
         }
         let imageBlocks = references.compactMap { reference -> BlockInputBlock? in
             guard reference.kind == .image else {
@@ -149,6 +173,26 @@ extension BlockInputView {
             return nil
         }
         return BlockInputBlock(kind: .image(BlockInputImage(source: url.absoluteString, altText: url.deletingPathExtension().lastPathComponent)))
+    }
+
+    static func imageTextBlock(for url: URL) -> BlockInputBlock? {
+        guard let imageBlock = imageBlock(for: url),
+              case let .image(image) = imageBlock.kind else {
+            return nil
+        }
+        return BlockInputBlock(text: markdownImageSource(for: image))
+    }
+
+    static func imageTextBlock(for reference: BlockInputFileDropReference) -> BlockInputBlock? {
+        guard reference.kind == .image,
+              let source = normalizedDropSource(reference.source) else {
+            return nil
+        }
+        return BlockInputBlock(text: markdownImageSource(for: BlockInputImage(source: source, altText: reference.label)))
+    }
+
+    static func markdownImageSource(for image: BlockInputImage) -> String {
+        BlockInputMarkdownImporter.markdown(for: image)
     }
 
     private func configureImageModalActions(_ modal: BlockInputImageModalView, context: BlockInputImageContext) {
@@ -238,6 +282,40 @@ extension BlockInputView {
         return replaceBlock(block, at: index, with: replacementBlocks, actionName: "Insert Image")
     }
 
+    private func insertImageText(
+        _ image: BlockInputImage,
+        block: BlockInputBlock,
+        index: Int,
+        selectedRange: NSRange
+    ) -> BlockInputSelection? {
+        let markdown = Self.markdownImageSource(for: image)
+        guard block.kind.supportsImageSyntaxSplitting else {
+            return insertImageTextBlocks([BlockInputBlock(text: markdown)], at: index + 1)
+        }
+        let beforeBlock = block
+        let beforeSelection = selection
+        let range = clampedRange(selectedRange, in: block.text)
+        let mutableText = NSMutableString(string: block.text)
+        mutableText.replaceCharacters(in: range, with: markdown)
+        var afterBlock = block
+        afterBlock.text = mutableText as String
+        let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
+            blockID: afterBlock.id,
+            utf16Offset: range.location + (markdown as NSString).length
+        ))
+        guard applyGranularBlockReplacement(afterBlock, at: index, selection: afterSelection) else {
+            return nil
+        }
+        undoController?.registerBlockReplacementStructuralEdit(
+            actionName: "Insert Image",
+            beforeBlock: beforeBlock,
+            afterBlock: afterBlock,
+            selectionBefore: beforeSelection,
+            selectionAfter: afterSelection
+        )
+        return afterSelection
+    }
+
     private func replaceBlock(
         _ beforeBlock: BlockInputBlock,
         at index: Int,
@@ -289,6 +367,20 @@ extension BlockInputView {
                     return nil
                 }
                 return .blocks([firstImage.id])
+            }
+        )
+    }
+
+    private func insertImageTextBlocks(_ textBlocks: [BlockInputBlock], at insertionIndex: Int) -> BlockInputSelection? {
+        performStructuralEdit(
+            named: textBlocks.count == 1 ? "Insert Image" : "Insert Images",
+            storeSyncAction: { _, _, _ in .insertBlocks(textBlocks, insertionIndex: insertionIndex) },
+            edit: { document in
+                guard document.insertBlocks(textBlocks, at: insertionIndex) != nil,
+                      let firstBlock = textBlocks.first else {
+                    return nil
+                }
+                return .cursor(BlockInputCursor(blockID: firstBlock.id, utf16Offset: firstBlock.utf16Length))
             }
         )
     }

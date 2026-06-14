@@ -470,7 +470,7 @@ The provider only runs for a focused, editable, inline-Markdown-capable block wi
 
 ## File Drops
 
-Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block.
+Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block by default, or Markdown image text blocks when `imagePresentation` is `.textLinksWithPreviewStrip`.
 
 Use `fileDropHandler` to copy files into project storage, rewrite destinations, or reject a drop before mutation:
 
@@ -503,7 +503,7 @@ Return `.useDefault` for built-in insertion, `.cancel` to leave the document unc
 
 ## Images
 
-Markdown image syntax and HTML image tags parse as standalone `.image` blocks:
+Markdown image syntax and HTML image tags parse as standalone `.image` blocks by default:
 
 ```markdown
 ![Alt Text](https://example.com/image.png)
@@ -511,6 +511,38 @@ Markdown image syntax and HTML image tags parse as standalone `.image` blocks:
 ```
 
 Images typed, pasted, parsed, or inserted in the middle of supported text split the source into text before, image block, and text after. Dropped local images insert below the target text block.
+
+Use `.textLinksWithPreviewStrip` when images should stay as editable Markdown image text while the editor shows extracted thumbnails above the document:
+
+```swift
+let document = BlockInputDocument(
+    markdown: markdown,
+    imageParsingMode: .preserveSourceText
+)
+
+var style = BlockInputStyle.default
+style.imagePreviewStrip = BlockInputImagePreviewStripStyle(
+    thumbnailSize: NSSize(width: 76, height: 76),
+    contentInsets: NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12),
+    interItemSpacing: 12,
+    borderColor: NSColor.separatorColor.withAlphaComponent(0.35),
+    removeButton: BlockInputImagePreviewRemoveButtonStyle(
+        borderColor: NSColor.separatorColor.withAlphaComponent(0.32),
+        shadowColor: .black,
+        shadowOpacity: 0.18
+    )
+)
+
+let configuration = BlockInputConfiguration(
+    document: document,
+    style: style,
+    imagePresentation: .textLinksWithPreviewStrip
+)
+```
+
+Pair `.preserveSourceText` with `.textLinksWithPreviewStrip` for Markdown imports; `imagePresentation` controls editor insertion and live conversion, while parsing mode controls how incoming Markdown is converted into blocks. Existing `.image` blocks still render as image blocks.
+
+Preview tiles are extracted from loaded editor blocks only, ignoring code, raw Markdown, table, and existing image blocks. Clicking a tile selects the exact source image range. Removing a tile performs an undoable text edit that deletes that source occurrence.
 
 Remote images load through `BlockInputImageLoading`. The default loader memory-caches loaded images, can use `BlockInputImageDiskCaching` for remote disk cache entries, and respects source byte and pixel limits.
 
@@ -557,6 +589,10 @@ let document = try await BlockInputDocument.readingMarkdown(from: url)
 try await document.writeMarkdown(to: url)
 
 let parsed = await BlockInputDocument.parsingMarkdown("# Heading")
+let textImages = await BlockInputDocument.parsingMarkdown(
+    markdown,
+    imageParsingMode: .preserveSourceText
+)
 let markdown = await parsed.markdownSnapshot()
 ```
 

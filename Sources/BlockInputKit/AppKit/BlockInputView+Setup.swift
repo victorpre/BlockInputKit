@@ -26,6 +26,25 @@ extension BlockInputView {
         collectionView.setDraggingSourceOperationMask(.move, forLocal: true)
         installSelectionExpansionKeyMonitor()
 
+        setupDropIndicator()
+        setupScrollView()
+        addSubview(scrollView)
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        let imagePreviewConstraints = setupImagePreviewStrip()
+        NSLayoutConstraint.activate([
+            imagePreviewStripView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            imagePreviewStripView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            imagePreviewStripView.topAnchor.constraint(equalTo: topAnchor),
+            imagePreviewConstraints.height,
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            imagePreviewConstraints.scrollTop,
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+        setupEditorChromeView()
+    }
+
+    private func setupDropIndicator() {
         dropIndicatorView.wantsLayer = true
         dropIndicatorView.layer?.cornerRadius = 1
         dropIndicatorView.layer?.zPosition = 10
@@ -35,7 +54,9 @@ extension BlockInputView {
         collectionView.addSubview(dropIndicatorView, positioned: .above, relativeTo: nil)
         configurePlaceholderLabel()
         collectionView.addSubview(placeholderLabel, positioned: .above, relativeTo: nil)
+    }
 
+    private func setupScrollView() {
         scrollView.borderType = .noBorder
         scrollView.hasHorizontalScroller = false
         scrollView.hasVerticalScroller = true
@@ -45,16 +66,6 @@ extension BlockInputView {
         scrollView.onContentBoundsDidChange = { [weak self] in
             self?.handleDocumentScrollContentBoundsChange()
         }
-
-        addSubview(scrollView)
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
-        setupEditorChromeView()
     }
 
     private func handleDocumentScrollContentBoundsChange() {

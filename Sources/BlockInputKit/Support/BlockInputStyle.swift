@@ -15,6 +15,8 @@ public struct BlockInputStyle: @unchecked Sendable {
     public var codeBlock: BlockInputCodeBlockStyle
     /// Styling for image block surfaces.
     public var imageBlock: BlockInputImageBlockStyle
+    /// Styling for the editor-owned image preview strip.
+    public var imagePreviewStrip: BlockInputImagePreviewStripStyle
     /// Styling for editor-owned background surfaces.
     public var editorSurface: BlockInputEditorSurfaceStyle
     /// Styling for inline file-link chips.
@@ -31,6 +33,7 @@ public struct BlockInputStyle: @unchecked Sendable {
         inlineCode: BlockInputInlineCodeStyle = BlockInputInlineCodeStyle(),
         codeBlock: BlockInputCodeBlockStyle = BlockInputCodeBlockStyle(),
         imageBlock: BlockInputImageBlockStyle = BlockInputImageBlockStyle(),
+        imagePreviewStrip: BlockInputImagePreviewStripStyle = BlockInputImagePreviewStripStyle(),
         editorSurface: BlockInputEditorSurfaceStyle = BlockInputEditorSurfaceStyle(),
         fileChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
         slashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
@@ -41,10 +44,182 @@ public struct BlockInputStyle: @unchecked Sendable {
         self.inlineCode = inlineCode
         self.codeBlock = codeBlock
         self.imageBlock = imageBlock
+        self.imagePreviewStrip = imagePreviewStrip
         self.editorSurface = editorSurface
         self.fileChip = fileChip
         self.slashCommandChip = slashCommandChip
         self.rawSlashCommandChip = rawSlashCommandChip
+    }
+}
+
+/// Visual styling for the textual-image preview strip.
+public struct BlockInputImagePreviewStripStyle: @unchecked Sendable {
+    /// Thumbnail display size. Width and height values are clamped to at least `1`.
+    public var thumbnailSize: NSSize {
+        didSet {
+            thumbnailSize = Self.validSize(thumbnailSize)
+        }
+    }
+    /// Padding around the thumbnail row inside the strip.
+    public var contentInsets: NSEdgeInsets {
+        didSet {
+            contentInsets = Self.validInsets(contentInsets)
+        }
+    }
+    /// Horizontal spacing between thumbnail tiles. Negative values are clamped to zero.
+    public var interItemSpacing: CGFloat {
+        didSet {
+            interItemSpacing = Self.validNonNegative(interItemSpacing)
+        }
+    }
+    /// Thumbnail border color. When nil, no border is drawn.
+    public var borderColor: NSColor?
+    /// Thumbnail border width. Negative values are clamped to zero.
+    public var borderWidth: CGFloat {
+        didSet {
+            borderWidth = Self.validNonNegative(borderWidth)
+        }
+    }
+    /// Thumbnail corner radius. Negative values are clamped to zero.
+    public var cornerRadius: CGFloat {
+        didSet {
+            cornerRadius = Self.validNonNegative(cornerRadius)
+        }
+    }
+    /// Remove button styling shown over each thumbnail.
+    public var removeButton: BlockInputImagePreviewRemoveButtonStyle
+
+    /// Creates image preview strip styling overrides.
+    public init(
+        thumbnailSize: NSSize = NSSize(width: 76, height: 76),
+        contentInsets: NSEdgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12),
+        interItemSpacing: CGFloat = 12,
+        borderColor: NSColor? = NSColor.separatorColor.withAlphaComponent(0.35),
+        borderWidth: CGFloat = 1,
+        cornerRadius: CGFloat = 12,
+        removeButton: BlockInputImagePreviewRemoveButtonStyle = BlockInputImagePreviewRemoveButtonStyle()
+    ) {
+        self.thumbnailSize = Self.validSize(thumbnailSize)
+        self.contentInsets = Self.validInsets(contentInsets)
+        self.interItemSpacing = Self.validNonNegative(interItemSpacing)
+        self.borderColor = borderColor
+        self.borderWidth = Self.validNonNegative(borderWidth)
+        self.cornerRadius = Self.validNonNegative(cornerRadius)
+        self.removeButton = removeButton
+    }
+
+    var preferredHeight: CGFloat {
+        contentInsets.top + thumbnailSize.height + contentInsets.bottom
+    }
+
+    private static func validSize(_ size: NSSize) -> NSSize {
+        NSSize(width: max(1, size.width), height: max(1, size.height))
+    }
+
+    private static func validInsets(_ insets: NSEdgeInsets) -> NSEdgeInsets {
+        NSEdgeInsets(
+            top: validNonNegative(insets.top),
+            left: validNonNegative(insets.left),
+            bottom: validNonNegative(insets.bottom),
+            right: validNonNegative(insets.right)
+        )
+    }
+
+    private static func validNonNegative(_ value: CGFloat) -> CGFloat {
+        value.isFinite ? max(0, value) : 0
+    }
+}
+
+/// Visual styling for preview-strip remove buttons.
+public struct BlockInputImagePreviewRemoveButtonStyle: @unchecked Sendable {
+    /// Whether thumbnail remove buttons are shown.
+    public var isVisible: Bool
+    /// Remove button size. Width and height values are clamped to at least `1`.
+    public var size: NSSize {
+        didSet {
+            size = Self.validSize(size)
+        }
+    }
+    /// Distance from the thumbnail's top and trailing edges. Negative values are clamped to zero.
+    public var edgeInset: CGFloat {
+        didSet {
+            edgeInset = Self.validNonNegative(edgeInset)
+        }
+    }
+    /// Button fill color.
+    public var backgroundColor: NSColor
+    /// Button border color. When nil, no border is drawn.
+    public var borderColor: NSColor?
+    /// Button border width. Negative values are clamped to zero.
+    public var borderWidth: CGFloat {
+        didSet {
+            borderWidth = Self.validNonNegative(borderWidth)
+        }
+    }
+    /// Button corner radius. Negative values are clamped to zero.
+    public var cornerRadius: CGFloat {
+        didSet {
+            cornerRadius = Self.validNonNegative(cornerRadius)
+        }
+    }
+    /// Symbol foreground color.
+    public var symbolColor: NSColor
+    /// Symbol point size. Non-positive values use the built-in symbol size.
+    public var symbolPointSize: CGFloat?
+    /// Drop shadow color. When nil, no shadow is drawn.
+    public var shadowColor: NSColor?
+    /// Drop shadow opacity.
+    public var shadowOpacity: Float {
+        didSet {
+            shadowOpacity = min(max(shadowOpacity, 0), 1)
+        }
+    }
+    /// Drop shadow blur radius. Negative values are clamped to zero.
+    public var shadowRadius: CGFloat {
+        didSet {
+            shadowRadius = Self.validNonNegative(shadowRadius)
+        }
+    }
+    /// Drop shadow offset.
+    public var shadowOffset: NSSize
+
+    /// Creates preview-strip remove button styling overrides.
+    public init(
+        isVisible: Bool = true,
+        size: NSSize = NSSize(width: 24, height: 24),
+        edgeInset: CGFloat = 6,
+        backgroundColor: NSColor = .controlBackgroundColor,
+        borderColor: NSColor? = NSColor.separatorColor.withAlphaComponent(0.32),
+        borderWidth: CGFloat = 1,
+        cornerRadius: CGFloat = 12,
+        symbolColor: NSColor = .labelColor,
+        symbolPointSize: CGFloat? = 13,
+        shadowColor: NSColor? = .black,
+        shadowOpacity: Float = 0.18,
+        shadowRadius: CGFloat = 3,
+        shadowOffset: NSSize = NSSize(width: 0, height: -1)
+    ) {
+        self.isVisible = isVisible
+        self.size = Self.validSize(size)
+        self.edgeInset = Self.validNonNegative(edgeInset)
+        self.backgroundColor = backgroundColor
+        self.borderColor = borderColor
+        self.borderWidth = Self.validNonNegative(borderWidth)
+        self.cornerRadius = Self.validNonNegative(cornerRadius)
+        self.symbolColor = symbolColor
+        self.symbolPointSize = symbolPointSize.flatMap { $0 > 0 ? $0 : nil }
+        self.shadowColor = shadowColor
+        self.shadowOpacity = min(max(shadowOpacity, 0), 1)
+        self.shadowRadius = Self.validNonNegative(shadowRadius)
+        self.shadowOffset = shadowOffset
+    }
+
+    private static func validSize(_ size: NSSize) -> NSSize {
+        NSSize(width: max(1, size.width), height: max(1, size.height))
+    }
+
+    private static func validNonNegative(_ value: CGFloat) -> CGFloat {
+        value.isFinite ? max(0, value) : 0
     }
 }
 

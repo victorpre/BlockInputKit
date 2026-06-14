@@ -17,8 +17,20 @@ public struct BlockInputDocument: Equatable, Codable, Sendable {
     }
 
     /// Parses a Markdown snapshot into structured blocks.
-    public init(markdown: String) {
-        self = BlockInputMarkdownImporter.document(from: markdown)
+    ///
+    /// Use `imageParsingMode: .preserveSourceText` when the editor should keep
+    /// Markdown and HTML image syntax as editable source text instead of turning
+    /// it into standalone image blocks during import.
+    ///
+    /// - Parameters:
+    ///   - markdown: Markdown source to parse.
+    ///   - imageParsingMode: Import-time image syntax handling. The default
+    ///     `.imageBlocks` preserves existing standalone image block behavior.
+    public init(
+        markdown: String,
+        imageParsingMode: BlockInputMarkdownImageParsingMode = .imageBlocks
+    ) {
+        self = BlockInputMarkdownImporter.document(from: markdown, imageParsingMode: imageParsingMode)
     }
 
     /// Serializes the structured blocks into Markdown.
