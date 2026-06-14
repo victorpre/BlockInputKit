@@ -75,6 +75,8 @@ extension BlockInputBlockItem {
         scrollViewBottomConstraint?.isActive = true
         metadataRowTopConstraint?.isActive = false
         metadataRowBottomConstraint?.isActive = false
+        detailButton.isHidden = true
+        detailButton.alphaValue = 0
         frontMatterDividerView.isHidden = true
         frontMatterDividerView.alphaValue = 0
         handleView.isEnabled = false

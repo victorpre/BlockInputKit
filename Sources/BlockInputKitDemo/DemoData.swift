@@ -78,6 +78,13 @@ enum DemoData {
             ),
             BlockInputBlock(kind: .checklistItem(isChecked: false), text: "Unchecked checklist item"),
             BlockInputBlock(kind: .checklistItem(isChecked: true), text: "Checked checklist item"),
+            BlockInputBlock(
+                kind: .checklistItem(isChecked: false),
+                text: "Checklist with metadata — hover for ···",
+                whenDate: "2026-06-15",
+                deadline: "2026-06-20",
+                tags: ["work", "urgent"]
+            ),
             BlockInputBlock(kind: .heading(level: 2), text: "Tables")
         ]
     }

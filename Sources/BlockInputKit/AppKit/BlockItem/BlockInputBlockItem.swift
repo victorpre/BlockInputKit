@@ -40,6 +40,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     let handleView = BlockInputDragHandleView()
     let kindLabel = BlockInputMarkerView()
     let checklistButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    let detailButton = NSButton(image: NSImage(systemSymbolName: "ellipsis.circle", accessibilityDescription: "More")!, target: nil, action: nil)
     let quoteBarView = NSView()
     let scrollView = BlockInputBlockItemScrollView()
     let codeBackgroundView = NSView()
@@ -107,6 +108,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var imageBlockBottomConstraint: NSLayoutConstraint?
     var metadataRowTopConstraint: NSLayoutConstraint?
     var metadataRowBottomConstraint: NSLayoutConstraint?
+    var detailButtonLeadingConstraint: NSLayoutConstraint?
+    var detailButtonTopConstraint: NSLayoutConstraint?
+    var lastComputedDetailButtonOffset: CGFloat = 0
     var imageLoadTask: Task<Void, Never>?
     var imageLoadCacheKey: String?
     private var isHorizontalRule = false
@@ -165,10 +169,12 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     override func mouseEntered(with event: NSEvent) {
         delegate?.blockItemDidRevealReorderHandle(self)
         setReorderHandleVisible(true)
+        setDetailButtonVisible(true)
     }
 
     override func mouseExited(with event: NSEvent) {
         setReorderHandleVisible(false)
+        setDetailButtonVisible(false)
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -436,6 +442,16 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         )
         view.addTrackingArea(trackingArea)
         self.trackingArea = trackingArea
+
+        // After recreating the tracking area, check the actual mouse position
+        // so the detail button does not stay visible if the mouse left during
+        // the gap between removing the old area and adding the new one.
+        if let mouseInWindow = view.window?.mouseLocationOutsideOfEventStream {
+            let mouseInView = view.convert(mouseInWindow, from: nil)
+            if !view.bounds.contains(mouseInView) {
+                setDetailButtonVisible(false, animated: false)
+            }
+        }
     }
 
 }

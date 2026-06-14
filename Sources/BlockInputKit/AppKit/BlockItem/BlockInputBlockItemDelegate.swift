@@ -185,6 +185,12 @@ protocol BlockInputBlockItemDelegate: AnyObject {
     func blockItemDidRequestToggleChecklist(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItem(_ item: BlockInputBlockItem, blockID: BlockInputBlockID, didResolveImageDimensions dimensions: BlockInputImageDimensions)
     func blockItem(_ item: BlockInputBlockItem, blockID: BlockInputBlockID, didResizeImageToWidth width: Int, height: Int)
+    /// Routes checklist detail button clicks to the editor for host processing.
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestChecklistMetadataDetail sourceRect: NSRect
+    )
     func blockItemDidBeginReordering(_ item: BlockInputBlockItem, blockID: BlockInputBlockID)
     func blockItemDidRequestIndent(
         _ item: BlockInputBlockItem,

@@ -13,4 +13,9 @@ extension BlockInputBlockItem {
             handleView.animator().alphaValue = alpha
         }
     }
+
+    func setDetailButtonVisible(_ isVisible: Bool, animated: Bool = true) {
+        let alpha: CGFloat = isVisible && !detailButton.isHidden ? 1 : 0
+        detailButton.alphaValue = alpha
+    }
 }

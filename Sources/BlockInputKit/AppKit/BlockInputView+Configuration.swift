@@ -107,6 +107,7 @@ extension BlockInputView {
         onFocusChange = configuration.onFocusChange
         fileDropHandler = configuration.fileDropHandler
         modalOverlayProvider = configuration.modalOverlayProvider
+        checklistMetadataDetailHandler = configuration.checklistMetadataDetailHandler
         refreshMutationModalPresentation()
     }
 

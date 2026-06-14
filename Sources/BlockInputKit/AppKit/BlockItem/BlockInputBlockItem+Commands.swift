@@ -116,6 +116,15 @@ extension BlockInputBlockItem {
         delegate?.blockItemDidRequestToggleChecklist(self, blockID: blockID)
     }
 
+    @objc func requestChecklistMetadataDetail() {
+        guard isEditable,
+              let blockID else {
+            return
+        }
+        let sourceRect = detailButton.convert(detailButton.bounds, to: nil)
+        delegate?.blockItem(self, blockID: blockID, didRequestChecklistMetadataDetail: sourceRect)
+    }
+
     func requestMoveVertically(_ direction: BlockInputVerticalMovementDirection) -> Bool {
         guard let blockID else {
             return false

@@ -66,6 +66,23 @@ final class DemoModel: ObservableObject {
             completionProvider: completionProvider,
             completionReturnBehavior: .passthroughExactMatch,
             slashCommandAvailability: .anywhere,
+            checklistMetadataDetailHandler: { context in
+                NSLog("[Demo] Checklist detail: id=%@ whenDate=%@ deadline=%@ tags=%@",
+                      context.blockID.rawValue,
+                      context.whenDate ?? "nil",
+                      context.deadline ?? "nil",
+                      context.tags.description)
+                let alert = NSAlert()
+                alert.messageText = "Checklist Metadata"
+                let info = """
+                When: \(context.whenDate ?? "none")
+                Deadline: \(context.deadline ?? "none")
+                Tags: \(context.tags.isEmpty ? "none" : context.tags.joined(separator: ", "))
+                """
+                alert.informativeText = info
+                alert.addButton(withTitle: "OK")
+                alert.beginSheetModal(for: context.editorView.window!) { _ in }
+            },
             completionPopupConfiguration: completionPopupConfiguration(),
             onDocumentMutation: { [weak self, itemID = session.id] change in
                 Task { @MainActor in

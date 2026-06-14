@@ -241,8 +241,11 @@ private final class BlockInputBlockItemClipView: NSClipView {
     }
 
     override func cursorUpdate(with event: NSEvent) {
-        guard let scrollView = superview as? BlockInputBlockItemScrollView,
-              scrollView.blockItem?.applyEditableTextSurfaceCursor(at: nil) == true else {
+        guard let scrollView = superview as? BlockInputBlockItemScrollView else {
+            super.cursorUpdate(with: event)
+            return
+        }
+        guard scrollView.blockItem?.applyEditableTextSurfaceCursor(at: nil) == true else {
             super.cursorUpdate(with: event)
             return
         }

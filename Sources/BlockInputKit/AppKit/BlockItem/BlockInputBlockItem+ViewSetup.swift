@@ -18,6 +18,7 @@ extension BlockInputBlockItem {
         setupFrontMatterDividerView()
         setupQuoteBarView()
         setupMetadataRowView()
+        setupDetailButton()
         addArrangedSubviews()
         activateLayoutConstraints()
     }
@@ -128,13 +129,25 @@ extension BlockInputBlockItem {
         metadataRowView.isHidden = true
     }
 
+    private func setupDetailButton() {
+        detailButton.target = self
+        detailButton.action = #selector(requestChecklistMetadataDetail)
+        detailButton.isHidden = true
+        detailButton.alphaValue = 0
+        detailButton.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+        detailButton.contentTintColor = .secondaryLabelColor
+        detailButton.isBordered = false
+        detailButton.toolTip = "Task details"
+        detailButton.setAccessibilityLabel("Task details")
+    }
+
     private func addArrangedSubviews() {
         codeBackgroundView.translatesAutoresizingMaskIntoConstraints = true
         view.addSubview(codeBackgroundView)
         selectionBackgroundView.translatesAutoresizingMaskIntoConstraints = true
         view.addSubview(selectionBackgroundView)
         for subview in [
-            kindLabel, checklistButton, quoteBarView, scrollView, tableView, imageBlockView, horizontalRuleView
+            kindLabel, checklistButton, quoteBarView, scrollView, detailButton, tableView, imageBlockView, horizontalRuleView
         ] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
@@ -220,6 +233,16 @@ extension BlockInputBlockItem {
         self.horizontalRuleLeadingConstraint = horizontalRuleLeadingConstraint
         let scrollViewTrailingConstraint = makeScrollViewTrailingConstraint()
         self.scrollViewTrailingConstraint = scrollViewTrailingConstraint
+        let detailButtonLeadingConstraint = detailButton.leadingAnchor.constraint(
+            equalTo: scrollView.leadingAnchor,
+            constant: Self.textContainerContentLeading + 6
+        )
+        self.detailButtonLeadingConstraint = detailButtonLeadingConstraint
+        let detailButtonTopConstraint = detailButton.topAnchor.constraint(
+            equalTo: scrollView.topAnchor,
+            constant: 2
+        )
+        self.detailButtonTopConstraint = detailButtonTopConstraint
         let horizontalRuleTrailingConstraint = makeHorizontalRuleTrailingConstraint()
         self.horizontalRuleTrailingConstraint = horizontalRuleTrailingConstraint
         let quoteBarLeadingConstraint = quoteBarView.leadingAnchor.constraint(
@@ -249,6 +272,11 @@ extension BlockInputBlockItem {
             scrollViewBottomConstraint,
             horizontalRuleLeadingConstraint,
             horizontalRuleTrailingConstraint,
+            detailButtonLeadingConstraint,
+            detailButtonTopConstraint,
+            detailButton.widthAnchor.constraint(equalToConstant: 20),
+            detailButton.heightAnchor.constraint(equalToConstant: 20),
+            detailButton.trailingAnchor.constraint(lessThanOrEqualTo: scrollView.trailingAnchor, constant: -2),
             horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             horizontalRuleView.heightAnchor.constraint(equalToConstant: 9)
         ] + metadataRowLayoutConstraints() + tableViewLayoutConstraints() + imageBlockViewLayoutConstraints() + frontMatterDividerLayoutConstraints()

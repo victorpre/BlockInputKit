@@ -401,6 +401,27 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         _ = toggleChecklistItem(blockID: blockID)
     }
 
+    func blockItem(
+        _ item: BlockInputBlockItem,
+        blockID: BlockInputBlockID,
+        didRequestChecklistMetadataDetail sourceRect: NSRect
+    ) {
+        guard isEditable,
+              let index = index(of: blockID),
+              let block = block(at: index),
+              case .checklistItem = block.kind else {
+            return
+        }
+        checklistMetadataDetailHandler?(BlockInputChecklistMetadataDetailContext(
+            blockID: blockID,
+            whenDate: block.whenDate,
+            deadline: block.deadline,
+            tags: block.tags,
+            sourceRect: sourceRect,
+            editorView: self
+        ))
+    }
+
     func blockItemDidBeginReordering(_ item: BlockInputBlockItem, blockID: BlockInputBlockID) {
         _ = cancelMultiBlockSelectionForReorderStart()
     }

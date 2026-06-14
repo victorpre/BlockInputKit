@@ -209,6 +209,39 @@ public struct BlockInputSlashCommandChipClickContext {
     }
 }
 
+/// Context sent when a checklist detail button is clicked.
+public struct BlockInputChecklistMetadataDetailContext {
+    /// Block that owns the metadata.
+    public var blockID: BlockInputBlockID
+    /// Current `whenDate` value, or nil.
+    public var whenDate: String?
+    /// Current `deadline` value, or nil.
+    public var deadline: String?
+    /// Current tags.
+    public var tags: [String]
+    /// Anchor rect for popup placement, in window coordinates.
+    public var sourceRect: NSRect
+    /// Editor view routing the click.
+    public var editorView: BlockInputView
+
+    /// Creates host context for a checklist metadata detail request.
+    public init(
+        blockID: BlockInputBlockID,
+        whenDate: String?,
+        deadline: String?,
+        tags: [String],
+        sourceRect: NSRect,
+        editorView: BlockInputView
+    ) {
+        self.blockID = blockID
+        self.whenDate = whenDate
+        self.deadline = deadline
+        self.tags = tags
+        self.sourceRect = sourceRect
+        self.editorView = editorView
+    }
+}
+
 /// Runtime options and host integration points for a block input editor.
 public struct BlockInputConfiguration {
     /// Default visual horizontal inset for block content.
@@ -332,6 +365,13 @@ public struct BlockInputConfiguration {
     /// together lets hosts rehost modals into another surface while aligning them to that surface. When nil, the editor
     /// owns the modal as a direct child and uses editor bounds as the placement surface.
     public var modalOverlayProvider: (@MainActor (BlockInputModalOverlayContext) -> BlockInputModalOverlay?)?
+    /// Optional host handler for checklist detail button clicks.
+    ///
+    /// The host receives current metadata values and an anchor rect; it should show its own popup or sheet for editing.
+    /// Use the editor's public mutation methods (`setChecklistWhenDate`, `setChecklistDeadline`, `addChecklistTag`,
+    /// `removeChecklistTag`, `clearChecklistMetadata`) to apply changes.
+    public var checklistMetadataDetailHandler:
+        (@MainActor (BlockInputChecklistMetadataDetailContext) -> Void)?
     /// Built-in completion popup behavior, including caret anchoring and optional overlay hosting.
     public var completionPopupConfiguration: BlockInputCompletionPopupConfiguration
     /// Convenience access to `completionPopupConfiguration.placement`.
@@ -404,6 +444,8 @@ public struct BlockInputConfiguration {
         slashCommandChipClickHandler:
             (@MainActor (BlockInputSlashCommandChipClickContext) -> BlockInputSlashCommandChipClickAction)? = nil,
         modalOverlayProvider: (@MainActor (BlockInputModalOverlayContext) -> BlockInputModalOverlay?)? = nil,
+        checklistMetadataDetailHandler:
+            (@MainActor (BlockInputChecklistMetadataDetailContext) -> Void)? = nil,
         completionPopupPlacement: BlockInputCompletionPopupPlacement = .caret,
         completionPopupConfiguration: BlockInputCompletionPopupConfiguration? = nil,
         onDocumentMutation: ((BlockInputDocumentChange) -> Void)? = nil,
@@ -445,6 +487,7 @@ public struct BlockInputConfiguration {
         self.slashCommandAvailability = slashCommandAvailability
         self.slashCommandChipClickHandler = slashCommandChipClickHandler
         self.modalOverlayProvider = modalOverlayProvider
+        self.checklistMetadataDetailHandler = checklistMetadataDetailHandler
         self.completionPopupConfiguration = completionPopupConfiguration ?? BlockInputCompletionPopupConfiguration(
             placement: completionPopupPlacement
         )

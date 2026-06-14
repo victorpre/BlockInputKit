@@ -39,8 +39,10 @@ extension BlockInputBlockItem {
         guard usesEditableTextSurfaceCursor else {
             return false
         }
-        if let point, containsReorderHandleHitTarget(point) {
-            return false
+        if let point {
+            if containsReorderHandleHitTarget(point) {
+                return false
+            }
         }
         NSCursor.iBeam.set()
         return true

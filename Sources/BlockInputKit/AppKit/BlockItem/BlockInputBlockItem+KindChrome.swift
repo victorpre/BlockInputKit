@@ -50,6 +50,7 @@ extension BlockInputBlockItem {
         updateQuoteBarVerticalExtent()
         configureChecklistButton(for: block, contentIndent: contentIndent)
         configureMetadataRow(for: block)
+        configureDetailButton(for: block)
         updateImageBlockLayout(for: block)
     }
 
@@ -114,6 +115,22 @@ extension BlockInputBlockItem {
         scrollViewBottomConstraint?.isActive = false
         metadataRowTopConstraint?.isActive = true
         metadataRowBottomConstraint?.isActive = true
+    }
+
+    private func configureDetailButton(for block: BlockInputBlock) {
+        let isChecklist: Bool
+        if case .checklistItem = block.kind { isChecklist = true } else { isChecklist = false }
+        detailButton.isHidden = !isChecklist || !isEditable
+        if !detailButton.isHidden {
+            detailButton.alphaValue = 0
+            let firstLine = block.text.components(separatedBy: .newlines).first ?? ""
+            let font = Self.font(for: block.kind, style: style)
+            let firstLineWidth = (firstLine as NSString).size(withAttributes: [.font: font]).width
+            let newOffset = Self.textContainerContentLeading + ceil(firstLineWidth) + 6
+            guard abs(newOffset - lastComputedDetailButtonOffset) > 0.5 else { return }
+            lastComputedDetailButtonOffset = newOffset
+            detailButtonLeadingConstraint?.constant = newOffset
+        }
     }
 
     func textContainerInset(
