@@ -40,6 +40,19 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
         ])
     }
 
+    func testParsesImageMarkdownLinks() throws {
+        let text = "Open ![alt](https://example.com/image.png) and ![file](file:///tmp/image.png)"
+        let ranges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text)
+            .filter { $0.style == .link }
+        let firstRange = try XCTUnwrap(ranges.first)
+
+        XCTAssertEqual(ranges.map { content(in: text, range: $0.contentRange) }, ["alt", "file"])
+        XCTAssertEqual(ranges.map { $0.linkDestination?.scheme }, ["https", "file"])
+        XCTAssertEqual(content(in: text, range: firstRange.fullRange), "![alt](https://example.com/image.png)")
+        XCTAssertEqual(firstRange.delimiterRanges.first, NSRange(location: 5, length: 2))
+        XCTAssertEqual(ranges.last?.inlineChipKind(in: text), .fileLink)
+    }
+
     func testParsesEscapedLinkLabelDelimitersAsHiddenSource() throws {
         let text = "Open [a\\[b\\]c](https://example.com)"
         let range = try XCTUnwrap(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text)
@@ -159,7 +172,7 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
         XCTAssertEqual(range.inlineChipKind(in: text), .fileLink)
     }
 
-    func testReportsUnsupportedLinkSourceRangesForCompletionExclusion() {
+    func testReportsLinkSourceRangesForCompletionExclusion() {
         let text = [
             "Open [@read](mailto:user@example.com)",
             "[file](@read)",
@@ -175,8 +188,8 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
             "[file](@read)",
             "[@empty]()",
             "[](@dest)",
-            "[@image](file:///tmp/image.png)",
-            "[image](@dest)"
+            "![@image](file:///tmp/image.png)",
+            "![image](@dest)"
         ])
     }
 
@@ -192,8 +205,7 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
             "[   ](https://example.com)",
             "[text](https://example.com\nnext)",
             "[[nested](https://example.com)](https://outer.com)",
-            "[a[b](https://inner.com)](https://outer.com)",
-            "![alt](https://example.com/image.png)"
+            "[a[b](https://inner.com)](https://outer.com)"
         ]
 
         for example in examples {

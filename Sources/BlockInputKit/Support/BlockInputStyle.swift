@@ -186,14 +186,14 @@ public struct BlockInputImagePreviewRemoveButtonStyle: @unchecked Sendable {
     /// Creates preview-strip remove button styling overrides.
     public init(
         isVisible: Bool = true,
-        size: NSSize = NSSize(width: 24, height: 24),
-        edgeInset: CGFloat = 6,
+        size: NSSize = NSSize(width: 20, height: 20),
+        edgeInset: CGFloat = 5,
         backgroundColor: NSColor = .controlBackgroundColor,
         borderColor: NSColor? = NSColor.separatorColor.withAlphaComponent(0.32),
         borderWidth: CGFloat = 1,
-        cornerRadius: CGFloat = 12,
+        cornerRadius: CGFloat = 10,
         symbolColor: NSColor = .labelColor,
-        symbolPointSize: CGFloat? = 13,
+        symbolPointSize: CGFloat? = 11,
         shadowColor: NSColor? = .black,
         shadowOpacity: Float = 0.18,
         shadowRadius: CGFloat = 3,

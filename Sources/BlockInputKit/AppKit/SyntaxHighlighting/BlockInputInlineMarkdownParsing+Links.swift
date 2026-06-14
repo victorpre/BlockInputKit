@@ -25,11 +25,6 @@ extension BlockInputInlineMarkdownParsing {
                 location += 1
                 continue
             }
-            // Images intentionally stay out of inline-link handling for now; image block/rendering support will own them.
-            if location > 0, text.character(at: location - 1) == linkExclamation {
-                location += 1
-                continue
-            }
             if location > 0, text.character(at: location - 1) == linkOpeningBracket {
                 location += 1
                 continue
@@ -132,6 +127,7 @@ extension BlockInputInlineMarkdownParsing {
             )
         }
         let sourceRanges = BlockInputLinkSourceRanges(
+            imageMarkerLocation: imageMarkerLocation(before: openingBracketLocation, in: text),
             openingBracketLocation: openingBracketLocation,
             closingBracketLocation: closingBracketLocation,
             urlStart: urlStart,
@@ -175,11 +171,21 @@ extension BlockInputInlineMarkdownParsing {
         sourceRanges: BlockInputLinkSourceRanges
     ) -> [NSRange] {
         [
-            NSRange(location: sourceRanges.openingBracketLocation, length: 1),
+            sourceRanges.openingDelimiterRange,
             NSRange(location: sourceRanges.closingBracketLocation, length: 2),
             sourceRanges.urlRange,
             NSRange(location: sourceRanges.closingParenthesisLocation, length: 1)
         ] + escapedLabelDelimiterRanges(in: text, labelRange: sourceRanges.labelRange)
+    }
+
+    private static func imageMarkerLocation(before openingBracketLocation: Int, in text: NSString) -> Int? {
+        let markerLocation = openingBracketLocation - 1
+        guard markerLocation >= 0,
+              text.character(at: markerLocation) == linkExclamation,
+              !isEscapedLinkCharacter(at: markerLocation, in: text) else {
+            return nil
+        }
+        return markerLocation
     }
 
     private static func closingLinkLabelLocation(
@@ -324,6 +330,7 @@ private struct BlockInputLinkClosingSearch {
 
 /// Source offsets for one Markdown link; ranges are derived lazily to keep the scanner allocation-light.
 private struct BlockInputLinkSourceRanges {
+    let imageMarkerLocation: Int?
     let openingBracketLocation: Int
     let closingBracketLocation: Int
     let urlStart: Int
@@ -340,10 +347,18 @@ private struct BlockInputLinkSourceRanges {
         NSRange(location: urlStart, length: closingParenthesisLocation - urlStart)
     }
 
+    var openingDelimiterRange: NSRange {
+        NSRange(location: sourceStartLocation, length: openingBracketLocation - sourceStartLocation + 1)
+    }
+
     var fullRange: NSRange {
         NSRange(
-            location: openingBracketLocation,
-            length: closingParenthesisLocation - openingBracketLocation + 1
+            location: sourceStartLocation,
+            length: closingParenthesisLocation - sourceStartLocation + 1
         )
+    }
+
+    private var sourceStartLocation: Int {
+        imageMarkerLocation ?? openingBracketLocation
     }
 }

@@ -540,7 +540,9 @@ let configuration = BlockInputConfiguration(
 )
 ```
 
-Pair `.preserveSourceText` with `.textLinksWithPreviewStrip` for Markdown imports; `imagePresentation` controls editor insertion and live conversion, while parsing mode controls how incoming Markdown is converted into blocks. Existing `.image` blocks still render as image blocks.
+Pair `.preserveSourceText` with `.textLinksWithPreviewStrip` for Markdown imports; `imagePresentation` controls editor insertion and
+live conversion, while parsing mode controls how incoming Markdown is converted into blocks. Existing `.image` blocks still render as image
+blocks. Local-file Markdown image text renders its label with the same file-chip styling as file links while preserving the original Markdown source.
 
 Preview tiles are extracted from loaded editor blocks only, ignoring code, raw Markdown, table, and existing image blocks. Clicking a tile selects the exact source image range. Removing a tile performs an undoable text edit that deletes that source occurrence.
 
