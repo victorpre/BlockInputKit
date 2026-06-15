@@ -33,6 +33,7 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
             thumbnailSize: NSSize(width: 42, height: 38),
             contentInsets: NSEdgeInsets(top: 5, left: 7, bottom: 6, right: 8),
             interItemSpacing: 9,
+            backgroundColor: .systemPurple,
             borderColor: .separatorColor,
             borderWidth: 2,
             cornerRadius: 4,
@@ -53,6 +54,7 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
         ))
 
         XCTAssertEqual(view.imagePreviewStripHeightConstraint?.constant, 49)
+        XCTAssertEqual(view.imagePreviewStripView.layer?.backgroundColor, NSColor.systemPurple.cgColor)
         XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 1)
         XCTAssertTrue(view.imagePreviewStripView.hasHorizontalScrollerForTesting)
 
@@ -64,6 +66,28 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
         ))
 
         XCTAssertEqual(view.imagePreviewStripView.firstRemoveButtonImageSizeForTesting, NSSize(width: 17, height: 17))
+    }
+
+    func testPreviewStripStyleCanClearBackgroundColor() {
+        var style = BlockInputStyle.default
+        style.imagePreviewStrip = BlockInputImagePreviewStripStyle(backgroundColor: .systemPurple)
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(text: "![Alt](image.png)")
+            ]),
+            style: style,
+            imagePresentation: .textLinksWithPreviewStrip
+        ))
+
+        style.imagePreviewStrip.backgroundColor = nil
+        view.configure(BlockInputConfiguration(
+            document: view.document,
+            style: style,
+            imagePresentation: .textLinksWithPreviewStrip
+        ))
+
+        XCTAssertNil(view.imagePreviewStripView.layer?.backgroundColor)
     }
 
     func testInsertImageContextInTextLinkPresentationInsertsMarkdownImageText() {

@@ -526,6 +526,7 @@ style.imagePreviewStrip = BlockInputImagePreviewStripStyle(
     thumbnailSize: NSSize(width: 76, height: 76),
     contentInsets: NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12),
     interItemSpacing: 12,
+    backgroundColor: NSColor.controlBackgroundColor.withAlphaComponent(0.08),
     borderColor: NSColor.separatorColor.withAlphaComponent(0.35),
     removeButton: BlockInputImagePreviewRemoveButtonStyle(
         borderColor: NSColor.separatorColor.withAlphaComponent(0.32),

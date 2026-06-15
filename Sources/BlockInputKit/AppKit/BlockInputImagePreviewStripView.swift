@@ -61,12 +61,14 @@ final class BlockInputImagePreviewStripView: NSView {
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
+        applyAppearance()
         tileViews.forEach { $0.applyAppearance() }
     }
 
     func configureStyle(_ style: BlockInputImagePreviewStripStyle) {
         let reloadsImages = self.style.thumbnailSize != style.thumbnailSize
         self.style = style
+        applyAppearance()
         tileViews.forEach { $0.configureStyle(style, reloadsImage: reloadsImages) }
         needsLayout = true
     }
@@ -105,6 +107,13 @@ final class BlockInputImagePreviewStripView: NSView {
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
+        applyAppearance()
+    }
+
+    private func applyAppearance() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = style.backgroundColor?.cgColor
+        }
     }
 
     private func rebuildTiles() {

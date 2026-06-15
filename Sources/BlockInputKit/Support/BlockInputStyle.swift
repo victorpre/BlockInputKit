@@ -72,6 +72,8 @@ public struct BlockInputImagePreviewStripStyle: @unchecked Sendable {
             interItemSpacing = Self.validNonNegative(interItemSpacing)
         }
     }
+    /// Strip background color. When nil, the strip stays transparent.
+    public var backgroundColor: NSColor?
     /// Thumbnail border color. When nil, no border is drawn.
     public var borderColor: NSColor?
     /// Thumbnail border width. Negative values are clamped to zero.
@@ -94,6 +96,7 @@ public struct BlockInputImagePreviewStripStyle: @unchecked Sendable {
         thumbnailSize: NSSize = NSSize(width: 76, height: 76),
         contentInsets: NSEdgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12),
         interItemSpacing: CGFloat = 12,
+        backgroundColor: NSColor? = nil,
         borderColor: NSColor? = NSColor.separatorColor.withAlphaComponent(0.35),
         borderWidth: CGFloat = 1,
         cornerRadius: CGFloat = 12,
@@ -102,6 +105,7 @@ public struct BlockInputImagePreviewStripStyle: @unchecked Sendable {
         self.thumbnailSize = Self.validSize(thumbnailSize)
         self.contentInsets = Self.validInsets(contentInsets)
         self.interItemSpacing = Self.validNonNegative(interItemSpacing)
+        self.backgroundColor = backgroundColor
         self.borderColor = borderColor
         self.borderWidth = Self.validNonNegative(borderWidth)
         self.cornerRadius = Self.validNonNegative(cornerRadius)
