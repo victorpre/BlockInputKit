@@ -56,6 +56,41 @@ final class BlockInputViewFileDropHandlerTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks[1].kind, .image(BlockInputImage(source: "assets/Photo (1).png", altText: "Copied")))
     }
 
+    func testAsyncDropHookInsertsImageReferencesInlineWithTextLinkPresentation() async throws {
+        let blockID = BlockInputBlockID(rawValue: "item")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), text: "Attach ")
+            ]),
+            imagePresentation: .textLinksWithPreviewStrip,
+            fileDropHandler: { context in
+                XCTAssertEqual(context.placement, .inline(blockID: blockID, utf16Offset: 7))
+                return .insert([
+                    BlockInputFileDropReference(kind: .image, source: "assets/First.png", label: "First"),
+                    BlockInputFileDropReference(kind: .image, source: "assets/Second.jpg", label: "Second")
+                ])
+            }
+        ))
+        let textView = try textView(in: mounted.view)
+
+        XCTAssertTrue(textView.performDragOperation(BlockInputDraggingInfo(
+            fileURLs: [
+                URL(fileURLWithPath: "/tmp/First.png"),
+                URL(fileURLWithPath: "/tmp/Second.jpg")
+            ],
+            location: try windowLocation(forUTF16Offset: 7, in: textView)
+        )))
+        await drainFileDropTasks(in: mounted.view)
+
+        XCTAssertEqual(mounted.view.document.blocks.count, 1)
+        XCTAssertEqual(mounted.view.document.blocks[0].kind, .checklistItem(isChecked: false))
+        XCTAssertEqual(
+            mounted.view.document.blocks[0].text,
+            "Attach ![First](assets/First.png) ![Second](assets/Second.jpg)"
+        )
+        XCTAssertEqual(mounted.view.imagePreviewStripView.itemCountForTesting, 2)
+    }
+
     func testAsyncDropHookCancelDoesNotMutate() async throws {
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
             document: BlockInputDocument(blocks: [

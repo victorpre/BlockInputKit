@@ -55,6 +55,33 @@ final class BlockInputViewFileDropTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks[0].text, "Open docs")
     }
 
+    func testDroppingMultipleImagesIntoListItemWithTextLinkPresentationInsertsInlineMarkdownImages() throws {
+        let blockID = BlockInputBlockID(rawValue: "item")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, kind: .numberedListItem(start: 2), text: "Attach ")
+            ]),
+            imagePresentation: .textLinksWithPreviewStrip
+        ))
+        let textView = try textView(in: mounted.view)
+        let draggingInfo = BlockInputDraggingInfo(
+            fileURLs: [
+                URL(fileURLWithPath: "/tmp/First Photo.png"),
+                URL(fileURLWithPath: "/tmp/Second Photo.jpg")
+            ],
+            location: try windowLocation(forUTF16Offset: 7, in: textView)
+        )
+
+        XCTAssertTrue(textView.performDragOperation(draggingInfo))
+
+        let expectedText = "Attach ![First Photo](file:///tmp/First%20Photo.png) ![Second Photo](file:///tmp/Second%20Photo.jpg)"
+        XCTAssertEqual(mounted.view.document.blocks.count, 1)
+        XCTAssertEqual(mounted.view.document.blocks[0].kind, .numberedListItem(start: 2))
+        XCTAssertEqual(mounted.view.document.blocks[0].text, expectedText)
+        XCTAssertEqual(mounted.view.imagePreviewStripView.itemCountForTesting, 2)
+        assertCaret(in: mounted.view, textView: textView, blockID: blockID, utf16Offset: (expectedText as NSString).length)
+    }
+
     func testAcceptedFileDropCaretIsVerticallyAlignedToTextLine() throws {
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "block", text: "Open docs")

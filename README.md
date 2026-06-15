@@ -470,7 +470,8 @@ The provider only runs for a focused, editable, inline-Markdown-capable block wi
 
 ## File Drops
 
-Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block by default, or Markdown image text blocks when `imagePresentation` is `.textLinksWithPreviewStrip`.
+Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block by
+default, or inline Markdown image text at the drop caret when `imagePresentation` is `.textLinksWithPreviewStrip`.
 
 Use `fileDropHandler` to copy files into project storage, rewrite destinations, or reject a drop before mutation:
 
