@@ -20,6 +20,23 @@ final class BlockInputViewPlaceholderTests: XCTestCase {
         XCTAssertEqual(mounted.view.placeholderLabel.frame.minX, expectedPlaceholderLeadingEdge(in: mounted.view), accuracy: 0.5)
     }
 
+    func testPlaceholderHidesForWhitespaceOnlyTextBlock() {
+        let whitespaceBlocks = [
+            BlockInputBlock(id: "spaces", text: "   "),
+            BlockInputBlock(id: "newline", text: "\n")
+        ]
+
+        for block in whitespaceBlocks {
+            let view = BlockInputView()
+            view.configure(BlockInputConfiguration(
+                document: BlockInputDocument(blocks: [block]),
+                placeholder: "Ask anything"
+            ))
+
+            assertPlaceholderHidden(view)
+        }
+    }
+
     func testPlaceholderTracksMountedTextLeadingAfterResize() throws {
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
             document: BlockInputDocument(blocks: [

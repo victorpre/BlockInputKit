@@ -121,7 +121,7 @@ final class BlockInputPlaceholderLabel: NSTextField {
 
 extension BlockInputBlock {
     var isPlaceholderEligibleEmptyTextBlock: Bool {
-        guard isEmpty else {
+        guard text.isEmpty else {
             return false
         }
         switch kind {
