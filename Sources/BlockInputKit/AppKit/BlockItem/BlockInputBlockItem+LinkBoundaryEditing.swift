@@ -75,6 +75,11 @@ extension BlockInputBlockItem {
             .filter { range in
                 range.style == .link && range.fullRange.intersectionLength(with: affectedRange) > 0
             }
+            .filter { range in
+                // Edits wholly inside the visible label are normal text edits; only expand deletions crossing hidden source.
+                affectedRange.location < range.contentRange.location ||
+                    NSMaxRange(affectedRange) > NSMaxRange(range.contentRange)
+            }
         guard !overlappingLinks.isEmpty else {
             return nil
         }

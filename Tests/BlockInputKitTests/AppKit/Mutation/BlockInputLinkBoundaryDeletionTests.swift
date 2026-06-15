@@ -38,6 +38,39 @@ final class BlockInputLinkBoundaryDeletionTests: XCTestCase {
         XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: "block", utf16Offset: 5)))
     }
 
+    func testBackspaceInsideFileLinkLabelDeletesCharacterOnly() throws {
+        let text = "Open [cat](file:///tmp/cat.png) now"
+        let mounted = makeMountedBlockInputView(blocks: [
+            BlockInputBlock(id: "block", text: text)
+        ])
+        let textView = try activeTextView(in: mounted, text: text)
+        let caretOffset = (text as NSString).range(of: "cat").location + 2
+        textView.setSelectedRange(NSRange(location: caretOffset, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["Open [ct](file:///tmp/cat.png) now"])
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: "block", utf16Offset: caretOffset - 1)))
+    }
+
+    func testDeleteForwardInsideMarkdownImageLabelDeletesCharacterOnly() throws {
+        let text = "Open ![cat](file:///tmp/cat.png) now"
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: text)
+            ]),
+            imagePresentation: .textLinksWithPreviewStrip
+        ))
+        let textView = try activeTextView(in: mounted, text: text)
+        let caretOffset = (text as NSString).range(of: "cat").location + 1
+        textView.setSelectedRange(NSRange(location: caretOffset, length: 0))
+
+        textView.doCommand(by: #selector(NSResponder.deleteForward(_:)))
+
+        XCTAssertEqual(mounted.view.document.blocks.map(\.text), ["Open ![ct](file:///tmp/cat.png) now"])
+        XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: "block", utf16Offset: caretOffset)))
+    }
+
     func testBackspaceAtSlashCommandChipBoundaryRemovesWholeLink() throws {
         let text = "Run [/table](host-app://commands/table) now"
         let mounted = makeMountedBlockInputView(blocks: [
