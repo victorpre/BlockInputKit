@@ -85,6 +85,27 @@ final class BlockInputSelectAllCommandTests: XCTestCase {
         XCTAssertTrue(mounted.window.firstResponder === textView)
     }
 
+    func testCommandAWithDocumentBehaviorSelectsWhitespaceOnlyText() throws {
+        let blockID = BlockInputBlockID(rawValue: "spaces")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "   ")
+            ]),
+            placeholder: "Ask anything",
+            selectAllBehavior: .document
+        ))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        mounted.window.makeFirstResponder(textView)
+
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandAEvent()))
+
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "   ")
+        XCTAssertEqual(mounted.view.selection, .blocks([blockID]))
+        XCTAssertTrue(mounted.window.firstResponder === mounted.view)
+        XCTAssertTrue(mounted.view.placeholderLabel.isHidden)
+    }
+
     func testCommandAWithDocumentBehaviorCollapsesSingleEmptyPlaceholderDocumentFromEditorFocus() throws {
         let blockID = BlockInputBlockID(rawValue: "empty")
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
