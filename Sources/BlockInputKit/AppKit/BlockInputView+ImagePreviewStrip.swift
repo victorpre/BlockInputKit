@@ -2,8 +2,8 @@ import AppKit
 
 extension BlockInputView {
     func setupImagePreviewStrip() -> (height: NSLayoutConstraint, scrollTop: NSLayoutConstraint) {
-        imagePreviewStripView.onSelect = { [weak self] occurrence in
-            self?.selectImagePreviewOccurrence(occurrence)
+        imagePreviewStripView.onOpen = { [weak self] occurrence in
+            self?.openImagePreviewOccurrence(occurrence)
         }
         imagePreviewStripView.onRemove = { [weak self] occurrence in
             self?.removeImagePreviewOccurrence(occurrence)
@@ -43,15 +43,12 @@ extension BlockInputView {
         return style.imagePreviewStrip.preferredHeight
     }
 
-    func selectImagePreviewOccurrence(_ occurrence: BlockInputImagePreviewOccurrence) {
-        guard containsValidTextRange(BlockInputTextRange(blockID: occurrence.blockID, range: occurrence.sourceRange)) else {
+    func openImagePreviewOccurrence(_ occurrence: BlockInputImagePreviewOccurrence) {
+        guard let resolvedURL = occurrence.image.resolvedURL(relativeTo: imageBaseURL),
+              let url = BlockInputLinkURL.supportedURL(from: resolvedURL.absoluteString) else {
             return
         }
-        applySelection(
-            .text(BlockInputTextRange(blockID: occurrence.blockID, range: occurrence.sourceRange)),
-            notify: true
-        )
-        restoreVisibleTextSelection(BlockInputTextRange(blockID: occurrence.blockID, range: occurrence.sourceRange))
+        _ = linkURLOpener(url)
     }
 
     func removeImagePreviewOccurrence(_ occurrence: BlockInputImagePreviewOccurrence) {

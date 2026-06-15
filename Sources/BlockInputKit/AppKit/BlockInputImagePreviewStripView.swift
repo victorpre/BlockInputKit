@@ -9,7 +9,7 @@ struct BlockInputImagePreviewOccurrence: Equatable {
 }
 
 final class BlockInputImagePreviewStripView: NSView {
-    var onSelect: ((BlockInputImagePreviewOccurrence) -> Void)?
+    var onOpen: ((BlockInputImagePreviewOccurrence) -> Void)?
     var onRemove: ((BlockInputImagePreviewOccurrence) -> Void)?
 
     private let scrollView = NSScrollView()
@@ -38,6 +38,10 @@ final class BlockInputImagePreviewStripView: NSView {
 
     var hasHorizontalScrollerForTesting: Bool {
         scrollView.hasHorizontalScroller
+    }
+
+    func openFirstTileForTesting() {
+        tileViews.first?.performPrimaryAction()
     }
 
     override init(frame frameRect: NSRect) {
@@ -108,8 +112,8 @@ final class BlockInputImagePreviewStripView: NSView {
         tileViews = items.map { item in
             let tile = BlockInputImagePreviewTileView()
             tile.configure(item: item, style: style, imageLoadingContext: imageLoadingContext)
-            tile.onSelect = { [weak self] occurrence in
-                self?.onSelect?(occurrence)
+            tile.onOpen = { [weak self] occurrence in
+                self?.onOpen?(occurrence)
             }
             tile.onRemove = { [weak self] occurrence in
                 self?.onRemove?(occurrence)
@@ -135,7 +139,7 @@ final class BlockInputImagePreviewStripView: NSView {
 }
 
 private final class BlockInputImagePreviewTileView: NSView {
-    var onSelect: ((BlockInputImagePreviewOccurrence) -> Void)?
+    var onOpen: ((BlockInputImagePreviewOccurrence) -> Void)?
     var onRemove: ((BlockInputImagePreviewOccurrence) -> Void)?
 
     private let imageView = NSImageView()
@@ -175,11 +179,19 @@ private final class BlockInputImagePreviewTileView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard let item else {
+        guard item != nil else {
             super.mouseDown(with: event)
             return
         }
-        onSelect?(item)
+        performPrimaryAction()
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        guard item != nil else {
+            return false
+        }
+        performPrimaryAction()
+        return true
     }
 
     func configure(
@@ -192,8 +204,16 @@ private final class BlockInputImagePreviewTileView: NSView {
         self.imageLoadingContext = imageLoadingContext
         configureStyle(style)
         configureImageLoading(imageLoadingContext)
-        setAccessibilityLabel(item.image.altText.isEmpty ? item.image.source : item.image.altText)
+        let accessibilityName = item.image.altText.isEmpty ? item.image.source : item.image.altText
+        setAccessibilityLabel("Open image \(accessibilityName)")
         startLoad()
+    }
+
+    func performPrimaryAction() {
+        guard let item else {
+            return
+        }
+        onOpen?(item)
     }
 
     func configureStyle(_ style: BlockInputImagePreviewStripStyle, reloadsImage: Bool = false) {
@@ -235,7 +255,7 @@ private final class BlockInputImagePreviewTileView: NSView {
 
     private func setup() {
         wantsLayer = true
-        setAccessibilityRole(.image)
+        setAccessibilityRole(.button)
         imageView.wantsLayer = true
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.layer?.masksToBounds = true

@@ -96,7 +96,27 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
         XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 1)
     }
 
-    func testPreviewStripSelectionRemovalAndUndoUseExactSourceRange() {
+    func testPreviewStripClickOpensResolvedImageURLThroughLinkOpener() throws {
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        var openedURL: URL?
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(text: "Before ![Alt](cat.png) after")
+            ]),
+            imagePresentation: .textLinksWithPreviewStrip,
+            imageBaseURL: try XCTUnwrap(URL(string: "https://example.com/assets/"))
+        ))
+        view.linkURLOpener = {
+            openedURL = $0
+            return true
+        }
+
+        view.imagePreviewStripView.openFirstTileForTesting()
+
+        XCTAssertEqual(openedURL, try XCTUnwrap(URL(string: "https://example.com/assets/cat.png")))
+    }
+
+    func testPreviewStripRemovalAndUndoUseExactSourceRange() {
         let blockID = BlockInputBlockID(rawValue: "block")
         let sourceText = "Before ![Alt](file:///tmp/cat.png) after"
         let imageSource = "![Alt](file:///tmp/cat.png)"
@@ -116,10 +136,6 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
             sourceText: imageSource,
             image: BlockInputImage(source: "file:///tmp/cat.png", altText: "Alt")
         )
-
-        view.selectImagePreviewOccurrence(occurrence)
-
-        XCTAssertEqual(view.selection, .text(BlockInputTextRange(blockID: blockID, range: range)))
 
         view.removeImagePreviewOccurrence(occurrence)
 
