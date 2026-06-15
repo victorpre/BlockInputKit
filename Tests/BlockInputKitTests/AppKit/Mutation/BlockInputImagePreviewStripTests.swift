@@ -55,6 +55,9 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
 
         XCTAssertEqual(view.imagePreviewStripHeightConstraint?.constant, 49)
         XCTAssertEqual(view.imagePreviewStripView.layer?.backgroundColor, NSColor.systemPurple.cgColor)
+        XCTAssertFalse(view.imagePreviewStripView.scrollViewDrawsBackgroundForTesting)
+        XCTAssertFalse(view.imagePreviewStripView.clipViewDrawsBackgroundForTesting)
+        XCTAssertEqual(view.imagePreviewStripView.clipViewBackgroundColorForTesting, .clear)
         XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 1)
         XCTAssertTrue(view.imagePreviewStripView.hasHorizontalScrollerForTesting)
 

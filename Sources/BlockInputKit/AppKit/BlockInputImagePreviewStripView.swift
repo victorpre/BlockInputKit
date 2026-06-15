@@ -40,6 +40,18 @@ final class BlockInputImagePreviewStripView: NSView {
         scrollView.hasHorizontalScroller
     }
 
+    var scrollViewDrawsBackgroundForTesting: Bool {
+        scrollView.drawsBackground
+    }
+
+    var clipViewDrawsBackgroundForTesting: Bool {
+        scrollView.contentView.drawsBackground
+    }
+
+    var clipViewBackgroundColorForTesting: NSColor {
+        scrollView.contentView.backgroundColor
+    }
+
     func openFirstTileForTesting() {
         tileViews.first?.performPrimaryAction()
     }
@@ -93,7 +105,12 @@ final class BlockInputImagePreviewStripView: NSView {
         wantsLayer = true
         isHidden = true
         scrollView.borderType = .noBorder
+        scrollView.backgroundColor = .clear
         scrollView.drawsBackground = false
+        scrollView.contentView.backgroundColor = .clear
+        scrollView.contentView.drawsBackground = false
+        scrollView.contentView.wantsLayer = true
+        scrollView.contentView.layer?.backgroundColor = NSColor.clear.cgColor
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true

@@ -54,8 +54,9 @@ public extension BlockInputView {
     ///
     /// Image files are inserted according to `BlockInputConfiguration.imagePresentation`:
     /// the default `.inlineBlocks` creates image blocks, while `.textLinksWithPreviewStrip`
-    /// creates Markdown image text blocks. Other file URLs are inserted as Markdown file-link
-    /// paragraph blocks. Non-file URLs are ignored.
+    /// inserts Markdown image text inline when the current selection is in a textual block,
+    /// or as Markdown image text blocks otherwise. Other file URLs are inserted as Markdown
+    /// file-link paragraph blocks. Non-file URLs are ignored.
     @discardableResult
     func insertLocalFileURLs(
         _ fileURLs: [URL],
@@ -64,9 +65,14 @@ public extension BlockInputView {
         guard isEditable else {
             return nil
         }
+        if blockID == nil,
+           let activeBlockID,
+           let inlineSelection = insertLocalFileURLsInlineIfPossible(fileURLs, into: activeBlockID) {
+            return inlineSelection
+        }
         // Keep picker insertion aligned with drop behavior so host apps do not need
         // to duplicate BlockInputKit's file/image classification rules.
-        let insertedBlocks = fileURLs.compactMap(droppedFileBlock)
+        let insertedBlocks = droppedFileBlocks(for: fileURLs)
         guard !insertedBlocks.isEmpty else {
             return nil
         }
@@ -84,7 +90,8 @@ public extension BlockInputView {
     /// Inserts local file URLs at a document index using image-aware block mapping.
     ///
     /// Image files follow `BlockInputConfiguration.imagePresentation`: inline image blocks by default, or Markdown image
-    /// text blocks when `.textLinksWithPreviewStrip` is configured.
+    /// text blocks when `.textLinksWithPreviewStrip` is configured. Multiple image text links are kept together in one
+    /// textual block so preview-strip mode does not fragment the document.
     ///
     /// The insertion index is clamped to the current document, but never before
     /// leading frontmatter because frontmatter is only canonical at index `0`.
@@ -96,7 +103,7 @@ public extension BlockInputView {
         guard isEditable else {
             return nil
         }
-        let insertedBlocks = fileURLs.compactMap(droppedFileBlock)
+        let insertedBlocks = droppedFileBlocks(for: fileURLs)
         guard !insertedBlocks.isEmpty else {
             return nil
         }
@@ -209,7 +216,7 @@ extension BlockInputView {
         guard isEditable else {
             return nil
         }
-        let insertedBlocks = fileURLs.compactMap(droppedFileBlock)
+        let insertedBlocks = droppedFileBlocks(for: fileURLs)
         guard !insertedBlocks.isEmpty else {
             return nil
         }
@@ -243,25 +250,51 @@ extension BlockInputView {
         return Self.imageBlock(for: url) ?? Self.fileLinkBlock(for: url)
     }
 
-    static func fileDropActionName(for blocks: [BlockInputBlock]) -> String {
-        guard blocks.allSatisfy(isImageInsertionBlock) else {
-            return "Insert Files"
+    private func droppedFileBlocks(for fileURLs: [URL]) -> [BlockInputBlock] {
+        if imagePresentation == .textLinksWithPreviewStrip {
+            let imageTextBlocks = fileURLs.compactMap(Self.imageTextBlock)
+            if imageTextBlocks.count == fileURLs.count, !imageTextBlocks.isEmpty {
+                return [BlockInputBlock(text: imageTextBlocks.map(\.text).joined(separator: " "))]
+            }
         }
-        return blocks.count == 1 ? "Insert Image" : "Insert Images"
+        return fileURLs.compactMap(droppedFileBlock)
     }
 
-    private static func isImageInsertionBlock(_ block: BlockInputBlock) -> Bool {
+    static func fileDropActionName(for blocks: [BlockInputBlock]) -> String {
+        var imageCount = 0
+        for block in blocks {
+            guard let blockImageCount = imageInsertionCount(in: block) else {
+                return "Insert Files"
+            }
+            imageCount += blockImageCount
+        }
+        return imageCount == 1 ? "Insert Image" : "Insert Images"
+    }
+
+    private static func imageInsertionCount(in block: BlockInputBlock) -> Int? {
         if block.kind.isImage {
-            return true
+            return 1
         }
         let matches = BlockInputImageSyntaxParser.imageMatches(in: block.text)
-        guard matches.count == 1,
-              let match = matches.first,
-              match.range.location == 0,
-              match.range.length == (block.text as NSString).length else {
-            return false
+        guard !matches.isEmpty else {
+            return nil
         }
-        return true
+        let text = block.text as NSString
+        var cursor = 0
+        for match in matches {
+            guard match.range.location >= cursor else {
+                return nil
+            }
+            let separatorRange = NSRange(location: cursor, length: match.range.location - cursor)
+            guard text.substring(with: separatorRange).trimmingCharacters(in: .whitespaces).isEmpty else {
+                return nil
+            }
+            cursor = NSMaxRange(match.range)
+        }
+        guard text.substring(from: cursor).trimmingCharacters(in: .whitespaces).isEmpty else {
+            return nil
+        }
+        return matches.count
     }
 
     @discardableResult
@@ -271,12 +304,23 @@ extension BlockInputView {
         atUTF16Offset utf16Offset: Int,
         item: BlockInputBlockItem
     ) -> BlockInputSelection? {
+        guard item.representedBlockID == blockID else {
+            return nil
+        }
+        return insertFileURLsInline(fileURLs, into: blockID, atUTF16Offset: utf16Offset)
+    }
+
+    @discardableResult
+    func insertFileURLsInline(
+        _ fileURLs: [URL],
+        into blockID: BlockInputBlockID,
+        atUTF16Offset utf16Offset: Int
+    ) -> BlockInputSelection? {
         guard isEditable else {
             return nil
         }
         let insertionText = inlineFileInsertionText(for: fileURLs)
         guard !insertionText.isEmpty,
-              item.representedBlockID == blockID,
               let index = index(of: blockID),
               var block = block(at: index),
               block.id == blockID,
@@ -303,6 +347,34 @@ extension BlockInputView {
             selectionAfter: afterSelection
         )
         return afterSelection
+    }
+
+    private func insertLocalFileURLsInlineIfPossible(
+        _ fileURLs: [URL],
+        into blockID: BlockInputBlockID
+    ) -> BlockInputSelection? {
+        guard imagePresentation == .textLinksWithPreviewStrip,
+              fileURLs.allSatisfy({ Self.imageTextBlock(for: $0) != nil }),
+              let block = block(withID: blockID),
+              BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
+            return nil
+        }
+        return insertFileURLsInline(
+            fileURLs,
+            into: blockID,
+            atUTF16Offset: localFileInlineInsertionOffset(in: block)
+        )
+    }
+
+    private func localFileInlineInsertionOffset(in block: BlockInputBlock) -> Int {
+        switch selection {
+        case let .cursor(cursor) where cursor.blockID == block.id:
+            return cursor.utf16Offset
+        case let .text(range) where range.blockID == block.id:
+            return NSMaxRange(range.range)
+        default:
+            return block.utf16Length
+        }
     }
 
     @discardableResult
