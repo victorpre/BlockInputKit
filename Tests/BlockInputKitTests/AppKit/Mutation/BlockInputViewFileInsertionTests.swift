@@ -320,7 +320,7 @@ final class BlockInputViewFileInsertionTests: XCTestCase {
             URL(fileURLWithPath: "/tmp/Cat Photo.png")
         ])
 
-        let expectedText = "![Cat Photo](file:///tmp/Cat%20Photo.png)"
+        let expectedText = "![Cat Photo](file:///tmp/Cat%20Photo.png) "
         XCTAssertEqual(view.document.blocks.count, 1)
         XCTAssertEqual(view.document.blocks[0].kind, .paragraph)
         XCTAssertEqual(view.document.blocks[0].text, expectedText)

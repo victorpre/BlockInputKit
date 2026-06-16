@@ -22,7 +22,7 @@ final class TextLinkImageInsertionTests: XCTestCase {
             URL(fileURLWithPath: "/tmp/Second Photo.jpg")
         ])
 
-        let expectedText = "Attach ![First Photo](file:///tmp/First%20Photo.png) ![Second Photo](file:///tmp/Second%20Photo.jpg)"
+        let expectedText = "Attach ![First Photo](file:///tmp/First%20Photo.png) ![Second Photo](file:///tmp/Second%20Photo.jpg) "
         XCTAssertEqual(view.document.blocks.count, 1)
         XCTAssertEqual(view.document.blocks[0].kind, .numberedListItem(start: 2))
         XCTAssertEqual(view.document.blocks[0].text, expectedText)
@@ -54,7 +54,7 @@ final class TextLinkImageInsertionTests: XCTestCase {
             URL(fileURLWithPath: "/tmp/Second Photo.jpg")
         ], below: firstID)
 
-        let expectedText = "![First Photo](file:///tmp/First%20Photo.png) ![Second Photo](file:///tmp/Second%20Photo.jpg)"
+        let expectedText = "![First Photo](file:///tmp/First%20Photo.png) ![Second Photo](file:///tmp/Second%20Photo.jpg) "
         XCTAssertEqual(view.document.blocks.count, 3)
         XCTAssertEqual(view.document.blocks.map(\.id).first, firstID)
         XCTAssertEqual(view.document.blocks.map(\.id).last, secondID)

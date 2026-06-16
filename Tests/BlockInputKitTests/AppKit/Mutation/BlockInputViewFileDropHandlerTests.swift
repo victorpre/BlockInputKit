@@ -86,7 +86,7 @@ final class BlockInputViewFileDropHandlerTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks[0].kind, .checklistItem(isChecked: false))
         XCTAssertEqual(
             mounted.view.document.blocks[0].text,
-            "Attach ![First](assets/First.png) ![Second](assets/Second.jpg)"
+            "Attach ![First](assets/First.png) ![Second](assets/Second.jpg) "
         )
         XCTAssertEqual(mounted.view.imagePreviewStripView.itemCountForTesting, 2)
     }

@@ -180,7 +180,7 @@ extension BlockInputView {
               case let .image(image) = imageBlock.kind else {
             return nil
         }
-        return BlockInputBlock(text: markdownImageSource(for: image))
+        return BlockInputBlock(text: markdownImageInsertionSource(for: image))
     }
 
     static func imageTextBlock(for reference: BlockInputFileDropReference) -> BlockInputBlock? {
@@ -188,11 +188,15 @@ extension BlockInputView {
               let source = normalizedDropSource(reference.source) else {
             return nil
         }
-        return BlockInputBlock(text: markdownImageSource(for: BlockInputImage(source: source, altText: reference.label)))
+        return BlockInputBlock(text: markdownImageInsertionSource(for: BlockInputImage(source: source, altText: reference.label)))
     }
 
     static func markdownImageSource(for image: BlockInputImage) -> String {
         BlockInputMarkdownImporter.markdown(for: image)
+    }
+
+    static func markdownImageInsertionSource(for image: BlockInputImage) -> String {
+        "\(markdownImageSource(for: image)) "
     }
 
     private func configureImageModalActions(_ modal: BlockInputImageModalView, context: BlockInputImageContext) {
@@ -288,13 +292,13 @@ extension BlockInputView {
         index: Int,
         selectedRange: NSRange
     ) -> BlockInputSelection? {
-        let markdown = Self.markdownImageSource(for: image)
         guard block.kind.supportsImageSyntaxSplitting else {
-            return insertImageTextBlocks([BlockInputBlock(text: markdown)], at: index + 1)
+            return insertImageTextBlocks([BlockInputBlock(text: Self.markdownImageInsertionSource(for: image))], at: index + 1)
         }
         let beforeBlock = block
         let beforeSelection = selection
         let range = clampedRange(selectedRange, in: block.text)
+        let markdown = Self.markdownImageInsertionSource(for: image, in: block.text, replacing: range)
         let mutableText = NSMutableString(string: block.text)
         mutableText.replaceCharacters(in: range, with: markdown)
         var afterBlock = block
@@ -314,6 +318,29 @@ extension BlockInputView {
             selectionAfter: afterSelection
         )
         return afterSelection
+    }
+
+    private static func markdownImageInsertionSource(
+        for image: BlockInputImage,
+        in text: String,
+        replacing range: NSRange
+    ) -> String {
+        var source = markdownImageInsertionSource(for: image)
+        if source.hasSuffix(" "),
+           isWhitespace(at: NSMaxRange(range), in: text) {
+            source.removeLast()
+        }
+        return source
+    }
+
+    private static func isWhitespace(at utf16Offset: Int, in text: String) -> Bool {
+        let nsText = text as NSString
+        guard utf16Offset >= 0,
+              utf16Offset < nsText.length,
+              let scalar = UnicodeScalar(Int(nsText.character(at: utf16Offset))) else {
+            return false
+        }
+        return CharacterSet.whitespacesAndNewlines.contains(scalar)
     }
 
     private func replaceBlock(

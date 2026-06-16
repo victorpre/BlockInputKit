@@ -44,7 +44,7 @@ final class BlockInputViewFileDropTests: XCTestCase {
         XCTAssertTrue(textView.draggingEntered(draggingInfo).contains(.copy))
         XCTAssertTrue(textView.performDragOperation(draggingInfo))
 
-        let expectedText = "Open ![Cat Photo](file:///tmp/Cat%20Photo.png)docs"
+        let expectedText = "Open ![Cat Photo](file:///tmp/Cat%20Photo.png) docs"
         XCTAssertEqual(mounted.view.document.blocks[0].text, expectedText)
         XCTAssertEqual(mounted.view.imagePreviewStripView.itemCountForTesting, 1)
         assertCaret(in: mounted.view, textView: textView, blockID: blockID, utf16Offset: (expectedText as NSString).length - 4)
@@ -53,6 +53,27 @@ final class BlockInputViewFileDropTests: XCTestCase {
 
         XCTAssertEqual(undo?.actionName, "Insert Image")
         XCTAssertEqual(mounted.view.document.blocks[0].text, "Open docs")
+    }
+
+    func testDroppingImageBeforeExistingWhitespaceDoesNotDoubleSeparator() throws {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "Open  docs")
+            ]),
+            imagePresentation: .textLinksWithPreviewStrip
+        ))
+        let textView = try textView(in: mounted.view)
+        let draggingInfo = BlockInputDraggingInfo(
+            fileURLs: [URL(fileURLWithPath: "/tmp/Cat Photo.png")],
+            location: try windowLocation(forUTF16Offset: 5, in: textView)
+        )
+
+        XCTAssertTrue(textView.performDragOperation(draggingInfo))
+
+        let expectedText = "Open ![Cat Photo](file:///tmp/Cat%20Photo.png) docs"
+        XCTAssertEqual(mounted.view.document.blocks[0].text, expectedText)
+        assertCaret(in: mounted.view, textView: textView, blockID: blockID, utf16Offset: (expectedText as NSString).length - 5)
     }
 
     func testDroppingMultipleImagesIntoListItemWithTextLinkPresentationInsertsInlineMarkdownImages() throws {
@@ -74,7 +95,7 @@ final class BlockInputViewFileDropTests: XCTestCase {
 
         XCTAssertTrue(textView.performDragOperation(draggingInfo))
 
-        let expectedText = "Attach ![First Photo](file:///tmp/First%20Photo.png) ![Second Photo](file:///tmp/Second%20Photo.jpg)"
+        let expectedText = "Attach ![First Photo](file:///tmp/First%20Photo.png) ![Second Photo](file:///tmp/Second%20Photo.jpg) "
         XCTAssertEqual(mounted.view.document.blocks.count, 1)
         XCTAssertEqual(mounted.view.document.blocks[0].kind, .numberedListItem(start: 2))
         XCTAssertEqual(mounted.view.document.blocks[0].text, expectedText)

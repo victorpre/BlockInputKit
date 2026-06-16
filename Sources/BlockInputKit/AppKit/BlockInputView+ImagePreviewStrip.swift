@@ -65,12 +65,14 @@ extension BlockInputView {
         }
         let beforeBlock = block
         let beforeSelection = selection
+        let removalRange = imagePreviewOccurrenceRemovalRange(occurrence.sourceRange, in: text)
         let replacementText = NSMutableString(string: block.text)
-        replacementText.replaceCharacters(in: occurrence.sourceRange, with: "")
+        replacementText.replaceCharacters(in: removalRange, with: "")
         block.text = replacementText as String
+        let afterOffset = min(occurrence.sourceRange.location, replacementText.length)
         let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
             blockID: block.id,
-            utf16Offset: occurrence.sourceRange.location
+            utf16Offset: afterOffset
         ))
         guard applyGranularBlockReplacement(block, at: index, selection: afterSelection) else {
             return
@@ -82,6 +84,20 @@ extension BlockInputView {
             selectionBefore: beforeSelection,
             selectionAfter: afterSelection
         )
+    }
+
+    private func imagePreviewOccurrenceRemovalRange(_ sourceRange: NSRange, in text: NSString) -> NSRange {
+        let trailingLocation = NSMaxRange(sourceRange)
+        if trailingLocation < text.length,
+           text.character(at: trailingLocation) == spaceCharacter {
+            return NSRange(location: sourceRange.location, length: sourceRange.length + 1)
+        }
+        let leadingLocation = sourceRange.location - 1
+        if leadingLocation >= 0,
+           text.character(at: leadingLocation) == spaceCharacter {
+            return NSRange(location: leadingLocation, length: sourceRange.length + 1)
+        }
+        return sourceRange
     }
 
     private func updateImagePreviewStripHeight(_ height: CGFloat) {
@@ -114,3 +130,5 @@ extension BlockInputView {
         return occurrences
     }
 }
+
+private let spaceCharacter: unichar = 0x20
