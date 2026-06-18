@@ -132,6 +132,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     override func loadView() {
         let rootView = BlockInputBlockItemRootView()
         rootView.blockItem = self
+        rootView.translatesAutoresizingMaskIntoConstraints = false
         view = rootView
     }
 

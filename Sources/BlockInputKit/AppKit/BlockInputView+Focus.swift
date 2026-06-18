@@ -88,7 +88,7 @@ extension BlockInputView {
     }
 
     @discardableResult
-    func resignEditorFocus() -> Bool {
+    public func resignEditorFocus() -> Bool {
         guard isEditorFirstResponder else {
             return true
         }

@@ -206,13 +206,17 @@ final class BlockInputImageBlockView: NSView {
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(statusLabel)
 
+        let statusLabelLeading = statusLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12)
+        statusLabelLeading.priority = .defaultHigh
+        let statusLabelTrailing = statusLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12)
+        statusLabelTrailing.priority = .defaultHigh
         NSLayoutConstraint.activate([
             imageView.leadingAnchor.constraint(equalTo: leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: trailingAnchor),
             imageView.topAnchor.constraint(equalTo: topAnchor),
             imageView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            statusLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            statusLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            statusLabelLeading,
+            statusLabelTrailing,
             statusLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
     }
