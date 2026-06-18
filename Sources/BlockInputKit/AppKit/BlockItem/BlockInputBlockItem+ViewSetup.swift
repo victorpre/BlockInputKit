@@ -40,7 +40,6 @@ extension BlockInputBlockItem {
         checklistButton.action = #selector(requestToggleChecklist)
         checklistButton.isHidden = true
         checklistButton.toolTip = "Toggle checklist item"
-        checklistButton.setAccessibilityLabel("Toggle checklist item")
     }
 
     private func setupCodeBackgroundView() {

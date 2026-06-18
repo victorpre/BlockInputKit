@@ -1,5 +1,14 @@
 import AppKit
 
+@usableFromInline
+let dueDateAlertColor = NSColor(red: 230/255, green: 87/255, blue: 120/255, alpha: 1)
+
+@usableFromInline
+let whenDateAlertColor = NSColor(red: 87/255, green: 150/255, blue: 230/255, alpha: 1)
+
+@usableFromInline
+let whenDateTodayColor = NSColor(red: 0.95, green: 0.65, blue: 0.05, alpha: 1)
+
 /// Visual styling used by AppKit block editor surfaces.
 public struct BlockInputStyle: @unchecked Sendable {
     /// Current built-in visual style.
@@ -25,6 +34,20 @@ public struct BlockInputStyle: @unchecked Sendable {
     public var slashCommandChip: BlockInputInlineChipStyle
     /// Styling for raw `/command` visual chips.
     public var rawSlashCommandChip: BlockInputInlineChipStyle
+    /// Styling for hashtag inline chips rendered in checklist blocks.
+    public var hashtagChip: BlockInputInlineChipStyle
+    /// Styling for overdue due-date inline chips rendered in checklist blocks.
+    public var dueDateOverdueChip: BlockInputInlineChipStyle
+    /// Styling for today due-date inline chips rendered in checklist blocks.
+    public var dueDateTodayChip: BlockInputInlineChipStyle
+    /// Styling for upcoming due-date inline chips rendered in checklist blocks.
+    public var dueDateUpcomingChip: BlockInputInlineChipStyle
+    /// Styling for overdue when-date inline chips rendered in checklist blocks.
+    public var whenDateOverdueChip: BlockInputInlineChipStyle
+    /// Styling for today when-date inline chips rendered in checklist blocks.
+    public var whenDateTodayChip: BlockInputInlineChipStyle
+    /// Styling for upcoming when-date inline chips rendered in checklist blocks.
+    public var whenDateUpcomingChip: BlockInputInlineChipStyle
 
     /// Creates editor styling with optional overrides for built-in visual defaults.
     public init(
@@ -37,7 +60,49 @@ public struct BlockInputStyle: @unchecked Sendable {
         editorSurface: BlockInputEditorSurfaceStyle = BlockInputEditorSurfaceStyle(),
         fileChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
         slashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
-        rawSlashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle()
+        rawSlashCommandChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(),
+        hashtagChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(
+            fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
+            foregroundColor: .labelColor,
+            cornerRadius: 6
+        ),
+        dueDateOverdueChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(
+            fillColor: NSColor.systemRed.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemRed.withAlphaComponent(0.18),
+            foregroundColor: dueDateAlertColor,
+            cornerRadius: 6
+        ),
+        dueDateTodayChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(
+            fillColor: NSColor.systemOrange.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemOrange.withAlphaComponent(0.18),
+            foregroundColor: dueDateAlertColor,
+            cornerRadius: 6
+        ),
+        dueDateUpcomingChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(
+            fillColor: NSColor.systemTeal.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemTeal.withAlphaComponent(0.18),
+            foregroundColor: .secondaryLabelColor,
+            cornerRadius: 6
+        ),
+        whenDateOverdueChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(
+            fillColor: NSColor.systemRed.withAlphaComponent(0.11),
+            strokeColor: NSColor.systemRed.withAlphaComponent(0.18),
+            foregroundColor: dueDateAlertColor,
+            cornerRadius: 6
+        ),
+        whenDateTodayChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(
+            fillColor: NSColor(red: 0.95, green: 0.65, blue: 0.05, alpha: 0.11),
+            strokeColor: NSColor(red: 0.95, green: 0.65, blue: 0.05, alpha: 0.18),
+            foregroundColor: whenDateTodayColor,
+            cornerRadius: 6
+        ),
+        whenDateUpcomingChip: BlockInputInlineChipStyle = BlockInputInlineChipStyle(
+            fillColor: NSColor.systemBlue.withAlphaComponent(0.07),
+            strokeColor: NSColor.systemBlue.withAlphaComponent(0.12),
+            foregroundColor: .secondaryLabelColor,
+            cornerRadius: 6
+        )
     ) {
         self.baseText = baseText
         self.selectionBackgroundColor = selectionBackgroundColor
@@ -49,6 +114,13 @@ public struct BlockInputStyle: @unchecked Sendable {
         self.fileChip = fileChip
         self.slashCommandChip = slashCommandChip
         self.rawSlashCommandChip = rawSlashCommandChip
+        self.hashtagChip = hashtagChip
+        self.dueDateOverdueChip = dueDateOverdueChip
+        self.dueDateTodayChip = dueDateTodayChip
+        self.dueDateUpcomingChip = dueDateUpcomingChip
+        self.whenDateOverdueChip = whenDateOverdueChip
+        self.whenDateTodayChip = whenDateTodayChip
+        self.whenDateUpcomingChip = whenDateUpcomingChip
     }
 }
 

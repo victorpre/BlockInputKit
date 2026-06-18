@@ -82,7 +82,8 @@ extension BlockInputBlockItem {
         case let .checklistItem(isChecked):
             checklistButton.isHidden = false
             checklistButton.isEnabled = isEditable
-            checklistButton.state = isChecked ? .on : .off
+            checklistButton.isChecked = isChecked
+            checklistButton.accentColor = accentColor
             checklistButtonLeadingConstraint?.constant = Self.checklistButtonLeadingConstant(
                 indentationLevel: block.indentationLevel(forLine: 0),
                 rowContentIndent: contentIndent
@@ -90,7 +91,7 @@ extension BlockInputBlockItem {
         default:
             checklistButton.isHidden = true
             checklistButton.isEnabled = false
-            checklistButton.state = .off
+            checklistButton.isChecked = false
             checklistButtonLeadingConstraint?.constant = Self.checklistButtonBaseLeading
         }
     }

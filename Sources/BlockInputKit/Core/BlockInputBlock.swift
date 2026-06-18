@@ -450,6 +450,13 @@ extension BlockInputBlockKind {
         return false
     }
 
+    var isChecklist: Bool {
+        if case .checklistItem = self {
+            return true
+        }
+        return false
+    }
+
     var isSelectableStandaloneBlock: Bool {
         self == .horizontalRule || isImage
     }
