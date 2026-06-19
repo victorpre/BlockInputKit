@@ -131,6 +131,9 @@ extension BlockInputView {
         }
         switch acceptedDrop.context.placement {
         case let .inline(blockID, utf16Offset):
+            if imagePresentation == .textLinksWithPreviewStrip {
+                return insertFileReferencesInline(references, into: blockID, atUTF16Offset: utf16Offset) != nil
+            }
             let imageReferences = references.filter { $0.kind == .image }
             let fileReferences = references.filter { $0.kind == .fileLink }
             let insertedImages = imageReferences.isEmpty ? nil : insertImageReferences(imageReferences, below: blockID)

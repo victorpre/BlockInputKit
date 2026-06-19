@@ -76,6 +76,8 @@ public struct BlockInputImagePreviewStripStyle: @unchecked Sendable {
             interItemSpacing = Self.validNonNegative(interItemSpacing)
         }
     }
+    /// Strip background color. When nil, the strip stays transparent.
+    public var backgroundColor: NSColor?
     /// Thumbnail border color. When nil, no border is drawn.
     public var borderColor: NSColor?
     /// Thumbnail border width. Negative values are clamped to zero.
@@ -98,6 +100,7 @@ public struct BlockInputImagePreviewStripStyle: @unchecked Sendable {
         thumbnailSize: NSSize = NSSize(width: 76, height: 76),
         contentInsets: NSEdgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12),
         interItemSpacing: CGFloat = 12,
+        backgroundColor: NSColor? = nil,
         borderColor: NSColor? = NSColor.separatorColor.withAlphaComponent(0.35),
         borderWidth: CGFloat = 1,
         cornerRadius: CGFloat = 12,
@@ -106,6 +109,7 @@ public struct BlockInputImagePreviewStripStyle: @unchecked Sendable {
         self.thumbnailSize = Self.validSize(thumbnailSize)
         self.contentInsets = Self.validInsets(contentInsets)
         self.interItemSpacing = Self.validNonNegative(interItemSpacing)
+        self.backgroundColor = backgroundColor
         self.borderColor = borderColor
         self.borderWidth = Self.validNonNegative(borderWidth)
         self.cornerRadius = Self.validNonNegative(cornerRadius)
@@ -190,14 +194,14 @@ public struct BlockInputImagePreviewRemoveButtonStyle: @unchecked Sendable {
     /// Creates preview-strip remove button styling overrides.
     public init(
         isVisible: Bool = true,
-        size: NSSize = NSSize(width: 24, height: 24),
-        edgeInset: CGFloat = 6,
+        size: NSSize = NSSize(width: 20, height: 20),
+        edgeInset: CGFloat = 5,
         backgroundColor: NSColor = .controlBackgroundColor,
         borderColor: NSColor? = NSColor.separatorColor.withAlphaComponent(0.32),
         borderWidth: CGFloat = 1,
-        cornerRadius: CGFloat = 12,
+        cornerRadius: CGFloat = 10,
         symbolColor: NSColor = .labelColor,
-        symbolPointSize: CGFloat? = 13,
+        symbolPointSize: CGFloat? = 11,
         shadowColor: NSColor? = .black,
         shadowOpacity: Float = 0.18,
         shadowRadius: CGFloat = 3,

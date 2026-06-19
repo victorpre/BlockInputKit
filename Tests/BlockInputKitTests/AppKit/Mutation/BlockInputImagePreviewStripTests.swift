@@ -33,6 +33,7 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
             thumbnailSize: NSSize(width: 42, height: 38),
             contentInsets: NSEdgeInsets(top: 5, left: 7, bottom: 6, right: 8),
             interItemSpacing: 9,
+            backgroundColor: .systemPurple,
             borderColor: .separatorColor,
             borderWidth: 2,
             cornerRadius: 4,
@@ -53,6 +54,10 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
         ))
 
         XCTAssertEqual(view.imagePreviewStripHeightConstraint?.constant, 49)
+        XCTAssertEqual(view.imagePreviewStripView.layer?.backgroundColor, NSColor.systemPurple.cgColor)
+        XCTAssertFalse(view.imagePreviewStripView.scrollViewDrawsBackgroundForTesting)
+        XCTAssertFalse(view.imagePreviewStripView.clipViewDrawsBackgroundForTesting)
+        XCTAssertEqual(view.imagePreviewStripView.clipViewBackgroundColorForTesting, .clear)
         XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 1)
         XCTAssertTrue(view.imagePreviewStripView.hasHorizontalScrollerForTesting)
 
@@ -64,6 +69,28 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
         ))
 
         XCTAssertEqual(view.imagePreviewStripView.firstRemoveButtonImageSizeForTesting, NSSize(width: 17, height: 17))
+    }
+
+    func testPreviewStripStyleCanClearBackgroundColor() {
+        var style = BlockInputStyle.default
+        style.imagePreviewStrip = BlockInputImagePreviewStripStyle(backgroundColor: .systemPurple)
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(text: "![Alt](image.png)")
+            ]),
+            style: style,
+            imagePresentation: .textLinksWithPreviewStrip
+        ))
+
+        style.imagePreviewStrip.backgroundColor = nil
+        view.configure(BlockInputConfiguration(
+            document: view.document,
+            style: style,
+            imagePresentation: .textLinksWithPreviewStrip
+        ))
+
+        XCTAssertNil(view.imagePreviewStripView.layer?.backgroundColor)
     }
 
     func testInsertImageContextInTextLinkPresentationInsertsMarkdownImageText() {
@@ -96,7 +123,54 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
         XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 1)
     }
 
-    func testPreviewStripSelectionRemovalAndUndoUseExactSourceRange() {
+    func testInsertImageContextInTextLinkPresentationAddsTrailingSpaceWhenInsertedAlone() {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "")
+            ]),
+            imagePresentation: .textLinksWithPreviewStrip
+        ))
+        let context = BlockInputImageContext(
+            blockID: blockID,
+            selectedRange: NSRange(location: 0, length: 0),
+            sourceText: "",
+            anchorWindowRect: .zero
+        )
+
+        let selection = view.insertImage(
+            BlockInputImage(source: "https://example.com/cat.png", altText: "Cat"),
+            context: context
+        )
+
+        let expectedText = "![Cat](https://example.com/cat.png) "
+        XCTAssertEqual(view.document.blocks[0].text, expectedText)
+        XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: (expectedText as NSString).length)))
+        XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 1)
+    }
+
+    func testPreviewStripClickOpensResolvedImageURLThroughLinkOpener() throws {
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        var openedURL: URL?
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(text: "Before ![Alt](cat.png) after")
+            ]),
+            imagePresentation: .textLinksWithPreviewStrip,
+            imageBaseURL: try XCTUnwrap(URL(string: "https://example.com/assets/"))
+        ))
+        view.linkURLOpener = {
+            openedURL = $0
+            return true
+        }
+
+        view.imagePreviewStripView.openFirstTileForTesting()
+
+        XCTAssertEqual(openedURL, try XCTUnwrap(URL(string: "https://example.com/assets/cat.png")))
+    }
+
+    func testPreviewStripRemovalAndUndoUseExactSourceRange() {
         let blockID = BlockInputBlockID(rawValue: "block")
         let sourceText = "Before ![Alt](file:///tmp/cat.png) after"
         let imageSource = "![Alt](file:///tmp/cat.png)"
@@ -117,13 +191,9 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
             image: BlockInputImage(source: "file:///tmp/cat.png", altText: "Alt")
         )
 
-        view.selectImagePreviewOccurrence(occurrence)
-
-        XCTAssertEqual(view.selection, .text(BlockInputTextRange(blockID: blockID, range: range)))
-
         view.removeImagePreviewOccurrence(occurrence)
 
-        XCTAssertEqual(view.document.blocks[0].text, "Before  after")
+        XCTAssertEqual(view.document.blocks[0].text, "Before after")
         XCTAssertEqual(view.selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: range.location)))
         XCTAssertTrue(view.imagePreviewStripView.isEmpty)
 
@@ -132,6 +202,33 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
         XCTAssertEqual(undo?.actionName, "Remove Image")
         XCTAssertEqual(view.document.blocks[0].text, sourceText)
         XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 1)
+    }
+
+    func testPreviewStripRemovalCollapsesMiddleImageSeparator() {
+        let blockID = BlockInputBlockID(rawValue: "block")
+        let first = "![First](file:///tmp/first.png)"
+        let second = "![Second](file:///tmp/second.png)"
+        let third = "![Third](file:///tmp/third.png)"
+        let sourceText = "\(first) \(second) \(third) "
+        let range = (sourceText as NSString).range(of: second)
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: sourceText)
+            ]),
+            imagePresentation: .textLinksWithPreviewStrip
+        ))
+        let occurrence = BlockInputImagePreviewOccurrence(
+            blockID: blockID,
+            sourceRange: range,
+            sourceText: second,
+            image: BlockInputImage(source: "file:///tmp/second.png", altText: "Second")
+        )
+
+        view.removeImagePreviewOccurrence(occurrence)
+
+        XCTAssertEqual(view.document.blocks[0].text, "\(first) \(third) ")
+        XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 2)
     }
 
     func testPreviewStripReloadsImagesWhenBaseURLChanges() async throws {

@@ -54,8 +54,9 @@ public extension BlockInputView {
     ///
     /// Image files are inserted according to `BlockInputConfiguration.imagePresentation`:
     /// the default `.inlineBlocks` creates image blocks, while `.textLinksWithPreviewStrip`
-    /// creates Markdown image text blocks. Other file URLs are inserted as Markdown file-link
-    /// paragraph blocks. Non-file URLs are ignored.
+    /// inserts Markdown image text inline when the current selection is in a textual block,
+    /// or as Markdown image text blocks otherwise. Other file URLs are inserted as Markdown
+    /// file-link paragraph blocks. Non-file URLs are ignored.
     @discardableResult
     func insertLocalFileURLs(
         _ fileURLs: [URL],
@@ -64,9 +65,14 @@ public extension BlockInputView {
         guard isEditable else {
             return nil
         }
+        if blockID == nil,
+           let activeBlockID,
+           let inlineSelection = insertLocalFileURLsInlineIfPossible(fileURLs, into: activeBlockID) {
+            return inlineSelection
+        }
         // Keep picker insertion aligned with drop behavior so host apps do not need
         // to duplicate BlockInputKit's file/image classification rules.
-        let insertedBlocks = fileURLs.compactMap(droppedFileBlock)
+        let insertedBlocks = droppedFileBlocks(for: fileURLs)
         guard !insertedBlocks.isEmpty else {
             return nil
         }
@@ -84,7 +90,8 @@ public extension BlockInputView {
     /// Inserts local file URLs at a document index using image-aware block mapping.
     ///
     /// Image files follow `BlockInputConfiguration.imagePresentation`: inline image blocks by default, or Markdown image
-    /// text blocks when `.textLinksWithPreviewStrip` is configured.
+    /// text blocks when `.textLinksWithPreviewStrip` is configured. Multiple image text links are kept together in one
+    /// textual block so preview-strip mode does not fragment the document.
     ///
     /// The insertion index is clamped to the current document, but never before
     /// leading frontmatter because frontmatter is only canonical at index `0`.
@@ -96,7 +103,7 @@ public extension BlockInputView {
         guard isEditable else {
             return nil
         }
-        let insertedBlocks = fileURLs.compactMap(droppedFileBlock)
+        let insertedBlocks = droppedFileBlocks(for: fileURLs)
         guard !insertedBlocks.isEmpty else {
             return nil
         }
@@ -209,7 +216,7 @@ extension BlockInputView {
         guard isEditable else {
             return nil
         }
-        let insertedBlocks = fileURLs.compactMap(droppedFileBlock)
+        let insertedBlocks = droppedFileBlocks(for: fileURLs)
         guard !insertedBlocks.isEmpty else {
             return nil
         }
@@ -243,160 +250,51 @@ extension BlockInputView {
         return Self.imageBlock(for: url) ?? Self.fileLinkBlock(for: url)
     }
 
-    static func fileDropActionName(for blocks: [BlockInputBlock]) -> String {
-        guard blocks.allSatisfy(isImageInsertionBlock) else {
-            return "Insert Files"
+    private func droppedFileBlocks(for fileURLs: [URL]) -> [BlockInputBlock] {
+        if imagePresentation == .textLinksWithPreviewStrip {
+            let imageTextBlocks = fileURLs.compactMap(Self.imageTextBlock)
+            if imageTextBlocks.count == fileURLs.count, !imageTextBlocks.isEmpty {
+                return [BlockInputBlock(text: Self.joinedInlineFileInsertionText(imageTextBlocks.map(\.text)))]
+            }
         }
-        return blocks.count == 1 ? "Insert Image" : "Insert Images"
+        return fileURLs.compactMap(droppedFileBlock)
     }
 
-    private static func isImageInsertionBlock(_ block: BlockInputBlock) -> Bool {
+    static func fileDropActionName(for blocks: [BlockInputBlock]) -> String {
+        var imageCount = 0
+        for block in blocks {
+            guard let blockImageCount = imageInsertionCount(in: block) else {
+                return "Insert Files"
+            }
+            imageCount += blockImageCount
+        }
+        return imageCount == 1 ? "Insert Image" : "Insert Images"
+    }
+
+    private static func imageInsertionCount(in block: BlockInputBlock) -> Int? {
         if block.kind.isImage {
-            return true
+            return 1
         }
         let matches = BlockInputImageSyntaxParser.imageMatches(in: block.text)
-        guard matches.count == 1,
-              let match = matches.first,
-              match.range.location == 0,
-              match.range.length == (block.text as NSString).length else {
-            return false
-        }
-        return true
-    }
-
-    @discardableResult
-    func insertFileURLsInline(
-        _ fileURLs: [URL],
-        into blockID: BlockInputBlockID,
-        atUTF16Offset utf16Offset: Int,
-        item: BlockInputBlockItem
-    ) -> BlockInputSelection? {
-        guard isEditable else {
+        guard !matches.isEmpty else {
             return nil
         }
-        let insertionText = inlineFileInsertionText(for: fileURLs)
-        guard !insertionText.isEmpty,
-              item.representedBlockID == blockID,
-              let index = index(of: blockID),
-              var block = block(at: index),
-              block.id == blockID,
-              BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
-            return nil
-        }
-        let beforeBlock = block
-        let beforeSelection = selection
-        let insertionOffset = min(max(utf16Offset, 0), block.utf16Length)
-        let mutableText = NSMutableString(string: block.text)
-        mutableText.insert(insertionText, at: insertionOffset)
-        block.text = mutableText as String
-        let afterOffset = insertionOffset + (insertionText as NSString).length
-        let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
-            blockID: blockID,
-            utf16Offset: afterOffset
-        ))
-        _ = applyGranularBlockReplacement(block, at: index, selection: afterSelection)
-        undoController?.registerBlockReplacementStructuralEdit(
-            actionName: inlineFileInsertionActionName(for: fileURLs),
-            beforeBlock: beforeBlock,
-            afterBlock: block,
-            selectionBefore: beforeSelection,
-            selectionAfter: afterSelection
-        )
-        return afterSelection
-    }
-
-    @discardableResult
-    func insertFileReferencesInline(
-        _ references: [BlockInputFileDropReference],
-        into blockID: BlockInputBlockID,
-        atUTF16Offset utf16Offset: Int
-    ) -> BlockInputSelection? {
-        guard isEditable else {
-            return nil
-        }
-        let insertionText = inlineFileInsertionText(for: references)
-        guard !insertionText.isEmpty,
-              let index = index(of: blockID),
-              var block = block(at: index),
-              block.id == blockID,
-              BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
-            return nil
-        }
-        let beforeBlock = block
-        let beforeSelection = selection
-        let insertionOffset = min(max(utf16Offset, 0), block.utf16Length)
-        let mutableText = NSMutableString(string: block.text)
-        mutableText.insert(insertionText, at: insertionOffset)
-        block.text = mutableText as String
-        let afterOffset = insertionOffset + (insertionText as NSString).length
-        let afterSelection = BlockInputSelection.cursor(BlockInputCursor(
-            blockID: blockID,
-            utf16Offset: afterOffset
-        ))
-        _ = applyGranularBlockReplacement(block, at: index, selection: afterSelection)
-        undoController?.registerBlockReplacementStructuralEdit(
-            actionName: inlineFileInsertionActionName(for: references),
-            beforeBlock: beforeBlock,
-            afterBlock: block,
-            selectionBefore: beforeSelection,
-            selectionAfter: afterSelection
-        )
-        return afterSelection
-    }
-
-    private func inlineFileInsertionText(for fileURLs: [URL]) -> String {
-        fileURLs.compactMap { url in
-            if imagePresentation == .textLinksWithPreviewStrip,
-               let imageTextBlock = Self.imageTextBlock(for: url) {
-                return imageTextBlock.text
+        let text = block.text as NSString
+        var cursor = 0
+        for match in matches {
+            guard match.range.location >= cursor else {
+                return nil
             }
-            return Self.inlineFileLinkMarkdownSource(for: url)
-        }.joined(separator: " ")
-    }
-
-    private func inlineFileInsertionText(for references: [BlockInputFileDropReference]) -> String {
-        references.compactMap { reference in
-            if imagePresentation == .textLinksWithPreviewStrip,
-               let imageTextBlock = Self.imageTextBlock(for: reference) {
-                return imageTextBlock.text
+            let separatorRange = NSRange(location: cursor, length: match.range.location - cursor)
+            guard text.substring(with: separatorRange).trimmingCharacters(in: .whitespaces).isEmpty else {
+                return nil
             }
-            return Self.inlineFileLinkMarkdownSource(for: reference)
-        }.joined(separator: " ")
-    }
-
-    private func inlineFileInsertionActionName(for fileURLs: [URL]) -> String {
-        guard imagePresentation == .textLinksWithPreviewStrip,
-              !fileURLs.isEmpty,
-              fileURLs.allSatisfy({ Self.imageTextBlock(for: $0) != nil }) else {
-            return "Insert Files"
+            cursor = NSMaxRange(match.range)
         }
-        return fileURLs.count == 1 ? "Insert Image" : "Insert Images"
-    }
-
-    private func inlineFileInsertionActionName(for references: [BlockInputFileDropReference]) -> String {
-        guard imagePresentation == .textLinksWithPreviewStrip,
-              !references.isEmpty,
-              references.allSatisfy({ Self.imageTextBlock(for: $0) != nil }) else {
-            return "Insert Files"
-        }
-        return references.count == 1 ? "Insert Image" : "Insert Images"
-    }
-
-    private static func inlineFileLinkMarkdownSource(for url: URL) -> String? {
-        guard url.isFileURL else {
+        guard text.substring(from: cursor).trimmingCharacters(in: .whitespaces).isEmpty else {
             return nil
         }
-        let displayName = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
-        return BlockInputLinkURL.markdownLink(label: displayName, destination: url.absoluteString)
-    }
-
-    static func inlineFileLinkMarkdownSource(for reference: BlockInputFileDropReference) -> String? {
-        guard reference.kind == .fileLink,
-              let source = normalizedDropSource(reference.source) else {
-            return nil
-        }
-        let label = reference.label.isEmpty ? source : reference.label
-        return BlockInputLinkURL.markdownLink(label: label, destination: source)
+        return matches.count
     }
 
     static func block(for reference: BlockInputFileDropReference) -> BlockInputBlock? {

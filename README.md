@@ -470,7 +470,8 @@ The provider only runs for a focused, editable, inline-Markdown-capable block wi
 
 ## File Drops
 
-Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block by default, or Markdown image text blocks when `imagePresentation` is `.textLinksWithPreviewStrip`.
+Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block by
+default, or inline Markdown image text at the drop caret when `imagePresentation` is `.textLinksWithPreviewStrip`.
 
 Use `fileDropHandler` to copy files into project storage, rewrite destinations, or reject a drop before mutation:
 
@@ -525,6 +526,7 @@ style.imagePreviewStrip = BlockInputImagePreviewStripStyle(
     thumbnailSize: NSSize(width: 76, height: 76),
     contentInsets: NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12),
     interItemSpacing: 12,
+    backgroundColor: NSColor.controlBackgroundColor.withAlphaComponent(0.08),
     borderColor: NSColor.separatorColor.withAlphaComponent(0.35),
     removeButton: BlockInputImagePreviewRemoveButtonStyle(
         borderColor: NSColor.separatorColor.withAlphaComponent(0.32),
@@ -540,9 +542,11 @@ let configuration = BlockInputConfiguration(
 )
 ```
 
-Pair `.preserveSourceText` with `.textLinksWithPreviewStrip` for Markdown imports; `imagePresentation` controls editor insertion and live conversion, while parsing mode controls how incoming Markdown is converted into blocks. Existing `.image` blocks still render as image blocks.
+Pair `.preserveSourceText` with `.textLinksWithPreviewStrip` for Markdown imports; `imagePresentation` controls editor insertion and
+live conversion, while parsing mode controls how incoming Markdown is converted into blocks. Existing `.image` blocks still render as image
+blocks. Local-file Markdown image text renders its label with the same file-chip styling as file links while preserving the original Markdown source.
 
-Preview tiles are extracted from loaded editor blocks only, ignoring code, raw Markdown, table, and existing image blocks. Clicking a tile selects the exact source image range. Removing a tile performs an undoable text edit that deletes that source occurrence.
+Preview tiles are extracted from loaded editor blocks only, ignoring code, raw Markdown, table, and existing image blocks. Clicking a tile opens the resolved image URL through the same URL-opening route as link modals. Removing a tile performs an undoable text edit that deletes that source occurrence.
 
 Remote images load through `BlockInputImageLoading`. The default loader memory-caches loaded images, can use `BlockInputImageDiskCaching` for remote disk cache entries, and respects source byte and pixel limits.
 
