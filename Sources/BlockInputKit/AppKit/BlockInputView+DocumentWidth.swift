@@ -2,7 +2,7 @@ import AppKit
 
 extension BlockInputView {
     func updateCollectionViewWidthForVisibleBounds() {
-        let visibleWidth = max(scrollView.contentView.bounds.width, 0)
+        let visibleWidth = resolvedCollectionViewportWidth()
         guard visibleWidth > 0,
               abs(collectionView.frame.width - visibleWidth) > 0.5 || abs(collectionView.bounds.width - visibleWidth) > 0.5 else {
             return
@@ -12,11 +12,25 @@ extension BlockInputView {
         frame.size.width = visibleWidth
         frame.size.height = max(frame.height, visibleHeight)
         collectionView.frame = frame
-        collectionView.collectionViewLayout?.invalidateLayout()
         updateVisibleItemWidthsForCurrentWidth()
+        collectionView.collectionViewLayout?.invalidateLayout()
         collectionView.needsLayout = true
         updatePlaceholderLayout()
         invalidatePreferredHeight()
+    }
+
+    func resolvedCollectionViewportWidth() -> CGFloat {
+        let candidateWidths = [
+            collectionView.visibleRect.width,
+            scrollView.contentView.bounds.width,
+            scrollView.bounds.width,
+            bounds.width,
+            collectionView.frame.width,
+            collectionView.bounds.width
+        ]
+        return candidateWidths
+            .filter { $0 > 0 }
+            .min() ?? 0
     }
 
     func updateVisibleItemWidthsForCurrentWidth() {
@@ -54,10 +68,11 @@ extension BlockInputView {
         reflowVisibleItemsAfterHeightChange(startingAt: firstIndex)
     }
 
-    private func currentCollectionItemWidth() -> CGFloat {
+    func currentCollectionItemWidth(viewportWidth: CGFloat? = nil) -> CGFloat {
         let sectionInset = layout.sectionInset
         let scrollViewInsets = collectionView.enclosingScrollView?.contentInsets ?? NSEdgeInsetsZero
         let horizontalInsets = sectionInset.left + sectionInset.right + scrollViewInsets.left + scrollViewInsets.right
-        return max(collectionView.bounds.width - horizontalInsets, 0)
+        let resolvedWidth = viewportWidth ?? resolvedCollectionViewportWidth()
+        return max(resolvedWidth - horizontalInsets - 4, 1)
     }
 }

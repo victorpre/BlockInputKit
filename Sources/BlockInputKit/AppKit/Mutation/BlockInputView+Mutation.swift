@@ -179,7 +179,7 @@ extension BlockInputView {
     }
 
     func resizeVisibleItem(_ item: BlockInputBlockItem, for block: BlockInputBlock) {
-        let itemWidth = item.view.bounds.width > 0 ? item.view.bounds.width : collectionView.bounds.width
+        let itemWidth = item.view.bounds.width > 0 ? item.view.bounds.width : resolvedCollectionViewportWidth()
         let height = measuredBlockItemHeight(for: block, itemWidth: itemWidth)
         guard abs(item.view.frame.height - height) > 0.5 else {
             return

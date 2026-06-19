@@ -131,6 +131,10 @@ extension BlockInputBlockItem {
         view.firstDescendant(of: BlockInputDetailButton.self)
     }
 
+    var testingMetadataRowView: BlockInputMetadataRowView? {
+        view.firstDescendant(of: BlockInputMetadataRowView.self)
+    }
+
     var testingHorizontalRuleView: NSView? {
         view.firstDescendant(of: NSView.self) { view in
             view.identifier?.rawValue == "BlockInputHorizontalRuleView"

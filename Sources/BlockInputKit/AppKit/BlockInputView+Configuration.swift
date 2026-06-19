@@ -50,6 +50,7 @@ extension BlockInputView {
         hideDropIndicator()
         invalidateReadOnlyCursorRects()
         clearStaleFocusState()
+        updateCollectionViewWidthForVisibleBounds()
         reloadConfiguredDocument(restoresFocus: restoresFocus)
         refreshImagePreviewStrip()
         attachDocumentStoreObservationIfNeeded()

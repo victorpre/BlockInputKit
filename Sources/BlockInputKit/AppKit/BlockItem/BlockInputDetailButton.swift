@@ -2,7 +2,7 @@ import AppKit
 
 final class BlockInputDetailButton: NSButton {
     var activeCursor: NSCursor? {
-        !isHidden && alphaValue > 0 ? .pointingHand : nil
+        !isHidden ? .pointingHand : nil
     }
 
     override var isHidden: Bool {

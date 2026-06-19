@@ -5,6 +5,11 @@ final class BlockInputCollectionView: NSCollectionView {
     weak var blockInputView: BlockInputView?
     private weak var blockSelectionDragItem: BlockInputBlockItem?
 
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        blockInputView?.updateVisibleItemWidthsForCurrentWidth()
+    }
+
     override func layout() {
         super.layout()
         blockInputView?.updateVisibleItemWidthsForCurrentWidth()

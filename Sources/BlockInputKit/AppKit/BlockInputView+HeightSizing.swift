@@ -91,7 +91,7 @@ extension BlockInputView {
     }
 
     private var lastMeasuredContentWidthFallback: CGFloat {
-        max(collectionView.bounds.width, scrollView.contentSize.width, 0)
+        max(resolvedCollectionViewportWidth(), scrollView.contentSize.width, 0)
     }
 
     private var activeTextSelectionCaret: (blockID: BlockInputBlockID, utf16Offset: Int)? {

@@ -8,6 +8,13 @@ extension BlockInputTextView {
         if applyReadOnlyCursor(for: event) {
             return
         }
+        if linkHitResult(for: event) != nil {
+            NSCursor.pointingHand.set()
+            return
+        }
+        if blockItem?.applyEditableTextSurfaceCursor(at: blockItem?.view.convert(event.locationInWindow, from: nil)) == true {
+            return
+        }
         super.cursorUpdate(with: event)
     }
 
@@ -16,6 +23,13 @@ extension BlockInputTextView {
             return
         }
         if applyReadOnlyCursor(for: event) {
+            return
+        }
+        if linkHitResult(for: event) != nil {
+            NSCursor.pointingHand.set()
+            return
+        }
+        if blockItem?.applyEditableTextSurfaceCursor(at: blockItem?.view.convert(event.locationInWindow, from: nil)) == true {
             return
         }
         super.mouseMoved(with: event)

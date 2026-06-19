@@ -167,6 +167,7 @@ public final class BlockInputView: NSView {
     public override func setBoundsSize(_ newSize: NSSize) {
         super.setBoundsSize(newSize)
         updateEditorChromeLayers()
+        updateCollectionViewWidthForVisibleBounds()
     }
 
     public override func resetCursorRects() {

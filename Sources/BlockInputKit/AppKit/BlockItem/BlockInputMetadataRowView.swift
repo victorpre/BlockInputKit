@@ -10,6 +10,10 @@ final class BlockInputMetadataRowView: NSView {
         stack.edgeInsets = NSEdgeInsets(top: 2, left: 0, bottom: 2, right: 0)
         return stack
     }()
+    private var stackViewLeadingConstraint: NSLayoutConstraint?
+    private var stackViewTrailingConstraint: NSLayoutConstraint?
+    private var stackViewTopConstraint: NSLayoutConstraint?
+    private var stackViewBottomConstraint: NSLayoutConstraint?
 
     override var isFlipped: Bool { true }
 
@@ -26,12 +30,15 @@ final class BlockInputMetadataRowView: NSView {
     private func setupView() {
         translatesAutoresizingMaskIntoConstraints = false
         addSubview(stackView)
-        NSLayoutConstraint.activate([
-            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stackView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
-            stackView.topAnchor.constraint(equalTo: topAnchor),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
+        let leading = stackView.leadingAnchor.constraint(equalTo: leadingAnchor)
+        let trailing = stackView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor)
+        let top = stackView.topAnchor.constraint(equalTo: topAnchor)
+        let bottom = stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        stackViewLeadingConstraint = leading
+        stackViewTrailingConstraint = trailing
+        stackViewTopConstraint = top
+        stackViewBottomConstraint = bottom
+        stackView.isHidden = true
     }
 
     func configure(
@@ -40,6 +47,9 @@ final class BlockInputMetadataRowView: NSView {
         tags: [String],
         dateStyle: BlockInputMetadataDateStyle = BlockInputMetadataDateStyle()
     ) {
+        if stackView.superview == nil {
+            addSubview(stackView)
+        }
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         if let whenDate, !whenDate.isEmpty {
@@ -56,13 +66,37 @@ final class BlockInputMetadataRowView: NSView {
             stackView.addArrangedSubview(BlockInputMetadataChipView(kind: .tag, text: tag))
         }
 
-        setAccessibilityElement(!stackView.arrangedSubviews.isEmpty)
+        updateStackViewVisibility(hasContent: !stackView.arrangedSubviews.isEmpty)
         invalidateIntrinsicContentSize()
+    }
+
+    private func updateStackViewVisibility(hasContent: Bool) {
+        setAccessibilityElement(hasContent)
+        stackView.isHidden = !hasContent
+        if hasContent {
+            if stackView.superview == nil {
+                addSubview(stackView)
+            }
+            NSLayoutConstraint.activate([
+                stackViewLeadingConstraint,
+                stackViewTrailingConstraint,
+                stackViewTopConstraint,
+                stackViewBottomConstraint
+            ].compactMap { $0 })
+        } else {
+            NSLayoutConstraint.deactivate([
+                stackViewLeadingConstraint,
+                stackViewTrailingConstraint,
+                stackViewTopConstraint,
+                stackViewBottomConstraint
+            ].compactMap { $0 })
+            stackView.removeFromSuperview()
+        }
     }
 
     var contentMaxX: CGFloat {
         guard !stackView.arrangedSubviews.isEmpty else { return 0 }
-        let rightmost = stackView.arrangedSubviews.compactMap { $0 as? NSView }
+        let rightmost = stackView.arrangedSubviews
             .map { $0.convert($0.bounds, to: self).maxX }
             .max() ?? 0
         return rightmost
@@ -70,7 +104,7 @@ final class BlockInputMetadataRowView: NSView {
 
     func clearChips() {
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        setAccessibilityElement(false)
+        updateStackViewVisibility(hasContent: false)
     }
 
     override var intrinsicContentSize: NSSize {

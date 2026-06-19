@@ -162,7 +162,11 @@ extension BlockInputBlockItem {
     }
 
     private func activateLayoutConstraints() {
-        NSLayoutConstraint.activate(chromeLayoutConstraints() + contentLayoutConstraints())
+        NSLayoutConstraint.activate(chromeLayoutConstraints() + baseContentLayoutConstraints())
+        _ = detailButtonLayoutConstraints()
+        _ = metadataRowLayoutConstraints()
+        _ = tableViewLayoutConstraints()
+        _ = imageBlockViewLayoutConstraints()
     }
 
     private func chromeLayoutConstraints() -> [NSLayoutConstraint] {
@@ -214,7 +218,7 @@ extension BlockInputBlockItem {
         ]
     }
 
-    private func contentLayoutConstraints() -> [NSLayoutConstraint] {
+    private func baseContentLayoutConstraints() -> [NSLayoutConstraint] {
         let scrollViewLeadingConstraint = scrollView.leadingAnchor.constraint(
             equalTo: kindLabel.trailingAnchor,
             constant: Self.defaultTextLeading
@@ -243,6 +247,15 @@ extension BlockInputBlockItem {
             constant: 2
         )
         self.detailButtonTopConstraint = detailButtonTopConstraint
+        let detailButtonWidthConstraint = detailButton.widthAnchor.constraint(equalToConstant: 20)
+        self.detailButtonWidthConstraint = detailButtonWidthConstraint
+        let detailButtonHeightConstraint = detailButton.heightAnchor.constraint(equalToConstant: 20)
+        self.detailButtonHeightConstraint = detailButtonHeightConstraint
+        let detailButtonTrailingConstraint = detailButton.trailingAnchor.constraint(
+            lessThanOrEqualTo: scrollView.trailingAnchor,
+            constant: -2
+        )
+        self.detailButtonTrailingConstraint = detailButtonTrailingConstraint
         let horizontalRuleTrailingConstraint = makeHorizontalRuleTrailingConstraint()
         self.horizontalRuleTrailingConstraint = horizontalRuleTrailingConstraint
         let quoteBarLeadingConstraint = quoteBarView.leadingAnchor.constraint(
@@ -272,32 +285,40 @@ extension BlockInputBlockItem {
             scrollViewBottomConstraint,
             horizontalRuleLeadingConstraint,
             horizontalRuleTrailingConstraint,
-            detailButtonLeadingConstraint,
-            detailButtonTopConstraint,
-            detailButton.widthAnchor.constraint(equalToConstant: 20),
-            detailButton.heightAnchor.constraint(equalToConstant: 20),
-            detailButton.trailingAnchor.constraint(lessThanOrEqualTo: scrollView.trailingAnchor, constant: -2),
             horizontalRuleView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             horizontalRuleView.heightAnchor.constraint(equalToConstant: 9)
-        ] + metadataRowLayoutConstraints() + tableViewLayoutConstraints() + imageBlockViewLayoutConstraints() + frontMatterDividerLayoutConstraints()
+        ] + frontMatterDividerLayoutConstraints()
+    }
+
+    private func detailButtonLayoutConstraints() -> [NSLayoutConstraint] {
+        [
+            detailButtonLeadingConstraint,
+            detailButtonTopConstraint,
+            detailButtonWidthConstraint,
+            detailButtonHeightConstraint,
+            detailButtonTrailingConstraint
+        ].compactMap { $0 }
     }
 
     private func metadataRowLayoutConstraints() -> [NSLayoutConstraint] {
+        let leadingConstraint = metadataRowView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor)
+        self.metadataRowLeadingConstraint = leadingConstraint
+        let trailingConstraint = metadataRowView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor)
+        self.metadataRowTrailingConstraint = trailingConstraint
         let topConstraint = metadataRowView.topAnchor.constraint(
             equalTo: scrollView.bottomAnchor,
             constant: Self.metadataRowTopInset
         )
-        metadataRowTopConstraint = topConstraint
-        let bottomConstraint = metadataRowView.bottomAnchor.constraint(
-            equalTo: view.bottomAnchor,
-            constant: -Self.metadataRowBottomInset
+        self.metadataRowTopConstraint = topConstraint
+        let heightConstraint = metadataRowView.heightAnchor.constraint(
+            equalToConstant: Self.metadataRowMinimumHeight
         )
-        metadataRowBottomConstraint = bottomConstraint
+        metadataRowHeightConstraint = heightConstraint
         return [
-            metadataRowView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            metadataRowView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            leadingConstraint,
+            trailingConstraint,
             topConstraint,
-            bottomConstraint
+            heightConstraint
         ]
     }
 
@@ -322,6 +343,16 @@ extension BlockInputBlockItem {
     }
 
     private func tableViewLayoutConstraints() -> [NSLayoutConstraint] {
+        let leading = tableView.leadingAnchor.constraint(
+            equalTo: scrollView.leadingAnchor,
+            constant: Self.tableSurfaceLeadingInset
+        )
+        self.tableViewLeadingConstraint = leading
+        let trailing = tableView.trailingAnchor.constraint(
+            equalTo: scrollView.trailingAnchor,
+            constant: -Self.tableSurfaceTrailingInset
+        )
+        self.tableViewTrailingConstraint = trailing
         let top = tableView.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: Self.tableExternalVerticalInset)
         tableViewTopConstraint = top
         let bottom = tableView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -Self.tableExternalVerticalInset)
@@ -329,8 +360,8 @@ extension BlockInputBlockItem {
         return [
             // Table borders align to the same glyph column as text blocks; the
             // trailing inset keeps rendered width in parity with offscreen text measurement.
-            tableView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: Self.tableSurfaceLeadingInset),
-            tableView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -Self.tableSurfaceTrailingInset),
+            leading,
+            trailing,
             top,
             bottom
         ]

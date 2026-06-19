@@ -206,7 +206,7 @@ extension BlockInputBlockItem {
         guard case let .image(image) = block.kind else {
             return
         }
-        let itemWidth = view.bounds.width > 0 ? view.bounds.width : 0
+        let itemWidth = resolvedBlockItemViewportWidth()
         let scrollViewWidth = Self.textScrollViewWidth(
             for: itemWidth,
             block: block,

@@ -12,6 +12,7 @@ extension BlockInputBlockItem {
         } else {
             usesImageSurface = false
         }
+        let hasMetadata = block.whenDate != nil || block.deadline != nil || !block.tags.isEmpty
         let contentIndent = Self.contentIndent(for: block)
         let verticalMetrics = Self.verticalMetrics(for: block, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
         textView.textContainerInset = textContainerInset(for: kind, metrics: verticalMetrics)
@@ -49,8 +50,14 @@ extension BlockInputBlockItem {
         updateHorizontalConstraints(for: block)
         updateQuoteBarVerticalExtent()
         configureChecklistButton(for: block, contentIndent: contentIndent)
-        configureMetadataRow(for: block)
-        configureDetailButton(for: block)
+        configureMetadataRow(for: block, hasMetadata: hasMetadata, isMounted: isMountedForLayout)
+        configureDetailButton(for: block, hasMetadata: hasMetadata, isMounted: isMountedForLayout)
+        updateOptionalSurfaceConstraints(
+            usesTableSurface: usesTableSurface,
+            usesImageSurface: usesImageSurface,
+            isMounted: isMountedForLayout,
+            block: block
+        )
         updateImageBlockLayout(for: block)
     }
 
@@ -97,31 +104,48 @@ extension BlockInputBlockItem {
         }
     }
 
-    private func configureMetadataRow(for block: BlockInputBlock) {
-        let hasMetadata = block.whenDate != nil || block.deadline != nil || !block.tags.isEmpty
-        guard case .checklistItem = block.kind, hasMetadata else {
-            metadataRowView.isHidden = true
-            metadataRowTopConstraint?.constant = 0
-            metadataRowBottomConstraint?.constant = 0
-            scrollViewBottomConstraint?.isActive = true
-            metadataRowTopConstraint?.isActive = false
-            metadataRowBottomConstraint?.isActive = false
-            return
-        }
-        metadataRowView.configure(with: block.whenDate, deadline: block.deadline, tags: block.tags, dateStyle: style.metadataDate)
-        metadataRowView.isHidden = false
-        metadataRowTopConstraint?.constant = Self.metadataRowTopInset
-        metadataRowBottomConstraint?.constant = -Self.metadataRowBottomInset
-        scrollViewBottomConstraint?.isActive = false
-        metadataRowTopConstraint?.isActive = true
-        metadataRowBottomConstraint?.isActive = true
-    }
-
-    private func configureDetailButton(for block: BlockInputBlock) {
+    private func configureMetadataRow(for block: BlockInputBlock, hasMetadata: Bool, isMounted: Bool) {
         let isChecklist: Bool
         if case .checklistItem = block.kind { isChecklist = true } else { isChecklist = false }
-        detailButton.isHidden = !isChecklist || !isEditable
-        if !detailButton.isHidden {
+        let shouldShow = isChecklist && hasMetadata && isMounted
+
+        if isChecklist && hasMetadata {
+            metadataRowView.configure(with: block.whenDate, deadline: block.deadline, tags: block.tags, dateStyle: style.metadataDate)
+        } else {
+            metadataRowView.clearChips()
+        }
+        metadataRowView.isHidden = !shouldShow
+
+        let metadataReserve = Self.metadataRowTopInset + Self.metadataRowMinimumHeight + Self.metadataRowBottomInset
+        scrollViewBottomConstraint?.constant = shouldShow ? -metadataReserve : 0
+        metadataRowHeightConstraint?.constant = shouldShow ? Self.metadataRowMinimumHeight : 0
+        let metadataConstraints = [
+            metadataRowLeadingConstraint,
+            metadataRowTrailingConstraint,
+            metadataRowTopConstraint,
+            metadataRowHeightConstraint
+        ].compactMap { $0 }
+        if shouldShow {
+            NSLayoutConstraint.activate(metadataConstraints)
+        } else {
+            NSLayoutConstraint.deactivate(metadataConstraints)
+        }
+    }
+
+    private func configureDetailButton(for block: BlockInputBlock, hasMetadata: Bool, isMounted: Bool) {
+        let isChecklist: Bool
+        if case .checklistItem = block.kind { isChecklist = true } else { isChecklist = false }
+        let shouldShow = isChecklist && isEditable && isMounted && hasMetadata
+        detailButton.isHidden = !shouldShow
+        let detailButtonConstraints = [
+            detailButtonLeadingConstraint,
+            detailButtonTopConstraint,
+            detailButtonWidthConstraint,
+            detailButtonHeightConstraint,
+            detailButtonTrailingConstraint
+        ].compactMap { $0 }
+        if shouldShow {
+            NSLayoutConstraint.activate(detailButtonConstraints)
             detailButton.alphaValue = 0
             let firstLine = block.text.components(separatedBy: .newlines).first ?? ""
             let font = Self.font(for: block.kind, style: style)
@@ -131,6 +155,56 @@ extension BlockInputBlockItem {
             lastComputedDetailButtonOffset = newOffset
             detailButtonLeadingConstraint?.constant = newOffset
             view.window?.invalidateCursorRects(for: view)
+            return
+        }
+        NSLayoutConstraint.deactivate(detailButtonConstraints)
+    }
+
+    private func updateOptionalSurfaceConstraints(
+        usesTableSurface: Bool,
+        usesImageSurface: Bool,
+        isMounted: Bool,
+        block: BlockInputBlock
+    ) {
+        let tableConstraints = [
+            tableViewLeadingConstraint,
+            tableViewTrailingConstraint,
+            tableViewTopConstraint,
+            tableViewBottomConstraint
+        ].compactMap { $0 }
+        if usesTableSurface && isMounted {
+            NSLayoutConstraint.activate(tableConstraints)
+        } else {
+            NSLayoutConstraint.deactivate(tableConstraints)
+        }
+
+        let imageConstraints = [
+            imageBlockLeadingConstraint,
+            imageBlockTrailingConstraint,
+            imageBlockWidthConstraint,
+            imageBlockTopConstraint,
+            imageBlockBottomConstraint
+        ].compactMap { $0 }
+        if usesImageSurface && isMounted {
+            NSLayoutConstraint.activate(imageConstraints)
+        } else {
+            NSLayoutConstraint.deactivate(imageConstraints)
+        }
+
+        if isMounted {
+            metadataRowView.setAccessibilityElement(true)
+        }
+        if usesTableSurface {
+            tableView.isHidden = false
+        }
+        if usesImageSurface {
+            imageBlockView.isHidden = false
+        }
+        if block.kind == .table {
+            tableView.needsLayout = true
+        }
+        if case .image = block.kind {
+            imageBlockView.needsLayout = true
         }
     }
 

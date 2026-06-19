@@ -23,11 +23,11 @@ extension BlockInputBlockItem {
     }
 
     var detailButtonCursorRect: NSRect {
-        guard !detailButton.isHidden,
-              detailButton.alphaValue > 0 else {
+        guard !detailButton.isHidden else {
             return .zero
         }
-        return detailButton.frame.intersection(view.bounds)
+        let cursorRect = detailButton.bounds.insetBy(dx: 6, dy: 4)
+        return detailButton.convert(cursorRect, to: view).intersection(view.bounds)
     }
 
     func editableTextSurfaceCursorRects(in hostView: NSView) -> [NSRect] {

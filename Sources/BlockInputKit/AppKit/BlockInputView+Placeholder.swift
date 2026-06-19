@@ -102,7 +102,7 @@ extension BlockInputView {
     private func placeholderFallbackTextLeadingEdge() -> CGFloat {
         let block = BlockInputBlock(kind: .paragraph)
         return BlockInputBlockItem.horizontalMetrics(
-            for: collectionView.bounds.width,
+            for: resolvedCollectionViewportWidth(),
             block: block,
             allowsReordering: allowsBlockReordering,
             editorHorizontalInset: editorHorizontalInset,

@@ -94,10 +94,15 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var quoteBarLeadingConstraint: NSLayoutConstraint?
     var quoteBarTopConstraint: NSLayoutConstraint?
     var quoteBarBottomConstraint: NSLayoutConstraint?
+    var tableViewLeadingConstraint: NSLayoutConstraint?
+    var tableViewTrailingConstraint: NSLayoutConstraint?
     var horizontalRuleLeadingConstraint: NSLayoutConstraint?
     var horizontalRuleTrailingConstraint: NSLayoutConstraint?
     var tableViewTopConstraint: NSLayoutConstraint?
     var tableViewBottomConstraint: NSLayoutConstraint?
+    var metadataRowLeadingConstraint: NSLayoutConstraint?
+    var metadataRowTrailingConstraint: NSLayoutConstraint?
+    var metadataRowTopConstraint: NSLayoutConstraint?
     var frontMatterDividerLeadingConstraint: NSLayoutConstraint?
     var frontMatterDividerTrailingConstraint: NSLayoutConstraint?
     var frontMatterDividerBottomConstraint: NSLayoutConstraint?
@@ -106,16 +111,19 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var imageBlockWidthConstraint: NSLayoutConstraint?
     var imageBlockTopConstraint: NSLayoutConstraint?
     var imageBlockBottomConstraint: NSLayoutConstraint?
-    var metadataRowTopConstraint: NSLayoutConstraint?
-    var metadataRowBottomConstraint: NSLayoutConstraint?
+    var metadataRowHeightConstraint: NSLayoutConstraint?
     var detailButtonLeadingConstraint: NSLayoutConstraint?
     var detailButtonTopConstraint: NSLayoutConstraint?
+    var detailButtonWidthConstraint: NSLayoutConstraint?
+    var detailButtonHeightConstraint: NSLayoutConstraint?
+    var detailButtonTrailingConstraint: NSLayoutConstraint?
     var lastComputedDetailButtonOffset: CGFloat = 0
     var imageLoadTask: Task<Void, Never>?
     var imageLoadCacheKey: String?
     private var isHorizontalRule = false
     var isImageBlock = false
     var imageCaretOffset: Int?
+    private var didApplyMountedLayout = false
 
     var currentSelectedRange: NSRange {
         tableView.activeCellSelectedSourceRange ?? textView.selectedRange()
@@ -150,6 +158,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         super.viewDidLayout()
         if let renderedBlock {
             updateHorizontalConstraints(for: renderedBlock)
+            if !didApplyMountedLayout, isMountedForLayout {
+                configureBlockKindChrome(block: renderedBlock)
+                didApplyMountedLayout = true
+            }
         }
         refreshCodeAppearanceIfNeeded()
         updateTextViewDocumentFrame()
@@ -258,6 +270,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             textView.string = text
         }
         configureBlockKindChrome(block: block)
+        didApplyMountedLayout = isMountedForLayout
         textView.updateInlineHintView()
         setBlockSelection(isSelected)
         // Frontmatter is pinned to document index 0, so keep the reorder
@@ -284,8 +297,9 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     }
 
     func updateHorizontalConstraints(for block: BlockInputBlock) {
+        let itemWidth = resolvedBlockItemViewportWidth()
         let metrics = Self.horizontalMetrics(
-            for: view.bounds.width,
+            for: itemWidth,
             block: block,
             allowsReordering: allowsReordering,
             editorHorizontalInset: editorHorizontalInset,
@@ -296,14 +310,10 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         kindLabelLeadingConstraint?.constant = metrics.kindLabelLeading
         kindLabelWidthConstraint?.constant = metrics.kindLabelWidth
         scrollViewLeadingConstraint?.constant = metrics.scrollViewLeading
-        let usesCollapsedWidth = view.bounds.width > 0 &&
-            metrics.handleWidth == 0 &&
-            metrics.scrollViewTrailingInset == 0 &&
-            abs(metrics.scrollViewWidth - view.bounds.width) <= 0.5
-        scrollViewWidthConstraint?.priority = usesCollapsedWidth ? .required : .defaultLow
+        scrollViewWidthConstraint?.priority = .defaultLow
         scrollViewWidthConstraint?.constant = metrics.scrollViewWidth
         scrollViewTrailingConstraint?.constant = -metrics.scrollViewTrailingInset
-        let horizontalRuleInset = min(Self.horizontalRuleInnerInset, max(metrics.scrollViewWidth / 2, 0))
+        let horizontalRuleInset: CGFloat = min(Self.horizontalRuleInnerInset, max(metrics.scrollViewWidth / 2, 0))
         horizontalRuleLeadingConstraint?.constant = horizontalRuleInset
         horizontalRuleTrailingConstraint?.constant = -horizontalRuleInset
         frontMatterDividerLeadingConstraint?.constant = horizontalRuleInset
@@ -313,6 +323,22 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
             imageBlockTrailingConstraint?.constant = 0
             imageBlockWidthConstraint?.constant = metrics.scrollViewWidth
         }
+    }
+
+    func resolvedBlockItemViewportWidth() -> CGFloat {
+        guard isMountedForLayout else {
+            return 0
+        }
+        let candidateWidths = [
+            view.bounds.width,
+            view.enclosingScrollView?.contentView.bounds.width ?? 0,
+            view.superview?.bounds.width ?? 0
+        ]
+        return max(candidateWidths.max() ?? 0, 0)
+    }
+
+    var isMountedForLayout: Bool {
+        view.bounds.width > 0 && view.bounds.height > 0
     }
 
     func updateTableCellEditState(for block: BlockInputBlock) {
@@ -481,6 +507,7 @@ extension BlockInputBlockItem {
         resetTextForReuse()
         resetLayoutForReuse()
         resetChromeForReuse()
+        didApplyMountedLayout = false
         view.window?.invalidateCursorRects(for: view)
     }
 

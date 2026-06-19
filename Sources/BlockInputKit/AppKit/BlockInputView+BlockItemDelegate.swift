@@ -176,7 +176,7 @@ extension BlockInputView: BlockInputBlockItemDelegate {
         beforeBlock: BlockInputBlock,
         afterBlock: BlockInputBlock
     ) -> Bool {
-        let itemWidth = item.view.bounds.width > 0 ? item.view.bounds.width : collectionView.bounds.width
+        let itemWidth = item.view.bounds.width > 0 ? item.view.bounds.width : resolvedCollectionViewportWidth()
         let beforeHeight = measuredBlockItemHeight(for: beforeBlock, itemWidth: itemWidth)
         let afterHeight = measuredBlockItemHeight(for: afterBlock, itemWidth: itemWidth)
         let isStaleCodeBlockHeight: Bool
