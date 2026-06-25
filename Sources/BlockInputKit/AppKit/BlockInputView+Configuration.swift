@@ -79,6 +79,7 @@ extension BlockInputView {
         completionReturnBehavior = configuration.completionReturnBehavior
         dropIndicatorColor = configuration.dropIndicatorColor
         imagePresentation = configuration.imagePresentation
+        imagePreviewAttachments = configuration.imagePreviewAttachments
         applyEditorSurfaceStyle()
         configureHeightSizing(configuration.heightSizing)
     }

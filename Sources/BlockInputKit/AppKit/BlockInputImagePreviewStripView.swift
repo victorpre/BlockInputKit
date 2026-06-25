@@ -8,15 +8,54 @@ struct BlockInputImagePreviewOccurrence: Equatable {
     var image: BlockInputImage
 }
 
+struct BlockInputImagePreviewAttachmentSnapshot: Equatable {
+    var id: String
+    var fileURL: URL
+    var label: String
+
+    init(_ attachment: BlockInputImagePreviewAttachment) {
+        id = attachment.id
+        fileURL = attachment.fileURL
+        label = attachment.label
+    }
+}
+
+enum BlockInputImagePreviewItem: Equatable {
+    case occurrence(BlockInputImagePreviewOccurrence)
+    case attachment(BlockInputImagePreviewAttachmentSnapshot)
+
+    var image: BlockInputImage {
+        switch self {
+        case let .occurrence(occurrence):
+            return occurrence.image
+        case let .attachment(attachment):
+            return BlockInputImage(source: attachment.fileURL.absoluteString, altText: attachment.label)
+        }
+    }
+
+    var accessibilityName: String {
+        switch self {
+        case let .occurrence(occurrence):
+            return occurrence.image.altText.isEmpty ? occurrence.image.source : occurrence.image.altText
+        case let .attachment(attachment):
+            if !attachment.label.isEmpty {
+                return attachment.label
+            }
+            return attachment.fileURL.lastPathComponent
+        }
+    }
+}
+
 final class BlockInputImagePreviewStripView: NSView {
-    var onOpen: ((BlockInputImagePreviewOccurrence) -> Void)?
-    var onRemove: ((BlockInputImagePreviewOccurrence) -> Void)?
+    var onOpen: ((BlockInputImagePreviewItem) -> Void)?
+    var onRemove: ((BlockInputImagePreviewItem) -> Void)?
 
     private let scrollView = NSScrollView()
     private let contentView = NSView()
     private var tileViews: [BlockInputImagePreviewTileView] = []
-    private var items: [BlockInputImagePreviewOccurrence] = []
+    private var items: [BlockInputImagePreviewItem] = []
     private var style = BlockInputImagePreviewStripStyle()
+    private var contentHorizontalInset: CGFloat?
     private var imageLoadingContext = BlockInputImageBlockLoadingContext()
     private var imageLoadingSignature = BlockInputImagePreviewLoadingSignature(context: BlockInputImageBlockLoadingContext())
 
@@ -34,6 +73,10 @@ final class BlockInputImagePreviewStripView: NSView {
 
     var firstLoadedImagePixelSizeForTesting: NSSize? {
         tileViews.first?.loadedImagePixelSizeForTesting
+    }
+
+    var firstTileFrameForTesting: NSRect? {
+        tileViews.first?.frame
     }
 
     var hasHorizontalScrollerForTesting: Bool {
@@ -54,6 +97,10 @@ final class BlockInputImagePreviewStripView: NSView {
 
     func openFirstTileForTesting() {
         tileViews.first?.performPrimaryAction()
+    }
+
+    func removeFirstTileForTesting() {
+        tileViews.first?.performRemoveAction()
     }
 
     override init(frame frameRect: NSRect) {
@@ -85,6 +132,14 @@ final class BlockInputImagePreviewStripView: NSView {
         needsLayout = true
     }
 
+    func configureContentHorizontalInset(_ contentHorizontalInset: CGFloat?) {
+        guard self.contentHorizontalInset != contentHorizontalInset else {
+            return
+        }
+        self.contentHorizontalInset = contentHorizontalInset
+        needsLayout = true
+    }
+
     func configureImageLoading(_ context: BlockInputImageBlockLoadingContext) {
         let signature = BlockInputImagePreviewLoadingSignature(context: context)
         let shouldReload = signature != imageLoadingSignature
@@ -93,7 +148,7 @@ final class BlockInputImagePreviewStripView: NSView {
         tileViews.forEach { $0.configureImageLoading(context, reloadsImage: shouldReload) }
     }
 
-    func configureItems(_ items: [BlockInputImagePreviewOccurrence]) {
+    func configureItems(_ items: [BlockInputImagePreviewItem]) {
         guard self.items != items else {
             return
         }
@@ -152,25 +207,27 @@ final class BlockInputImagePreviewStripView: NSView {
 
     private func layoutTiles() {
         let insets = style.contentInsets
-        var tileX = insets.left
+        let leadingInset = contentHorizontalInset.map { max(insets.left, $0) } ?? insets.left
+        let trailingInset = contentHorizontalInset.map { max(insets.right, $0) } ?? insets.right
+        var tileX = leadingInset
         let tileSize = style.thumbnailSize
         let tileY = max(insets.top, (bounds.height - tileSize.height) / 2)
         for tile in tileViews {
             tile.frame = NSRect(origin: NSPoint(x: tileX, y: tileY), size: tileSize)
             tileX += tileSize.width + style.interItemSpacing
         }
-        let contentWidth = max(tileX - style.interItemSpacing + insets.right, bounds.width)
+        let contentWidth = max(tileX - style.interItemSpacing + trailingInset, bounds.width)
         contentView.frame = NSRect(x: 0, y: 0, width: contentWidth, height: bounds.height)
     }
 }
 
 private final class BlockInputImagePreviewTileView: NSView {
-    var onOpen: ((BlockInputImagePreviewOccurrence) -> Void)?
-    var onRemove: ((BlockInputImagePreviewOccurrence) -> Void)?
+    var onOpen: ((BlockInputImagePreviewItem) -> Void)?
+    var onRemove: ((BlockInputImagePreviewItem) -> Void)?
 
     private let imageView = NSImageView()
     private let removeButton = NSButton()
-    private var item: BlockInputImagePreviewOccurrence?
+    private var item: BlockInputImagePreviewItem?
     private var style = BlockInputImagePreviewStripStyle()
     private var imageLoadingContext = BlockInputImageBlockLoadingContext()
     private var loadTask: Task<Void, Never>?
@@ -221,7 +278,7 @@ private final class BlockInputImagePreviewTileView: NSView {
     }
 
     func configure(
-        item: BlockInputImagePreviewOccurrence,
+        item: BlockInputImagePreviewItem,
         style: BlockInputImagePreviewStripStyle,
         imageLoadingContext: BlockInputImageBlockLoadingContext
     ) {
@@ -230,8 +287,7 @@ private final class BlockInputImagePreviewTileView: NSView {
         self.imageLoadingContext = imageLoadingContext
         configureStyle(style)
         configureImageLoading(imageLoadingContext)
-        let accessibilityName = item.image.altText.isEmpty ? item.image.source : item.image.altText
-        setAccessibilityLabel("Open image \(accessibilityName)")
+        setAccessibilityLabel("Open image \(item.accessibilityName)")
         startLoad()
     }
 
@@ -240,6 +296,13 @@ private final class BlockInputImagePreviewTileView: NSView {
             return
         }
         onOpen?(item)
+    }
+
+    func performRemoveAction() {
+        guard let item else {
+            return
+        }
+        onRemove?(item)
     }
 
     func configureStyle(_ style: BlockInputImagePreviewStripStyle, reloadsImage: Bool = false) {
@@ -309,15 +372,18 @@ private final class BlockInputImagePreviewTileView: NSView {
     private func startLoad() {
         loadTask?.cancel()
         imageView.image = nil
-        guard let item,
-              let resolvedURL = item.image.resolvedURL(relativeTo: imageLoadingContext.baseURL),
+        guard let item else {
+            return
+        }
+        let image = item.image
+        guard let resolvedURL = image.resolvedURL(relativeTo: imageLoadingContext.baseURL),
               allowsLoading(resolvedURL) else {
             return
         }
         let request = BlockInputImageLoadRequest(
-            image: item.image,
+            image: image,
             resolvedURL: resolvedURL,
-            cacheKey: item.image.cacheKey(
+            cacheKey: image.cacheKey(
                 resolvedURL: resolvedURL,
                 loaderVersion: "preview-strip-v1",
                 maximumPixelDimension: imageLoadingContext.maximumPixelDimension
@@ -388,10 +454,7 @@ private final class BlockInputImagePreviewTileView: NSView {
 
     @objc
     private func removeButtonClicked() {
-        guard let item else {
-            return
-        }
-        onRemove?(item)
+        performRemoveAction()
     }
 
     var removeButtonImageSizeForTesting: NSSize? {

@@ -45,6 +45,7 @@ public final class BlockInputView: NSView {
     var imageDiskCache: (any BlockInputImageDiskCaching)?
     var imageBaseURL: URL?, fileBaseURL: URL?
     var imagePresentation = BlockInputImagePresentation.inlineBlocks
+    var imagePreviewAttachments: [BlockInputImagePreviewAttachment] = []
     var allowsRemoteImageLoading = true
     var maximumImageSourceBytes = 20 * 1024 * 1024, maximumImagePixelDimension = 8_192
     var defaultImagePlaceholderAspectRatio: CGFloat = 16.0 / 9.0
@@ -53,7 +54,7 @@ public final class BlockInputView: NSView {
     let collectionView = BlockInputCollectionView()
     let imagePreviewStripView = BlockInputImagePreviewStripView()
     let placeholderLabel = BlockInputPlaceholderLabel(labelWithString: "")
-    let editorChromeView = BlockInputEditorChromeView()
+    let editorChromeView = BlockInputEditorChromeView(), editorChromeStrokeOverlayView = BlockInputEditorChromeView()
     let dropIndicatorView = NSView()
     let editorChromeFillLayer = CAShapeLayer()
     let editorChromeStrokeLayer = CAShapeLayer()

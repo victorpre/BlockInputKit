@@ -548,6 +548,29 @@ blocks. Local-file Markdown image text renders its label with the same file-chip
 
 Preview tiles are extracted from loaded editor blocks only, ignoring code, raw Markdown, table, and existing image blocks. Clicking a tile opens the resolved image URL through the same URL-opening route as link modals. Removing a tile performs an undoable text edit that deletes that source occurrence.
 
+Hosts can also show local image previews without inserting Markdown by passing `imagePreviewAttachments`. Attachment previews render in the
+same strip as Markdown-derived previews, even when `imagePresentation` is not `.textLinksWithPreviewStrip`; their open and remove controls
+call the attachment callbacks, and BlockInputKit does not mutate document text for them.
+
+```swift
+let attachment = BlockInputImagePreviewAttachment(
+    id: "staged-photo",
+    fileURL: URL(filePath: "/Users/me/Project/.attachments/photo.png"),
+    label: "photo.png",
+    open: { attachment in
+        NSWorkspace.shared.open(attachment.fileURL)
+    },
+    remove: { attachment in
+        removeStagedImage(id: attachment.id)
+    }
+)
+
+let configuration = BlockInputConfiguration(
+    document: document,
+    imagePreviewAttachments: [attachment]
+)
+```
+
 Remote images load through `BlockInputImageLoading`. The default loader memory-caches loaded images, can use `BlockInputImageDiskCaching` for remote disk cache entries, and respects source byte and pixel limits.
 
 Image blocks with known dimensions can be resized from the right or bottom edge. Resizing persists `width` and `height` on `BlockInputImage` and exports as an HTML `<img>` tag.

@@ -287,6 +287,8 @@ public struct BlockInputConfiguration {
     /// together with `BlockInputDocument(markdown:imageParsingMode: .preserveSourceText)` when the editor should keep
     /// image syntax editable as text and show extracted image thumbnails in a preview strip.
     public var imagePresentation: BlockInputImagePresentation
+    /// Host-owned local images shown in the preview strip without changing document Markdown.
+    public var imagePreviewAttachments: [BlockInputImagePreviewAttachment]
     /// Image loader used for image block bytes and natural dimensions.
     public var imageLoader: any BlockInputImageLoading
     /// Optional disk cache used by the default loader for remote image bytes and dimensions.
@@ -386,6 +388,7 @@ public struct BlockInputConfiguration {
         selectAllBehavior: BlockInputSelectAllBehavior = .focusedContentThenDocument,
         heightSizing: BlockInputEditorHeightSizing? = nil,
         imagePresentation: BlockInputImagePresentation = .inlineBlocks,
+        imagePreviewAttachments: [BlockInputImagePreviewAttachment] = [],
         imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader(),
         imageDiskCache: (any BlockInputImageDiskCaching)? = BlockInputDefaultImageDiskCache(),
         imageBaseURL: URL? = nil,
@@ -428,6 +431,7 @@ public struct BlockInputConfiguration {
         self.selectAllBehavior = selectAllBehavior
         self.heightSizing = heightSizing
         self.imagePresentation = imagePresentation
+        self.imagePreviewAttachments = imagePreviewAttachments
         self.imageLoader = imageLoader
         self.imageDiskCache = imageDiskCache
         self.imageBaseURL = imageBaseURL

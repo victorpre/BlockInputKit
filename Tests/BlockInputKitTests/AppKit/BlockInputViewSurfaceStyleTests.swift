@@ -121,14 +121,19 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
         XCTAssertNil(mounted.view.layer?.borderColor)
         XCTAssertEqual(mounted.view.layer?.borderWidth, 0)
         XCTAssertEqual(mounted.view.editorChromeFillLayer.fillColor, NSColor.systemRed.cgColor)
-        XCTAssertEqual(mounted.view.editorChromeStrokeLayer.strokeColor, NSColor.systemGreen.cgColor)
-        XCTAssertEqual(mounted.view.editorChromeStrokeLayer.lineWidth, 2)
+        XCTAssertNil(mounted.view.editorChromeStrokeLayer.strokeColor)
+        XCTAssertEqual(mounted.view.editorChromeStrokeLayer.lineWidth, 0)
         XCTAssertTrue(mounted.view.editorChromeFillLayer.superlayer === mounted.view.layer)
-        XCTAssertTrue(mounted.view.editorChromeStrokeLayer.superlayer === mounted.view.layer)
+        XCTAssertNil(mounted.view.editorChromeStrokeLayer.superlayer)
         XCTAssertTrue(mounted.view.layer?.mask === mounted.view.editorChromeMaskLayer)
         XCTAssertNotNil(mounted.view.editorChromeFillLayer.path)
-        XCTAssertNotNil(mounted.view.editorChromeStrokeLayer.path)
+        XCTAssertNil(mounted.view.editorChromeStrokeLayer.path)
         XCTAssertNotNil(mounted.view.editorChromeMaskLayer.path)
+        XCTAssertTrue(mounted.view.editorChromeView.drawsFill)
+        XCTAssertFalse(mounted.view.editorChromeView.drawsStroke)
+        XCTAssertFalse(mounted.view.editorChromeStrokeOverlayView.drawsFill)
+        XCTAssertTrue(mounted.view.editorChromeStrokeOverlayView.drawsStroke)
+        XCTAssertEqual(mounted.view.editorChromeStrokeOverlayView.strokePassCount, 2)
     }
 
     func testMountedEditorRendersBottomChromeCornersAtVisualBottom() throws {
@@ -233,6 +238,7 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
 
         let hitView = try XCTUnwrap(mounted.view.hitTest(NSPoint(x: mounted.view.bounds.midX, y: mounted.view.bounds.midY)))
         XCTAssertFalse(hitView === mounted.view.editorChromeView)
+        XCTAssertFalse(hitView === mounted.view.editorChromeStrokeOverlayView)
     }
 
     func testMountedEditorReconfiguresChromeStyle() throws {
