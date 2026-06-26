@@ -57,6 +57,29 @@ final class BlockInputLinkClickTests: XCTestCase {
         XCTAssertEqual(openedURL?.absoluteString, "https://example.com")
     }
 
+    func testCommandClickUsesConfiguredURLOpener() throws {
+        var openedURL: URL?
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: "Open [docs](https://example.com)")
+            ]),
+            urlOpener: {
+                openedURL = $0
+                return true
+            }
+        ))
+        let textView = try textView(in: mounted.view)
+        let location = try windowLocation(forUTF16Offset: 7, in: textView)
+
+        XCTAssertTrue(mounted.view.handleLinkClick(
+            blockID: "block",
+            selectedRange: NSRange(location: 7, length: 0),
+            event: try mouseDownEvent(location: location, windowNumber: mounted.window.windowNumber, modifierFlags: .command)
+        ))
+
+        XCTAssertEqual(openedURL?.absoluteString, "https://example.com")
+    }
+
     func testPlainClickOpensModalWhenTrackedMouseUpCompletesThroughMonitorPath() throws {
         let mounted = makeMountedBlockInputView(blocks: [
             BlockInputBlock(id: "block", text: "Open [docs](https://example.com)")

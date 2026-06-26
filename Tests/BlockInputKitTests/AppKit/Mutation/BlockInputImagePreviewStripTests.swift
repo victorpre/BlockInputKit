@@ -10,8 +10,13 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
         let recorder = PreviewAttachmentRecorder()
         let attachment = makePreviewAttachment(id: "host", label: "Host Image", recorder: recorder)
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        var openedEditorURL: URL?
         view.configure(BlockInputConfiguration(
-            imagePreviewAttachments: [attachment]
+            imagePreviewAttachments: [attachment],
+            urlOpener: {
+                openedEditorURL = $0
+                return true
+            }
         ))
 
         XCTAssertFalse(view.imagePreviewStripView.isHidden)
@@ -23,6 +28,7 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
 
         XCTAssertEqual(recorder.openedIDs, ["host"])
         XCTAssertEqual(recorder.removedIDs, ["host"])
+        XCTAssertNil(openedEditorURL)
     }
 
     func testHostPreviewAttachmentsCoexistWithMarkdownPreviewsAndRemovalDoesNotMutateMarkdown() {
@@ -200,7 +206,7 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
         XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 1)
     }
 
-    func testPreviewStripClickOpensResolvedImageURLThroughLinkOpener() throws {
+    func testPreviewStripClickOpensResolvedImageURLThroughConfiguredURLOpener() throws {
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
         var openedURL: URL?
         view.configure(BlockInputConfiguration(
@@ -208,12 +214,12 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
                 BlockInputBlock(text: "Before ![Alt](cat.png) after")
             ]),
             imagePresentation: .textLinksWithPreviewStrip,
-            imageBaseURL: try XCTUnwrap(URL(string: "https://example.com/assets/"))
+            imageBaseURL: try XCTUnwrap(URL(string: "https://example.com/assets/")),
+            urlOpener: {
+                openedURL = $0
+                return true
+            }
         ))
-        view.linkURLOpener = {
-            openedURL = $0
-            return true
-        }
 
         view.imagePreviewStripView.openFirstTileForTesting()
 

@@ -18,9 +18,6 @@ struct BlockInputLinkContext: Equatable {
 }
 
 extension BlockInputView {
-    /// Hook used by link interactions so URL opening can be replaced in tests.
-    typealias BlockInputURLOpener = (URL) -> Bool
-
     /// Builds the immutable source context for link UI and paste actions.
     func linkContext(
         blockID: BlockInputBlockID,

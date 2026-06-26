@@ -108,7 +108,7 @@ public final class BlockInputView: NSView {
     var blockSelectionExpansion: BlockInputBlockSelectionExpansion?
     var horizontalSelectionExpansion: BlockInputHorizontalSelectionExpansion?
     var tableKeyboardRowSelection: BlockInputTableKeyboardRowSelection?
-    // Production opens links through NSWorkspace; tests replace this hook to assert command-click and modal Open behavior.
+    // Configured opener for editor-owned links and Markdown-image preview occurrences.
     var linkURLOpener: BlockInputURLOpener = { NSWorkspace.shared.open($0) }
     // The link modal is editor-owned so it can be anchored to row geometry, clamped inside the editor, and snapshotted.
     var linkModalView: BlockInputLinkModalView?

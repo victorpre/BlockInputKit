@@ -408,7 +408,17 @@ The helper inserts a Markdown file link followed by a space and renders the link
 
 The trailing space leaves the caret after the accepted file chip.
 
-Plain click opens the link modal. Cmd-click opens through the editor URL opener hook.
+Plain click opens the link modal. Cmd-click opens through `BlockInputConfiguration.urlOpener`, which defaults to
+`NSWorkspace.shared.open`.
+
+```swift
+let configuration = BlockInputConfiguration(
+    document: document,
+    urlOpener: { url in
+        routeEditorURL(url)
+    }
+)
+```
 
 ### Slash Commands
 
@@ -546,11 +556,11 @@ Pair `.preserveSourceText` with `.textLinksWithPreviewStrip` for Markdown import
 live conversion, while parsing mode controls how incoming Markdown is converted into blocks. Existing `.image` blocks still render as image
 blocks. Local-file Markdown image text renders its label with the same file-chip styling as file links while preserving the original Markdown source.
 
-Preview tiles are extracted from loaded editor blocks only, ignoring code, raw Markdown, table, and existing image blocks. Clicking a tile opens the resolved image URL through the same URL-opening route as link modals. Removing a tile performs an undoable text edit that deletes that source occurrence.
+Preview tiles are extracted from loaded editor blocks only, ignoring code, raw Markdown, table, and existing image blocks. Clicking a Markdown-derived tile opens the resolved image URL through `BlockInputConfiguration.urlOpener`, the same route used by link modals. Removing a Markdown-derived tile performs an undoable text edit that deletes that source occurrence.
 
 Hosts can also show local image previews without inserting Markdown by passing `imagePreviewAttachments`. Attachment previews render in the
 same strip as Markdown-derived previews, even when `imagePresentation` is not `.textLinksWithPreviewStrip`; their open and remove controls
-call the attachment callbacks, and BlockInputKit does not mutate document text for them.
+call the attachment callbacks instead of `urlOpener`, and BlockInputKit does not mutate document text for them.
 
 ```swift
 let attachment = BlockInputImagePreviewAttachment(

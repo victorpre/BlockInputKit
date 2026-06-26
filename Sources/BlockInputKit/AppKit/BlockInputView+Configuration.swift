@@ -107,6 +107,7 @@ extension BlockInputView {
         onSelectionChange = configuration.onSelectionChange
         onFocusChange = configuration.onFocusChange
         fileDropHandler = configuration.fileDropHandler
+        linkURLOpener = configuration.urlOpener
         modalOverlayProvider = configuration.modalOverlayProvider
         refreshMutationModalPresentation()
     }
