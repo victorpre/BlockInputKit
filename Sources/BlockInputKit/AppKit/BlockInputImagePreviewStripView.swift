@@ -79,6 +79,15 @@ final class BlockInputImagePreviewStripView: NSView {
         tileViews.first?.frame
     }
 
+    var firstTileImageFrameForTesting: NSRect? {
+        tileViews.first?.imageFrameForTesting
+    }
+
+    var firstTileCenterWindowPointForTesting: NSPoint? {
+        guard let tile = tileViews.first, tile.window != nil else { return nil }
+        return tile.convert(NSPoint(x: tile.bounds.midX, y: tile.bounds.midY), to: nil)
+    }
+
     var hasHorizontalScrollerForTesting: Bool {
         scrollView.hasHorizontalScroller
     }
@@ -225,7 +234,7 @@ private final class BlockInputImagePreviewTileView: NSView {
     var onOpen: ((BlockInputImagePreviewItem) -> Void)?
     var onRemove: ((BlockInputImagePreviewItem) -> Void)?
 
-    private let imageView = NSImageView()
+    private let imageView = BlockInputAspectFillImageView()
     private let removeButton = NSButton()
     private var item: BlockInputImagePreviewItem?
     private var style = BlockInputImagePreviewStripStyle()
@@ -329,7 +338,7 @@ private final class BlockInputImagePreviewTileView: NSView {
         layer?.cornerRadius = style.cornerRadius
         layer?.borderWidth = style.borderWidth
         layer?.borderColor = style.borderColor?.cgColor
-        imageView.layer?.cornerRadius = style.cornerRadius
+        imageView.cornerRadius = style.cornerRadius
         removeButton.contentTintColor = style.removeButton.symbolColor
         removeButton.layer?.backgroundColor = style.removeButton.backgroundColor.cgColor
         removeButton.layer?.borderColor = style.removeButton.borderColor?.cgColor
@@ -345,9 +354,6 @@ private final class BlockInputImagePreviewTileView: NSView {
     private func setup() {
         wantsLayer = true
         setAccessibilityRole(.button)
-        imageView.wantsLayer = true
-        imageView.imageScaling = .scaleProportionallyUpOrDown
-        imageView.layer?.masksToBounds = true
         addSubview(imageView)
 
         removeButton.isBordered = false
@@ -467,6 +473,10 @@ private final class BlockInputImagePreviewTileView: NSView {
             return nil
         }
         return NSSize(width: cgImage.width, height: cgImage.height)
+    }
+
+    var imageFrameForTesting: NSRect? {
+        imageView.aspectFillImageFrameForTesting
     }
 }
 
