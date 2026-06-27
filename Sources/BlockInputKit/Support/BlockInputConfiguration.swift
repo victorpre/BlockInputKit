@@ -229,6 +229,12 @@ public struct BlockInputConfiguration {
     }
     /// Whether the leading drag handle can reorder blocks.
     public var allowsBlockReordering: Bool
+    /// Whether user-driven drag and drop is accepted by the editor.
+    ///
+    /// When false, the editor unregisters its drop destinations, hides drop carets and indicators, and ignores
+    /// collection-view block reorder drags and file drops. Programmatic mutation APIs such as
+    /// `insertLocalFileURLs(...)` and `moveBlock(...)` remain available.
+    public var allowsDrops: Bool
     /// Visual horizontal inset used for block content.
     ///
     /// When reordering is enabled, the drag handle is centered inside this inset when possible
@@ -288,12 +294,10 @@ public struct BlockInputConfiguration {
     public var heightSizing: BlockInputEditorHeightSizing?
     /// How images are presented in the editor.
     ///
-    /// The default `.inlineBlocks` keeps existing standalone image block behavior. Use `.textLinksWithPreviewStrip`
-    /// together with `BlockInputDocument(markdown:imageParsingMode: .preserveSourceText)` when the editor should keep
-    /// image syntax editable as text and show extracted image thumbnails in a preview strip.
+    /// The default `.inlineBlocks` keeps existing standalone image block behavior. Use `.textLinks` together with
+    /// `BlockInputDocument(markdown:imageParsingMode: .preserveSourceText)` when the editor should keep image syntax
+    /// editable as text.
     public var imagePresentation: BlockInputImagePresentation
-    /// Host-owned local images shown in the preview strip without changing document Markdown.
-    public var imagePreviewAttachments: [BlockInputImagePreviewAttachment]
     /// Image loader used for image block bytes and natural dimensions.
     public var imageLoader: any BlockInputImageLoading
     /// Optional disk cache used by the default loader for remote image bytes and dimensions.
@@ -302,9 +306,7 @@ public struct BlockInputConfiguration {
     public var imageBaseURL: URL?
     /// Base URL used to resolve relative file-link sources inserted by file drop hooks.
     public var fileBaseURL: URL?
-    /// Opens editor-owned URLs such as Cmd-click links, link modal opens, and Markdown-image preview-strip tiles.
-    ///
-    /// Host-owned `BlockInputImagePreviewAttachment` tiles keep using their attachment `open` callback.
+    /// Opens editor-owned URLs such as Cmd-click links and link modal opens.
     public var urlOpener: BlockInputURLOpener
     /// Whether remote `http` and `https` image URLs should be loaded.
     public var allowsRemoteImageLoading: Bool
@@ -384,6 +386,7 @@ public struct BlockInputConfiguration {
         document: BlockInputDocument = BlockInputDocument(),
         documentStore: (any BlockInputDocumentStore)? = nil,
         allowsBlockReordering: Bool = true,
+        allowsDrops: Bool = true,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         editorVerticalInset: CGFloat = BlockInputConfiguration.defaultEditorVerticalInset,
         blockVerticalInsetMultiplier: CGFloat = 1,
@@ -397,7 +400,6 @@ public struct BlockInputConfiguration {
         selectAllBehavior: BlockInputSelectAllBehavior = .focusedContentThenDocument,
         heightSizing: BlockInputEditorHeightSizing? = nil,
         imagePresentation: BlockInputImagePresentation = .inlineBlocks,
-        imagePreviewAttachments: [BlockInputImagePreviewAttachment] = [],
         imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader(),
         imageDiskCache: (any BlockInputImageDiskCaching)? = BlockInputDefaultImageDiskCache(),
         imageBaseURL: URL? = nil,
@@ -428,6 +430,7 @@ public struct BlockInputConfiguration {
         usesDefaultDocumentStore = documentStore == nil
         self.documentStore = documentStore ?? BlockInputMemoryDocumentStore(document: document)
         self.allowsBlockReordering = allowsBlockReordering
+        self.allowsDrops = allowsDrops
         self.editorHorizontalInset = editorHorizontalInset
         self.editorVerticalInset = editorVerticalInset
         self.blockVerticalInsetMultiplier = Self.sanitizedBlockVerticalInsetMultiplier(blockVerticalInsetMultiplier)
@@ -441,7 +444,6 @@ public struct BlockInputConfiguration {
         self.selectAllBehavior = selectAllBehavior
         self.heightSizing = heightSizing
         self.imagePresentation = imagePresentation
-        self.imagePreviewAttachments = imagePreviewAttachments
         self.imageLoader = imageLoader
         self.imageDiskCache = imageDiskCache
         self.imageBaseURL = imageBaseURL

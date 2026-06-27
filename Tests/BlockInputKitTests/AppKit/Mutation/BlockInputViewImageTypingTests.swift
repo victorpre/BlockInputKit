@@ -59,7 +59,7 @@ final class BlockInputViewImageTypingTests: XCTestCase {
         let view = BlockInputView()
         view.configure(BlockInputConfiguration(
             document: document,
-            imagePresentation: .textLinksWithPreviewStrip
+            imagePresentation: .textLinks
         ))
 
         let selection = view.applyTypingShortcutIfNeeded(

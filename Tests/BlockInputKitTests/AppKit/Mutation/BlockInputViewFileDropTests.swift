@@ -31,7 +31,7 @@ final class BlockInputViewFileDropTests: XCTestCase {
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: blockID, text: "Open docs")
             ]),
-            imagePresentation: .textLinksWithPreviewStrip,
+            imagePresentation: .textLinks,
             undoController: undoController
         ))
         let textView = try textView(in: mounted.view)
@@ -46,7 +46,6 @@ final class BlockInputViewFileDropTests: XCTestCase {
 
         let expectedText = "Open ![Cat Photo](file:///tmp/Cat%20Photo.png) docs"
         XCTAssertEqual(mounted.view.document.blocks[0].text, expectedText)
-        XCTAssertEqual(mounted.view.imagePreviewStripView.itemCountForTesting, 1)
         assertCaret(in: mounted.view, textView: textView, blockID: blockID, utf16Offset: (expectedText as NSString).length - 4)
 
         let undo = mounted.view.undoStructuralEdit()
@@ -61,7 +60,7 @@ final class BlockInputViewFileDropTests: XCTestCase {
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: blockID, text: "Open  docs")
             ]),
-            imagePresentation: .textLinksWithPreviewStrip
+            imagePresentation: .textLinks
         ))
         let textView = try textView(in: mounted.view)
         let draggingInfo = BlockInputDraggingInfo(
@@ -82,7 +81,7 @@ final class BlockInputViewFileDropTests: XCTestCase {
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: blockID, kind: .numberedListItem(start: 2), text: "Attach ")
             ]),
-            imagePresentation: .textLinksWithPreviewStrip
+            imagePresentation: .textLinks
         ))
         let textView = try textView(in: mounted.view)
         let draggingInfo = BlockInputDraggingInfo(
@@ -99,7 +98,6 @@ final class BlockInputViewFileDropTests: XCTestCase {
         XCTAssertEqual(mounted.view.document.blocks.count, 1)
         XCTAssertEqual(mounted.view.document.blocks[0].kind, .numberedListItem(start: 2))
         XCTAssertEqual(mounted.view.document.blocks[0].text, expectedText)
-        XCTAssertEqual(mounted.view.imagePreviewStripView.itemCountForTesting, 2)
         assertCaret(in: mounted.view, textView: textView, blockID: blockID, utf16Offset: (expectedText as NSString).length)
     }
 

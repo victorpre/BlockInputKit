@@ -62,7 +62,7 @@ final class BlockInputViewFileDropHandlerTests: XCTestCase {
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: blockID, kind: .checklistItem(isChecked: false), text: "Attach ")
             ]),
-            imagePresentation: .textLinksWithPreviewStrip,
+            imagePresentation: .textLinks,
             fileDropHandler: { context in
                 XCTAssertEqual(context.placement, .inline(blockID: blockID, utf16Offset: 7))
                 return .insert([
@@ -88,7 +88,6 @@ final class BlockInputViewFileDropHandlerTests: XCTestCase {
             mounted.view.document.blocks[0].text,
             "Attach ![First](assets/First.png) ![Second](assets/Second.jpg) "
         )
-        XCTAssertEqual(mounted.view.imagePreviewStripView.itemCountForTesting, 2)
     }
 
     func testAsyncDropHookCancelDoesNotMutate() async throws {
@@ -106,6 +105,51 @@ final class BlockInputViewFileDropHandlerTests: XCTestCase {
         )))
         await drainFileDropTasks(in: mounted.view)
 
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Open docs")
+    }
+
+    func testAsyncDropHookHandledDoesNotMutate() async throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: "Open docs")
+            ]),
+            fileDropHandler: { _ in .handled }
+        ))
+        let textView = try textView(in: mounted.view)
+
+        XCTAssertTrue(textView.performDragOperation(BlockInputDraggingInfo(
+            fileURLs: [URL(fileURLWithPath: "/tmp/README.md")],
+            location: try windowLocation(forUTF16Offset: 5, in: textView)
+        )))
+        await drainFileDropTasks(in: mounted.view)
+
+        XCTAssertEqual(mounted.view.document.blocks[0].text, "Open docs")
+    }
+
+    func testAllowsDropsFalseRejectsEditorDropWithoutCallingHook() async throws {
+        let recorder = FileDropHookRecorder()
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "block", text: "Open docs")
+            ]),
+            allowsDrops: false,
+            fileDropHandler: { _ in
+                await recorder.markCalled()
+                return .handled
+            }
+        ))
+        let textView = try textView(in: mounted.view)
+        let draggingInfo = BlockInputDraggingInfo(
+            fileURLs: [URL(fileURLWithPath: "/tmp/README.md")],
+            location: try windowLocation(forUTF16Offset: 5, in: textView)
+        )
+
+        XCTAssertFalse(textView.draggingEntered(draggingInfo).contains(.copy))
+        XCTAssertFalse(textView.performDragOperation(draggingInfo))
+        await drainFileDropTasks(in: mounted.view)
+
+        let wasCalled = await recorder.wasCalled
+        XCTAssertFalse(wasCalled)
         XCTAssertEqual(mounted.view.document.blocks[0].text, "Open docs")
     }
 
@@ -146,5 +190,13 @@ final class BlockInputViewFileDropHandlerTests: XCTestCase {
             fileBaseURL: fileBaseURL
         )
         .first { $0.style == .link }
+    }
+}
+
+private actor FileDropHookRecorder {
+    private(set) var wasCalled = false
+
+    func markCalled() {
+        wasCalled = true
     }
 }

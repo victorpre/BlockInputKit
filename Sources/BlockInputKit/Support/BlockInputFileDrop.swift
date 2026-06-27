@@ -77,6 +77,8 @@ public struct BlockInputFileDropContext: Equatable, Sendable {
 public enum BlockInputFileDropResult: Equatable, Sendable {
     /// Use the editor's built-in insertion behavior.
     case useDefault
+    /// The host handled the drop and the editor should not mutate the document.
+    case handled
     /// Do not mutate the document.
     case cancel
     /// Insert the returned logical references.

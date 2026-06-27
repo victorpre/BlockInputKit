@@ -59,7 +59,7 @@ final class BlockInputLinkBoundaryDeletionTests: XCTestCase {
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: "block", text: text)
             ]),
-            imagePresentation: .textLinksWithPreviewStrip
+            imagePresentation: .textLinks
         ))
         let textView = try activeTextView(in: mounted, text: text)
         let caretOffset = (text as NSString).range(of: "cat").location + 1

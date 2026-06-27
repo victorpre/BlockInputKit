@@ -37,9 +37,9 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertNil(configuration.disabledCursor)
         XCTAssertNil(configuration.inlineHintProvider)
         XCTAssertFalse(configuration.rawSlashCommandChips)
+        XCTAssertTrue(configuration.allowsDrops)
         XCTAssertEqual(configuration.selectAllBehavior, .focusedContentThenDocument)
         XCTAssertNil(configuration.heightSizing)
-        XCTAssertTrue(configuration.imagePreviewAttachments.isEmpty)
         XCTAssertEqual(configuration.completionReturnBehavior, .acceptHighlightedSuggestion)
         XCTAssertEqual(configuration.slashCommandAvailability, .documentStart)
         XCTAssertNil(configuration.slashCommandChipClickHandler)
@@ -113,6 +113,7 @@ final class BlockInputConfigurationTests: XCTestCase {
 
         view.configure(BlockInputConfiguration(
             allowsBlockReordering: false,
+            allowsDrops: false,
             editorHorizontalInset: 28,
             editorVerticalInset: 14,
             blockVerticalInsetMultiplier: 0.75,
@@ -132,6 +133,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         ))
 
         XCTAssertFalse(view.allowsBlockReordering)
+        XCTAssertFalse(view.allowsDrops)
         XCTAssertEqual(view.editorHorizontalInset, 28)
         XCTAssertEqual(view.editorVerticalInset, 14)
         XCTAssertEqual(view.blockVerticalInsetMultiplier, 0.75)

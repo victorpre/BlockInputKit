@@ -14,6 +14,8 @@ public final class BlockInputView: NSView {
     public internal(set) var selection: BlockInputSelection?
     /// Whether drag reordering is enabled for block items.
     public internal(set) var allowsBlockReordering = true
+    /// Whether the editor accepts user-driven drag and drop.
+    public internal(set) var allowsDrops = true
     /// Visual horizontal inset used for block content.
     ///
     /// When reordering is enabled, the drag handle is centered inside this inset when possible
@@ -45,14 +47,12 @@ public final class BlockInputView: NSView {
     var imageDiskCache: (any BlockInputImageDiskCaching)?
     var imageBaseURL: URL?, fileBaseURL: URL?
     var imagePresentation = BlockInputImagePresentation.inlineBlocks
-    var imagePreviewAttachments: [BlockInputImagePreviewAttachment] = []
     var allowsRemoteImageLoading = true
     var maximumImageSourceBytes = 20 * 1024 * 1024, maximumImagePixelDimension = 8_192
     var defaultImagePlaceholderAspectRatio: CGFloat = 16.0 / 9.0
 
     let scrollView = BlockInputDocumentScrollView()
     let collectionView = BlockInputCollectionView()
-    let imagePreviewStripView = BlockInputImagePreviewStripView()
     let placeholderLabel = BlockInputPlaceholderLabel(labelWithString: "")
     let editorChromeView = BlockInputEditorChromeView(), editorChromeStrokeOverlayView = BlockInputEditorChromeView()
     let dropIndicatorView = NSView()
@@ -60,7 +60,6 @@ public final class BlockInputView: NSView {
     let editorChromeStrokeLayer = CAShapeLayer()
     let editorChromeMaskLayer = CAShapeLayer()
     let layout = BlockInputCollectionViewFlowLayout()
-    var imagePreviewStripHeightConstraint: NSLayoutConstraint?, scrollViewTopConstraint: NSLayoutConstraint?
     var documentStore: (any BlockInputDocumentStore)?
     var documentStoreObservation: BlockInputDocumentStoreObservation?
     var progressiveLoadTask: Task<Void, Never>?, progressiveLoadBatchLimit = 5_000
@@ -134,7 +133,6 @@ public final class BlockInputView: NSView {
         collectionView.visibleItems().forEach { item in
             (item as? BlockInputLoadingItem)?.applySurfaceStyle(style.editorSurface)
         }
-        refreshImagePreviewStrip()
     }
 
     /// Creates an editor view and installs its collection-view-backed editing surface.

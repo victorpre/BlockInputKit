@@ -144,6 +144,7 @@ extension BlockInputBlockItem {
 
     func draggingPasteboardItem() -> NSPasteboardItem? {
         guard isEditable,
+              allowsDrops,
               handleView.isEnabled,
               let blockID else {
             return nil

@@ -58,7 +58,7 @@ extension BlockInputView {
         _ fileURLs: [URL],
         into blockID: BlockInputBlockID
     ) -> BlockInputSelection? {
-        guard imagePresentation == .textLinksWithPreviewStrip,
+        guard imagePresentation.usesTextLinks,
               fileURLs.allSatisfy({ Self.imageTextBlock(for: $0) != nil }),
               let block = block(withID: blockID),
               BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
@@ -138,7 +138,7 @@ extension BlockInputView {
 
     private func inlineFileInsertionText(for fileURLs: [URL]) -> String {
         let sources = fileURLs.compactMap { url in
-            if imagePresentation == .textLinksWithPreviewStrip,
+            if imagePresentation.usesTextLinks,
                let imageTextBlock = Self.imageTextBlock(for: url) {
                 return imageTextBlock.text
             }
@@ -149,7 +149,7 @@ extension BlockInputView {
 
     private func inlineFileInsertionText(for references: [BlockInputFileDropReference]) -> String {
         let sources = references.compactMap { reference in
-            if imagePresentation == .textLinksWithPreviewStrip,
+            if imagePresentation.usesTextLinks,
                let imageTextBlock = Self.imageTextBlock(for: reference) {
                 return imageTextBlock.text
             }
@@ -159,7 +159,7 @@ extension BlockInputView {
     }
 
     private func inlineFileInsertionActionName(for fileURLs: [URL]) -> String {
-        guard imagePresentation == .textLinksWithPreviewStrip,
+        guard imagePresentation.usesTextLinks,
               !fileURLs.isEmpty,
               fileURLs.allSatisfy({ Self.imageTextBlock(for: $0) != nil }) else {
             return "Insert Files"
@@ -168,7 +168,7 @@ extension BlockInputView {
     }
 
     private func inlineFileInsertionActionName(for references: [BlockInputFileDropReference]) -> String {
-        guard imagePresentation == .textLinksWithPreviewStrip,
+        guard imagePresentation.usesTextLinks,
               !references.isEmpty,
               references.allSatisfy({ Self.imageTextBlock(for: $0) != nil }) else {
             return "Insert Files"

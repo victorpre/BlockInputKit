@@ -40,7 +40,7 @@ extension BlockInputView {
         if fileDropHandler != nil {
             return handleDroppedFileURLs(fileURLs, placement: .inline(blockID: blockID, utf16Offset: utf16Offset))
         }
-        if imagePresentation == .textLinksWithPreviewStrip {
+        if imagePresentation.usesTextLinks {
             return insertFileURLsInline(fileURLs, into: blockID, atUTF16Offset: utf16Offset, item: item) != nil
         }
         let imageURLs = fileURLs.filter { Self.imageBlock(for: $0) != nil }

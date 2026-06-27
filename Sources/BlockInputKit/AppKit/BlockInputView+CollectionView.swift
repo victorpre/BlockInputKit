@@ -138,7 +138,6 @@ extension BlockInputView {
             progressiveStoreError = nil
             updateDocumentCacheAfterProgressiveBatch(batch)
             appendProgressiveBatch(batch)
-            refreshImagePreviewStrip()
             updatePlaceholderVisibility()
             if batch.isComplete,
                pendingDocumentSnapshotWorkItem != nil {
@@ -148,7 +147,6 @@ extension BlockInputView {
             progressiveStoreError = nil
             refreshDocumentFromStore()
             reloadDataKeepingFocus()
-            refreshImagePreviewStrip()
             if documentStore?.isComplete == true,
                pendingDocumentSnapshotWorkItem != nil {
                 scheduleDeferredDocumentSnapshot()
@@ -156,7 +154,6 @@ extension BlockInputView {
         case .failed(let error):
             progressiveStoreError = error
             collectionView.reloadData()
-            refreshImagePreviewStrip()
             updatePlaceholderVisibility()
         }
     }
@@ -208,7 +205,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         _ collectionView: NSCollectionView,
         pasteboardWriterForItemAt indexPath: IndexPath
     ) -> NSPasteboardWriting? {
-        guard isEditable, allowsBlockReordering else { return nil }
+        guard isEditable, allowsDrops, allowsBlockReordering else { return nil }
         guard let block = block(at: indexPath.item),
               block.kind != .frontMatter else {
             return nil
@@ -237,7 +234,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         proposedIndexPath proposedDropIndexPath: AutoreleasingUnsafeMutablePointer<NSIndexPath>,
         dropOperation proposedDropOperation: UnsafeMutablePointer<NSCollectionView.DropOperation>
     ) -> NSDragOperation {
-        guard isEditable else { hideDropIndicator(); return [] }
+        guard isEditable, allowsDrops else { hideDropIndicator(); return [] }
         if canAcceptBlockReorderDrop(draggingInfo) {
             let insertionIndex = resolvedDropInsertionIndex(
                 from: draggingInfo,
@@ -284,7 +281,7 @@ extension BlockInputView: NSCollectionViewDelegate {
         dropOperation: NSCollectionView.DropOperation
     ) -> Bool {
         hideDropIndicator()
-        guard isEditable else { return false }
+        guard isEditable, allowsDrops else { return false }
         let resolvedInsertionIndex = resolvedDropInsertionIndex(
             from: draggingInfo,
             proposedItemIndex: indexPath.item
@@ -360,7 +357,7 @@ extension BlockInputView: NSCollectionViewDelegate {
     }
 
     func canAcceptBlockReorderDrop(_ draggingInfo: NSDraggingInfo) -> Bool {
-        guard isEditable, allowsBlockReordering,
+        guard isEditable, allowsDrops, allowsBlockReordering,
               let rawID = draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID),
               let index = index(of: BlockInputBlockID(rawValue: rawID)),
               block(at: index)?.kind != .frontMatter else {
@@ -370,7 +367,7 @@ extension BlockInputView: NSCollectionViewDelegate {
     }
 
     func collectionFileDropTarget(for draggingInfo: NSDraggingInfo) -> BlockInputCollectionFileDropTarget? {
-        guard isEditable, draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID) == nil,
+        guard isEditable, allowsDrops, draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID) == nil,
               !showsProgressiveLoadingRow else {
             return nil
         }

@@ -178,14 +178,25 @@ final class BlockInputEditorChromeView: NSView {
                 .fill()
             }
 
-            if drawsStroke, let strokeColor = chrome.strokeColor, chrome.borderWidth > 0 {
+            if drawsStroke,
+               let strokeColor = chrome.strokeColor,
+               chrome.borderWidth > 0,
+               !chrome.strokedEdges.isEmpty {
                 strokeColor.setStroke()
                 let strokeInset = chrome.borderWidth / 2
-                let path = NSBezierPath.blockInputEditorChromePath(
-                    in: bounds.insetBy(dx: strokeInset, dy: strokeInset),
-                    radius: chrome.cornerRadius,
-                    roundedCorners: chrome.roundedCorners
-                )
+                let strokeRect = bounds.insetBy(dx: strokeInset, dy: strokeInset)
+                let path = chrome.strokedEdges == .all
+                    ? NSBezierPath.blockInputEditorChromePath(
+                        in: strokeRect,
+                        radius: chrome.cornerRadius,
+                        roundedCorners: chrome.roundedCorners
+                    )
+                    : NSBezierPath.blockInputEditorChromeStrokePath(
+                        in: strokeRect,
+                        radius: chrome.cornerRadius,
+                        roundedCorners: chrome.roundedCorners,
+                        strokedEdges: chrome.strokedEdges
+                    )
                 path.lineWidth = chrome.borderWidth
                 for _ in 0..<max(0, strokePassCount) {
                     path.stroke()
@@ -251,6 +262,127 @@ private extension NSBezierPath {
         }
         path.close()
         return path
+    }
+
+    static func blockInputEditorChromeStrokePath(
+        in rect: NSRect,
+        radius: CGFloat,
+        roundedCorners: BlockInputEditorChromeCorners,
+        strokedEdges: BlockInputEditorChromeEdges
+    ) -> NSBezierPath {
+        let radius = min(max(0, radius), min(rect.width, rect.height) / 2)
+        let path = NSBezierPath()
+        guard rect.width > 0, rect.height > 0 else {
+            return path
+        }
+
+        let radii = BlockInputEditorChromeStrokeRadii(radius: radius, roundedCorners: roundedCorners)
+        path.blockInputAppendBottomStroke(in: rect, radii: radii, strokedEdges: strokedEdges)
+        path.blockInputAppendRightStroke(in: rect, radii: radii, strokedEdges: strokedEdges)
+        path.blockInputAppendTopStroke(in: rect, radii: radii, strokedEdges: strokedEdges)
+        path.blockInputAppendLeftStroke(in: rect, radii: radii, strokedEdges: strokedEdges)
+        return path
+    }
+
+    private func blockInputAppendBottomStroke(
+        in rect: NSRect,
+        radii: BlockInputEditorChromeStrokeRadii,
+        strokedEdges: BlockInputEditorChromeEdges
+    ) {
+        guard strokedEdges.contains(.bottom) || strokedEdges.contains(.right) else {
+            return
+        }
+        if strokedEdges.contains(.bottom) {
+            move(to: NSPoint(x: rect.minX + radii.bottomLeft, y: rect.minY))
+            line(to: NSPoint(x: rect.maxX - radii.bottomRight, y: rect.minY))
+        }
+        if radii.bottomRight > 0, strokedEdges.contains(.bottom), strokedEdges.contains(.right) {
+            curve(
+                to: NSPoint(x: rect.maxX, y: rect.minY + radii.bottomRight),
+                controlPoint1: NSPoint(x: rect.maxX - radii.bottomRight * Self.blockInputEditorChromeCurveFactor, y: rect.minY),
+                controlPoint2: NSPoint(x: rect.maxX, y: rect.minY + radii.bottomRight * Self.blockInputEditorChromeCurveFactor)
+            )
+        } else if strokedEdges.contains(.right) {
+            move(to: NSPoint(x: rect.maxX, y: rect.minY + radii.bottomRight))
+        }
+    }
+
+    private func blockInputAppendRightStroke(
+        in rect: NSRect,
+        radii: BlockInputEditorChromeStrokeRadii,
+        strokedEdges: BlockInputEditorChromeEdges
+    ) {
+        guard strokedEdges.contains(.right) || strokedEdges.contains(.top) else {
+            return
+        }
+        if strokedEdges.contains(.right) {
+            line(to: NSPoint(x: rect.maxX, y: rect.maxY - radii.topRight))
+        }
+        if radii.topRight > 0, strokedEdges.contains(.right), strokedEdges.contains(.top) {
+            curve(
+                to: NSPoint(x: rect.maxX - radii.topRight, y: rect.maxY),
+                controlPoint1: NSPoint(x: rect.maxX, y: rect.maxY - radii.topRight * Self.blockInputEditorChromeCurveFactor),
+                controlPoint2: NSPoint(x: rect.maxX - radii.topRight * Self.blockInputEditorChromeCurveFactor, y: rect.maxY)
+            )
+        } else if strokedEdges.contains(.top) {
+            move(to: NSPoint(x: rect.maxX - radii.topRight, y: rect.maxY))
+        }
+    }
+
+    private func blockInputAppendTopStroke(
+        in rect: NSRect,
+        radii: BlockInputEditorChromeStrokeRadii,
+        strokedEdges: BlockInputEditorChromeEdges
+    ) {
+        guard strokedEdges.contains(.top) || strokedEdges.contains(.left) else {
+            return
+        }
+        if strokedEdges.contains(.top) {
+            line(to: NSPoint(x: rect.minX + radii.topLeft, y: rect.maxY))
+        }
+        if radii.topLeft > 0, strokedEdges.contains(.top), strokedEdges.contains(.left) {
+            curve(
+                to: NSPoint(x: rect.minX, y: rect.maxY - radii.topLeft),
+                controlPoint1: NSPoint(x: rect.minX + radii.topLeft * Self.blockInputEditorChromeCurveFactor, y: rect.maxY),
+                controlPoint2: NSPoint(x: rect.minX, y: rect.maxY - radii.topLeft * Self.blockInputEditorChromeCurveFactor)
+            )
+        } else if strokedEdges.contains(.left) {
+            move(to: NSPoint(x: rect.minX, y: rect.maxY - radii.topLeft))
+        }
+    }
+
+    private func blockInputAppendLeftStroke(
+        in rect: NSRect,
+        radii: BlockInputEditorChromeStrokeRadii,
+        strokedEdges: BlockInputEditorChromeEdges
+    ) {
+        guard strokedEdges.contains(.left) else {
+            return
+        }
+        line(to: NSPoint(x: rect.minX, y: rect.minY + radii.bottomLeft))
+        if radii.bottomLeft > 0, strokedEdges.contains(.bottom) {
+            curve(
+                to: NSPoint(x: rect.minX + radii.bottomLeft, y: rect.minY),
+                controlPoint1: NSPoint(x: rect.minX, y: rect.minY + radii.bottomLeft * Self.blockInputEditorChromeCurveFactor),
+                controlPoint2: NSPoint(x: rect.minX + radii.bottomLeft * Self.blockInputEditorChromeCurveFactor, y: rect.minY)
+            )
+        }
+    }
+
+    private static var blockInputEditorChromeCurveFactor: CGFloat { 0.45 }
+}
+
+private struct BlockInputEditorChromeStrokeRadii {
+    let topLeft: CGFloat
+    let topRight: CGFloat
+    let bottomRight: CGFloat
+    let bottomLeft: CGFloat
+
+    init(radius: CGFloat, roundedCorners: BlockInputEditorChromeCorners) {
+        topLeft = roundedCorners.contains(.topLeft) ? radius : 0
+        topRight = roundedCorners.contains(.topRight) ? radius : 0
+        bottomRight = roundedCorners.contains(.bottomRight) ? radius : 0
+        bottomLeft = roundedCorners.contains(.bottomLeft) ? radius : 0
     }
 }
 

@@ -173,22 +173,25 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
 
     func testMountedEditorTranslucentChromeDarkensLightFullViewSnapshots() throws {
         let size = NSSize(width: 80, height: 40)
-        let view = BlockInputView(frame: NSRect(origin: .zero, size: size))
-        view.configure(BlockInputConfiguration(style: BlockInputStyle(editorSurface: BlockInputEditorSurfaceStyle(
-            editorBackgroundColor: nil,
-            scrollBackgroundColor: nil,
-            collectionBackgroundColor: nil,
-            chrome: BlockInputEditorChromeStyle(
-                fillColor: NSColor.black.withAlphaComponent(0.08),
-                strokeColor: NSColor.black.withAlphaComponent(0.18),
-                borderWidth: 1,
-                cornerRadius: 18,
-                roundedCorners: .bottom,
-                clipsContentToShape: true
-            )
-        ))))
-        view.displayIfNeeded()
-        view.layoutSubtreeIfNeeded()
+        let mounted = makeMountedBlockInputView(
+            configuration: BlockInputConfiguration(style: BlockInputStyle(editorSurface: BlockInputEditorSurfaceStyle(
+                editorBackgroundColor: nil,
+                scrollBackgroundColor: nil,
+                collectionBackgroundColor: nil,
+                chrome: BlockInputEditorChromeStyle(
+                    fillColor: NSColor.black.withAlphaComponent(0.08),
+                    strokeColor: NSColor.black.withAlphaComponent(0.18),
+                    borderWidth: 1,
+                    cornerRadius: 18,
+                    roundedCorners: .bottom,
+                    clipsContentToShape: true
+                )
+            ))),
+            size: size,
+            styleMask: [.borderless]
+        )
+        mounted.view.displayIfNeeded()
+        mounted.view.layoutSubtreeIfNeeded()
 
         let bitmap = try XCTUnwrap(
             NSBitmapImageRep(
@@ -211,7 +214,7 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
         NSColor.white.setFill()
         NSRect(origin: .zero, size: size).fill()
         NSGraphicsContext.restoreGraphicsState()
-        view.cacheDisplay(in: view.bounds, to: bitmap)
+        mounted.view.cacheDisplay(in: mounted.view.bounds, to: bitmap)
 
         let background = try XCTUnwrap(bitmap.colorAt(x: 2, y: 38)?.usingColorSpace(.deviceRGB))
         let fill = try XCTUnwrap(bitmap.colorAt(x: 40, y: 20)?.usingColorSpace(.deviceRGB))

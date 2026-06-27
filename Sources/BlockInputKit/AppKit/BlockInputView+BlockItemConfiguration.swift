@@ -4,6 +4,7 @@ extension BlockInputView {
         item.configure(
             block: block,
             allowsReordering: allowsBlockReordering,
+            allowsDrops: allowsDrops,
             editorHorizontalInset: editorHorizontalInset,
             accentColor: dropIndicatorColor,
             style: style,

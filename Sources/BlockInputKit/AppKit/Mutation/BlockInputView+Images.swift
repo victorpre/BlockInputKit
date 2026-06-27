@@ -106,7 +106,7 @@ extension BlockInputView {
               block.text == context.sourceText else {
             return nil
         }
-        if imagePresentation == .textLinksWithPreviewStrip {
+        if imagePresentation.usesTextLinks {
             return insertImageText(image, block: block, index: index, selectedRange: context.selectedRange)
         }
         if !block.kind.supportsImageSyntaxSplitting {
@@ -120,7 +120,7 @@ extension BlockInputView {
         guard isEditable else {
             return nil
         }
-        if imagePresentation == .textLinksWithPreviewStrip {
+        if imagePresentation.usesTextLinks {
             let textBlocks = fileURLs.compactMap(Self.imageTextBlock(for:))
             guard !textBlocks.isEmpty,
                   let index = index(of: blockID) else {
@@ -141,7 +141,7 @@ extension BlockInputView {
         guard isEditable else {
             return nil
         }
-        if imagePresentation == .textLinksWithPreviewStrip {
+        if imagePresentation.usesTextLinks {
             let textBlocks = references.compactMap { reference -> BlockInputBlock? in
                 guard reference.kind == .image else {
                     return nil

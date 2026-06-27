@@ -17,9 +17,7 @@ extension BlockInputView {
     }
 
     private func editorContentTopInset(for verticalInset: CGFloat) -> CGFloat {
-        (imagePreviewStripHeightConstraint?.constant ?? 0) > 0
-            ? 0
-            : verticalInset
+        verticalInset
     }
 
     func updateEditorSectionInset(_ verticalInset: CGFloat) {

@@ -4,13 +4,21 @@ private let promisedFileURLPasteboardType = NSPasteboard.PasteboardType("com.app
 
 extension BlockInputTextView {
     func configureFileDropHandling() {
-        registerForDraggedTypes([.fileURL])
         fileDropCaretView.wantsLayer = true
         fileDropCaretView.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
         fileDropCaretView.layer?.cornerRadius = 1
         fileDropCaretView.isHidden = true
         fileDropCaretView.setAccessibilityElement(false)
         addSubview(fileDropCaretView)
+    }
+
+    func setFileDropHandlingEnabled(_ isEnabled: Bool) {
+        if isEnabled {
+            registerForDraggedTypes([.fileURL])
+        } else {
+            unregisterDraggedTypes()
+            hideFileDropCaret()
+        }
     }
 
     func hideFileDropCaret() {
@@ -22,6 +30,9 @@ extension BlockInputTextView {
     }
 
     func handlesFileDropPasteboard(_ pasteboard: NSPasteboard) -> Bool {
+        guard blockItem?.allowsDrops == true else {
+            return false
+        }
         if pasteboard.string(forType: .blockInputBlockID) != nil {
             return true
         }
@@ -32,19 +43,31 @@ extension BlockInputTextView {
     }
 
     func fileDropOperation(_ sender: NSDraggingInfo, _ nativeOperation: @autoclosure () -> NSDragOperation) -> NSDragOperation {
-        handlesFileDropPasteboard(sender.draggingPasteboard) ? validateFileDrop(sender) : nativeOperation()
+        guard blockItem?.allowsDrops != false else {
+            hideFileDropCaret()
+            return []
+        }
+        return handlesFileDropPasteboard(sender.draggingPasteboard) ? validateFileDrop(sender) : nativeOperation()
     }
 
     func prepareFileDropOperation(_ sender: NSDraggingInfo, _ nativePreparation: @autoclosure () -> Bool) -> Bool {
-        handlesFileDropPasteboard(sender.draggingPasteboard) ? fileDropTarget(for: sender) != nil : nativePreparation()
+        guard blockItem?.allowsDrops != false else {
+            return false
+        }
+        return handlesFileDropPasteboard(sender.draggingPasteboard) ? fileDropTarget(for: sender) != nil : nativePreparation()
     }
 
     func performFileDropOperation(_ sender: NSDraggingInfo, _ nativeDrop: @autoclosure () -> Bool) -> Bool {
-        handlesFileDropPasteboard(sender.draggingPasteboard) ? performFileDrop(sender) : nativeDrop()
+        guard blockItem?.allowsDrops != false else {
+            hideFileDropCaret()
+            return false
+        }
+        return handlesFileDropPasteboard(sender.draggingPasteboard) ? performFileDrop(sender) : nativeDrop()
     }
 
     func validateFileDrop(_ sender: NSDraggingInfo) -> NSDragOperation {
         guard blockItem?.isEditable != false,
+              blockItem?.allowsDrops == true,
               let target = fileDropTarget(for: sender) else {
             hideFileDropCaret()
             return []
@@ -55,7 +78,8 @@ extension BlockInputTextView {
 
     func performFileDrop(_ sender: NSDraggingInfo) -> Bool {
         defer { hideFileDropCaret() }
-        guard let target = fileDropTarget(for: sender) else {
+        guard blockItem?.allowsDrops == true,
+              let target = fileDropTarget(for: sender) else {
             return false
         }
         return blockItem?.requestInsertFileURLs(target.fileURLs, atUTF16Offset: target.utf16Offset) == true
@@ -65,6 +89,7 @@ extension BlockInputTextView {
         guard draggingInfo.draggingPasteboard.string(forType: .blockInputBlockID) == nil,
               let blockItem,
               blockItem.isEditable,
+              blockItem.allowsDrops,
               let block = blockItem.renderedBlock,
               BlockInputBlockItem.supportsInlineMarkdownStyling(block.kind) else {
             return nil

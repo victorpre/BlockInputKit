@@ -15,7 +15,6 @@ extension BlockInputView {
     }
 
     func publishDocumentChange() {
-        refreshImagePreviewStrip()
         updatePlaceholderVisibility()
         guard let onDocumentChange else {
             return

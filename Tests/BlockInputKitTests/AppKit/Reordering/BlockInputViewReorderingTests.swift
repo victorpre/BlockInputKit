@@ -64,6 +64,25 @@ final class BlockInputViewReorderingTests: XCTestCase {
         XCTAssertNil(writer)
     }
 
+    func testPasteboardWriterIsDisabledWhenDropsAreDisabled() {
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let view = BlockInputView()
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "First")
+            ]),
+            allowsBlockReordering: true,
+            allowsDrops: false
+        ))
+
+        let writer = view.collectionView(
+            view.collectionView,
+            pasteboardWriterForItemAt: IndexPath(item: 0, section: 0)
+        )
+
+        XCTAssertNil(writer)
+    }
+
     func testPasteboardWriterStoresBlockIDWhenReorderingIsEnabled() throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         let view = configuredReorderView(blockIDs: [blockID])

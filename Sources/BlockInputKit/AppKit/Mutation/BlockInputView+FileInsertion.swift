@@ -53,7 +53,7 @@ public extension BlockInputView {
     /// Inserts local file URLs using the same image-aware block mapping as file drops.
     ///
     /// Image files are inserted according to `BlockInputConfiguration.imagePresentation`:
-    /// the default `.inlineBlocks` creates image blocks, while `.textLinksWithPreviewStrip`
+    /// the default `.inlineBlocks` creates image blocks, while `.textLinks`
     /// inserts Markdown image text inline when the current selection is in a textual block,
     /// or as Markdown image text blocks otherwise. Other file URLs are inserted as Markdown
     /// file-link paragraph blocks. Non-file URLs are ignored.
@@ -90,7 +90,7 @@ public extension BlockInputView {
     /// Inserts local file URLs at a document index using image-aware block mapping.
     ///
     /// Image files follow `BlockInputConfiguration.imagePresentation`: inline image blocks by default, or Markdown image
-    /// text blocks when `.textLinksWithPreviewStrip` is configured. Multiple image text links are kept together in one
+    /// text blocks when `.textLinks` is configured. Multiple image text links are kept together in one
     /// textual block so preview-strip mode does not fragment the document.
     ///
     /// The insertion index is clamped to the current document, but never before
@@ -243,7 +243,7 @@ extension BlockInputView {
     }
 
     private func droppedFileBlock(for url: URL) -> BlockInputBlock? {
-        if imagePresentation == .textLinksWithPreviewStrip,
+        if imagePresentation.usesTextLinks,
            let imageTextBlock = Self.imageTextBlock(for: url) {
             return imageTextBlock
         }
@@ -251,7 +251,7 @@ extension BlockInputView {
     }
 
     private func droppedFileBlocks(for fileURLs: [URL]) -> [BlockInputBlock] {
-        if imagePresentation == .textLinksWithPreviewStrip {
+        if imagePresentation.usesTextLinks {
             let imageTextBlocks = fileURLs.compactMap(Self.imageTextBlock)
             if imageTextBlocks.count == fileURLs.count, !imageTextBlocks.isEmpty {
                 return [BlockInputBlock(text: Self.joinedInlineFileInsertionText(imageTextBlocks.map(\.text)))]

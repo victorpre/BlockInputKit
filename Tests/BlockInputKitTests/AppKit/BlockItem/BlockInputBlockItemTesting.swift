@@ -5,6 +5,7 @@ extension BlockInputBlockItem {
     static func configuredForTesting(
         block: BlockInputBlock,
         allowsReordering: Bool,
+        allowsDrops: Bool = true,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         style: BlockInputStyle = .default,
         blockVerticalInsetMultiplier: CGFloat = 1,
@@ -22,6 +23,7 @@ extension BlockInputBlockItem {
         item.configure(
             block: block,
             allowsReordering: allowsReordering,
+            allowsDrops: allowsDrops,
             editorHorizontalInset: editorHorizontalInset,
             accentColor: .controlAccentColor,
             style: style,

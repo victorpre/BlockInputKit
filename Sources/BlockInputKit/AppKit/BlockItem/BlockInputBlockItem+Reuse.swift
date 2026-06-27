@@ -20,6 +20,7 @@ extension BlockInputBlockItem {
 
     func resetLayoutForReuse() {
         allowsReordering = true
+        allowsDrops = true
         editorHorizontalInset = BlockInputConfiguration.defaultEditorHorizontalInset
         blockVerticalInsetMultiplier = 1
         scrollView.isHidden = false

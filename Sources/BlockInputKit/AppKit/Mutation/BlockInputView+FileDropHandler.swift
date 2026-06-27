@@ -24,7 +24,7 @@ extension BlockInputView {
         fileURLs: [URL],
         placement: BlockInputFileDropPlacement
     ) -> BlockInputAcceptedFileDrop? {
-        guard isEditable else {
+        guard isEditable, allowsDrops else {
             return nil
         }
         let files = fileURLs.enumerated().compactMap(Self.droppedFile)
@@ -56,7 +56,7 @@ extension BlockInputView {
         _ fileURLs: [URL],
         placement: BlockInputFileDropPlacement
     ) -> Bool {
-        guard isEditable else {
+        guard isEditable, allowsDrops else {
             return false
         }
         guard let acceptedDrop = acceptedFileDrop(fileURLs: fileURLs, placement: placement) else {
@@ -101,12 +101,14 @@ extension BlockInputView {
         _ result: BlockInputFileDropResult,
         acceptedDrop: BlockInputAcceptedFileDrop
     ) -> Bool {
-        guard isEditable else {
+        guard isEditable, allowsDrops else {
             return false
         }
         switch result {
         case .useDefault:
             return applyDefaultFileDrop(acceptedDrop)
+        case .handled:
+            return true
         case .cancel:
             return false
         case let .insert(references):
@@ -131,7 +133,7 @@ extension BlockInputView {
         }
         switch acceptedDrop.context.placement {
         case let .inline(blockID, utf16Offset):
-            if imagePresentation == .textLinksWithPreviewStrip {
+            if imagePresentation.usesTextLinks {
                 return insertFileReferencesInline(references, into: blockID, atUTF16Offset: utf16Offset) != nil
             }
             let imageReferences = references.filter { $0.kind == .image }

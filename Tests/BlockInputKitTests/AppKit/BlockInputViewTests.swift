@@ -371,6 +371,27 @@ final class BlockInputViewTests: XCTestCase {
         XCTAssertEqual(publishedDocument, view.document)
     }
 
+    func testMoveBlockPublishesChangeWhenDropsAreDisabled() {
+        let firstID = BlockInputBlockID(rawValue: "first")
+        let secondID = BlockInputBlockID(rawValue: "second")
+        let view = BlockInputView()
+        var publishedDocument: BlockInputDocument?
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: firstID, text: "First"),
+                BlockInputBlock(id: secondID, text: "Second")
+            ]),
+            allowsDrops: false,
+            onDocumentChange: { publishedDocument = $0 }
+        ))
+
+        let selection = view.moveBlock(blockID: firstID, to: 1)
+
+        XCTAssertEqual(selection, .blocks([firstID]))
+        XCTAssertEqual(view.document.blocks.map(\.id), [secondID, firstID])
+        XCTAssertEqual(publishedDocument, view.document)
+    }
+
     func testNoOpStructuralEditDoesNotPublishDocumentChange() {
         let blockID = BlockInputBlockID(rawValue: "first")
         let view = BlockInputView()

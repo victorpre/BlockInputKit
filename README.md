@@ -481,7 +481,7 @@ The provider only runs for a focused, editable, inline-Markdown-capable block wi
 ## File Drops
 
 Dragging local files onto supported text blocks inserts file chips at the drop caret. Image files insert image blocks below the target block by
-default, or inline Markdown image text at the drop caret when `imagePresentation` is `.textLinksWithPreviewStrip`.
+default, or inline Markdown image text at the drop caret when `imagePresentation` is `.textLinks`.
 
 Use `fileDropHandler` to copy files into project storage, rewrite destinations, or reject a drop before mutation:
 
@@ -510,7 +510,19 @@ let configuration = BlockInputConfiguration(
 )
 ```
 
-Return `.useDefault` for built-in insertion, `.cancel` to leave the document unchanged, or `.insert(...)` with replacement references.
+Return `.useDefault` for built-in insertion, `.handled` when the host already handled the drop, `.cancel` to reject it, or
+`.insert(...)` with replacement references.
+
+Set `allowsDrops: false` when a host-owned drop target should cover the editor. This disables editor-owned drop carets,
+collection drop indicators, file insertion, and block-reorder drag/drop, while leaving programmatic insertion APIs
+available:
+
+```swift
+let configuration = BlockInputConfiguration(
+    document: document,
+    allowsDrops: false
+)
+```
 
 ## Images
 
@@ -523,7 +535,7 @@ Markdown image syntax and HTML image tags parse as standalone `.image` blocks by
 
 Images typed, pasted, parsed, or inserted in the middle of supported text split the source into text before, image block, and text after. Dropped local images insert below the target text block.
 
-Use `.textLinksWithPreviewStrip` when images should stay as editable Markdown image text while the editor shows extracted thumbnails above the document:
+Use `.textLinks` when images should stay as editable Markdown image text:
 
 ```swift
 let document = BlockInputDocument(
@@ -531,55 +543,19 @@ let document = BlockInputDocument(
     imageParsingMode: .preserveSourceText
 )
 
-var style = BlockInputStyle.default
-style.imagePreviewStrip = BlockInputImagePreviewStripStyle(
-    thumbnailSize: NSSize(width: 76, height: 76),
-    contentInsets: NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12),
-    interItemSpacing: 12,
-    backgroundColor: NSColor.controlBackgroundColor.withAlphaComponent(0.08),
-    borderColor: NSColor.separatorColor.withAlphaComponent(0.35),
-    removeButton: BlockInputImagePreviewRemoveButtonStyle(
-        borderColor: NSColor.separatorColor.withAlphaComponent(0.32),
-        shadowColor: .black,
-        shadowOpacity: 0.18
-    )
-)
-
 let configuration = BlockInputConfiguration(
     document: document,
-    style: style,
-    imagePresentation: .textLinksWithPreviewStrip
+    imagePresentation: .textLinks
 )
 ```
 
-Pair `.preserveSourceText` with `.textLinksWithPreviewStrip` for Markdown imports; `imagePresentation` controls editor insertion and
+Pair `.preserveSourceText` with `.textLinks` for Markdown imports; `imagePresentation` controls editor insertion and
 live conversion, while parsing mode controls how incoming Markdown is converted into blocks. Existing `.image` blocks still render as image
 blocks. Local-file Markdown image text renders its label with the same file-chip styling as file links while preserving the original Markdown source.
 
-Preview tiles are extracted from loaded editor blocks only, ignoring code, raw Markdown, table, and existing image blocks. Clicking a Markdown-derived tile opens the resolved image URL through `BlockInputConfiguration.urlOpener`, the same route used by link modals. Removing a Markdown-derived tile performs an undoable text edit that deletes that source occurrence.
-
-Hosts can also show local image previews without inserting Markdown by passing `imagePreviewAttachments`. Attachment previews render in the
-same strip as Markdown-derived previews, even when `imagePresentation` is not `.textLinksWithPreviewStrip`; their open and remove controls
-call the attachment callbacks instead of `urlOpener`, and BlockInputKit does not mutate document text for them.
-
-```swift
-let attachment = BlockInputImagePreviewAttachment(
-    id: "staged-photo",
-    fileURL: URL(filePath: "/Users/me/Project/.attachments/photo.png"),
-    label: "photo.png",
-    open: { attachment in
-        NSWorkspace.shared.open(attachment.fileURL)
-    },
-    remove: { attachment in
-        removeStagedImage(id: attachment.id)
-    }
-)
-
-let configuration = BlockInputConfiguration(
-    document: document,
-    imagePreviewAttachments: [attachment]
-)
-```
+BlockInputKit does not render a top attachment strip. Hosts that need staged image, file, or screenshot previews should
+render those controls above or around the editor and use `allowsDrops: false` with a host-owned drop target when the host
+needs full drop ownership.
 
 Remote images load through `BlockInputImageLoading`. The default loader memory-caches loaded images, can use `BlockInputImageDiskCaching` for remote disk cache entries, and respects source byte and pixel limits.
 

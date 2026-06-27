@@ -197,6 +197,14 @@ class BlockInputTextView: NSTextView {
 
     override func draggingEnded(_ sender: NSDraggingInfo) { hideFileDropCaret(); super.draggingEnded(sender) }
 
+    override func updateDragTypeRegistration() {
+        if blockItem?.allowsDrops == false {
+            unregisterDraggedTypes()
+        } else {
+            super.updateDragTypeRegistration()
+        }
+    }
+
     override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
         prepareFileDropOperation(sender, super.prepareForDragOperation(sender))
     }

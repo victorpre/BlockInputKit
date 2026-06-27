@@ -51,7 +51,6 @@ extension BlockInputView {
         invalidateReadOnlyCursorRects()
         clearStaleFocusState()
         reloadConfiguredDocument(restoresFocus: restoresFocus)
-        refreshImagePreviewStrip()
         attachDocumentStoreObservationIfNeeded()
         invalidatePreferredHeight()
     }
@@ -67,6 +66,7 @@ extension BlockInputView {
 
     private func configureEditorSurface(_ configuration: BlockInputConfiguration) {
         allowsBlockReordering = configuration.allowsBlockReordering
+        allowsDrops = configuration.allowsDrops
         editorHorizontalInset = configuration.editorHorizontalInset
         editorVerticalInset = configuration.editorVerticalInset
         blockVerticalInsetMultiplier = configuration.blockVerticalInsetMultiplier
@@ -79,8 +79,8 @@ extension BlockInputView {
         completionReturnBehavior = configuration.completionReturnBehavior
         dropIndicatorColor = configuration.dropIndicatorColor
         imagePresentation = configuration.imagePresentation
-        imagePreviewAttachments = configuration.imagePreviewAttachments
         applyEditorSurfaceStyle()
+        updateCollectionDraggedTypes()
         configureHeightSizing(configuration.heightSizing)
     }
 
@@ -141,7 +141,6 @@ extension BlockInputView {
         if style.imageBlock.placeholderAspectRatio == nil {
             style.imageBlock.placeholderAspectRatio = configuration.defaultImagePlaceholderAspectRatio
         }
-        imagePreviewStripView.configureStyle(style.imagePreviewStrip)
     }
 
     private func configureImageLoading(_ configuration: BlockInputConfiguration) {

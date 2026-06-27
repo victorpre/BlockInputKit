@@ -311,7 +311,7 @@ final class BlockInputViewFileInsertionTests: XCTestCase {
         var publishedDocument: BlockInputDocument?
         view.configure(BlockInputConfiguration(
             document: BlockInputDocument(),
-            imagePresentation: .textLinksWithPreviewStrip,
+            imagePresentation: .textLinks,
             undoController: undoController,
             onDocumentChange: { publishedDocument = $0 }
         ))

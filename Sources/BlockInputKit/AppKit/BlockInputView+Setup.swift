@@ -22,7 +22,7 @@ extension BlockInputView {
             BlockInputLoadingItem.self,
             forItemWithIdentifier: BlockInputLoadingItem.reuseIdentifier
         )
-        collectionView.registerForDraggedTypes([.blockInputBlockID, .fileURL])
+        updateCollectionDraggedTypes()
         collectionView.setDraggingSourceOperationMask(.move, forLocal: true)
         installSelectionExpansionKeyMonitor()
 
@@ -30,15 +30,10 @@ extension BlockInputView {
         setupScrollView()
         addSubview(scrollView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        let imagePreviewConstraints = setupImagePreviewStrip()
         NSLayoutConstraint.activate([
-            imagePreviewStripView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            imagePreviewStripView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            imagePreviewStripView.topAnchor.constraint(equalTo: topAnchor),
-            imagePreviewConstraints.height,
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            imagePreviewConstraints.scrollTop,
+            scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
         setupEditorChromeView()
@@ -77,7 +72,7 @@ extension BlockInputView {
     private func setupEditorChromeView() {
         editorChromeView.drawsStroke = false
         editorChromeView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(editorChromeView, positioned: .below, relativeTo: imagePreviewStripView)
+        addSubview(editorChromeView, positioned: .below, relativeTo: scrollView)
 
         editorChromeStrokeOverlayView.drawsFill = false
         // Preserve the previous stroke density while keeping every edge in one overlay layer.
@@ -86,6 +81,14 @@ extension BlockInputView {
         addSubview(editorChromeStrokeOverlayView, positioned: .above, relativeTo: nil)
 
         NSLayoutConstraint.activate(chromeConstraints(for: editorChromeView) + chromeConstraints(for: editorChromeStrokeOverlayView))
+    }
+
+    func updateCollectionDraggedTypes() {
+        if allowsDrops {
+            collectionView.registerForDraggedTypes([.blockInputBlockID, .fileURL])
+        } else {
+            collectionView.unregisterDraggedTypes()
+        }
     }
 
     private func chromeConstraints(for view: NSView) -> [NSLayoutConstraint] {

@@ -65,6 +65,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var imageLoadingContext = BlockInputImageBlockLoadingContext()
     var fileBaseURL: URL?
     var allowsReordering = true
+    var allowsDrops = true
     var isEditable = true
     var disabledCursor: NSCursor?
     var rawSlashCommandChips = false
@@ -193,6 +194,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     func configure(
         block: BlockInputBlock,
         allowsReordering: Bool,
+        allowsDrops: Bool = true,
         editorHorizontalInset: CGFloat = BlockInputConfiguration.defaultEditorHorizontalInset,
         accentColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
@@ -215,6 +217,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         renderedBlock = block
         self.delegate = delegate
         self.allowsReordering = allowsReordering
+        self.allowsDrops = allowsDrops
         self.editorHorizontalInset = editorHorizontalInset
         self.blockVerticalInsetMultiplier = BlockInputConfiguration.sanitizedBlockVerticalInsetMultiplier(blockVerticalInsetMultiplier)
         self.style = style
@@ -237,6 +240,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         horizontalRuleView.blockItem = self
         horizontalRuleView.accentColor = accentColor
         textView.blockItem = self
+        textView.setFileDropHandlingEnabled(allowsDrops)
         tableView.blockItem = self
         tableView.delegate = self
         textView.updateFileDropCaretColor(accentColor)

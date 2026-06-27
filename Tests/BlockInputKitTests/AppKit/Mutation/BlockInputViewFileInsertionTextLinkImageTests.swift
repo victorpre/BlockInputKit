@@ -12,7 +12,7 @@ final class TextLinkImageInsertionTests: XCTestCase {
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: blockID, kind: .numberedListItem(start: 2), text: "Attach ")
             ]),
-            imagePresentation: .textLinksWithPreviewStrip,
+            imagePresentation: .textLinks,
             undoController: undoController
         ))
         view.focus(blockID: blockID, utf16Offset: 7)
@@ -27,7 +27,6 @@ final class TextLinkImageInsertionTests: XCTestCase {
         XCTAssertEqual(view.document.blocks[0].kind, .numberedListItem(start: 2))
         XCTAssertEqual(view.document.blocks[0].text, expectedText)
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: blockID, utf16Offset: (expectedText as NSString).length)))
-        XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 2)
 
         let undo = view.undoStructuralEdit()
 
@@ -45,7 +44,7 @@ final class TextLinkImageInsertionTests: XCTestCase {
                 BlockInputBlock(id: firstID, text: "First"),
                 BlockInputBlock(id: secondID, text: "Second")
             ]),
-            imagePresentation: .textLinksWithPreviewStrip,
+            imagePresentation: .textLinks,
             undoController: undoController
         ))
 
@@ -60,7 +59,6 @@ final class TextLinkImageInsertionTests: XCTestCase {
         XCTAssertEqual(view.document.blocks.map(\.id).last, secondID)
         XCTAssertEqual(view.document.blocks[1].text, expectedText)
         XCTAssertEqual(selection, .cursor(BlockInputCursor(blockID: view.document.blocks[1].id, utf16Offset: 0)))
-        XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 2)
 
         let undo = view.undoStructuralEdit()
 

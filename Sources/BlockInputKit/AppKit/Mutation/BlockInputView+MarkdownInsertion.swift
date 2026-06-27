@@ -68,7 +68,7 @@ public extension BlockInputView {
     }
 
     private var markdownInsertionImageParsingMode: BlockInputMarkdownImageParsingMode {
-        imagePresentation == .textLinksWithPreviewStrip ? .preserveSourceText : .imageBlocks
+        imagePresentation.usesTextLinks ? .preserveSourceText : .imageBlocks
     }
 }
 

@@ -16,11 +16,6 @@ final class BlockInputStyleTests: XCTestCase {
         XCTAssertEqual(style.fileChip.cornerRadius, 6)
         XCTAssertEqual(style.slashCommandChip.cornerRadius, 6)
         XCTAssertEqual(style.rawSlashCommandChip.cornerRadius, 6)
-        XCTAssertNil(style.imagePreviewStrip.backgroundColor)
-        XCTAssertEqual(style.imagePreviewStrip.removeButton.size, NSSize(width: 20, height: 20))
-        XCTAssertEqual(style.imagePreviewStrip.removeButton.edgeInset, 5)
-        XCTAssertEqual(style.imagePreviewStrip.removeButton.cornerRadius, 10)
-        XCTAssertEqual(style.imagePreviewStrip.removeButton.symbolPointSize, 11)
     }
 
     func testStyleInitializerPreservesSurfaceAndChipOverrides() {
@@ -65,16 +60,18 @@ final class BlockInputStyleTests: XCTestCase {
         XCTAssertEqual(chip.cornerRadius, 0)
     }
 
-    func testImagePreviewStripStylePreservesBackgroundOverride() {
-        let style = BlockInputImagePreviewStripStyle(backgroundColor: .systemPink)
-
-        XCTAssertEqual(style.backgroundColor, .systemPink)
-    }
-
     func testEditorChromeStyleClampsNegativeValues() {
         let chrome = BlockInputEditorChromeStyle(borderWidth: -1, cornerRadius: -8)
 
         XCTAssertEqual(chrome.borderWidth, 0)
         XCTAssertEqual(chrome.cornerRadius, 0)
+    }
+
+    func testEditorChromeStylePreservesStrokedEdgeOverrides() {
+        let chrome = BlockInputEditorChromeStyle(strokedEdges: [.left, .bottom, .right])
+
+        XCTAssertEqual(chrome.strokedEdges, [.left, .bottom, .right])
+        XCTAssertEqual(BlockInputEditorChromeEdges.horizontal, [.top, .bottom])
+        XCTAssertEqual(BlockInputEditorChromeEdges.vertical, [.left, .right])
     }
 }

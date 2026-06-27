@@ -24,17 +24,16 @@ extension BlockInputView {
     /// for currently loaded blocks.
     public func preferredHeight(forWidth width: CGFloat) -> CGFloat {
         let viewportWidth = max(width, 0)
-        let previewHeight = imagePreviewStripPreferredHeightForLoadedBlocks()
         guard let heightSizing else {
-            return ceil(previewHeight + naturalContentHeight(forWidth: viewportWidth, stoppingAt: nil))
+            return ceil(naturalContentHeight(forWidth: viewportWidth, stoppingAt: nil))
         }
-        let minimumHeight = previewHeight + lineLimitedHeight(forLineCount: sanitizedDefaultLineCount(in: heightSizing))
+        let minimumHeight = lineLimitedHeight(forLineCount: sanitizedDefaultLineCount(in: heightSizing))
         let maximumHeight = heightSizing.maximumVisibleLineCount.map {
-            previewHeight + lineLimitedHeight(forLineCount: sanitizedMaximumLineCount($0, in: heightSizing))
+            lineLimitedHeight(forLineCount: sanitizedMaximumLineCount($0, in: heightSizing))
         }
-        let naturalHeight = previewHeight + naturalContentHeight(
+        let naturalHeight = naturalContentHeight(
             forWidth: viewportWidth,
-            stoppingAt: maximumHeight.map { max($0 - previewHeight, 0) }
+            stoppingAt: maximumHeight
         )
         let cappedHeight = maximumHeight.map { min(naturalHeight, $0) } ?? naturalHeight
         return ceil(max(minimumHeight, cappedHeight))
