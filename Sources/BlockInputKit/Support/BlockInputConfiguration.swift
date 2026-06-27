@@ -1,5 +1,10 @@
 import AppKit
 
+/// Opens a URL for editor-owned link interactions.
+///
+/// Return `true` when the URL was handled.
+public typealias BlockInputURLOpener = (URL) -> Bool
+
 /// Host-provided popup placement inside an overlay surface.
 ///
 /// Return this from `BlockInputCompletionPopupConfiguration.overlayProvider` to choose both the destination parent
@@ -320,6 +325,8 @@ public struct BlockInputConfiguration {
     /// together with `BlockInputDocument(markdown:imageParsingMode: .preserveSourceText)` when the editor should keep
     /// image syntax editable as text and show extracted image thumbnails in a preview strip.
     public var imagePresentation: BlockInputImagePresentation
+    /// Host-owned local images shown in the preview strip without changing document Markdown.
+    public var imagePreviewAttachments: [BlockInputImagePreviewAttachment]
     /// Image loader used for image block bytes and natural dimensions.
     public var imageLoader: any BlockInputImageLoading
     /// Optional disk cache used by the default loader for remote image bytes and dimensions.
@@ -328,6 +335,10 @@ public struct BlockInputConfiguration {
     public var imageBaseURL: URL?
     /// Base URL used to resolve relative file-link sources inserted by file drop hooks.
     public var fileBaseURL: URL?
+    /// Opens editor-owned URLs such as Cmd-click links, link modal opens, and Markdown-image preview-strip tiles.
+    ///
+    /// Host-owned `BlockInputImagePreviewAttachment` tiles keep using their attachment `open` callback.
+    public var urlOpener: BlockInputURLOpener
     /// Whether remote `http` and `https` image URLs should be loaded.
     public var allowsRemoteImageLoading: Bool
     /// Maximum source image payload accepted by the default image loader.
@@ -426,10 +437,12 @@ public struct BlockInputConfiguration {
         selectAllBehavior: BlockInputSelectAllBehavior = .focusedContentThenDocument,
         heightSizing: BlockInputEditorHeightSizing? = nil,
         imagePresentation: BlockInputImagePresentation = .inlineBlocks,
+        imagePreviewAttachments: [BlockInputImagePreviewAttachment] = [],
         imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader(),
         imageDiskCache: (any BlockInputImageDiskCaching)? = BlockInputDefaultImageDiskCache(),
         imageBaseURL: URL? = nil,
         fileBaseURL: URL? = nil,
+        urlOpener: @escaping BlockInputURLOpener = { NSWorkspace.shared.open($0) },
         allowsRemoteImageLoading: Bool = true,
         maximumImageSourceBytes: Int = 20 * 1024 * 1024,
         maximumImagePixelDimension: Int = 8_192,
@@ -470,10 +483,12 @@ public struct BlockInputConfiguration {
         self.selectAllBehavior = selectAllBehavior
         self.heightSizing = heightSizing
         self.imagePresentation = imagePresentation
+        self.imagePreviewAttachments = imagePreviewAttachments
         self.imageLoader = imageLoader
         self.imageDiskCache = imageDiskCache
         self.imageBaseURL = imageBaseURL
         self.fileBaseURL = fileBaseURL
+        self.urlOpener = urlOpener
         self.allowsRemoteImageLoading = allowsRemoteImageLoading
         self.maximumImageSourceBytes = max(1, maximumImageSourceBytes)
         self.maximumImagePixelDimension = max(1, maximumImagePixelDimension)

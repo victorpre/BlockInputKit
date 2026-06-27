@@ -50,7 +50,7 @@ extension BlockInputView {
             forBounds: NSRect(x: 0, y: 0, width: maxWidth, height: CGFloat.greatestFiniteMagnitude)
         ).height ?? placeholderLabel.intrinsicContentSize.height
         let labelHeight = ceil(fittingHeight)
-        let topOffset = editorVerticalInset + metrics.topContentInset
+        let topOffset = editorContentTopInset + metrics.topContentInset
         let labelY = collectionView.isFlipped
             ? topOffset
             : max(collectionView.bounds.height - topOffset - labelHeight, 0)

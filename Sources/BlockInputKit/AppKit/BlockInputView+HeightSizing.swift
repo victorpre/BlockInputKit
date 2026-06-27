@@ -238,7 +238,7 @@ extension BlockInputView {
             fileBaseURL: fileBaseURL,
             blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
         )
-        return (rowHeight * CGFloat(lineCount)) + (editorVerticalInset * 2)
+        return (rowHeight * CGFloat(lineCount)) + editorContentTopInset + editorVerticalInset
     }
 
     private func sanitizedDefaultLineCount(in heightSizing: BlockInputEditorHeightSizing) -> Int {

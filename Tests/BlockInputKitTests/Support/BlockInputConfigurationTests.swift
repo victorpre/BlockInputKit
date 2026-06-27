@@ -39,6 +39,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertFalse(configuration.rawSlashCommandChips)
         XCTAssertEqual(configuration.selectAllBehavior, .focusedContentThenDocument)
         XCTAssertNil(configuration.heightSizing)
+        XCTAssertTrue(configuration.imagePreviewAttachments.isEmpty)
         XCTAssertEqual(configuration.completionReturnBehavior, .acceptHighlightedSuggestion)
         XCTAssertEqual(configuration.slashCommandAvailability, .documentStart)
         XCTAssertNil(configuration.slashCommandChipClickHandler)

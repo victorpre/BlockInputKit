@@ -33,6 +33,7 @@ extension BlockInputView {
         guard let chrome = style.editorSurface.chrome else {
             removeEditorChromeLayers()
             editorChromeView.configure(chrome: nil, fallbackFillColor: nil)
+            editorChromeStrokeOverlayView.configure(chrome: nil, fallbackFillColor: nil)
             layer.backgroundColor = style.editorSurface.editorBackgroundColor?.cgColor
             layer.borderColor = nil
             layer.borderWidth = 0
@@ -44,6 +45,7 @@ extension BlockInputView {
 
         let fillColor = chrome.fillColor ?? style.editorSurface.editorBackgroundColor
         editorChromeView.configure(chrome: chrome, fallbackFillColor: style.editorSurface.editorBackgroundColor)
+        editorChromeStrokeOverlayView.configure(chrome: chrome, fallbackFillColor: nil)
         layer.backgroundColor = nil
         layer.borderColor = nil
         layer.borderWidth = 0
@@ -53,8 +55,8 @@ extension BlockInputView {
         installEditorChromeLayersIfNeeded()
         editorChromeFillLayer.fillColor = fillColor?.cgColor
         editorChromeStrokeLayer.fillColor = nil
-        editorChromeStrokeLayer.strokeColor = chrome.strokeColor?.cgColor
-        editorChromeStrokeLayer.lineWidth = chrome.strokeColor == nil ? 0 : chrome.borderWidth
+        editorChromeStrokeLayer.strokeColor = nil
+        editorChromeStrokeLayer.lineWidth = 0
         layer.mask = chrome.clipsContentToShape ? editorChromeMaskLayer : nil
         updateEditorChromeLayers()
     }
@@ -65,7 +67,7 @@ extension BlockInputView {
         }
         let currentBounds = bounds
         editorChromeFillLayer.frame = currentBounds
-        editorChromeStrokeLayer.frame = currentBounds
+        editorChromeStrokeLayer.frame = .zero
         editorChromeMaskLayer.frame = currentBounds
 
         guard currentBounds.width > 0, currentBounds.height > 0,
@@ -83,7 +85,7 @@ extension BlockInputView {
             roundedCorners: chrome.roundedCorners
         )
         editorChromeFillLayer.path = chromePath
-        editorChromeStrokeLayer.path = chromePath
+        editorChromeStrokeLayer.path = nil
         editorChromeMaskLayer.path = CGPath.blockInputEditorChromePath(
             in: currentBounds,
             radius: chrome.cornerRadius,
@@ -98,9 +100,7 @@ extension BlockInputView {
         if editorChromeFillLayer.superlayer == nil {
             layer.insertSublayer(editorChromeFillLayer, at: 0)
         }
-        if editorChromeStrokeLayer.superlayer == nil {
-            layer.insertSublayer(editorChromeStrokeLayer, above: editorChromeFillLayer)
-        }
+        editorChromeStrokeLayer.removeFromSuperlayer()
     }
 
     private func removeEditorChromeLayers() {
@@ -135,6 +135,10 @@ private extension BlockInputEditorChromeCorners {
 }
 
 final class BlockInputEditorChromeView: NSView {
+    var drawsFill = true
+    var drawsStroke = true
+    var strokePassCount = 1
+
     private var chrome: BlockInputEditorChromeStyle?
     private var fallbackFillColor: NSColor?
 
@@ -164,7 +168,7 @@ final class BlockInputEditorChromeView: NSView {
         }
 
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            if let fillColor = chrome.fillColor ?? fallbackFillColor {
+            if drawsFill, let fillColor = chrome.fillColor ?? fallbackFillColor {
                 fillColor.setFill()
                 NSBezierPath.blockInputEditorChromePath(
                     in: bounds,
@@ -174,7 +178,7 @@ final class BlockInputEditorChromeView: NSView {
                 .fill()
             }
 
-            if let strokeColor = chrome.strokeColor, chrome.borderWidth > 0 {
+            if drawsStroke, let strokeColor = chrome.strokeColor, chrome.borderWidth > 0 {
                 strokeColor.setStroke()
                 let strokeInset = chrome.borderWidth / 2
                 let path = NSBezierPath.blockInputEditorChromePath(
@@ -183,7 +187,9 @@ final class BlockInputEditorChromeView: NSView {
                     roundedCorners: chrome.roundedCorners
                 )
                 path.lineWidth = chrome.borderWidth
-                path.stroke()
+                for _ in 0..<max(0, strokePassCount) {
+                    path.stroke()
+                }
             }
         }
     }

@@ -75,13 +75,25 @@ extension BlockInputView {
     }
 
     private func setupEditorChromeView() {
+        editorChromeView.drawsStroke = false
         editorChromeView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(editorChromeView, positioned: .above, relativeTo: scrollView)
-        NSLayoutConstraint.activate([
-            editorChromeView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            editorChromeView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            editorChromeView.topAnchor.constraint(equalTo: topAnchor),
-            editorChromeView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
+        addSubview(editorChromeView, positioned: .below, relativeTo: imagePreviewStripView)
+
+        editorChromeStrokeOverlayView.drawsFill = false
+        // Preserve the previous stroke density while keeping every edge in one overlay layer.
+        editorChromeStrokeOverlayView.strokePassCount = 2
+        editorChromeStrokeOverlayView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(editorChromeStrokeOverlayView, positioned: .above, relativeTo: nil)
+
+        NSLayoutConstraint.activate(chromeConstraints(for: editorChromeView) + chromeConstraints(for: editorChromeStrokeOverlayView))
+    }
+
+    private func chromeConstraints(for view: NSView) -> [NSLayoutConstraint] {
+        [
+            view.leadingAnchor.constraint(equalTo: leadingAnchor),
+            view.trailingAnchor.constraint(equalTo: trailingAnchor),
+            view.topAnchor.constraint(equalTo: topAnchor),
+            view.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ]
     }
 }

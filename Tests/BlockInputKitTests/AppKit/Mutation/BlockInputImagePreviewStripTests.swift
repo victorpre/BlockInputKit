@@ -6,6 +6,62 @@ import XCTest
 
 @MainActor
 final class BlockInputImagePreviewStripTests: XCTestCase {
+    func testHostPreviewAttachmentsRenderWithoutTextLinkPresentation() {
+        let recorder = PreviewAttachmentRecorder()
+        let attachment = makePreviewAttachment(id: "host", label: "Host Image", recorder: recorder)
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        var openedEditorURL: URL?
+        view.configure(BlockInputConfiguration(
+            imagePreviewAttachments: [attachment],
+            urlOpener: {
+                openedEditorURL = $0
+                return true
+            }
+        ))
+
+        XCTAssertFalse(view.imagePreviewStripView.isHidden)
+        XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 1)
+        XCTAssertEqual(view.imagePreviewStripHeightConstraint?.constant, BlockInputStyle.default.imagePreviewStrip.preferredHeight)
+
+        view.imagePreviewStripView.openFirstTileForTesting()
+        view.imagePreviewStripView.removeFirstTileForTesting()
+
+        XCTAssertEqual(recorder.openedIDs, ["host"])
+        XCTAssertEqual(recorder.removedIDs, ["host"])
+        XCTAssertNil(openedEditorURL)
+    }
+
+    func testHostPreviewAttachmentsCoexistWithMarkdownPreviewsAndRemovalDoesNotMutateMarkdown() {
+        let recorder = PreviewAttachmentRecorder()
+        let attachment = makePreviewAttachment(id: "host", label: "Host Image", recorder: recorder)
+        let sourceText = "Before ![Alt](file:///tmp/cat.png) after"
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(text: sourceText)
+            ]),
+            imagePresentation: .textLinksWithPreviewStrip,
+            imagePreviewAttachments: [attachment]
+        ))
+
+        XCTAssertFalse(view.imagePreviewStripView.isHidden)
+        XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 2)
+
+        view.imagePreviewStripView.removeFirstTileForTesting()
+
+        XCTAssertEqual(recorder.removedIDs, ["host"])
+        XCTAssertEqual(view.document.blocks[0].text, sourceText)
+        XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 2)
+
+        view.configure(BlockInputConfiguration(
+            document: view.document,
+            imagePresentation: .textLinksWithPreviewStrip
+        ))
+
+        XCTAssertEqual(view.document.blocks[0].text, sourceText)
+        XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 1)
+    }
+
     func testPreviewStripExtractsLoadedImageSyntaxOnly() async throws {
         let store = BlockInputProgressiveMemoryDocumentStore(blocks: [
             BlockInputBlock(id: "loaded", text: "Loaded ![Loaded](loaded.png)"),
@@ -150,7 +206,7 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
         XCTAssertEqual(view.imagePreviewStripView.itemCountForTesting, 1)
     }
 
-    func testPreviewStripClickOpensResolvedImageURLThroughLinkOpener() throws {
+    func testPreviewStripClickOpensResolvedImageURLThroughConfiguredURLOpener() throws {
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
         var openedURL: URL?
         view.configure(BlockInputConfiguration(
@@ -158,12 +214,12 @@ final class BlockInputImagePreviewStripTests: XCTestCase {
                 BlockInputBlock(text: "Before ![Alt](cat.png) after")
             ]),
             imagePresentation: .textLinksWithPreviewStrip,
-            imageBaseURL: try XCTUnwrap(URL(string: "https://example.com/assets/"))
+            imageBaseURL: try XCTUnwrap(URL(string: "https://example.com/assets/")),
+            urlOpener: {
+                openedURL = $0
+                return true
+            }
         ))
-        view.linkURLOpener = {
-            openedURL = $0
-            return true
-        }
 
         view.imagePreviewStripView.openFirstTileForTesting()
 
@@ -346,6 +402,31 @@ private actor RecordingPreviewImageLoader: BlockInputImageLoading {
         return resolvedURLs
     }
 
+}
+
+@MainActor
+private final class PreviewAttachmentRecorder: @unchecked Sendable {
+    var openedIDs: [String] = []
+    var removedIDs: [String] = []
+}
+
+@MainActor
+private func makePreviewAttachment(
+    id: String,
+    label: String,
+    recorder: PreviewAttachmentRecorder
+) -> BlockInputImagePreviewAttachment {
+    BlockInputImagePreviewAttachment(
+        id: id,
+        fileURL: URL(fileURLWithPath: "/tmp/\(id).png"),
+        label: label,
+        open: { attachment in
+            recorder.openedIDs.append(attachment.id)
+        },
+        remove: { attachment in
+            recorder.removedIDs.append(attachment.id)
+        }
+    )
 }
 
 private enum RecordingPreviewImageLoaderError: Error {

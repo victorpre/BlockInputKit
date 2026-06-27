@@ -45,6 +45,7 @@ public final class BlockInputView: NSView {
     var imageDiskCache: (any BlockInputImageDiskCaching)?
     var imageBaseURL: URL?, fileBaseURL: URL?
     var imagePresentation = BlockInputImagePresentation.inlineBlocks
+    var imagePreviewAttachments: [BlockInputImagePreviewAttachment] = []
     var allowsRemoteImageLoading = true
     var maximumImageSourceBytes = 20 * 1024 * 1024, maximumImagePixelDimension = 8_192
     var defaultImagePlaceholderAspectRatio: CGFloat = 16.0 / 9.0
@@ -53,7 +54,7 @@ public final class BlockInputView: NSView {
     let collectionView = BlockInputCollectionView()
     let imagePreviewStripView = BlockInputImagePreviewStripView()
     let placeholderLabel = BlockInputPlaceholderLabel(labelWithString: "")
-    let editorChromeView = BlockInputEditorChromeView()
+    let editorChromeView = BlockInputEditorChromeView(), editorChromeStrokeOverlayView = BlockInputEditorChromeView()
     let dropIndicatorView = NSView()
     let editorChromeFillLayer = CAShapeLayer()
     let editorChromeStrokeLayer = CAShapeLayer()
@@ -107,7 +108,7 @@ public final class BlockInputView: NSView {
     var blockSelectionExpansion: BlockInputBlockSelectionExpansion?
     var horizontalSelectionExpansion: BlockInputHorizontalSelectionExpansion?
     var tableKeyboardRowSelection: BlockInputTableKeyboardRowSelection?
-    // Production opens links through NSWorkspace; tests replace this hook to assert command-click and modal Open behavior.
+    // Configured opener for editor-owned links and Markdown-image preview occurrences.
     var linkURLOpener: BlockInputURLOpener = { NSWorkspace.shared.open($0) }
     // The link modal is editor-owned so it can be anchored to row geometry, clamped inside the editor, and snapshotted.
     var linkModalView: BlockInputLinkModalView?

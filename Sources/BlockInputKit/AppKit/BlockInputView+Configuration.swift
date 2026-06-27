@@ -80,6 +80,7 @@ extension BlockInputView {
         completionReturnBehavior = configuration.completionReturnBehavior
         dropIndicatorColor = configuration.dropIndicatorColor
         imagePresentation = configuration.imagePresentation
+        imagePreviewAttachments = configuration.imagePreviewAttachments
         applyEditorSurfaceStyle()
         configureHeightSizing(configuration.heightSizing)
     }
@@ -107,6 +108,7 @@ extension BlockInputView {
         onSelectionChange = configuration.onSelectionChange
         onFocusChange = configuration.onFocusChange
         fileDropHandler = configuration.fileDropHandler
+        linkURLOpener = configuration.urlOpener
         modalOverlayProvider = configuration.modalOverlayProvider
         checklistMetadataDetailHandler = configuration.checklistMetadataDetailHandler
         refreshMutationModalPresentation()
